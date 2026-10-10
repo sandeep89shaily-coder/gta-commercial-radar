@@ -1,0 +1,45 @@
+# Databases and collection archives
+*.sqlite
+*.sqlite3
+*.db
+*.db-wal
+*.db-shm
+*.incomplete
+/data/
+**/data/
+/backups/
+**/backups/
+/logs/
+**/logs/
+/downloads/
+**/downloads/
+/exports/
+**/exports/
+*.csv
+*.jsonl
+*.parquet
+*.zip
+
+# Secrets
+.env
+.env.*
+!.env.example
+*secret*
+*credential*
+*api_key*
+*.pem
+*.key
+
+# Python / local environments
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.coverage
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
