@@ -1,0 +1,16 @@
+GTA RADAR DAILY — RECENT LEADS UPDATE
+
+What changed:
+- START_RADAR now checks records with source EVENT dates within the past 2 days, including records from original baselines.
+- The daily unattended run uses the same selector.
+- Selection uses source dates, not the day a historical file was downloaded.
+- Duplicate source/date combinations are remembered in a separate queue history.
+- Recent opportunities stay in the pending queue when AI cannot run; they remain REVIEW ONLY.
+- Older records are not incorrectly called fresh leads. Some records without reliable event dates are excluded.
+
+Simple use:
+1. Extract this full ZIP into Desktop/new data. It creates GTA_RADAR_DAILY_48H, leaving old folders untouched.
+2. Open GTA_RADAR_DAILY_48H and double-click START_RADAR.bat.
+3. When ready for automatic daily runs, double-click INSTALL_DAILY.bat once.
+
+Note: Autonomous web discovery still is not enabled without a permitted search service. DeepSeek alone analyzes attached evidence, and missing evidence can mean no paid AI investigations. These are genuine remaining limitations, not collection failures.

@@ -1,0 +1,670 @@
+[
+  {
+    "id": "brampton_building_permits",
+    "name": "Brampton Building Permits",
+    "jurisdiction": "Brampton",
+    "region": "Peel",
+    "family": "permit",
+    "collector": "arcgis",
+    "mode": "daily",
+    "enabled": true,
+    "url": "https://maps1.brampton.ca/arcgis/rest/services/BuildingPermit/Building_Permits/FeatureServer/0",
+    "query_url": "https://maps1.brampton.ca/arcgis/rest/services/BuildingPermit/Building_Permits/FeatureServer/0/query",
+    "page_size": 1000,
+    "key_fields": [
+      "PERMITNUMBER"
+    ],
+    "date_fields": [
+      "INDATE",
+      "ISSUEDATE",
+      "PROCESSDATE"
+    ],
+    "entity_fields": [
+      "BUILDER",
+      "CONTRACTOR"
+    ],
+    "address_fields": [
+      "ADDRESS"
+    ],
+    "description_fields": [
+      "WORKDESC",
+      "SUBDESC"
+    ],
+    "status_fields": [
+      "STATUSDESC"
+    ],
+    "value_fields": [],
+    "complete_snapshot": false,
+    "freshness_days": 2,
+    "official_page": "https://maps1.brampton.ca/arcgis/rest/services/BuildingPermit/Building_Permits/FeatureServer/0",
+    "licence_note": "City of Brampton public GIS/open-data service; verify dataset-specific licence before external redistribution.",
+    "freshness_fields": [
+      "PROCESSDATE",
+      "INDATE"
+    ],
+    "server_where": "SUBDESC LIKE 'A1:%' OR SUBDESC LIKE 'A2:%' OR SUBDESC LIKE 'A3:%' OR SUBDESC LIKE 'A4:%' OR SUBDESC LIKE 'B1:%' OR SUBDESC LIKE 'B2:%' OR SUBDESC LIKE 'B3:%' OR SUBDESC LIKE 'D:%' OR SUBDESC LIKE 'E:%' OR SUBDESC LIKE 'F1:%' OR SUBDESC LIKE 'F2:%' OR SUBDESC LIKE 'F3:%' OR WORKDESC LIKE '%Non Residential%' OR WORKDESC LIKE '%Interior/Unit Finish%' OR WORKDESC LIKE '%Change of Use%'",
+    "filter_note": "Server-side non-residential permit/use filter; zoning is not used as the sole gate. Existing broader baseline may be retained.",
+    "incremental_overlap_days": 3,
+    "incremental_fields": [
+      "PROCESSDATE",
+      "INDATE"
+    ]
+  },
+  {
+    "id": "mississauga_issued_building_permits",
+    "name": "Mississauga Issued Building Permits",
+    "jurisdiction": "Mississauga",
+    "region": "Peel",
+    "family": "permit",
+    "collector": "arcgis",
+    "mode": "daily",
+    "enabled": true,
+    "url": "https://services6.arcgis.com/hM5ymMLbxIyWTjn2/arcgis/rest/services/Issued_Building_Permits/FeatureServer/0",
+    "query_url": "https://services6.arcgis.com/hM5ymMLbxIyWTjn2/arcgis/rest/services/Issued_Building_Permits/FeatureServer/0/query",
+    "page_size": 2000,
+    "key_fields": [
+      "BP_NO"
+    ],
+    "date_fields": [
+      "ISSUE_DATE",
+      "APPLICATION_DATE",
+      "COMPLETE_DATE"
+    ],
+    "entity_fields": [],
+    "address_fields": [
+      "ADDRESS",
+      "UNIT_NO"
+    ],
+    "description_fields": [
+      "DESCRIPTION",
+      "SCOPE"
+    ],
+    "status_fields": [
+      "STATUS"
+    ],
+    "value_fields": [
+      "EST_CON_VALUE"
+    ],
+    "complete_snapshot": false,
+    "freshness_days": 45,
+    "official_page": "https://services6.arcgis.com/hM5ymMLbxIyWTjn2/arcgis/rest/services/Issued_Building_Permits/FeatureServer/0",
+    "licence_note": "City of Mississauga public open-data layer; verify current Open Data Terms before redistribution.",
+    "freshness_fields": [
+      "ISSUE_DATE",
+      "APPLICATION_DATE",
+      "COMPLETE_DATE"
+    ],
+    "server_where": "FILE_TYPE IN ('COMMERCIAL','INDUSTRIAL','PUBLIC','UNKNOWN')",
+    "filter_note": "Server-side FILE_TYPE excludes explicit RESIDENTIAL. UNKNOWN retained to avoid false negatives.",
+    "incremental_overlap_days": 3,
+    "incremental_fields": [
+      "ISSUE_DATE",
+      "APPLICATION_DATE",
+      "COMPLETE_DATE"
+    ]
+  },
+  {
+    "id": "toronto_active_building_permits",
+    "name": "Toronto Building Permits - Active Permits",
+    "jurisdiction": "Toronto",
+    "region": "Toronto",
+    "family": "permit",
+    "collector": "ckan",
+    "mode": "daily",
+    "enabled": true,
+    "api_base": "https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action",
+    "package_query": "Building Permits Active Permits",
+    "preferred_resource_names": [
+      "Active Building Permits",
+      "Active Permits"
+    ],
+    "preferred_formats": [
+      "CSV",
+      "JSON",
+      "GEOJSON",
+      "ZIP"
+    ],
+    "key_fields": [
+      "PERMIT_NUM",
+      "REVISION_NUM"
+    ],
+    "date_fields": [
+      "STATUS_DATE",
+      "ISSUED_DATE",
+      "APPLICATION_DATE"
+    ],
+    "entity_fields": [
+      "CONTRACTOR"
+    ],
+    "address_fields": [
+      "STREET_NUM",
+      "STREET_NAME",
+      "STREET_TYPE",
+      "STREET_DIRECTION",
+      "POSTAL"
+    ],
+    "description_fields": [
+      "WORK",
+      "DESCRIPTION",
+      "CURRENT_USE",
+      "PROPOSED_USE"
+    ],
+    "status_fields": [
+      "STATUS"
+    ],
+    "value_fields": [],
+    "complete_snapshot": true,
+    "freshness_days": 2,
+    "official_page": "https://open.toronto.ca/",
+    "licence_note": "Open Government Licence - Toronto.",
+    "freshness_fields": [
+      "STATUS_DATE",
+      "ISSUED_DATE",
+      "APPLICATION_DATE"
+    ],
+    "package_slug": "building-permits-active-permits",
+    "expected_package_title": "Building Permits - Active Permits",
+    "incremental_overlap_days": 3,
+    "incremental_fields": [
+      "STATUS_DATE",
+      "ISSUED_DATE",
+      "APPLICATION_DATE"
+    ]
+  },
+  {
+    "id": "toronto_business_licences",
+    "name": "Toronto Municipal Licensing & Standards - Business Licences and Permits",
+    "jurisdiction": "Toronto",
+    "region": "Toronto",
+    "family": "business_licence",
+    "collector": "ckan",
+    "mode": "daily",
+    "enabled": true,
+    "api_base": "https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action",
+    "package_query": "Municipal Licensing and Standards Business Licences and Permits",
+    "preferred_resource_names": [
+      "Business Licences",
+      "Municipal Licensing"
+    ],
+    "preferred_formats": [
+      "CSV",
+      "JSON",
+      "GEOJSON",
+      "ZIP"
+    ],
+    "key_fields": [
+      "LICENCE_NO"
+    ],
+    "date_fields": [
+      "LICENCE_ISSUED_DATE",
+      "ISSUED_DATE",
+      "DATE_ISSUED"
+    ],
+    "entity_fields": [
+      "OPERATING_NAME",
+      "CLIENT_NAME"
+    ],
+    "address_fields": [
+      "ADDRESS",
+      "BUSINESS_ADDRESS"
+    ],
+    "description_fields": [
+      "CATEGORY",
+      "LICENCE_CATEGORY"
+    ],
+    "status_fields": [
+      "STATUS",
+      "LICENCE_STATUS"
+    ],
+    "value_fields": [],
+    "complete_snapshot": true,
+    "freshness_days": 2,
+    "official_page": "https://open.toronto.ca/dataset/municipal-licensing-and-standards-business-licences-and-permits/",
+    "licence_note": "Open Government Licence - Toronto.",
+    "freshness_fields": [
+      "LICENCE_ISSUED_DATE",
+      "ISSUED_DATE",
+      "DATE_ISSUED"
+    ],
+    "package_slug": "municipal-licensing-and-standards-business-licences-and-permits",
+    "expected_package_title": "Municipal Licensing and Standards - Business Licences and Permits",
+    "incremental_overlap_days": 3,
+    "incremental_fields": [
+      "LICENCE_ISSUED_DATE",
+      "ISSUED_DATE",
+      "DATE_ISSUED"
+    ]
+  },
+  {
+    "id": "toronto_dinesafe",
+    "name": "Toronto DineSafe",
+    "jurisdiction": "Toronto",
+    "region": "Toronto",
+    "family": "health_inspection",
+    "collector": "ckan",
+    "mode": "daily",
+    "enabled": true,
+    "api_base": "https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action",
+    "package_query": "DineSafe",
+    "preferred_resource_names": [
+      "Dinesafe.csv",
+      "Dinesafe"
+    ],
+    "preferred_formats": [
+      "CSV",
+      "JSON",
+      "GEOJSON",
+      "ZIP"
+    ],
+    "key_fields": [
+      "ESTABLISHMENT_ID",
+      "INSPECTION_ID"
+    ],
+    "date_fields": [
+      "INSPECTION_DATE"
+    ],
+    "entity_fields": [
+      "ESTABLISHMENT_NAME"
+    ],
+    "address_fields": [
+      "ESTABLISHMENT_ADDRESS",
+      "ADDRESS"
+    ],
+    "description_fields": [
+      "ESTABLISHMENT_TYPE",
+      "INFRACTION_DETAILS"
+    ],
+    "status_fields": [
+      "ESTABLISHMENT_STATUS",
+      "INSPECTION_STATUS"
+    ],
+    "value_fields": [],
+    "complete_snapshot": true,
+    "freshness_days": 2,
+    "official_page": "https://open.toronto.ca/dataset/dinesafe/",
+    "licence_note": "Open Government Licence - Toronto.",
+    "freshness_fields": [
+      "INSPECTION_DATE"
+    ],
+    "package_id": "b6b4f3fb-2e2c-47e7-931d-b87d22806948",
+    "resource_id": "af0f5b8a-4b73-4a50-8781-65e949792b40",
+    "expected_package_title": "Dinesafe",
+    "incremental_overlap_days": 3,
+    "incremental_fields": [
+      "INSPECTION_DATE"
+    ]
+  },
+  {
+    "id": "ontario_private_schools",
+    "name": "Ontario Private School Contact Information",
+    "jurisdiction": "Ontario",
+    "region": "Ontario",
+    "family": "regulated_registry",
+    "collector": "ckan",
+    "mode": "monthly",
+    "enabled": true,
+    "api_base": "https://data.ontario.ca/en/api/3/action",
+    "package_query": "Private school contact information",
+    "preferred_resource_names": [
+      "Private school contact information"
+    ],
+    "preferred_formats": [
+      "CSV"
+    ],
+    "key_fields": [
+      "SCHOOL_NUMBER"
+    ],
+    "date_fields": [],
+    "entity_fields": [
+      "SCHOOL_NAME"
+    ],
+    "address_fields": [
+      "STREET_ADDRESS",
+      "SUITE",
+      "CITY",
+      "POSTAL_CODE"
+    ],
+    "description_fields": [
+      "SCHOOL_LEVEL",
+      "PROGRAM_TYPE"
+    ],
+    "status_fields": [
+      "SCHOOL_SPECIAL_CONDITION_CODE"
+    ],
+    "value_fields": [],
+    "complete_snapshot": true,
+    "freshness_days": 45,
+    "gta_only": true,
+    "official_page": "https://data.ontario.ca/dataset/private-school-contact-information",
+    "licence_note": "Open Government Licence - Ontario.",
+    "freshness_fields": [],
+    "package_slug": "private-school-contact-information",
+    "expected_package_title": "Private school contact information",
+    "resource_id": "d16de265-35e9-4277-9381-0c311e802e39",
+    "expected_resource_name": "Private school contact information",
+    "resource_url_contains": [
+      "private_school_contact_information_eng.csv"
+    ],
+    "resource_url_excludes": [
+      "international_private_schools"
+    ],
+    "incremental_overlap_days": 7
+  },
+  {
+    "id": "ontario_ichsc",
+    "name": "Ontario Integrated Community Health Services Centres",
+    "jurisdiction": "Ontario",
+    "region": "Ontario",
+    "family": "regulated_registry",
+    "collector": "ckan",
+    "mode": "monthly",
+    "enabled": true,
+    "api_base": "https://data.ontario.ca/en/api/3/action",
+    "package_query": "Integrated Community Health Services Centres locations",
+    "preferred_resource_names": [
+      "Listing English",
+      "Integrated Community Health Services Centres"
+    ],
+    "preferred_formats": [
+      "CSV"
+    ],
+    "key_fields": [
+      "FACILITY_NAME",
+      "ADDRESS"
+    ],
+    "date_fields": [
+      "INSPECTION_DATE"
+    ],
+    "entity_fields": [
+      "FACILITY_NAME",
+      "CENTRE_NAME"
+    ],
+    "address_fields": [
+      "ADDRESS",
+      "CITY",
+      "POSTAL_CODE"
+    ],
+    "description_fields": [
+      "SERVICES",
+      "OHIP_INSURED_SERVICES"
+    ],
+    "status_fields": [
+      "INSPECTION_RESULT"
+    ],
+    "value_fields": [],
+    "complete_snapshot": true,
+    "freshness_days": 45,
+    "gta_only": true,
+    "official_page": "https://data.ontario.ca/dataset/integrated-community-health-services-centres-ichsc-locations",
+    "licence_note": "Open Government Licence - Ontario.",
+    "freshness_fields": [
+      "INSPECTION_DATE"
+    ],
+    "package_slug": "integrated-community-health-services-centres-ichsc-locations",
+    "expected_package_title": "Integrated Community Health Services Centres",
+    "incremental_overlap_days": 7
+  },
+  {
+    "id": "ontario_childcare",
+    "name": "Ontario Licensed Child Care Facilities",
+    "jurisdiction": "Ontario",
+    "region": "Ontario",
+    "family": "regulated_registry",
+    "collector": "ckan",
+    "mode": "monthly",
+    "enabled": true,
+    "api_base": "https://data.ontario.ca/en/api/3/action",
+    "package_query": "Licensed child care facilities in Ontario",
+    "preferred_resource_names": [
+      "August 2026",
+      "Licensed child care facilities",
+      "English"
+    ],
+    "preferred_formats": [
+      "XLSX",
+      "CSV"
+    ],
+    "key_fields": [
+      "LICENCE_NUMBER"
+    ],
+    "date_fields": [
+      "ORIGINAL_ISSUE_DATE"
+    ],
+    "entity_fields": [
+      "CHILD_CARE_CENTRE_OR_AGENCY_NAME",
+      "LICENSEE_NAME"
+    ],
+    "address_fields": [
+      "FACILITY_ADDRESS",
+      "ADDRESS",
+      "CITY",
+      "POSTAL_CODE"
+    ],
+    "description_fields": [
+      "PROGRAM_TYPE"
+    ],
+    "status_fields": [
+      "LICENCE_STATUS"
+    ],
+    "value_fields": [],
+    "complete_snapshot": true,
+    "freshness_days": 45,
+    "gta_only": true,
+    "official_page": "https://data.ontario.ca/dataset/licensed-child-care-facilities-in-ontario",
+    "licence_note": "Open Government Licence - Ontario.",
+    "freshness_fields": [
+      "ORIGINAL_ISSUE_DATE"
+    ],
+    "package_slug": "licensed-child-care-facilities-in-ontario",
+    "expected_package_title": "Licensed child care facilities in Ontario",
+    "resource_url_must_end_with": [
+      ".xlsx"
+    ],
+    "incremental_overlap_days": 7
+  },
+  {
+    "id": "toronto_development_applications",
+    "name": "Toronto Application Information Centre - Active Development Applications",
+    "jurisdiction": "Toronto",
+    "region": "Toronto",
+    "family": "planning_application",
+    "collector": "arcgis",
+    "mode": "daily",
+    "enabled": true,
+    "url": "https://gis.toronto.ca/arcgis/rest/services/cot_geospatial11/FeatureServer/60",
+    "query_url": "https://gis.toronto.ca/arcgis/rest/services/cot_geospatial11/FeatureServer/60/query",
+    "page_size": 2000,
+    "key_fields": [
+      "APPLICATION_NUMBER"
+    ],
+    "date_fields": [
+      "LAST_MODIFIED_DATE",
+      "LATEST_MILESTONE_DATE",
+      "SUBMIT_DATE"
+    ],
+    "entity_fields": [],
+    "address_fields": [
+      "FULL_ADDRESS"
+    ],
+    "description_fields": [
+      "APPLICATION_TYPE",
+      "FOLDERDESCRIPTION",
+      "FOLDERTYPE_DESC"
+    ],
+    "status_fields": [
+      "STATUS_DESC",
+      "LATEST_MILESTONE"
+    ],
+    "value_fields": [],
+    "complete_snapshot": true,
+    "freshness_days": 2,
+    "freshness_fields": [
+      "LAST_MODIFIED_DATE",
+      "LATEST_MILESTONE_DATE",
+      "SUBMIT_DATE"
+    ],
+    "server_where": "1=1",
+    "incremental_overlap_days": 3,
+    "incremental_fields": [
+      "LAST_MODIFIED_DATE",
+      "LATEST_MILESTONE_DATE",
+      "SUBMIT_DATE"
+    ],
+    "official_page": "https://www.toronto.ca/city-government/planning-development/application-information-centre/",
+    "licence_note": "City of Toronto public AIC GIS service. Verify redistribution terms; retain source URL/evidence."
+  },
+  {
+    "id": "agco_cannabis_retail_applications",
+    "name": "AGCO Cannabis Retail Store Applications",
+    "jurisdiction": "Ontario",
+    "region": "Ontario",
+    "family": "cannabis_application",
+    "collector": "html_csv_link",
+    "mode": "daily",
+    "enabled": true,
+    "url": "https://www.agco.ca/en/cannabis/status-current-cannabis-retail-store-applications",
+    "key_fields": [
+      "LICENSE_NUMBER",
+      "LICENCE_NUMBER"
+    ],
+    "date_fields": [
+      "SOURCE_LAST_UPDATED"
+    ],
+    "entity_fields": [
+      "STORE_NAME"
+    ],
+    "address_fields": [
+      "ADDRESS",
+      "MUNICIPALITY_OR_FIRST_NATION"
+    ],
+    "description_fields": [
+      "STORE_APPLICATION_STATUS"
+    ],
+    "status_fields": [
+      "STORE_APPLICATION_STATUS"
+    ],
+    "value_fields": [],
+    "complete_snapshot": true,
+    "freshness_days": 30,
+    "gta_only": true,
+    "freshness_fields": [
+      "SOURCE_LAST_UPDATED"
+    ],
+    "official_page": "https://www.agco.ca/en/cannabis/status-current-cannabis-retail-store-applications",
+    "licence_note": "Public AGCO application-status page/export. Treat freshness as source-reported and review terms before redistribution.",
+    "stale_after_days": 30
+  },
+  {
+    "id": "ero_gta_environmental_instruments",
+    "name": "Environmental Registry of Ontario - GTA Commercial/Industrial Instruments",
+    "jurisdiction": "Ontario",
+    "region": "Ontario",
+    "family": "industrial_regulatory",
+    "collector": "ero_search",
+    "mode": "daily",
+    "enabled": true,
+    "url": "https://ero.ontario.ca/search",
+    "key_fields": [
+      "ERO_NUMBER"
+    ],
+    "date_fields": [
+      "LAST_UPDATED",
+      "DECISION_POSTED",
+      "PROPOSAL_POSTED"
+    ],
+    "entity_fields": [
+      "ENTITY_NAME"
+    ],
+    "address_fields": [],
+    "description_fields": [
+      "INSTRUMENT_TYPE",
+      "TITLE",
+      "SUMMARY"
+    ],
+    "status_fields": [
+      "NOTICE_STAGE"
+    ],
+    "value_fields": [],
+    "complete_snapshot": false,
+    "freshness_days": 3,
+    "gta_only": true,
+    "freshness_fields": [
+      "LAST_UPDATED",
+      "DECISION_POSTED",
+      "PROPOSAL_POSTED"
+    ],
+    "incremental_overlap_days": 4,
+    "baseline_days": 120,
+    "max_pages": 40,
+    "include_keywords": [
+      "ENVIRONMENTAL COMPLIANCE APPROVAL",
+      "TECHNICAL STANDARD FOR AIR POLLUTION",
+      "PERMIT TO TAKE WATER",
+      "WASTE",
+      "SEWAGE",
+      "AIR & NOISE",
+      "AIR AND NOISE"
+    ],
+    "official_page": "https://ero.ontario.ca/search",
+    "licence_note": "Public Environmental Registry notices. Store links/evidence; review reuse terms before redistribution."
+  },
+  {
+    "id": "toronto_cleared_building_permits",
+    "name": "Toronto Building Permits - Cleared Permits",
+    "jurisdiction": "Toronto",
+    "region": "Toronto",
+    "family": "permit_history",
+    "collector": "ckan",
+    "mode": "backfill",
+    "enabled": false,
+    "api_base": "https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action",
+    "package_query": "Building Permits Cleared Permits",
+    "preferred_resource_names": [
+      "Cleared Building Permits since 2017"
+    ],
+    "preferred_formats": [
+      "CSV",
+      "ZIP"
+    ],
+    "key_fields": [
+      "PERMIT_NUM",
+      "REVISION_NUM"
+    ],
+    "date_fields": [
+      "COMPLETED_DATE",
+      "ISSUED_DATE",
+      "APPLICATION_DATE"
+    ],
+    "entity_fields": [
+      "CONTRACTOR"
+    ],
+    "address_fields": [
+      "STREET_NUM",
+      "STREET_NAME",
+      "STREET_TYPE",
+      "STREET_DIRECTION",
+      "POSTAL"
+    ],
+    "description_fields": [
+      "WORK",
+      "DESCRIPTION",
+      "CURRENT_USE",
+      "PROPOSED_USE"
+    ],
+    "status_fields": [
+      "STATUS"
+    ],
+    "value_fields": [],
+    "complete_snapshot": false,
+    "freshness_days": 365,
+    "official_page": "https://open.toronto.ca/dataset/building-permits-cleared-permits/",
+    "licence_note": "Open Government Licence - Toronto. Backfill only; the 2000-2016 archive is intentionally not part of daily polling.",
+    "freshness_fields": [
+      "COMPLETED_DATE",
+      "ISSUED_DATE",
+      "APPLICATION_DATE"
+    ],
+    "package_slug": "building-permits-cleared-permits",
+    "expected_package_title": "Building Permits - Cleared Permits"
+  }
+]

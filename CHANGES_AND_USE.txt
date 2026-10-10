@@ -1,0 +1,17 @@
+GTA RADAR — MUNICIPAL-LED EVENT INTELLIGENCE
+
+One-time: Extract this folder next to older Radar folders. Run START_RADAR.bat.
+For daily scheduling and your encrypted DeepSeek key, run INSTALL_DAILY.bat once.
+
+The system now analyzes municipal records FIRST regardless of missing company/address or LOW relevance. It preserves the raw source DB, deduplicates per source record, enriches from business observations, and keeps pending opportunities.
+
+New outputs (in data folder):
+- opportunity_dashboard.html: source-by-source municipal vs business opportunity counts
+- collector_opportunity_audit.csv: every source, including zero-recent sources
+- opportunities_ALL_REVIEW_ONLY.csv: full recently dated opportunity list
+- recent_queue_pending.csv: retained research backlog
+- lead_research_dashboard.html: identity/contact research queue
+
+Two-day rolling event window for daily activity. Dates with no parseable event/observed timestamp are preserved in source data but cannot be asserted as 48-hour activity; they are shown in per-source audit as not selected. This release does not itself establish independently verified company operators or confirmed contacts. DeepSeek is optional, USD 0.50 and max 50 daily.
+
+Existing collectors are not erased or rebuilt, old database folders stay intact. Unverified leads are not marked sale-ready.

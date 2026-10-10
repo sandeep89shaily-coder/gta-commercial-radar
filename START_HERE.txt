@@ -1,0 +1,12 @@
+GTA COMMERCIAL RADAR — PEEL PILOT
+
+1. Extract this ZIP into your existing "new data" folder, beside older Radar folders.
+2. Open GTA_RADAR_PEEL_PILOT.
+3. Double-click START_RADAR.bat.
+
+Leave older versions untouched. The software looks for your earlier data and safely copies it if available. It also checks two new Peel public-page sources. They are pilots, not yet verified production feeds.
+
+To check only the new Peel sources later: double-click RUN_PEEL_PILOT.bat.
+To see the government source audit: open PEEL_GOVERNMENT_SOURCE_MATRIX.csv.
+
+The first run establishes a baseline. Historical records and government tenders are not automatically classified as fresh private-business leads. API keys are not needed for the Peel pilot.

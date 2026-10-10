@@ -1,0 +1,1607 @@
+[
+  {
+    "id": "brampton_building_permits",
+    "name": "Brampton Building Permits",
+    "jurisdiction": "Brampton",
+    "region": "Peel",
+    "family": "permit",
+    "collector": "arcgis",
+    "mode": "daily",
+    "enabled": true,
+    "url": "https://maps1.brampton.ca/arcgis/rest/services/BuildingPermit/Building_Permits/FeatureServer/0",
+    "query_url": "https://maps1.brampton.ca/arcgis/rest/services/BuildingPermit/Building_Permits/FeatureServer/0/query",
+    "page_size": 1000,
+    "key_fields": [
+      "PERMITNUMBER"
+    ],
+    "date_fields": [
+      "INDATE",
+      "ISSUEDATE",
+      "PROCESSDATE"
+    ],
+    "entity_fields": [
+      "BUILDER",
+      "CONTRACTOR"
+    ],
+    "address_fields": [
+      "ADDRESS"
+    ],
+    "description_fields": [
+      "WORKDESC",
+      "SUBDESC"
+    ],
+    "status_fields": [
+      "STATUSDESC"
+    ],
+    "value_fields": [],
+    "complete_snapshot": false,
+    "freshness_days": 2,
+    "official_page": "https://maps1.brampton.ca/arcgis/rest/services/BuildingPermit/Building_Permits/FeatureServer/0",
+    "licence_note": "City of Brampton public GIS/open-data service; verify dataset-specific licence before external redistribution.",
+    "freshness_fields": [
+      "PROCESSDATE",
+      "INDATE"
+    ],
+    "server_where": "SUBDESC LIKE 'A1:%' OR SUBDESC LIKE 'A2:%' OR SUBDESC LIKE 'A3:%' OR SUBDESC LIKE 'A4:%' OR SUBDESC LIKE 'B1:%' OR SUBDESC LIKE 'B2:%' OR SUBDESC LIKE 'B3:%' OR SUBDESC LIKE 'D:%' OR SUBDESC LIKE 'E:%' OR SUBDESC LIKE 'F1:%' OR SUBDESC LIKE 'F2:%' OR SUBDESC LIKE 'F3:%' OR WORKDESC LIKE '%Non Residential%' OR WORKDESC LIKE '%Interior/Unit Finish%' OR WORKDESC LIKE '%Change of Use%'",
+    "filter_note": "Server-side non-residential permit/use filter; zoning is not used as the sole gate. Existing broader baseline may be retained.",
+    "incremental_overlap_days": 3,
+    "incremental_fields": [
+      "PROCESSDATE",
+      "INDATE"
+    ]
+  },
+  {
+    "id": "mississauga_issued_building_permits",
+    "name": "Mississauga Issued Building Permits",
+    "jurisdiction": "Mississauga",
+    "region": "Peel",
+    "family": "permit",
+    "collector": "arcgis",
+    "mode": "daily",
+    "enabled": true,
+    "url": "https://services6.arcgis.com/hM5ymMLbxIyWTjn2/arcgis/rest/services/Issued_Building_Permits/FeatureServer/0",
+    "query_url": "https://services6.arcgis.com/hM5ymMLbxIyWTjn2/arcgis/rest/services/Issued_Building_Permits/FeatureServer/0/query",
+    "page_size": 2000,
+    "key_fields": [
+      "BP_NO"
+    ],
+    "date_fields": [
+      "ISSUE_DATE",
+      "APPLICATION_DATE",
+      "COMPLETE_DATE"
+    ],
+    "entity_fields": [],
+    "address_fields": [
+      "ADDRESS",
+      "UNIT_NO"
+    ],
+    "description_fields": [
+      "DESCRIPTION",
+      "SCOPE"
+    ],
+    "status_fields": [
+      "STATUS"
+    ],
+    "value_fields": [
+      "EST_CON_VALUE"
+    ],
+    "complete_snapshot": false,
+    "freshness_days": 45,
+    "official_page": "https://services6.arcgis.com/hM5ymMLbxIyWTjn2/arcgis/rest/services/Issued_Building_Permits/FeatureServer/0",
+    "licence_note": "City of Mississauga public open-data layer; verify current Open Data Terms before redistribution.",
+    "freshness_fields": [
+      "ISSUE_DATE",
+      "APPLICATION_DATE",
+      "COMPLETE_DATE"
+    ],
+    "server_where": "FILE_TYPE IN ('COMMERCIAL','INDUSTRIAL','PUBLIC','UNKNOWN')",
+    "filter_note": "Server-side FILE_TYPE excludes explicit RESIDENTIAL. UNKNOWN retained to avoid false negatives.",
+    "incremental_overlap_days": 3,
+    "incremental_fields": [
+      "ISSUE_DATE",
+      "APPLICATION_DATE",
+      "COMPLETE_DATE"
+    ]
+  },
+  {
+    "id": "toronto_active_building_permits",
+    "name": "Toronto Building Permits - Active Permits",
+    "jurisdiction": "Toronto",
+    "region": "Toronto",
+    "family": "permit",
+    "collector": "ckan",
+    "mode": "daily",
+    "enabled": true,
+    "api_base": "https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action",
+    "package_query": "Building Permits Active Permits",
+    "preferred_resource_names": [
+      "Active Building Permits",
+      "Active Permits"
+    ],
+    "preferred_formats": [
+      "CSV",
+      "JSON",
+      "GEOJSON",
+      "ZIP"
+    ],
+    "key_fields": [
+      "PERMIT_NUM",
+      "REVISION_NUM"
+    ],
+    "date_fields": [
+      "STATUS_DATE",
+      "ISSUED_DATE",
+      "APPLICATION_DATE"
+    ],
+    "entity_fields": [
+      "CONTRACTOR"
+    ],
+    "address_fields": [
+      "STREET_NUM",
+      "STREET_NAME",
+      "STREET_TYPE",
+      "STREET_DIRECTION",
+      "POSTAL"
+    ],
+    "description_fields": [
+      "WORK",
+      "DESCRIPTION",
+      "CURRENT_USE",
+      "PROPOSED_USE"
+    ],
+    "status_fields": [
+      "STATUS"
+    ],
+    "value_fields": [],
+    "complete_snapshot": true,
+    "freshness_days": 2,
+    "official_page": "https://open.toronto.ca/",
+    "licence_note": "Open Government Licence - Toronto.",
+    "freshness_fields": [
+      "STATUS_DATE",
+      "ISSUED_DATE",
+      "APPLICATION_DATE"
+    ],
+    "package_slug": "building-permits-active-permits",
+    "expected_package_title": "Building Permits - Active Permits",
+    "incremental_overlap_days": 3,
+    "incremental_fields": [
+      "STATUS_DATE",
+      "ISSUED_DATE",
+      "APPLICATION_DATE"
+    ]
+  },
+  {
+    "id": "toronto_business_licences",
+    "name": "Toronto Municipal Licensing & Standards - Business Licences and Permits",
+    "jurisdiction": "Toronto",
+    "region": "Toronto",
+    "family": "business_licence",
+    "collector": "ckan",
+    "mode": "daily",
+    "enabled": true,
+    "api_base": "https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action",
+    "package_query": "Municipal Licensing and Standards Business Licences and Permits",
+    "preferred_resource_names": [
+      "Business Licences",
+      "Municipal Licensing"
+    ],
+    "preferred_formats": [
+      "CSV",
+      "JSON",
+      "GEOJSON",
+      "ZIP"
+    ],
+    "key_fields": [
+      "LICENCE_NO"
+    ],
+    "date_fields": [
+      "LICENCE_ISSUED_DATE",
+      "ISSUED_DATE",
+      "DATE_ISSUED"
+    ],
+    "entity_fields": [
+      "OPERATING_NAME",
+      "CLIENT_NAME"
+    ],
+    "address_fields": [
+      "ADDRESS",
+      "BUSINESS_ADDRESS"
+    ],
+    "description_fields": [
+      "CATEGORY",
+      "LICENCE_CATEGORY"
+    ],
+    "status_fields": [
+      "STATUS",
+      "LICENCE_STATUS"
+    ],
+    "value_fields": [],
+    "complete_snapshot": true,
+    "freshness_days": 2,
+    "official_page": "https://open.toronto.ca/dataset/municipal-licensing-and-standards-business-licences-and-permits/",
+    "licence_note": "Open Government Licence - Toronto.",
+    "freshness_fields": [
+      "LICENCE_ISSUED_DATE",
+      "ISSUED_DATE",
+      "DATE_ISSUED"
+    ],
+    "package_slug": "municipal-licensing-and-standards-business-licences-and-permits",
+    "expected_package_title": "Municipal Licensing and Standards - Business Licences and Permits",
+    "incremental_overlap_days": 3,
+    "incremental_fields": [
+      "LICENCE_ISSUED_DATE",
+      "ISSUED_DATE",
+      "DATE_ISSUED"
+    ]
+  },
+  {
+    "id": "toronto_dinesafe",
+    "name": "Toronto DineSafe",
+    "jurisdiction": "Toronto",
+    "region": "Toronto",
+    "family": "health_inspection",
+    "collector": "ckan",
+    "mode": "daily",
+    "enabled": true,
+    "api_base": "https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action",
+    "package_query": "DineSafe",
+    "preferred_resource_names": [
+      "Dinesafe.csv",
+      "Dinesafe"
+    ],
+    "preferred_formats": [
+      "CSV",
+      "JSON",
+      "GEOJSON",
+      "ZIP"
+    ],
+    "key_fields": [
+      "ESTABLISHMENT_ID",
+      "INSPECTION_ID"
+    ],
+    "date_fields": [
+      "INSPECTION_DATE"
+    ],
+    "entity_fields": [
+      "ESTABLISHMENT_NAME"
+    ],
+    "address_fields": [
+      "ESTABLISHMENT_ADDRESS",
+      "ADDRESS"
+    ],
+    "description_fields": [
+      "ESTABLISHMENT_TYPE",
+      "INFRACTION_DETAILS"
+    ],
+    "status_fields": [
+      "ESTABLISHMENT_STATUS",
+      "INSPECTION_STATUS"
+    ],
+    "value_fields": [],
+    "complete_snapshot": true,
+    "freshness_days": 2,
+    "official_page": "https://open.toronto.ca/dataset/dinesafe/",
+    "licence_note": "Open Government Licence - Toronto.",
+    "freshness_fields": [
+      "INSPECTION_DATE"
+    ],
+    "package_id": "b6b4f3fb-2e2c-47e7-931d-b87d22806948",
+    "resource_id": "af0f5b8a-4b73-4a50-8781-65e949792b40",
+    "expected_package_title": "Dinesafe",
+    "incremental_overlap_days": 3,
+    "incremental_fields": [
+      "INSPECTION_DATE"
+    ]
+  },
+  {
+    "id": "ontario_private_schools",
+    "name": "Ontario Private School Contact Information",
+    "jurisdiction": "Ontario",
+    "region": "Ontario",
+    "family": "regulated_registry",
+    "collector": "ckan",
+    "mode": "monthly",
+    "enabled": true,
+    "api_base": "https://data.ontario.ca/en/api/3/action",
+    "package_query": "Private school contact information",
+    "preferred_resource_names": [
+      "Private school contact information"
+    ],
+    "preferred_formats": [
+      "CSV"
+    ],
+    "key_fields": [
+      "SCHOOL_NUMBER"
+    ],
+    "date_fields": [],
+    "entity_fields": [
+      "SCHOOL_NAME"
+    ],
+    "address_fields": [
+      "STREET_ADDRESS",
+      "SUITE",
+      "CITY",
+      "POSTAL_CODE"
+    ],
+    "description_fields": [
+      "SCHOOL_LEVEL",
+      "PROGRAM_TYPE"
+    ],
+    "status_fields": [
+      "SCHOOL_SPECIAL_CONDITION_CODE"
+    ],
+    "value_fields": [],
+    "complete_snapshot": true,
+    "freshness_days": 45,
+    "gta_only": true,
+    "official_page": "https://data.ontario.ca/dataset/private-school-contact-information",
+    "licence_note": "Open Government Licence - Ontario.",
+    "freshness_fields": [],
+    "package_slug": "private-school-contact-information",
+    "expected_package_title": "Private school contact information",
+    "resource_id": "d16de265-35e9-4277-9381-0c311e802e39",
+    "expected_resource_name": "Private school contact information",
+    "resource_url_contains": [
+      "private_school_contact_information_eng.csv"
+    ],
+    "resource_url_excludes": [
+      "international_private_schools"
+    ],
+    "incremental_overlap_days": 7
+  },
+  {
+    "id": "ontario_ichsc",
+    "name": "Ontario Integrated Community Health Services Centres",
+    "jurisdiction": "Ontario",
+    "region": "Ontario",
+    "family": "regulated_registry",
+    "collector": "ckan",
+    "mode": "monthly",
+    "enabled": true,
+    "api_base": "https://data.ontario.ca/en/api/3/action",
+    "package_query": "Integrated Community Health Services Centres locations",
+    "preferred_resource_names": [
+      "Listing English",
+      "Integrated Community Health Services Centres"
+    ],
+    "preferred_formats": [
+      "CSV"
+    ],
+    "key_fields": [
+      "FACILITY_NAME",
+      "ADDRESS"
+    ],
+    "date_fields": [
+      "INSPECTION_DATE"
+    ],
+    "entity_fields": [
+      "FACILITY_NAME",
+      "CENTRE_NAME"
+    ],
+    "address_fields": [
+      "ADDRESS",
+      "CITY",
+      "POSTAL_CODE"
+    ],
+    "description_fields": [
+      "SERVICES",
+      "OHIP_INSURED_SERVICES"
+    ],
+    "status_fields": [
+      "INSPECTION_RESULT"
+    ],
+    "value_fields": [],
+    "complete_snapshot": true,
+    "freshness_days": 45,
+    "gta_only": true,
+    "official_page": "https://data.ontario.ca/dataset/integrated-community-health-services-centres-ichsc-locations",
+    "licence_note": "Open Government Licence - Ontario.",
+    "freshness_fields": [
+      "INSPECTION_DATE"
+    ],
+    "package_slug": "integrated-community-health-services-centres-ichsc-locations",
+    "expected_package_title": "Integrated Community Health Services Centres",
+    "incremental_overlap_days": 7
+  },
+  {
+    "id": "ontario_childcare",
+    "name": "Ontario Licensed Child Care Facilities",
+    "jurisdiction": "Ontario",
+    "region": "Ontario",
+    "family": "regulated_registry",
+    "collector": "ckan",
+    "mode": "monthly",
+    "enabled": true,
+    "api_base": "https://data.ontario.ca/en/api/3/action",
+    "package_query": "Licensed child care facilities in Ontario",
+    "preferred_resource_names": [
+      "August 2026",
+      "Licensed child care facilities",
+      "English"
+    ],
+    "preferred_formats": [
+      "XLSX",
+      "CSV"
+    ],
+    "key_fields": [
+      "LICENCE_NUMBER"
+    ],
+    "date_fields": [
+      "ORIGINAL_ISSUE_DATE"
+    ],
+    "entity_fields": [
+      "CHILD_CARE_CENTRE_OR_AGENCY_NAME",
+      "LICENSEE_NAME"
+    ],
+    "address_fields": [
+      "FACILITY_ADDRESS",
+      "ADDRESS",
+      "CITY",
+      "POSTAL_CODE"
+    ],
+    "description_fields": [
+      "PROGRAM_TYPE"
+    ],
+    "status_fields": [
+      "LICENCE_STATUS"
+    ],
+    "value_fields": [],
+    "complete_snapshot": true,
+    "freshness_days": 45,
+    "gta_only": true,
+    "official_page": "https://data.ontario.ca/dataset/licensed-child-care-facilities-in-ontario",
+    "licence_note": "Open Government Licence - Ontario.",
+    "freshness_fields": [
+      "ORIGINAL_ISSUE_DATE"
+    ],
+    "package_slug": "licensed-child-care-facilities-in-ontario",
+    "expected_package_title": "Licensed child care facilities in Ontario",
+    "resource_url_must_end_with": [
+      ".xlsx"
+    ],
+    "incremental_overlap_days": 7
+  },
+  {
+    "id": "toronto_development_applications",
+    "name": "Toronto Application Information Centre - Active Development Applications",
+    "jurisdiction": "Toronto",
+    "region": "Toronto",
+    "family": "planning_application",
+    "collector": "arcgis",
+    "mode": "daily",
+    "enabled": true,
+    "url": "https://gis.toronto.ca/arcgis/rest/services/cot_geospatial11/FeatureServer/60",
+    "query_url": "https://gis.toronto.ca/arcgis/rest/services/cot_geospatial11/FeatureServer/60/query",
+    "page_size": 2000,
+    "key_fields": [
+      "APPLICATION_NUMBER"
+    ],
+    "date_fields": [
+      "LAST_MODIFIED_DATE",
+      "LATEST_MILESTONE_DATE",
+      "SUBMIT_DATE"
+    ],
+    "entity_fields": [],
+    "address_fields": [
+      "FULL_ADDRESS"
+    ],
+    "description_fields": [
+      "APPLICATION_TYPE",
+      "FOLDERDESCRIPTION",
+      "FOLDERTYPE_DESC"
+    ],
+    "status_fields": [
+      "STATUS_DESC",
+      "LATEST_MILESTONE"
+    ],
+    "value_fields": [],
+    "complete_snapshot": true,
+    "freshness_days": 2,
+    "freshness_fields": [
+      "LAST_MODIFIED_DATE",
+      "LATEST_MILESTONE_DATE",
+      "SUBMIT_DATE"
+    ],
+    "server_where": "1=1",
+    "incremental_overlap_days": 3,
+    "incremental_fields": [
+      "LAST_MODIFIED_DATE",
+      "LATEST_MILESTONE_DATE",
+      "SUBMIT_DATE"
+    ],
+    "official_page": "https://www.toronto.ca/city-government/planning-development/application-information-centre/",
+    "licence_note": "City of Toronto public AIC GIS service. Verify redistribution terms; retain source URL/evidence."
+  },
+  {
+    "id": "agco_cannabis_retail_applications",
+    "name": "AGCO Cannabis Retail Store Applications",
+    "jurisdiction": "Ontario",
+    "region": "Ontario",
+    "family": "cannabis_application",
+    "collector": "web_table",
+    "mode": "daily",
+    "enabled": true,
+    "url": "https://www.agco.ca/en/cannabis/status-current-cannabis-retail-store-applications",
+    "key_fields": [
+      "APPLICATION_ID"
+    ],
+    "date_fields": [
+      "PUBLIC_NOTICE_START_DATE"
+    ],
+    "entity_fields": [
+      "STORE_NAME"
+    ],
+    "address_fields": [
+      "ADDRESS",
+      "MUNICIPALITY_OR_FIRST_NATION",
+      "POSTAL_CODE"
+    ],
+    "description_fields": [
+      "STORE_APPLICATION_STATUS",
+      "PUBLIC_NOTICE_DATE"
+    ],
+    "status_fields": [
+      "STORE_APPLICATION_STATUS"
+    ],
+    "value_fields": [],
+    "complete_snapshot": true,
+    "freshness_days": 30,
+    "gta_only": true,
+    "freshness_fields": [],
+    "official_page": "https://www.agco.ca/en/cannabis/status-current-cannabis-retail-store-applications",
+    "licence_note": "Public AGCO application-status page/export. Treat freshness as source-reported and review terms before redistribution.",
+    "stale_after_days": 30,
+    "identity_strategy": "agco_application",
+    "required_columns": [
+      "APPLICATION_ID",
+      "STORE_NAME",
+      "ADDRESS",
+      "MUNICIPALITY_OR_FIRST_NATION",
+      "STORE_APPLICATION_STATUS"
+    ],
+    "column_aliases": {
+      "LICENCE_NUMBER": [
+        "LicenceNumber",
+        "License Number"
+      ],
+      "FILE_NUMBER": [
+        "FileNumber"
+      ],
+      "STORE_NAME": [
+        "PremisesName",
+        "Store Name"
+      ],
+      "ADDRESS": [
+        "StreetAddress",
+        "Address"
+      ],
+      "MUNICIPALITY_OR_FIRST_NATION": [
+        "City",
+        "City or Town",
+        "Municipality or First Nation"
+      ],
+      "POSTAL_CODE": [
+        "PostalCode"
+      ],
+      "STORE_APPLICATION_STATUS": [
+        "ApplicationStatusEn",
+        "Store Application Status"
+      ],
+      "PUBLIC_NOTICE_DATE": [
+        "PublicNoticeDateEn"
+      ],
+      "PUBLIC_NOTICE_START_DATE": [
+        "PublicNoticeStartDate"
+      ],
+      "PUBLIC_NOTICE_DEADLINE": [
+        "PublicNoticeDeadline"
+      ],
+      "ADDRESS_ID": [
+        "AddressID"
+      ]
+    },
+    "table_columns": [
+      "License Number",
+      "Municipality or First Nation",
+      "Store Name",
+      "Address",
+      "Store Application Status"
+    ],
+    "evidence_fields": [
+      "URLLINKEN"
+    ]
+  },
+  {
+    "id": "ero_gta_environmental_instruments",
+    "name": "Environmental Registry of Ontario - GTA Commercial/Industrial Instruments",
+    "jurisdiction": "Ontario",
+    "region": "Ontario",
+    "family": "industrial_regulatory",
+    "collector": "ero_search",
+    "mode": "daily",
+    "enabled": true,
+    "url": "https://ero.ontario.ca/search",
+    "key_fields": [
+      "ERO_NUMBER"
+    ],
+    "date_fields": [
+      "LAST_UPDATED",
+      "DECISION_POSTED",
+      "PROPOSAL_POSTED"
+    ],
+    "entity_fields": [
+      "ENTITY_NAME"
+    ],
+    "address_fields": [],
+    "description_fields": [
+      "INSTRUMENT_TYPE",
+      "TITLE",
+      "SUMMARY"
+    ],
+    "status_fields": [
+      "NOTICE_STAGE"
+    ],
+    "value_fields": [],
+    "complete_snapshot": false,
+    "freshness_days": 3,
+    "gta_only": true,
+    "freshness_fields": [
+      "LAST_UPDATED",
+      "DECISION_POSTED",
+      "PROPOSAL_POSTED"
+    ],
+    "incremental_overlap_days": 4,
+    "baseline_days": 120,
+    "max_pages": 40,
+    "include_keywords": [
+      "ENVIRONMENTAL COMPLIANCE APPROVAL",
+      "TECHNICAL STANDARD FOR AIR POLLUTION",
+      "PERMIT TO TAKE WATER",
+      "WASTE",
+      "SEWAGE",
+      "AIR & NOISE",
+      "AIR AND NOISE"
+    ],
+    "official_page": "https://ero.ontario.ca/search",
+    "licence_note": "Public Environmental Registry notices. Store links/evidence; review reuse terms before redistribution."
+  },
+  {
+    "id": "toronto_cleared_building_permits",
+    "name": "Toronto Building Permits - Cleared Permits",
+    "jurisdiction": "Toronto",
+    "region": "Toronto",
+    "family": "permit_history",
+    "collector": "ckan",
+    "mode": "backfill",
+    "enabled": false,
+    "api_base": "https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action",
+    "package_query": "Building Permits Cleared Permits",
+    "preferred_resource_names": [
+      "Cleared Building Permits since 2017"
+    ],
+    "preferred_formats": [
+      "CSV",
+      "ZIP"
+    ],
+    "key_fields": [
+      "PERMIT_NUM",
+      "REVISION_NUM"
+    ],
+    "date_fields": [
+      "COMPLETED_DATE",
+      "ISSUED_DATE",
+      "APPLICATION_DATE"
+    ],
+    "entity_fields": [
+      "CONTRACTOR"
+    ],
+    "address_fields": [
+      "STREET_NUM",
+      "STREET_NAME",
+      "STREET_TYPE",
+      "STREET_DIRECTION",
+      "POSTAL"
+    ],
+    "description_fields": [
+      "WORK",
+      "DESCRIPTION",
+      "CURRENT_USE",
+      "PROPOSED_USE"
+    ],
+    "status_fields": [
+      "STATUS"
+    ],
+    "value_fields": [],
+    "complete_snapshot": false,
+    "freshness_days": 365,
+    "official_page": "https://open.toronto.ca/dataset/building-permits-cleared-permits/",
+    "licence_note": "Open Government Licence - Toronto. Backfill only; the 2000-2016 archive is intentionally not part of daily polling.",
+    "freshness_fields": [
+      "COMPLETED_DATE",
+      "ISSUED_DATE",
+      "APPLICATION_DATE"
+    ],
+    "package_slug": "building-permits-cleared-permits",
+    "expected_package_title": "Building Permits - Cleared Permits"
+  },
+  {
+    "id": "peel_health_food",
+    "name": "Peel Health - Food Premises",
+    "jurisdiction": "Brampton / Mississauga / Caledon",
+    "region": "Peel",
+    "family": "health_inspection",
+    "collector": "peel_health",
+    "mode": "daily",
+    "enabled": true,
+    "url": "https://rmop.hedgerowsoftware.com/Portal/",
+    "table_url": "https://rmop.hedgerowsoftware.com/Portal/Food/Table",
+    "program_area": "Food",
+    "key_fields": [
+      "FACILITY_ID"
+    ],
+    "date_fields": [
+      "LAST_INSPECTION_DATE"
+    ],
+    "freshness_fields": [
+      "LAST_INSPECTION_DATE"
+    ],
+    "entity_fields": [
+      "FACILITY_NAME"
+    ],
+    "address_fields": [
+      "SITE_ADDRESS"
+    ],
+    "description_fields": [
+      "FACILITY_TYPE"
+    ],
+    "status_fields": [
+      "INSPECTION_RESULT"
+    ],
+    "value_fields": [],
+    "complete_snapshot": true,
+    "freshness_days": 7,
+    "incremental_overlap_days": 7,
+    "max_pages": 1000,
+    "request_pause_seconds": 0.1,
+    "official_page": "https://peelregion.ca/health/inspections-monitoring/health-inspections",
+    "licence_note": "Public Peel inspection disclosure. Past results describe conditions on the inspection date; directory presence does not establish a new opening. Retain evidence URL.",
+    "evidence_fields": [
+      "DETAIL_URL"
+    ]
+  },
+  {
+    "id": "peel_health_personal_services",
+    "name": "Peel Health - Personal Service Settings",
+    "jurisdiction": "Brampton / Mississauga / Caledon",
+    "region": "Peel",
+    "family": "health_inspection",
+    "collector": "peel_health",
+    "mode": "daily",
+    "enabled": true,
+    "url": "https://rmop.hedgerowsoftware.com/Portal/",
+    "table_url": "https://rmop.hedgerowsoftware.com/Portal/PersonalServicesSettings/Table",
+    "program_area": "PersonalServicesSettings",
+    "key_fields": [
+      "FACILITY_ID"
+    ],
+    "date_fields": [
+      "LAST_INSPECTION_DATE"
+    ],
+    "freshness_fields": [
+      "LAST_INSPECTION_DATE"
+    ],
+    "entity_fields": [
+      "FACILITY_NAME"
+    ],
+    "address_fields": [
+      "SITE_ADDRESS"
+    ],
+    "description_fields": [
+      "FACILITY_TYPE"
+    ],
+    "status_fields": [
+      "INSPECTION_RESULT"
+    ],
+    "value_fields": [],
+    "complete_snapshot": true,
+    "freshness_days": 7,
+    "incremental_overlap_days": 7,
+    "max_pages": 1000,
+    "request_pause_seconds": 0.1,
+    "official_page": "https://peelregion.ca/health/inspections-monitoring/health-inspections",
+    "licence_note": "Public Peel inspection disclosure. Past results describe conditions on the inspection date; directory presence does not establish a new opening. Retain evidence URL.",
+    "evidence_fields": [
+      "DETAIL_URL"
+    ]
+  },
+  {
+    "id": "peel_health_child_care",
+    "name": "Peel Health - Child Care",
+    "jurisdiction": "Brampton / Mississauga / Caledon",
+    "region": "Peel",
+    "family": "health_inspection",
+    "collector": "peel_health",
+    "mode": "daily",
+    "enabled": true,
+    "url": "https://rmop.hedgerowsoftware.com/Portal/",
+    "table_url": "https://rmop.hedgerowsoftware.com/Portal/ChildCare/Table",
+    "program_area": "ChildCare",
+    "key_fields": [
+      "FACILITY_ID"
+    ],
+    "date_fields": [
+      "LAST_INSPECTION_DATE"
+    ],
+    "freshness_fields": [
+      "LAST_INSPECTION_DATE"
+    ],
+    "entity_fields": [
+      "FACILITY_NAME"
+    ],
+    "address_fields": [
+      "SITE_ADDRESS"
+    ],
+    "description_fields": [
+      "FACILITY_TYPE"
+    ],
+    "status_fields": [
+      "INSPECTION_RESULT"
+    ],
+    "value_fields": [],
+    "complete_snapshot": true,
+    "freshness_days": 7,
+    "incremental_overlap_days": 7,
+    "max_pages": 1000,
+    "request_pause_seconds": 0.1,
+    "official_page": "https://peelregion.ca/health/inspections-monitoring/health-inspections",
+    "licence_note": "Public Peel inspection disclosure. Past results describe conditions on the inspection date; directory presence does not establish a new opening. Retain evidence URL.",
+    "evidence_fields": [
+      "DETAIL_URL"
+    ]
+  },
+  {
+    "id": "peel_health_pools",
+    "name": "Peel Health - Pools, Hot Tubs and Splash Pads",
+    "jurisdiction": "Brampton / Mississauga / Caledon",
+    "region": "Peel",
+    "family": "health_inspection",
+    "collector": "peel_health",
+    "mode": "daily",
+    "enabled": true,
+    "url": "https://rmop.hedgerowsoftware.com/Portal/",
+    "table_url": "https://rmop.hedgerowsoftware.com/Portal/PoolsHotTubsSplashPads/Table",
+    "program_area": "PoolsHotTubsSplashPads",
+    "key_fields": [
+      "FACILITY_ID"
+    ],
+    "date_fields": [
+      "LAST_INSPECTION_DATE"
+    ],
+    "freshness_fields": [
+      "LAST_INSPECTION_DATE"
+    ],
+    "entity_fields": [
+      "FACILITY_NAME"
+    ],
+    "address_fields": [
+      "SITE_ADDRESS"
+    ],
+    "description_fields": [
+      "FACILITY_TYPE"
+    ],
+    "status_fields": [
+      "INSPECTION_RESULT"
+    ],
+    "value_fields": [],
+    "complete_snapshot": true,
+    "freshness_days": 7,
+    "incremental_overlap_days": 7,
+    "max_pages": 1000,
+    "request_pause_seconds": 0.1,
+    "official_page": "https://peelregion.ca/health/inspections-monitoring/health-inspections",
+    "licence_note": "Public Peel inspection disclosure. Past results describe conditions on the inspection date; directory presence does not establish a new opening. Retain evidence URL.",
+    "evidence_fields": [
+      "DETAIL_URL"
+    ]
+  },
+  {
+    "id": "peel_health_tanning",
+    "name": "Peel Health - Tanning Beds",
+    "jurisdiction": "Brampton / Mississauga / Caledon",
+    "region": "Peel",
+    "family": "health_inspection",
+    "collector": "peel_health",
+    "mode": "daily",
+    "enabled": true,
+    "url": "https://rmop.hedgerowsoftware.com/Portal/",
+    "table_url": "https://rmop.hedgerowsoftware.com/Portal/TanningBeds/Table",
+    "program_area": "TanningBeds",
+    "key_fields": [
+      "FACILITY_ID"
+    ],
+    "date_fields": [
+      "LAST_INSPECTION_DATE"
+    ],
+    "freshness_fields": [
+      "LAST_INSPECTION_DATE"
+    ],
+    "entity_fields": [
+      "FACILITY_NAME"
+    ],
+    "address_fields": [
+      "SITE_ADDRESS"
+    ],
+    "description_fields": [
+      "FACILITY_TYPE"
+    ],
+    "status_fields": [
+      "INSPECTION_RESULT"
+    ],
+    "value_fields": [],
+    "complete_snapshot": true,
+    "freshness_days": 7,
+    "incremental_overlap_days": 7,
+    "max_pages": 1000,
+    "request_pause_seconds": 0.1,
+    "official_page": "https://peelregion.ca/health/inspections-monitoring/health-inspections",
+    "licence_note": "Public Peel inspection disclosure. Past results describe conditions on the inspection date; directory presence does not establish a new opening. Retain evidence URL.",
+    "evidence_fields": [
+      "DETAIL_URL"
+    ]
+  },
+  {
+    "id": "peel_health_camps",
+    "name": "Peel Health - Recreational Camps",
+    "jurisdiction": "Brampton / Mississauga / Caledon",
+    "region": "Peel",
+    "family": "health_inspection",
+    "collector": "peel_health",
+    "mode": "daily",
+    "enabled": true,
+    "url": "https://rmop.hedgerowsoftware.com/Portal/",
+    "table_url": "https://rmop.hedgerowsoftware.com/Portal/RecreationalCamps/Table",
+    "program_area": "RecreationalCamps",
+    "key_fields": [
+      "FACILITY_ID"
+    ],
+    "date_fields": [
+      "LAST_INSPECTION_DATE"
+    ],
+    "freshness_fields": [
+      "LAST_INSPECTION_DATE"
+    ],
+    "entity_fields": [
+      "FACILITY_NAME"
+    ],
+    "address_fields": [
+      "SITE_ADDRESS"
+    ],
+    "description_fields": [
+      "FACILITY_TYPE"
+    ],
+    "status_fields": [
+      "INSPECTION_RESULT"
+    ],
+    "value_fields": [],
+    "complete_snapshot": true,
+    "freshness_days": 7,
+    "incremental_overlap_days": 7,
+    "max_pages": 1000,
+    "request_pause_seconds": 0.1,
+    "official_page": "https://peelregion.ca/health/inspections-monitoring/health-inspections",
+    "licence_note": "Public Peel inspection disclosure. Past results describe conditions on the inspection date; directory presence does not establish a new opening. Retain evidence URL.",
+    "evidence_fields": [
+      "DETAIL_URL"
+    ]
+  },
+  {
+    "id": "peel_health_drinking_water",
+    "name": "Peel Health - Small Drinking Water Systems",
+    "jurisdiction": "Brampton / Mississauga / Caledon",
+    "region": "Peel",
+    "family": "health_inspection",
+    "collector": "peel_health",
+    "mode": "daily",
+    "enabled": true,
+    "url": "https://rmop.hedgerowsoftware.com/Portal/",
+    "table_url": "https://rmop.hedgerowsoftware.com/Portal/SmallDrinkingWaterSystem/Table",
+    "program_area": "SmallDrinkingWaterSystem",
+    "key_fields": [
+      "FACILITY_ID"
+    ],
+    "date_fields": [
+      "LAST_INSPECTION_DATE"
+    ],
+    "freshness_fields": [
+      "LAST_INSPECTION_DATE"
+    ],
+    "entity_fields": [
+      "FACILITY_NAME"
+    ],
+    "address_fields": [
+      "SITE_ADDRESS"
+    ],
+    "description_fields": [
+      "FACILITY_TYPE"
+    ],
+    "status_fields": [
+      "INSPECTION_RESULT"
+    ],
+    "value_fields": [],
+    "complete_snapshot": true,
+    "freshness_days": 7,
+    "incremental_overlap_days": 7,
+    "max_pages": 1000,
+    "request_pause_seconds": 0.1,
+    "official_page": "https://peelregion.ca/health/inspections-monitoring/health-inspections",
+    "licence_note": "Public Peel inspection disclosure. Past results describe conditions on the inspection date; directory presence does not establish a new opening. Retain evidence URL.",
+    "evidence_fields": [
+      "DETAIL_URL"
+    ]
+  },
+  {
+    "id": "york_region_active_development_applications",
+    "name": "York Region Active Development Applications",
+    "jurisdiction": "York Region",
+    "region": "York",
+    "family": "planning_application",
+    "collector": "arcgis",
+    "mode": "daily",
+    "enabled": false,
+    "url": "https://services1.arcgis.com/GzvOwaQBbX7KLiuG/ArcGIS/rest/services/Hosted_Development_Application_Status_And_Teams/FeatureServer/0",
+    "query_url": "https://services1.arcgis.com/GzvOwaQBbX7KLiuG/ArcGIS/rest/services/Hosted_Development_Application_Status_And_Teams/FeatureServer/0/query",
+    "page_size": 1000,
+    "key_fields": [
+      "APPL_GISID"
+    ],
+    "date_fields": [
+      "MOD_DATE",
+      "DATE_RECVD"
+    ],
+    "entity_fields": [
+      "APPL_NAME"
+    ],
+    "address_fields": [
+      "ADDRESS"
+    ],
+    "description_fields": [
+      "APPL_DESC",
+      "APPL_TYPE",
+      "APPL_SUBTYPE"
+    ],
+    "status_fields": [
+      "APPL_STATUS",
+      "APPL_STAGE"
+    ],
+    "value_fields": [],
+    "complete_snapshot": true,
+    "freshness_days": 10,
+    "freshness_fields": [
+      "MOD_DATE"
+    ],
+    "server_where": "1=1",
+    "incremental_overlap_days": 10,
+    "incremental_fields": [
+      "MOD_DATE"
+    ],
+    "official_page": "https://www.york.ca/newsroom/campaigns-projects/track-status-development-applications",
+    "licence_note": "Public York Region GIS/open data. Verify applicability of York Region Open Data Licence before commercial lead distribution. Regional review applications may overlap local municipal sources.",
+    "filter_note": "No blanket residential suppression; preserve UNKNOWN until project use validated. First baseline does not emit new leads.",
+    "collection_policy": "snapshot",
+    "snapshot_interval_days": 7
+  },
+  {
+    "id": "mississauga_site_plan_applications",
+    "name": "Mississauga Site Plan Applications",
+    "jurisdiction": "Mississauga",
+    "region": "Peel",
+    "family": "planning_application",
+    "collector": "arcgis",
+    "mode": "monthly",
+    "enabled": false,
+    "url": "https://services6.arcgis.com/hM5ymMLbxIyWTjn2/ArcGIS/rest/services/Site_Plan_Applications/FeatureServer/0",
+    "query_url": "https://services6.arcgis.com/hM5ymMLbxIyWTjn2/ArcGIS/rest/services/Site_Plan_Applications/FeatureServer/0/query",
+    "page_size": 1000,
+    "key_fields": [
+      "APP_FILE_NO"
+    ],
+    "date_fields": [
+      "APPLICATION_DATE"
+    ],
+    "entity_fields": [
+      "APPLICANT"
+    ],
+    "address_fields": [
+      "SITE_ADDRESS"
+    ],
+    "description_fields": [
+      "DESCRIPTION",
+      "CATEGORY_DESC",
+      "TYPE_DESC"
+    ],
+    "status_fields": [
+      "SIMPLE_STATUS"
+    ],
+    "value_fields": [],
+    "complete_snapshot": true,
+    "freshness_days": 35,
+    "server_where": "1=1",
+    "official_page": "https://services6.arcgis.com/hM5ymMLbxIyWTjn2/ArcGIS/rest/services/Site_Plan_Applications/FeatureServer/0",
+    "licence_note": "Public official ArcGIS service; verify specific commercial reuse rights before distribution. Test source changes, reliability, identity stability and overlap before enabling unattended collection.",
+    "filter_note": "Intentionally broad initial snapshot; do not mistake residential planning applications for commercial leads. Review-only source.",
+    "validation_state": "SCHEMA_VERIFIED_LIVE_COLLECTION_NOT_TESTED",
+    "polling_note": "Full monthly snapshot preferred pending edit timestamp/incremental field verification. Test via targeted doctor and poll; do not enable daily polling.",
+    "collection_policy": "snapshot",
+    "snapshot_interval_days": 3
+  },
+  {
+    "id": "mississauga_rezoning_applications",
+    "name": "Mississauga Rezoning Applications",
+    "jurisdiction": "Mississauga",
+    "region": "Peel",
+    "family": "planning_application",
+    "collector": "arcgis",
+    "mode": "monthly",
+    "enabled": false,
+    "url": "https://services6.arcgis.com/hM5ymMLbxIyWTjn2/ArcGIS/rest/services/Rezoning_Applications/FeatureServer/0",
+    "query_url": "https://services6.arcgis.com/hM5ymMLbxIyWTjn2/ArcGIS/rest/services/Rezoning_Applications/FeatureServer/0/query",
+    "page_size": 1000,
+    "key_fields": [
+      "APP_FILE_NO"
+    ],
+    "date_fields": [
+      "APPLICATION_DATE"
+    ],
+    "entity_fields": [
+      "APPLICANT"
+    ],
+    "address_fields": [
+      "SITE_ADDRESS"
+    ],
+    "description_fields": [
+      "DESCRIPTION",
+      "CATEGORY_DESC",
+      "TYPE_DESC"
+    ],
+    "status_fields": [
+      "SIMPLE_STATUS"
+    ],
+    "value_fields": [],
+    "complete_snapshot": true,
+    "freshness_days": 35,
+    "server_where": "1=1",
+    "official_page": "https://services6.arcgis.com/hM5ymMLbxIyWTjn2/ArcGIS/rest/services/Rezoning_Applications/FeatureServer/0",
+    "licence_note": "Public official ArcGIS service; verify specific commercial reuse rights before distribution. Test source changes, reliability, identity stability and overlap before enabling unattended collection.",
+    "filter_note": "Intentionally broad initial snapshot; do not mistake residential planning applications for commercial leads. Review-only source.",
+    "validation_state": "SCHEMA_VERIFIED_LIVE_COLLECTION_NOT_TESTED",
+    "polling_note": "Full monthly snapshot preferred pending edit timestamp/incremental field verification. Test via targeted doctor and poll; do not enable daily polling.",
+    "collection_policy": "snapshot",
+    "snapshot_interval_days": 3
+  },
+  {
+    "id": "richmond_hill_active_development_applications",
+    "name": "Richmond Hill Active Development Applications",
+    "jurisdiction": "Richmond Hill",
+    "region": "York",
+    "family": "planning_application",
+    "collector": "arcgis",
+    "mode": "monthly",
+    "enabled": false,
+    "url": "https://services5.arcgis.com/cu2HFDk7AqvG7e31/ArcGIS/rest/services/Development_Applications_view_-_Active_Applications/FeatureServer/0",
+    "query_url": "https://services5.arcgis.com/cu2HFDk7AqvG7e31/ArcGIS/rest/services/Development_Applications_view_-_Active_Applications/FeatureServer/0/query",
+    "page_size": 1000,
+    "key_fields": [
+      "OBJECTID"
+    ],
+    "date_fields": [
+      "APPLICATIONRECEIVEDDATE"
+    ],
+    "entity_fields": [
+      "OWNER"
+    ],
+    "address_fields": [
+      "ADDRESS"
+    ],
+    "description_fields": [
+      "DESCRIPTIONOFAPPLICATION",
+      "APPLICATIONTYPE"
+    ],
+    "status_fields": [
+      "STATUS"
+    ],
+    "value_fields": [],
+    "complete_snapshot": true,
+    "freshness_days": 35,
+    "server_where": "1=1",
+    "official_page": "https://services5.arcgis.com/cu2HFDk7AqvG7e31/ArcGIS/rest/services/Development_Applications_view_-_Active_Applications/FeatureServer/0",
+    "licence_note": "Public official ArcGIS service; verify specific commercial reuse rights before distribution. Test source changes, reliability, identity stability and overlap before enabling unattended collection.",
+    "filter_note": "Intentionally broad initial snapshot; do not mistake residential planning applications for commercial leads. Review-only source.",
+    "validation_state": "SCHEMA_VERIFIED_LIVE_COLLECTION_NOT_TESTED",
+    "polling_note": "Full monthly snapshot preferred pending edit timestamp/incremental field verification. Test via targeted doctor and poll; do not enable daily polling.",
+    "collection_policy": "snapshot",
+    "snapshot_interval_days": 3
+  },
+  {
+    "id": "hamilton_development_applications",
+    "name": "Hamilton Development Applications",
+    "jurisdiction": "Hamilton",
+    "region": "Hamilton",
+    "family": "development_application",
+    "collector": "arcgis",
+    "mode": "daily",
+    "enabled": false,
+    "url": "https://services.arcgis.com/rYz782eMbySr2srL/arcgis/rest/services/Development_Applications/FeatureServer/2",
+    "query_url": "https://services.arcgis.com/rYz782eMbySr2srL/arcgis/rest/services/Development_Applications/FeatureServer/2/query",
+    "page_size": 1000,
+    "key_fields": [
+      "OBJECTID"
+    ],
+    "date_fields": [],
+    "entity_fields": [],
+    "address_fields": [],
+    "description_fields": [],
+    "status_fields": [],
+    "value_fields": [],
+    "complete_snapshot": false,
+    "freshness_days": 14,
+    "official_page": "https://services.arcgis.com/rYz782eMbySr2srL/arcgis/rest/services/Development_Applications/FeatureServer/2",
+    "licence_note": "Public official ArcGIS data: verify per-source licence and live field/date mapping before enabling commercially.",
+    "freshness_fields": [],
+    "incremental_overlap_days": 5,
+    "incremental_fields": [],
+    "filter_note": "Unfiltered discovery: historical rows are baselines, not qualified leads.",
+    "collection_policy": "snapshot",
+    "snapshot_interval_days": 7
+  },
+  {
+    "id": "waterloo_city_building_permits",
+    "name": "City of Waterloo Building Permits",
+    "jurisdiction": "Waterloo",
+    "region": "Waterloo",
+    "family": "permit",
+    "collector": "arcgis",
+    "mode": "daily",
+    "enabled": false,
+    "url": "https://services.arcgis.com/ZpeBVw5o1kjit7LT/arcgis/rest/services/City_of_Waterloo_Building_Permits/FeatureServer/0",
+    "query_url": "https://services.arcgis.com/ZpeBVw5o1kjit7LT/arcgis/rest/services/City_of_Waterloo_Building_Permits/FeatureServer/0/query",
+    "page_size": 1000,
+    "key_fields": [
+      "PERMIT_ID",
+      "PERMIT_NUM"
+    ],
+    "date_fields": [
+      "ISSUEDATE"
+    ],
+    "entity_fields": [],
+    "address_fields": [
+      "ADDRESS"
+    ],
+    "description_fields": [
+      "DESCRIPTN",
+      "PERMITDESC",
+      "WORKDESC"
+    ],
+    "status_fields": [
+      "STATUS"
+    ],
+    "value_fields": [
+      "CONTRVALUE"
+    ],
+    "complete_snapshot": false,
+    "freshness_days": 14,
+    "official_page": "https://services.arcgis.com/ZpeBVw5o1kjit7LT/arcgis/rest/services/City_of_Waterloo_Building_Permits/FeatureServer/0",
+    "licence_note": "Public official ArcGIS data: verify per-source licence and live field/date mapping before enabling commercially.",
+    "freshness_fields": [
+      "ISSUEDATE"
+    ],
+    "incremental_overlap_days": 5,
+    "incremental_fields": [
+      "ISSUEDATE"
+    ],
+    "filter_note": "Unfiltered discovery: historical rows are baselines, not qualified leads."
+  },
+  {
+    "id": "st_catharines_building_permits",
+    "name": "St. Catharines Building Permits",
+    "jurisdiction": "St. Catharines",
+    "region": "Niagara",
+    "family": "permit",
+    "collector": "arcgis",
+    "mode": "daily",
+    "enabled": false,
+    "url": "https://services6.arcgis.com/Yx1h0qHJ9wIpQWuU/arcgis/rest/services/Building_Permits_Public/FeatureServer/0",
+    "query_url": "https://services6.arcgis.com/Yx1h0qHJ9wIpQWuU/arcgis/rest/services/Building_Permits_Public/FeatureServer/0/query",
+    "page_size": 1000,
+    "key_fields": [
+      "FOLDERYEAR",
+      "FOLDERSEQUENCE"
+    ],
+    "date_fields": [
+      "INDATE",
+      "ISSUEDATE"
+    ],
+    "entity_fields": [
+      "PROPERTYNAME"
+    ],
+    "address_fields": [
+      "PROPSTREET",
+      "PROPSTREETTYPE",
+      "PROPCITY"
+    ],
+    "description_fields": [
+      "FOLDERDESCRIPTION",
+      "FOLDERDESC"
+    ],
+    "status_fields": [
+      "STATUSDESC"
+    ],
+    "value_fields": [],
+    "complete_snapshot": false,
+    "freshness_days": 14,
+    "official_page": "https://services6.arcgis.com/Yx1h0qHJ9wIpQWuU/arcgis/rest/services/Building_Permits_Public/FeatureServer/0",
+    "licence_note": "Public official ArcGIS data: verify per-source licence and live field/date mapping before enabling commercially.",
+    "freshness_fields": [
+      "INDATE",
+      "ISSUEDATE"
+    ],
+    "incremental_overlap_days": 5,
+    "incremental_fields": [
+      "INDATE",
+      "ISSUEDATE"
+    ],
+    "filter_note": "Unfiltered discovery: historical rows are baselines, not qualified leads."
+  },
+  {
+    "id": "durham_planit_consents",
+    "name": "Durham PLANit Consent Applications",
+    "jurisdiction": "Durham Region",
+    "region": "Durham",
+    "family": "planning_application",
+    "collector": "arcgis",
+    "mode": "monthly",
+    "enabled": false,
+    "url": "https://maps.durham.ca/arcgis/rest/services/PLANit/PLANit/MapServer/1",
+    "query_url": "https://maps.durham.ca/arcgis/rest/services/PLANit/PLANit/MapServer/1/query",
+    "page_size": 1000,
+    "key_fields": [
+      "Regional_File_Number",
+      "ARN"
+    ],
+    "date_fields": [
+      "Completed_Date"
+    ],
+    "entity_fields": [],
+    "address_fields": [],
+    "description_fields": [
+      "Description",
+      "Job_Type"
+    ],
+    "status_fields": [
+      "Status",
+      "AppStatus"
+    ],
+    "value_fields": [],
+    "complete_snapshot": true,
+    "freshness_days": 35,
+    "server_where": "1=1",
+    "official_page": "https://maps.durham.ca/arcgis/rest/services/PLANit/PLANit/MapServer/1",
+    "licence_note": "Official Durham GIS public service; verify dataset-specific commercial reuse terms before sale or redistribution.",
+    "filter_note": "Historical baseline/reference source only until dates, missing addresses, and commercial relevance validated. No automatic qualified leads.",
+    "validation_state": "PUBLIC_SCHEMA_VERIFIED_NOT_LIVE_IMPORTED",
+    "polling_note": "Monthly complete snapshots pending repeat/live field verification; no safe date-based incremental assumption.",
+    "collection_policy": "snapshot",
+    "snapshot_interval_days": 7
+  },
+  {
+    "id": "durham_planit_opa",
+    "name": "Durham Regional Official Plan Applications",
+    "jurisdiction": "Durham Region",
+    "region": "Durham",
+    "family": "planning_application",
+    "collector": "arcgis",
+    "mode": "monthly",
+    "enabled": false,
+    "url": "https://maps.durham.ca/arcgis/rest/services/PLANit/PLANit/MapServer/2",
+    "query_url": "https://maps.durham.ca/arcgis/rest/services/PLANit/PLANit/MapServer/2/query",
+    "page_size": 1000,
+    "key_fields": [
+      "Regional_File_Number",
+      "ARN"
+    ],
+    "date_fields": [
+      "Completed_Date"
+    ],
+    "entity_fields": [],
+    "address_fields": [],
+    "description_fields": [
+      "Description",
+      "Job_Type"
+    ],
+    "status_fields": [
+      "Status",
+      "AppStatus"
+    ],
+    "value_fields": [],
+    "complete_snapshot": true,
+    "freshness_days": 35,
+    "server_where": "1=1",
+    "official_page": "https://maps.durham.ca/arcgis/rest/services/PLANit/PLANit/MapServer/2",
+    "licence_note": "Official Durham GIS public service; verify dataset-specific commercial reuse terms before sale or redistribution.",
+    "filter_note": "Historical baseline/reference source only until dates, missing addresses, and commercial relevance validated. No automatic qualified leads.",
+    "validation_state": "PUBLIC_SCHEMA_VERIFIED_NOT_LIVE_IMPORTED",
+    "polling_note": "Monthly complete snapshots pending repeat/live field verification; no safe date-based incremental assumption.",
+    "collection_policy": "snapshot",
+    "snapshot_interval_days": 7
+  },
+  {
+    "id": "durham_business_sites",
+    "name": "Durham Business Sites",
+    "jurisdiction": "Durham Region",
+    "region": "Durham",
+    "family": "business_directory",
+    "collector": "arcgis",
+    "mode": "monthly",
+    "enabled": false,
+    "url": "https://maps.durham.ca/arcgis/rest/services/Open_Data/Durham_OpenData/MapServer/11",
+    "query_url": "https://maps.durham.ca/arcgis/rest/services/Open_Data/Durham_OpenData/MapServer/11/query",
+    "page_size": 1000,
+    "key_fields": [
+      "Business_Id"
+    ],
+    "date_fields": [
+      "Updated_Date",
+      "Created_Date"
+    ],
+    "entity_fields": [
+      "Business_Name"
+    ],
+    "address_fields": [
+      "Street_Number",
+      "Street_Name",
+      "Street_Type",
+      "Municipality"
+    ],
+    "description_fields": [
+      "Business_Description",
+      "NAICSCode_Desc"
+    ],
+    "status_fields": [],
+    "value_fields": [],
+    "complete_snapshot": true,
+    "freshness_days": 35,
+    "server_where": "1=1",
+    "official_page": "https://maps.durham.ca/arcgis/rest/services/Open_Data/Durham_OpenData/MapServer/11",
+    "licence_note": "Official Durham GIS public service; verify dataset-specific commercial reuse terms before sale or redistribution.",
+    "filter_note": "Historical baseline/reference source only until dates, missing addresses, and commercial relevance validated. No automatic qualified leads.",
+    "validation_state": "PUBLIC_SCHEMA_VERIFIED_NOT_LIVE_IMPORTED",
+    "polling_note": "Monthly complete snapshots pending repeat/live field verification; no safe date-based incremental assumption.",
+    "collection_policy": "incremental",
+    "snapshot_interval_days": 7,
+    "incremental_fields": [
+      "Updated_Date"
+    ]
+  },
+  {
+    "id": "durham_capital_projects",
+    "name": "Durham Capital Project Boundaries",
+    "jurisdiction": "Durham Region",
+    "region": "Durham",
+    "family": "capital_project",
+    "collector": "arcgis",
+    "mode": "monthly",
+    "enabled": false,
+    "url": "https://maps.durham.ca/arcgis/rest/services/CDEAP2/MapServer/3",
+    "query_url": "https://maps.durham.ca/arcgis/rest/services/CDEAP2/MapServer/3/query",
+    "page_size": 1000,
+    "key_fields": [
+      "OBJECTID"
+    ],
+    "date_fields": [
+      "DATEUPDATED"
+    ],
+    "entity_fields": [
+      "PROJECTNAME"
+    ],
+    "address_fields": [
+      "ROADNAME"
+    ],
+    "description_fields": [
+      "PROJECTNAME",
+      "CATEGORY",
+      "STAGE"
+    ],
+    "status_fields": [
+      "STATUS"
+    ],
+    "value_fields": [],
+    "complete_snapshot": true,
+    "freshness_days": 35,
+    "server_where": "1=1",
+    "official_page": "https://maps.durham.ca/arcgis/rest/services/CDEAP2/MapServer/3",
+    "licence_note": "Official Durham GIS public service; verify dataset-specific commercial reuse terms before sale or redistribution.",
+    "filter_note": "Historical baseline/reference source only until dates, missing addresses, and commercial relevance validated. No automatic qualified leads.",
+    "validation_state": "PUBLIC_SCHEMA_VERIFIED_NOT_LIVE_IMPORTED",
+    "polling_note": "Monthly complete snapshots pending repeat/live field verification; no safe date-based incremental assumption.",
+    "collection_policy": "incremental",
+    "snapshot_interval_days": 7,
+    "incremental_fields": [
+      "DATEUPDATED"
+    ]
+  },
+  {
+    "id": "hamilton_building_demolition_permits",
+    "name": "Hamilton Building and Demolition Permits",
+    "jurisdiction": "Hamilton",
+    "region": "Hamilton",
+    "family": "permit",
+    "collector": "arcgis",
+    "mode": "monthly",
+    "enabled": false,
+    "url": "https://services.arcgis.com/rYz782eMbySr2srL/arcgis/rest/services/Building_and_Demolition_Permits_2017_to_Present/FeatureServer/6",
+    "query_url": "https://services.arcgis.com/rYz782eMbySr2srL/arcgis/rest/services/Building_and_Demolition_Permits_2017_to_Present/FeatureServer/6/query",
+    "page_size": 1000,
+    "key_fields": [
+      "PERMITNUMBER"
+    ],
+    "date_fields": [
+      "APPLIEDDATE",
+      "ISSUEDDATE",
+      "COMPLETEDDATE"
+    ],
+    "entity_fields": [],
+    "address_fields": [
+      "ORIGINALADDRESS1",
+      "ORIGINALCITY"
+    ],
+    "description_fields": [
+      "DESCRIPTION",
+      "PERMITCLASS",
+      "WORKCLASS"
+    ],
+    "status_fields": [
+      "STATUSCURRENT"
+    ],
+    "value_fields": [],
+    "complete_snapshot": true,
+    "freshness_days": 40,
+    "server_where": "1=1",
+    "official_page": "https://services.arcgis.com/rYz782eMbySr2srL/arcgis/rest/services/Building_and_Demolition_Permits_2017_to_Present/FeatureServer/6",
+    "licence_note": "Official publicly documented GIS source. Verify live response and current dataset-specific commercial licence before enabling external sales.",
+    "filter_note": "Staged disabled. Full snapshot on activation; historical data is NOT a fresh lead. No safe incremental freshness field assumed.",
+    "validation_state": "OFFICIAL_PUBLIC_SCHEMA_REVIEW_ONLY_NOT_LIVE_TESTED",
+    "collection_policy": "snapshot",
+    "snapshot_interval_days": 30
+  },
+  {
+    "id": "kitchener_active_planning_applications",
+    "name": "Kitchener Active Planning Applications",
+    "jurisdiction": "Waterloo",
+    "region": "Waterloo",
+    "family": "planning_application",
+    "collector": "arcgis",
+    "mode": "monthly",
+    "enabled": false,
+    "url": "https://services1.arcgis.com/qAo1OsXi67t7XgmS/arcgis/rest/services/Planning_Applications_Active/FeatureServer/0",
+    "query_url": "https://services1.arcgis.com/qAo1OsXi67t7XgmS/arcgis/rest/services/Planning_Applications_Active/FeatureServer/0/query",
+    "page_size": 1000,
+    "key_fields": [
+      "OBJECTID"
+    ],
+    "date_fields": [],
+    "entity_fields": [],
+    "address_fields": [],
+    "description_fields": [],
+    "status_fields": [],
+    "value_fields": [],
+    "complete_snapshot": true,
+    "freshness_days": 40,
+    "server_where": "1=1",
+    "official_page": "https://services1.arcgis.com/qAo1OsXi67t7XgmS/arcgis/rest/services/Planning_Applications_Active/FeatureServer/0",
+    "licence_note": "Official publicly documented GIS source. Verify live response and current dataset-specific commercial licence before enabling external sales.",
+    "filter_note": "Staged disabled. Full snapshot on activation; historical data is NOT a fresh lead. No safe incremental freshness field assumed.",
+    "validation_state": "OFFICIAL_PUBLIC_SCHEMA_REVIEW_ONLY_NOT_LIVE_TESTED",
+    "collection_policy": "snapshot",
+    "snapshot_interval_days": 3
+  }
+]

@@ -1,0 +1,115 @@
+{
+  "sources": [
+    {
+      "id": "federal_active_cbca",
+      "kind": "federal_csv",
+      "name": "Federal Active Business Corporations (Ontario subset)",
+      "url": "https://d4bf66bykfyaf.cloudfront.net/corporations-active-cbca-en.csv",
+      "enabled": true,
+      "commercial_reuse": "OGL-Canada: attribution required; verify licence at source",
+      "cadence_days": 1
+    },
+    {
+      "id": "york_business_directory_2024",
+      "kind": "arcgis",
+      "name": "York Region Business Directory (2024 vintage)",
+      "url": "https://services1.arcgis.com/GzvOwaQBbX7KLiuG/ArcGIS/rest/services/Business_Directory_2024/FeatureServer/1",
+      "enabled": true,
+      "cadence_days": 30,
+      "commercial_reuse": "Review York Region source terms before distribution",
+      "name_fields": [
+        "NAME"
+      ],
+      "address_fields": [
+        "FULL_ADDRESS"
+      ],
+      "city_fields": [
+        "MUNICIPALITY"
+      ],
+      "industry_fields": [
+        "PRIM_NAICS_DESC"
+      ],
+      "website_fields": [],
+      "key_fields": [
+        "BUSINESSID"
+      ],
+      "date_fields": [
+        "LAST_UPDATED"
+      ]
+    },
+    {
+      "id": "kitchener_business_licences",
+      "kind": "arcgis",
+      "name": "Kitchener Non-Temporary Business Licences",
+      "url": "https://services1.arcgis.com/qAo1OsXi67t7XgmS/arcgis/rest/services/Business_Licenses_Non_Temporary/FeatureServer/0",
+      "enabled": true,
+      "cadence_days": 1,
+      "commercial_reuse": "Review Kitchener dataset-specific terms before distribution",
+      "name_fields": [
+        "LICENSEE",
+        "LICENSE_HOLDER"
+      ],
+      "address_fields": [
+        "LICENCED_LOCATION"
+      ],
+      "city_fields": [],
+      "industry_fields": [
+        "LICENSE_TYPE",
+        "BUSINESS_DESCRIPTION"
+      ],
+      "website_fields": [],
+      "key_fields": [
+        "BUSINESS_LIC_NO"
+      ],
+      "date_fields": [
+        "ISSUEDATE",
+        "INDATE"
+      ]
+    },
+    {
+      "id": "niagara_employment_inventory",
+      "kind": "arcgis",
+      "name": "Niagara Consolidated Employment Inventory (historical annual surveys)",
+      "url": "https://services1.arcgis.com/WxiLK82TWf8W3O3f/arcgis/rest/services/OpenData_Consolidated_NEI_Opendata/FeatureServer/45",
+      "enabled": true,
+      "cadence_days": 30,
+      "commercial_reuse": "Niagara Open Government Licence 2.0; attribute source",
+      "name_fields": [
+        "businessname"
+      ],
+      "address_fields": [
+        "businessstreetname"
+      ],
+      "city_fields": [
+        "municipality"
+      ],
+      "industry_fields": [
+        "industry",
+        "primarysector"
+      ],
+      "website_fields": [
+        "businesswebsite"
+      ],
+      "key_fields": [
+        "OBJECTID"
+      ],
+      "date_fields": [
+        "Year"
+      ]
+    }
+  ],
+  "optional_sources": [
+    {
+      "id": "ontario_registry",
+      "kind": "manual_verification",
+      "enabled": false,
+      "reason": "Basic official searches available; no verified unrestricted bulk or automation permission"
+    },
+    {
+      "id": "press_releases",
+      "kind": "rss",
+      "enabled": false,
+      "reason": "Configure and review an authorized feed URL before enabling"
+    }
+  ]
+}
