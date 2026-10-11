@@ -112,7 +112,16 @@ def render(data,out):
  metrics=[('Brampton tracked sources',len(B['sources'])),('Brampton stored records',count),('Other active municipal records*',total),('Brampton source errors',statuses.get('ERROR',0)),('Unverified address matches',len(relations))]
  parts=['<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>GTA Radar — Operations and Evidence</title><style>',CSS,'</style></head><body><h1>GTA Radar — Operations &amp; Evidence</h1><p class="muted">Generated ',esc(datetime.now(timezone.utc).isoformat(timespec='seconds')),' UTC · Offline, read-only database snapshot</p><div class="note">Public records and document observations are <b>evidence</b>. Address matches are <b>UNVERIFIED research candidates</b>, never proof of common ownership or a commercial opportunity. Source availability does not establish reuse rights. Counts do not imply unique entities or newly published events.</div><div class="grid">']
  for label,value in metrics:parts.extend(['<div class="metric"><span>',esc(label),'</span><strong>',esc(value),'</strong></div>'])
- parts.append('</div><h2>1 · Source health — Brampton</h2>')
+ parts.append('</div><h2>Daily collection execution</h2>')
+ manifest=data/'daily_run_manifest.json'
+ if manifest.is_file():
+  try:
+   latest=json.loads(manifest.read_text(encoding='utf-8'))
+   parts.append('<p>Last run: '+esc(latest.get('started_at'))+' · Status: <strong>'+esc(latest.get('status'))+'</strong></p>')
+   parts.append(table([('step','Step'),('status','Result'),('finished_at','Finished'),('exit_code','Exit code')],latest.get('steps',[])))
+  except (ValueError,OSError,TypeError):parts.append('<p>Run manifest unreadable; validate scheduled collection.</p>')
+ else:parts.append('<p>No completed daily run manifest yet. Scheduled execution unverified.</p>')
+ parts.append('<h2>1 · Source health — Brampton</h2>')
  parts.append(table([('department','Department'),('title','Source'),('access_status','Status'),('records','Stored'),('last_run','Last run'),('detail','Last result'),('url','Official source')],B['sources']))
  parts.append('<h2>2 · Collection checkpoints</h2>')
  parts.append(table([('source_id','Source'),('last_oid','Last ID'),('total_estimate','Estimated total'),('backfilled','Full pass done'),('updated_at','Checkpoint time')],B['progress']))
