@@ -16,8 +16,8 @@ API='https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action/package_search
 PRIORITIES=(
  ('construction_development',r'building permit|development application|site plan|rezoning|zoning by.law|subdivision|development pipeline|planning application'),
  ('business_licensing',r'business licen|municipal licen|establishment|dinesafe|inspection'),
- ('procurement_finance',r'procurement|purchase order|tender|contract award|capital budget|financial plan|vendor'),
- ('infrastructure_transport',r'road closure|road restriction|construction project|traffic restriction|capital project|right.of.way'),
+ ('procurement_finance',r'procurement|purchase order|tender|contract|non.competitive|capital budget|financial plan|vendor'),
+ ('infrastructure_transport',r'road closure|road restriction|construction project|traffic restriction|capital project|right.of.way|roadwork'),
  ('land_property',r'address point|parcel|property|land use|assessment'),
  ('council_governance',r'council|committee|agenda|by.law|decision'),
 )
@@ -52,6 +52,9 @@ def fetch_catalog(session=None, *, rows=100):
     if len(packages)!=total:raise ValueError('Incomplete CKAN catalogue')
     return packages
 
+def normalize_title(text):
+    return ' '.join(re.findall(r'[a-z0-9]+',str(text or '').lower()))
+
 def audit(packages,sources):
     configured=[s for s in sources if str(s.get('jurisdiction','')).lower()=='toronto']
     rows=[]
@@ -59,9 +62,16 @@ def audit(packages,sources):
         resources=package.get('resources') or []
         name=str(package.get('name') or '')
         title=str(package.get('title') or '')
-        match=[s['id'] for s in configured if s.get('package_id')==package.get('id')
-               or s.get('package_name')==name]
-        # Names in existing package_query are searches, not exact binding evidence.
+        match=[s['id'] for s in configured if
+               (s.get('package_id') and s['package_id']==package.get('id'))
+               or (s.get('package_slug') and s['package_slug']==name)
+               or (s.get('package_name') and s['package_name']==name)]
+        # Search-based configuration is only a title candidate, not an ID check.
+        possible=[s['id'] for s in configured if s['id'] not in match
+                  and s.get('collector')=='ckan'
+                  and s.get('package_query')
+                  and normalize_title(s['package_query'])==normalize_title(title)]
+        enabled=[s['id'] for s in configured if s['id'] in match and s.get('enabled')]
         rows.append({
             'package_id':package.get('id',''),
             'package_name':name,'title':title,
@@ -75,7 +85,9 @@ def audit(packages,sources):
             'resource_ids':','.join(str(x['id']) for x in resources if x.get('id')),
             'priority_families':','.join(classify(package)),
             'configured_exact_ids':','.join(match),
-            'collector_alignment':'EXACT_CONFIGURED' if match else 'REVIEW_NOT_PROVEN',
+            'configured_enabled_ids':','.join(enabled),
+            'possible_query_matches':','.join(possible),
+            'collector_alignment':'EXACT_CONFIGURED' if match else 'TITLE_SEARCH_POSSIBLE' if possible else 'NOT_CONFIGURED',
         })
     return rows
 
@@ -103,7 +115,7 @@ def run(*,force=False):
              'Toronto_existing_configured_sources':len([s for s in sources if str(s.get('jurisdiction','')).lower()=='toronto']),
              'priority_candidates':sum(bool(r['priority_families']) for r in rows),
              'packages':rows,
-             'caveat':'Discovery only: REVIEW_NOT_PROVEN includes existing sources with search-based configuration. No live ingestion or licences validated.'}
+             'caveat':'Discovery only. EXACT_CONFIGURED means identity pinned in code, not proof of current successful ingestion. TITLE_SEARCH_POSSIBLE is not verified. No licence, schema, or live ingestion validated.'}
     for filename,text in [('toronto_catalog_inventory.csv',buffer.getvalue()),
                           ('toronto_catalog_inventory.json',json.dumps(summary,indent=2,ensure_ascii=False))]:
         output=dest/filename;temp=dest/(filename+'.tmp')
