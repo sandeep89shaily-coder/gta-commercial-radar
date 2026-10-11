@@ -51,7 +51,7 @@ class TorontoPublicRecordsTests(unittest.TestCase):
   with patch('toronto_public_records.resolve_ckan_package',return_value=package):
    with patch('toronto_public_records.choose_ckan_resource',return_value={'id':'r1','name':'Different data','format':'CSV','url':'https://open.toronto.ca/abc.csv'}):
     with self.assertRaisesRegex(ValueError,'Expected named resource'):fetch(HTTP(),self.spec)
-   with patch('toronto_public_records.choose_ckan_resource',return_value={'id':'r1','name':'Non-Competitive Contracts','format':'XML','url':'https://open.toronto.ca/abc.xml'}):
+   with patch('toronto_public_records.choose_ckan_resource',return_value={'id':'r1','name':'Non-Competitive Contracts','format':'PDF','url':'https://open.toronto.ca/abc.pdf'}):
     with self.assertRaisesRegex(ValueError,'Unsupported resource'):fetch(HTTP(),self.spec)
  def test_all_sources_are_toronto_only(self):
   self.assertEqual(len(SPECS),3)
