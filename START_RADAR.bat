@@ -14,7 +14,7 @@ if errorlevel 1 (
  pause
  exit /b 1
 )
-%PY% -c "import requests, bs4" >nul 2>nul
+%PY% -c "import requests, bs4, pypdf, pandas, openpyxl" >nul 2>nul
 if errorlevel 1 (
  echo Installing required Python packages - once only...
  %PY% -m pip install -r requirements.txt
