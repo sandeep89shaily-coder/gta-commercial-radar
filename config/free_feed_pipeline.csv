@@ -1,0 +1,21 @@
+priority,region,source_family,candidate,commercial_use_case,access_state,collector_state,next_validation
+1,York,planning,York Region active development applications,Commercial developments and renovations,public GIS endpoint known,preview disabled,Verify freshness field and licence
+1,York,planning,Richmond Hill development applications,Projects before permits,public ArcGIS endpoint identified,configured_disabled_live_validation_pending,"Run source-specific doctor + baseline on desktop; verify edit timestamps, commercial licences, and record overlap before enabling"
+1,Peel,planning,Mississauga site plan applications,Early development-stage demand,public ArcGIS endpoint identified,configured_disabled_live_validation_pending,"Run source-specific doctor + baseline on desktop; verify edit timestamps, commercial licences, and record overlap before enabling"
+1,Peel,planning,Mississauga rezoning applications,Early property investment,public ArcGIS endpoint identified,configured_disabled_live_validation_pending,"Run source-specific doctor + baseline on desktop; verify edit timestamps, commercial licences, and record overlap before enabling"
+1,Canada,procurement,CanadaBuys open tenders,Prospective service and equipment purchases,public bulk catalogue identified,research,Verify data licence fields and update cadence
+2,York,health,YorkSafe inspection records,Operating business corroboration,public search portal,research,Find approved bulk feed and commercial rights
+2,York,planning,Vaughan planning and permits,Commercial project development,public portal,research,Find machine-readable service
+2,York,planning,Markham development application reports,Earlier project discovery,public reports,research,Inspect document structure and reuse terms
+2,Halton,planning,Burlington building permits and site plans,Projects and tenant fitouts,public search portal,research,Validate permitted retrieval
+2,Halton,planning,Oakville building permits and applications,New and expanded business premises,public reports and portal,research,Validate bulk access
+2,Halton,health,Halton public health disclosure,Business operating signals,public search portal,research,Verify feed and licence
+2,Durham,health,Durham Check and Go,Business operating signals,public search portal,research,Verify API or licensed feed
+2,Durham,planning,Pickering planning and permits,New projects and commercial facilities,public portal and GIS,research,Validate endpoint and licence
+2,Durham,planning,Ajax planning and permits,New developments,public portal,research,Validate endpoint and licence
+2,Durham,planning,Whitby planning and permits,New developments,public portal,research,Identify accessible publication source
+2,Durham,planning,Oshawa planning and permits,Projects and new facilities,public GIS/reports,research,Verify layers and licence
+2,Ontario,healthcare,Ontario long term care development notices,Institutional building opportunities,public registry,research,Inspect structured access
+2,Ontario,environment,Access Environment approvals,Industrial investments and compliance opportunities,public search registry,research,Confirm permissible bulk access and avoid ERO overlaps
+2,Canada,procurement,Federal published contract awards,Historical institutional spending and vendor identities,public bulk catalogue identified,research,Confirm structure licence and signal classification
+3,Ontario,licensing,AGCO liquor applications,Food service and hospitality opening signals,public notices,research,Verify authorized automated access
