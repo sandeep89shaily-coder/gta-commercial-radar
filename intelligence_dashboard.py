@@ -128,6 +128,16 @@ def render(data,out):
    parts.append('<p><a href="toronto_candidate_validation.json">Latest Toronto priority-source schema probes (JSON)</a> — metadata and field names only; not confirmation of a working collector.</p>')
   if (data/'toronto_catalog_change_history.jsonl').is_file():
    parts.append('<p><a href="toronto_catalog_change_history.jsonl">Toronto CKAN catalogue publication history (JSONL)</a> — newly listed packages and metadata changes, not new businesses or permits.</p>')
+ if (data/'toronto_priority_sources.sqlite').is_file():
+  tdb=connection(data/'toronto_priority_sources.sqlite')
+  if tdb:
+   try:
+    parts.append('<h2>Toronto — Procurement, Roads and Council Record Archive</h2>')
+    parts.append('<p>Complete public dataset snapshots and version observations are stored separately. Baselines are not new business events; absent rows are not interpreted as deletions.</p>')
+    parts.append(table([('source_id','Source'),('observed_at','Latest check'),('status','Result'),('fetched','Records checked'),('created','New observations'),('updated','Modified')],rows(tdb,'SELECT source_id,observed_at,status,fetched,created,updated FROM runs ORDER BY id DESC LIMIT 20')))
+    if (data/'toronto_priority_changes_REVIEW_ONLY.csv').is_file():
+     parts.append('<p><a href="toronto_priority_changes_REVIEW_ONLY.csv">Dataset-level changes (review only)</a> — not yet independently qualified commercial opportunities.</p>')
+   finally:tdb.close()
  parts.append('<h2>1 · Source health — Brampton</h2>')
  parts.append(table([('department','Department'),('title','Source'),('access_status','Status'),('records','Stored'),('last_run','Last run'),('detail','Last result'),('url','Official source')],B['sources']))
  parts.append('<h2>2 · Collection checkpoints</h2>')
