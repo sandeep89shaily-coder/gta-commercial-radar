@@ -13,6 +13,7 @@ STEPS=[
  ('toronto_schema_validation',('toronto_source_validator.py',),False),
  ('toronto_public_records',('toronto_public_records.py',),False),
  ('toronto_research_signals',('toronto_signals.py',),False),
+ ('mississauga_catalog_discovery',('mississauga_catalog_audit.py',),False),
  ('brampton',('brampton_network.py',),True),
  ('peel',('peel_pilot.py',),True),
  ('business_collection',('business_discovery.py','run'),True),
