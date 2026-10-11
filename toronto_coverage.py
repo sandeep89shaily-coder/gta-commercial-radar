@@ -95,7 +95,7 @@ def summarize(packages, sources, status):
             'priority_gaps': candidates(packages)}
 
 
-def render(report, observed_at):
+def render(report, observed_at, metadata_observations=0):
     esc = lambda value: html.escape(str(value if value is not None else ''), quote=True)
     counts = ''.join('<tr><td>%s</td><td>%s</td></tr>' % (esc(k), esc(v))
                      for k, v in sorted(report['publishing_divisions'].items(),
@@ -121,7 +121,7 @@ th{{background:#edf2f6}}.note{{background:#f1f4f7;padding:14px;border-radius:8px
 </style></head><body>
 <h1>Toronto — Department and Source Coverage</h1>
 <p>Catalogued {esc(observed_at)} · {report['published_packages']} CKAN packages ·
-{len(report['configured_feeds'])} Toronto feed configurations · {len(report['priority_gaps'])} priority gap candidates</p>
+{len(report['configured_feeds'])} Toronto feed configurations · {len(report['priority_gaps'])} priority gap candidates · {metadata_observations} catalogue metadata changes this scan</p>
 <p class="note">Coverage states are deliberately conservative: EXACT_CONFIGURED confirms
 a code-level dataset identity, not that data was successfully downloaded.
 NOT_VERIFIED means local poll status was not available. CKAN does not include all City portals.
@@ -158,7 +158,7 @@ def run():
     writer.writeheader()
     writer.writerows(queue)
     outputs = [('toronto_gap_queue.csv', buffer.getvalue()),
-               ('toronto_department_coverage.html', render(report, source['observed_at']))]
+               ('toronto_department_coverage.html', render(report, source['observed_at'], source.get('catalogue_metadata_changes_observed', 0)))]
     for name, value in outputs:
         path = DATA / name
         tmp = path.with_suffix(path.suffix + '.tmp')
