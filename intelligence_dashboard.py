@@ -126,6 +126,8 @@ def render(data,out):
   parts.append('<p><a href="toronto_department_coverage.html">Open Toronto department and source audit</a> — identify missing priority CKAN feeds, publishing divisions, and configured collector health. <a href="toronto_gap_queue.csv">CSV research queue</a>. These are candidates, not confirmed records or opportunities.</p>')
   if (data/'toronto_candidate_validation.json').is_file():
    parts.append('<p><a href="toronto_candidate_validation.json">Latest Toronto priority-source schema probes (JSON)</a> — metadata and field names only; not confirmation of a working collector.</p>')
+  if (data/'toronto_catalog_change_history.jsonl').is_file():
+   parts.append('<p><a href="toronto_catalog_change_history.jsonl">Toronto CKAN catalogue publication history (JSONL)</a> — newly listed packages and metadata changes, not new businesses or permits.</p>')
  parts.append('<h2>1 · Source health — Brampton</h2>')
  parts.append(table([('department','Department'),('title','Source'),('access_status','Status'),('records','Stored'),('last_run','Last run'),('detail','Last result'),('url','Official source')],B['sources']))
  parts.append('<h2>2 · Collection checkpoints</h2>')
