@@ -1,0 +1,28 @@
+region,kind,source,verification,url
+Hamilton,development,Hamilton development applications,endpoint verified; schema and incremental field pending,https://services.arcgis.com/rYz782eMbySr2srL/arcgis/rest/services/Development_Applications/FeatureServer/2
+Waterloo,permits,City of Waterloo issued building permits,endpoint and schema verified; live poll pending,https://services.arcgis.com/ZpeBVw5o1kjit7LT/arcgis/rest/services/City_of_Waterloo_Building_Permits/FeatureServer/0
+Niagara,permits,St. Catharines building permits,endpoint and schema verified; live poll pending,https://services6.arcgis.com/Yx1h0qHJ9wIpQWuU/arcgis/rest/services/Building_Permits_Public/FeatureServer/0
+Hamilton,research,Hamilton business licences,research only—not an implemented collector,
+Hamilton,research,Hamilton building permits,research only—not an implemented collector,
+Halton,research,Oakville planning,research only—not an implemented collector,
+Halton,research,Burlington permits,research only—not an implemented collector,
+Halton,research,Milton permits,research only—not an implemented collector,
+Halton,research,Halton inspections,research only—not an implemented collector,
+Durham,research,Oshawa permits,research only—not an implemented collector,
+Durham,research,Whitby planning,research only—not an implemented collector,
+Durham,research,Ajax permits,research only—not an implemented collector,
+Durham,research,Pickering planning,research only—not an implemented collector,
+Durham,research,Durham public health,research only—not an implemented collector,
+York,research,Vaughan planning,research only—not an implemented collector,
+York,research,Markham ePLAN,research only—not an implemented collector,
+York,research,YorkSafe,research only—not an implemented collector,
+Waterloo,research,Kitchener planning,research only—not an implemented collector,
+Waterloo,research,Cambridge permits,research only—not an implemented collector,
+Waterloo,research,Waterloo Region health inspections,research only—not an implemented collector,
+Niagara,research,Niagara Falls permits,research only—not an implemented collector,
+Niagara,research,Welland planning,research only—not an implemented collector,
+Niagara,research,Niagara regional public health,research only—not an implemented collector,
+Durham,configured,Durham PLANit Consent Applications,OFFICIAL_ARCGIS_SCHEMA_VERIFIED; collector configured and disabled; live poll/licence pending,https://maps.durham.ca/arcgis/rest/services/PLANit/PLANit/MapServer/1
+Durham,configured,Durham Regional Official Plan Applications,OFFICIAL_ARCGIS_SCHEMA_VERIFIED; collector configured and disabled; live poll/licence pending,https://maps.durham.ca/arcgis/rest/services/PLANit/PLANit/MapServer/2
+Durham,configured,Durham Business Sites,OFFICIAL_ARCGIS_SCHEMA_VERIFIED; collector configured and disabled; live poll/licence pending,https://maps.durham.ca/arcgis/rest/services/Open_Data/Durham_OpenData/MapServer/11
+Durham,configured,Durham Capital Project Boundaries,OFFICIAL_ARCGIS_SCHEMA_VERIFIED; collector configured and disabled; live poll/licence pending,https://maps.durham.ca/arcgis/rest/services/CDEAP2/MapServer/3

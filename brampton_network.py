@@ -1,7 +1,7 @@
 """Brampton official-source archive: additive, source-faithful, no guessed business links.
 Run via python brampton_network.py. Never modifies Radar's original radar.sqlite.
 """
-import csv,hashlib,html,json,re,sqlite3,time,sys,os,random
+import csv,hashlib,html,json,re,sqlite3,time,sys,os,random,argparse
 from datetime import datetime,timezone
 from pathlib import Path
 from urllib.parse import urljoin
@@ -34,7 +34,7 @@ LICENCE_CATEGORIES = [
  'Licensed-Horse-Riding-Establishments',
 ]
 for slug in LICENCE_CATEGORIES:
- SOURCES.append(('brampton_lic_'+slug.lower().replace('-','_'),'Licensing',slug.replace('-',' '),LIC+slug+'.aspx','html_table_extended','weekly'))
+ SOURCES.append(('brampton_lic_'+slug.lower().replace('-','_'),'Licensing',slug.replace('-',' '),(LIC+'Licensed-Contractors-HVAC.aspx' if slug=='Licensed-HVAC-Contractors' else LIC+slug+'.aspx'),'html_table_extended','weekly'))
 ROAD='https://maps1.brampton.ca/arcgis/rest/services/Roadworks/RoadClosuresAndConstruction/FeatureServer'
 for layer,name in [(0,'Road construction projects'),(1,'Active road closures'),(2,'Upcoming road closures'),(3,'All road projects'),(4,'All road closures')]:
  SOURCES.append((f'brampton_roadworks_{layer}','Public Works',name,ROAD+'/'+str(layer),'arcgis_small','weekly'))
@@ -106,11 +106,11 @@ def arcgis(con,session,sid,url,stamp,limit=None):
  # Refresh is bounded and resumes across runs as well; no removal inference.
  restarting=bool(row and row[1])
  if restarting:cursor=-1
- page=min(int(meta.get('maxRecordCount') or 1000),100 if 'inspections' in sid else 500)
+ page=min(int(meta.get('maxRecordCount') or 1000),25 if 'inspections' in sid else 500)
  seen=created=changed=0; end=False; max_oid=cursor
  while seen<limit:
   args={'where':f'{oid} > {cursor}','outFields':'*','returnGeometry':'false','orderByFields':f'{oid} ASC','resultRecordCount':min(page,limit-seen),'f':'json'}
-  body=get(session,qurl,args,timeout=(8,30),attempts=3).json()
+  body=get(session,qurl,args,timeout=(10,60) if 'inspections' in sid else (8,30),attempts=4 if 'inspections' in sid else 3).json()
   if 'error' in body:raise ValueError(str(body['error']))
   batch=body.get('features') or []
   if not batch:end=True;break
@@ -128,6 +128,46 @@ def arcgis(con,session,sid,url,stamp,limit=None):
  if end:
   con.execute('UPDATE arcgis_progress SET backfilled=1,notes=?,updated_at=? WHERE source_id=?',('full ID-range scanned; next run refreshes changed records',utc(),sid));con.commit()
  return ('OK' if end else 'PARTIAL'),seen,created,changed,f'{seen} in this run; source has ~{total} rows; checkpoint {oid}={cursor}; '+('full pass complete' if end else 'resumes next run')+'; no removals inferred'
+
+def arcgis_small_by_ids(con,session,sid,url,stamp,limit=1000):
+ # Small public layers can expose duplicate/missing OBJECTID attributes in features.
+ # Query an explicit ID list and retrieve each ID with objectIds; only checkpoint
+ # identifiers we actually received. Never infer removals from an incomplete read.
+ meta=get(session,url,{'f':'json'},timeout=(10,25)).json()
+ if 'error' in meta:raise ValueError(str(meta['error']))
+ oid=meta.get('objectIdField') or next((f.get('name') for f in meta.get('fields',[]) if f.get('type')=='esriFieldTypeOID'),None)
+ if not oid:raise ValueError('No official ArcGIS object ID field')
+ qurl=url+'/query'
+ index=get(session,qurl,{'where':'1=1','returnIdsOnly':'true','f':'json'},timeout=(10,40)).json()
+ if 'error' in index:raise ValueError(str(index['error']))
+ ids=sorted(set(int(x) for x in (index.get('objectIds') or [])))
+ previous=con.execute('SELECT last_oid,backfilled FROM arcgis_progress WHERE source_id=?',(sid,)).fetchone()
+ cursor=(-1 if previous and previous[1] else int(previous[0]) if previous else -1)
+ pending=[x for x in ids if x>cursor][:max(1,limit)]
+ seen=created=changed=0
+ batch_size=max(1,min(50,int(meta.get('maxRecordCount') or 50)))
+ for pos in range(0,len(pending),batch_size):
+  chunk=pending[pos:pos+batch_size]
+  body=get(session,qurl,{'objectIds':','.join(map(str,chunk)),'outFields':'*','returnGeometry':'false','f':'json'},timeout=(12,45)).json()
+  if 'error' in body:raise ValueError(str(body['error']))
+  keyed={}
+  for ft in body.get('features') or []:
+   attrs=ft.get('attributes') or {}
+   val=attrs.get(oid)
+   if val is not None and str(val).lstrip('-').isdigit():keyed[int(val)]=attrs
+  if set(chunk)-set(keyed):raise ValueError('ArcGIS incomplete ID response; checkpoint unchanged for current page')
+  for number in chunk:
+   a,b=put(con,sid,str(number),keyed[number],stamp)
+   seen+=1;created+=a;changed+=b
+  cursor=chunk[-1]
+  con.execute('INSERT INTO arcgis_progress(source_id,last_oid,total_estimate,backfilled,updated_at,notes) VALUES(?,?,?,?,?,?) ON CONFLICT(source_id) DO UPDATE SET last_oid=excluded.last_oid,total_estimate=excluded.total_estimate,backfilled=excluded.backfilled,updated_at=excluded.updated_at,notes=excluded.notes',(sid,cursor,len(ids),0,utc(),'ID-list checkpoint'))
+  con.commit()
+  time.sleep(.2)
+ complete=(not pending or cursor>=ids[-1] if ids else True)
+ if complete:
+  con.execute('INSERT INTO arcgis_progress(source_id,last_oid,total_estimate,backfilled,updated_at,notes) VALUES(?,?,?,?,?,?) ON CONFLICT(source_id) DO UPDATE SET last_oid=excluded.last_oid,total_estimate=excluded.total_estimate,backfilled=excluded.backfilled,updated_at=excluded.updated_at,notes=excluded.notes',(sid,cursor,len(ids),1,utc(),'ID-list full pass completed'))
+  con.commit()
+ return ('OK' if complete else 'PARTIAL'),seen,created,changed,f'{seen} records retrieved by explicit IDs; source has {len(ids)} IDs; checkpoint={cursor}; no removals inferred'
 
 LIC_FIELDS=['organization_name','operating_name','business_address','expiry_date','file_number']
 LIC_HEADERS=('organization name','contractor operating name','business address','expiry date','file number')
@@ -197,7 +237,7 @@ def parse_extended_table(table):
 
 def webtable_extended(con,session,sid,url,stamp):
  """Bounded SharePoint next-page traversal; PARTIAL unless exhaustiveness is clear."""
- seen=created=changed=0;next_url=url;visited=set();pages=0;cap=20
+ seen=created=changed=0;next_url=url;visited=set();pages=0;cap=20;repeated=False;fingerprints=set()
  while next_url and next_url not in visited and pages<cap:
   visited.add(next_url)
   response=get(session,next_url,timeout=(8,30),attempts=2)
@@ -207,47 +247,87 @@ def webtable_extended(con,session,sid,url,stamp):
   if not batch:
    if pages==0:raise ValueError('No well-structured licence rows found; nothing modified')
    break
+  fingerprint=digest([row.get('file_number') for row in batch])
+  if fingerprint in fingerprints:
+   repeated=True;break
+  fingerprints.add(fingerprint)
   for fields in batch:
    key=fields['file_number']
    a,b=put(con,sid,key,{'fields':fields,'source_url':response.url},stamp)
    created+=a;changed+=b;seen+=1
   con.commit();pages+=1
-  # Avoid guessing SharePoint paging URLs; follow only explicit links supplied by the site.
+  # Only follow explicit navigation links. Never fabricate server page tokens.
   nxt=None
-  for a in soup.find_all('a',href=True):
-   title=(' '.join([a.get_text(' ',strip=True),a.get('title',''),a.get('aria-label','')])).lower()
-   href=a['href']
-   if ('next' in title or 'pagefirstrow' in href.lower() and 'paged=true' in href.lower()) and 'pagefirstrow' in href.lower():
-    target=urljoin(response.url,href)
-    if target not in visited and target.startswith('https://www.brampton.ca/'):
-     nxt=target;break
+  for anchor in soup.find_all('a',href=True):
+   title=' '.join((anchor.get_text(' ',strip=True),anchor.get('title',''),anchor.get('aria-label',''), ' '.join(anchor.get('rel',[])))).lower()
+   href=anchor['href']
+   backward='pagedprev' in href.lower() or 'previous' in title or 'prev' in title
+   forward=('next' in title or 'pagefirstrow' in href.lower() and 'paged=true' in href.lower())
+   if not forward or backward:continue
+   target=urljoin(response.url,href)
+   from urllib.parse import urlsplit
+   parsed=urlsplit(target)
+   if parsed.scheme=='https' and parsed.hostname in ('www.brampton.ca','www1.brampton.ca') and target not in visited:
+    nxt=target;break
   next_url=nxt
   if nxt:time.sleep(.3)
  status='PARTIAL' if next_url or pages==1 else 'PARTIAL'
- return status,seen,created,changed,f'{seen} parsed rows across {pages} pages; completeness not established; no removals inferred'
+ return status,seen,created,changed,f'{seen} parsed rows across {pages} pages; repeated_page={repeated}; completeness not established; no removals inferred'
 
 def content_monitor(con,session,sid,url,stamp):
- """Record meaningful page text and individual linked documents, not just a set of URLs."""
+ """Archive page text, linked-document metadata, and bounded public PDF text.
+
+ PDFs remain source-specific documents; failure to extract leaves an auditable
+ link entry and a PARTIAL status, not an invented document or silent success.
+ """
+ from urllib.parse import urlsplit
+ from io import BytesIO
  response=get(session,url,timeout=(8,25),attempts=2)
  soup=BeautifulSoup(response.text,'html.parser')
  for node in soup(['script','style','nav','footer','header']):node.decompose()
  main=soup.find('main') or soup.find(id='content') or soup.body or soup
- text=re.sub(r'\s+',' ',main.get_text(' ',strip=True))[:250000]
- if len(text)<50:raise ValueError('Little public text, likely JS-only content; not a structured feed')
+ page_text=re.sub(r'\s+',' ',main.get_text(' ',strip=True))[:250000]
+ if len(page_text)<50:raise ValueError('Little public text, likely JS-only content; not a structured feed')
  created=changed=0
- a,b=put(con,sid,'PAGE',{'url':response.url,'text':text},stamp);created+=a;changed+=b
- links=0
- for a in main.find_all('a',href=True):
-  link=urljoin(response.url,a['href'].strip())
-  if not link.startswith('https://') or any(x in link.lower() for x in ('login.aspx','signin','logout')):continue
-  title=a.get_text(' ',strip=True)[:250]
+ a,b=put(con,sid,'PAGE',{'url':response.url,'text':page_text},stamp);created+=a;changed+=b
+ links=[];pdf_links=[];errors=[]
+ allowed={'www.brampton.ca','www1.brampton.ca','brampton.ca','pub-brampton.escribemeetings.com'}
+ for anchor in main.find_all('a',href=True):
+  link=urljoin(response.url,anchor['href'].strip())
+  parts=urlsplit(link)
+  if parts.scheme!='https' or parts.hostname not in allowed:continue
+  if any(x in link.lower() for x in ('login.aspx','signin','logout')):continue
+  title=anchor.get_text(' ',strip=True)[:250]
   if not title:continue
-  if not (link.lower().endswith(('.pdf','.doc','.docx','.xlsx','.csv')) or any(x in title.lower() for x in ('agenda','minutes','report','project','contract','tender','budget','application','plan','notice'))):continue
-  key='LINK:'+digest(link)
-  aa,bb=put(con,sid,key,{'url':link,'label':title,'parent_url':response.url},stamp)
-  created+=aa;changed+=bb;links+=1
+  is_pdf=parts.path.lower().endswith('.pdf')
+  if not (is_pdf or parts.path.lower().endswith(('.doc','.docx','.xlsx','.csv')) or any(x in title.lower() for x in ('agenda','minutes','report','project','contract','tender','budget','application','plan','notice'))):continue
+  links.append((link,title))
+  aa,bb=put(con,sid,'LINK:'+digest(link),{'url':link,'label':title,'parent_url':response.url},stamp)
+  created+=aa;changed+=bb
+  if is_pdf:pdf_links.append((link,title))
  con.commit()
- return 'MONITOR',links+1,created,changed,f'Public page text snapshotted and {links} document/relevant links indexed; PDFs not yet extracted; no removals inferred'
+ # Bound document downloads to keep ordinary daily jobs predictable.
+ max_docs=max(0,min(8,int(os.getenv('BRAMPTON_PDFS_PER_SOURCE','3'))))
+ for link,title in pdf_links[:max_docs]:
+  try:
+   doc=get(session,link,timeout=(8,30),attempts=2)
+   data=doc.content
+   if len(data)>8*1024*1024:raise ValueError('Document above safe 8 MiB bound')
+   if not data.startswith(b'%PDF-'):raise ValueError('Not a PDF response')
+   from pypdf import PdfReader
+   reader=PdfReader(BytesIO(data))
+   if len(reader.pages)>120:raise ValueError('Document above safe 120-page bound')
+   extracted=' '.join((page.extract_text() or '') for page in reader.pages)
+   extracted=re.sub(r'\\s+',' ',extracted).strip()[:200000]
+   if not extracted:raise ValueError('No extractable PDF text (possibly scanned)')
+   aa,bb=put(con,sid,'DOCUMENT:'+digest(link),{'url':link,'label':title,'parent_url':response.url,'text':extracted,'pages':len(reader.pages),'sha256':hashlib.sha256(data).hexdigest()},stamp)
+   created+=aa;changed+=bb
+  except Exception as exc:
+   errors.append(title[:60]+': '+str(exc)[:100])
+ con.commit()
+ partial=bool(errors or len(pdf_links)>max_docs)
+ status='PARTIAL' if partial else 'MONITOR'
+ return status,len(links)+1,created,changed,f'{len(links)} links; {min(max_docs,len(pdf_links))-len(errors)} PDFs text-extracted; {len(errors)} PDF failures; {max(0,len(pdf_links)-max_docs)} deferred; no removals inferred'+('; '+errors[0] if errors else '')
 
 def discover(con,session,sid,url,stamp):
  response=get(session,url);soup=BeautifulSoup(response.text,'html.parser');count=0
@@ -265,13 +345,19 @@ def report(con):
   parts.append('<tr>'+''.join('<td>'+html.escape(str(x))+'</td>' for x in (dept,title,status,count,detail[:240]))+'</tr>')
  parts.append('</table><p>Source discovery links are stored in brampton_sources.sqlite. Existing Radar databases are unchanged.</p>')
  dest.write_text(''.join(parts),encoding='utf-8');return dest
-def main():
+def main(argv=None):
+ parser=argparse.ArgumentParser(description='Collect Brampton government data')
+ parser.add_argument('--activities-only',action='store_true',help='Only resume permit-activity backfill')
+ parser.add_argument('--activity-limit',type=int,default=10000,help='Maximum activity rows in this run (up to 50000)')
+ args=parser.parse_args(argv)
  DATA.mkdir(exist_ok=True);con=sqlite3.connect(DB);setup(con);session=requests.Session()
  for sid,dept,title,url,adapter,freq in SOURCES:
+  if args.activities_only and sid!='brampton_permit_activity':continue
   stamp=utc();cur=con.execute('INSERT INTO runs(source_id,started,status) VALUES(?,?,?)',(sid,stamp,'RUNNING'));rid=cur.lastrowid;con.commit()
   print(f'Brampton: {title} ...',flush=True)
   try:
-   if adapter in ('arcgis','arcgis_small'): status,n,a,b,detail=arcgis(con,session,sid,url,stamp,limit=200 if 'inspections' in sid else (1000 if adapter=='arcgis_small' else None))
+   if adapter=='arcgis_small':status,n,a,b,detail=arcgis_small_by_ids(con,session,sid,url,stamp)
+   elif adapter=='arcgis':status,n,a,b,detail=arcgis(con,session,sid,url,stamp,limit=75 if 'inspections' in sid else (min(50000,max(1,args.activity_limit)) if sid=='brampton_permit_activity' else None))
    elif adapter=='html_table':status,n,a,b,detail=webtable(con,session,sid,url,stamp)
    elif adapter=='html_table_extended':status,n,a,b,detail=webtable_extended(con,session,sid,url,stamp)
    elif adapter=='content_monitor':status,n,a,b,detail=content_monitor(con,session,sid,url,stamp)
