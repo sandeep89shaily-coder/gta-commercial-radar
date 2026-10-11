@@ -159,6 +159,9 @@ def render(data,out):
     parts.append(table([('source_id','Source'),('url','Public portal'),('last_checked','Last check'),('status','State'),('parsed_bid_count','Bid listings parsed')],rows(pdb,'SELECT source_id,url,last_checked,status,parsed_bid_count FROM public_pages ORDER BY source_id')))
     parts.append(table([('source_id','Source'),('observed_at','Checked'),('status','Run'),('fetched','Listing records')],rows(pdb,'SELECT source_id,observed_at,status,fetched FROM runs ORDER BY id DESC LIMIT 15')))
    finally:pdb.close()
+ if (data/'mississauga_service_provider_signals_REVIEW_ONLY.csv').is_file():
+  parts.append('<h2>Mississauga — Research Signals (NOT qualified sales leads)</h2>')
+  parts.append('<p><a href="mississauga_service_provider_signals_REVIEW_ONLY.csv">Post-baseline planning and public bid listing changes</a> — review evidence, dates and commercial relevance before sale or outreach.</p>')
  parts.append('<h2>1 · Source health — Brampton</h2>')
  parts.append(table([('department','Department'),('title','Source'),('access_status','Status'),('records','Stored'),('last_run','Last run'),('detail','Last result'),('url','Official source')],B['sources']))
  parts.append('<h2>2 · Collection checkpoints</h2>')
