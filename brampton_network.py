@@ -23,7 +23,7 @@ SOURCES=[
 # Brampton expansion: official published licence lists and public roadworks layers.
 # Each category is separate so failures and incompleteness stay visible.
 LICENCE_CATEGORIES = [
- 'Licensed-Animal-Kennels-or-Doggie-Daycare', 'Licensed-Auto-Service-Stations',
+ 'Licensed-Animal-Kennels-Doggie-Daycare', 'Licensed-Auto-Service-Stations',
  'Licensed-Building-Renovators','Licensed-Caterers','Licensed-Driveway-Contractors',
  'Licensed-Fence-Installation-Contractors','Licensed-HVAC-Contractors',
  'Licensed-Payday-Loans','Licensed-Pawnbrokers','Licensed-Pet-Grooming',
@@ -34,7 +34,7 @@ LICENCE_CATEGORIES = [
  'Licensed-Horse-Riding-Establishments',
 ]
 for slug in LICENCE_CATEGORIES:
- SOURCES.append(('brampton_lic_'+slug.lower().replace('-','_'),'Licensing',slug.replace('-',' '),(LIC+'Licensed-Contractors-HVAC.aspx' if slug=='Licensed-HVAC-Contractors' else LIC+slug+'.aspx'),'html_table_extended','weekly'))
+ SOURCES.append(('brampton_lic_'+('licensed-animal-kennels-or-doggie-daycare' if slug=='Licensed-Animal-Kennels-Doggie-Daycare' else slug).lower().replace('-','_'),'Licensing',slug.replace('-',' '),(LIC+'Licensed-Contractors-HVAC.aspx' if slug=='Licensed-HVAC-Contractors' else LIC+slug+'.aspx'),'html_table_extended','weekly'))
 ROAD='https://maps1.brampton.ca/arcgis/rest/services/Roadworks/RoadClosuresAndConstruction/FeatureServer'
 for layer,name in [(0,'Road construction projects'),(1,'Active road closures'),(2,'Upcoming road closures'),(3,'All road projects'),(4,'All road closures')]:
  SOURCES.append((f'brampton_roadworks_{layer}','Public Works',name,ROAD+'/'+str(layer),'arcgis_small','weekly'))
@@ -52,6 +52,25 @@ MONITOR_SOURCES=[
 for sid,dept,title,url in MONITOR_SOURCES:
  SOURCES.append((sid,dept,title,url,'content_monitor','weekly'))
 UA={'User-Agent':'GTACommercialRadar/1.0 (+official public-source collection; respectful rate-limited access)'}
+# Resolve category paths from official Brampton navigation, never guess off-domain links.
+LICENSING_INDEX='https://www.brampton.ca/EN/Business/Licensing/Pages/welcome.aspx'
+def resolve_licence_urls(session):
+ response=get(session,LICENSING_INDEX,timeout=(8,25),attempts=2)
+ soup=BeautifulSoup(response.text,'html.parser')
+ from urllib.parse import urlsplit
+ def key(t):return re.sub(r'[^a-z0-9]','',str(t or '').lower()).replace('or','')
+ official={}
+ for a in soup.find_all('a',href=True):
+  href=urljoin(response.url,a['href'])
+  parts=urlsplit(href)
+  if parts.scheme!='https' or parts.hostname not in ('www.brampton.ca','www1.brampton.ca'):continue
+  if '/business/licensing/pages/' not in parts.path.lower():continue
+  label=a.get_text(' ',strip=True)
+  if not label.lower().startswith('licensed '):continue
+  normalized=key(label)
+  if normalized and normalized not in official:official[normalized]=href.split('?')[0]
+ return official
+
 def utc():return datetime.now(timezone.utc).isoformat()
 def digest(x):return hashlib.sha256(json.dumps(x,sort_keys=True,ensure_ascii=False,default=str).encode()).hexdigest()
 def setup(con):
@@ -351,8 +370,19 @@ def main(argv=None):
  parser.add_argument('--activity-limit',type=int,default=10000,help='Maximum activity rows in this run (up to 50000)')
  args=parser.parse_args(argv)
  DATA.mkdir(exist_ok=True);con=sqlite3.connect(DB);setup(con);session=requests.Session()
+ try:official_licences=resolve_licence_urls(session)
+ except Exception as exc:
+  print('Licensing navigation discovery unavailable; using configured URLs:',str(exc)[:150],flush=True)
+  official_licences={}
+
  for sid,dept,title,url,adapter,freq in SOURCES:
   if args.activities_only and sid!='brampton_permit_activity':continue
+  if adapter=='html_table_extended':
+   lookup=re.sub(r'[^a-z0-9]','',title.lower()).replace('or','')
+   resolved=official_licences.get(lookup)
+   if resolved and resolved!=url:
+    url=resolved
+    con.execute('UPDATE sources SET url=? WHERE id=?',(url,sid));con.commit()
   stamp=utc();cur=con.execute('INSERT INTO runs(source_id,started,status) VALUES(?,?,?)',(sid,stamp,'RUNNING'));rid=cur.lastrowid;con.commit()
   print(f'Brampton: {title} ...',flush=True)
   try:
