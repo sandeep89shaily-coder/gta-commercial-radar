@@ -237,7 +237,7 @@ def parse_extended_table(table):
 
 def webtable_extended(con,session,sid,url,stamp):
  """Bounded SharePoint next-page traversal; PARTIAL unless exhaustiveness is clear."""
- seen=created=changed=0;next_url=url;visited=set();pages=0;cap=20
+ seen=created=changed=0;next_url=url;visited=set();pages=0;cap=20;repeated=False;fingerprints=set()
  while next_url and next_url not in visited and pages<cap:
   visited.add(next_url)
   response=get(session,next_url,timeout=(8,30),attempts=2)
@@ -247,24 +247,32 @@ def webtable_extended(con,session,sid,url,stamp):
   if not batch:
    if pages==0:raise ValueError('No well-structured licence rows found; nothing modified')
    break
+  fingerprint=digest([row.get('file_number') for row in batch])
+  if fingerprint in fingerprints:
+   repeated=True;break
+  fingerprints.add(fingerprint)
   for fields in batch:
    key=fields['file_number']
    a,b=put(con,sid,key,{'fields':fields,'source_url':response.url},stamp)
    created+=a;changed+=b;seen+=1
   con.commit();pages+=1
-  # Avoid guessing SharePoint paging URLs; follow only explicit links supplied by the site.
+  # Only follow explicit navigation links. Never fabricate server page tokens.
   nxt=None
-  for a in soup.find_all('a',href=True):
-   title=(' '.join([a.get_text(' ',strip=True),a.get('title',''),a.get('aria-label','')])).lower()
-   href=a['href']
-   if ('next' in title or 'pagefirstrow' in href.lower() and 'paged=true' in href.lower()) and 'pagefirstrow' in href.lower() and 'pagedprev' not in href.lower():
-    target=urljoin(response.url,href)
-    if target not in visited and target.startswith('https://www.brampton.ca/'):
-     nxt=target;break
+  for anchor in soup.find_all('a',href=True):
+   title=' '.join((anchor.get_text(' ',strip=True),anchor.get('title',''),anchor.get('aria-label',''), ' '.join(anchor.get('rel',[])))).lower()
+   href=anchor['href']
+   backward='pagedprev' in href.lower() or 'previous' in title or 'prev' in title
+   forward=('next' in title or 'pagefirstrow' in href.lower() and 'paged=true' in href.lower())
+   if not forward or backward:continue
+   target=urljoin(response.url,href)
+   from urllib.parse import urlsplit
+   parsed=urlsplit(target)
+   if parsed.scheme=='https' and parsed.hostname in ('www.brampton.ca','www1.brampton.ca') and target not in visited:
+    nxt=target;break
   next_url=nxt
   if nxt:time.sleep(.3)
  status='PARTIAL' if next_url or pages==1 else 'PARTIAL'
- return status,seen,created,changed,f'{seen} parsed rows across {pages} pages; completeness not established; no removals inferred'
+ return status,seen,created,changed,f'{seen} parsed rows across {pages} pages; repeated_page={repeated}; completeness not established; no removals inferred'
 
 def content_monitor(con,session,sid,url,stamp):
  """Archive page text, linked-document metadata, and bounded public PDF text.
