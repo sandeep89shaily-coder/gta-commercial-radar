@@ -126,18 +126,19 @@ def catalog_changes(previous, current, stamp):
 def store_history(path, events):
     """Deduplicate journal events by content, so interrupted audit retries are safe."""
     existing=path.read_text(encoding='utf-8') if path.is_file() else ''
-    hashes=set()
+    recent_by_package={}
     for line in existing.splitlines():
         if not line.strip():continue
         obj=json.loads(line)  # Corrupted history must not be silently replaced.
-        hashes.add(str(obj.get('event_key') or ''))
+        recent_by_package[str(obj.get('package_id') or '')]=str(obj.get('event_key') or '')
     written=[]
     for e in events:
         identity={k:v for k,v in e.items() if k!='observed_at'}
         key=hashlib.sha256(json.dumps(identity,sort_keys=True,ensure_ascii=False).encode('utf-8')).hexdigest()
-        if key in hashes:continue
+        pid=str(e.get('package_id') or '')
+        if key==recent_by_package.get(pid):continue
         written.append({**e,'event_key':key})
-        hashes.add(key)
+        recent_by_package[pid]=key
     updated=existing
     if updated and not updated.endswith('\n'):updated+='\n'
     updated+=''.join(json.dumps(x,sort_keys=True,ensure_ascii=False)+'\n' for x in written)
