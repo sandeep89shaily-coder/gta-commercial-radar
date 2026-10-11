@@ -47,6 +47,7 @@ MONITOR_SOURCES=[
  ('brampton_mobile_licensing_content','Licensing','Mobile licensing announcements','https://www.brampton.ca/EN/Business/Licensing/Pages/Mobile-Licensing.aspx'),
  ('brampton_procurement_content','Procurement','Brampton procurement public page','https://www.brampton.ca/EN/Business/Doing-Business-with-the-City/Pages/Understanding-Procurement.aspx'),
  ('brampton_economic_content','Economic Development','Business and investment public page','https://investbrampton.ca/'),
+ ('brampton_procurement_bid_opportunities','Procurement','City published bid opportunities','https://brampton.bidsandtenders.ca/Module/Tenders/en/Home/BidsHomepage'),
  ('brampton_budget_content','Finance','City budget and capital planning','https://www.brampton.ca/EN/City-Hall/Budget/Pages/Welcome.aspx'),
 ]
 for sid,dept,title,url in MONITOR_SOURCES:
@@ -111,12 +112,12 @@ def arcgis(con,session,sid,url,stamp,limit=None):
  # Never infer deleted records from a partial scan. Only move cursor in the same transaction as page inserts.
  limit=int(limit if limit is not None else os.getenv('BRAMPTON_ARCGIS_ROWS_PER_RUN','10000'))
  limit=max(1,min(limit,100000))
- meta=get(session,url,{'f':'json'},timeout=(8,15),attempts=2).json()
+ meta=get(session,url,{'f':'json'},timeout=(10,45) if 'inspections' in sid else (8,15),attempts=4 if 'inspections' in sid else 2).json()
  if 'error' in meta:raise ValueError(str(meta['error']))
  oid=meta.get('objectIdField') or next((f['name'] for f in meta.get('fields',[]) if f.get('type')=='esriFieldTypeOID'),None)
  if not oid or not re.fullmatch(r'[A-Za-z][A-Za-z_0-9]*',oid):raise ValueError('No safe stable object ID')
  qurl=url+'/query'
- count=get(session,qurl,{'where':'1=1','returnCountOnly':'true','f':'json'},timeout=(8,20),attempts=2).json()
+ count=get(session,qurl,{'where':'1=1','returnCountOnly':'true','f':'json'},timeout=(10,45) if 'inspections' in sid else (8,20),attempts=4 if 'inspections' in sid else 2).json()
  if 'error' in count:raise ValueError(str(count['error']))
  total=int(count['count'])
  row=con.execute('SELECT last_oid,backfilled FROM arcgis_progress WHERE source_id=?',(sid,)).fetchone()
@@ -168,7 +169,12 @@ def arcgis_small_by_ids(con,session,sid,url,stamp,limit=1000):
  for pos in range(0,len(pending),batch_size):
   chunk=pending[pos:pos+batch_size]
   body=get(session,qurl,{'objectIds':','.join(map(str,chunk)),'outFields':'*','returnGeometry':'false','f':'json'},timeout=(12,45)).json()
-  if 'error' in body:raise ValueError(str(body['error']))
+  if 'error' in body:
+   # Some roadworks layers reject objectIds queries even after listing valid IDs.
+   # Retry this exact set using a bounded IN predicate. Never advance for missing IDs.
+   safe_ids=','.join(map(str,chunk))
+   body=get(session,qurl,{'where':oid+' IN ('+safe_ids+')','outFields':'*','returnGeometry':'false','f':'json'},timeout=(12,45)).json()
+   if 'error' in body:raise ValueError('ArcGIS objectIds and IN fallback failed: '+str(body['error']))
   keyed={}
   for ft in body.get('features') or []:
    attrs=ft.get('attributes') or {}
