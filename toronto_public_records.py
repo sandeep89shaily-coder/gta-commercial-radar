@@ -7,6 +7,8 @@ Official catalogue pages: open.toronto.ca/dataset/<slug>/
 """
 from __future__ import annotations
 import csv, hashlib, json, sqlite3, sys
+from collections import Counter
+from xml.etree import ElementTree
 from datetime import datetime, timezone
 from pathlib import Path
 from radar import Http, choose_ckan_resource, normalize_row, parse_tabular_bytes, resolve_ckan_package
@@ -57,19 +59,56 @@ def setup(db):
  CREATE INDEX IF NOT EXISTS ix_toronto_changes ON changes(observed_at);""")
  db.commit()
 
+def parse_public_xml(content):
+ """Strict XML row parser for bounded, official Toronto procurement tables."""
+ if b'<!DOCTYPE' in content.upper() or b'<!ENTITY' in content.upper():
+  raise ValueError('XML entity/DTD declarations are not accepted')
+ root=ElementTree.fromstring(content)
+ def tag(el):
+  return str(el.tag).rsplit('}',1)[-1]
+ def fields(el):
+  attrs=dict(el.attrib)
+  if len(el):
+   # Select data records with scalar fields, never flatten structured reports silently.
+   if any(len(child) for child in el):return {}
+   for child in el:
+    key=tag(child)
+    if key in attrs:return {}
+    attrs[key]=(child.text or '').strip()
+  return attrs if len(attrs)>=2 else {}
+ choices=[]
+ for parent in root.iter():
+  group={}
+  for child in parent:
+   record=fields(child)
+   if record:group.setdefault(tag(child),[]).append(record)
+  for name,records in group.items():
+   if len(records)>=2:
+    choices.append((len(records),name,records))
+ if not choices:
+  record=fields(root)
+  if not record:raise ValueError('XML has no recognizable tabular records')
+  choices=[(1,tag(root),[record])]
+ choices.sort(key=lambda x:x[0],reverse=True)
+ if len(choices)>1 and choices[1][0]==choices[0][0]:
+  raise ValueError('Ambiguous XML record groups')
+ result=[normalize_row(r) for r in choices[0][2]]
+ if any(not r for r in result):raise ValueError('XML row missing scalar fields')
+ return result
+
 def fetch(http,spec):
  """Fetch one complete, parseable CKAN resource by exact published package slug/ID."""
  cfg={'id':spec['id'],'name':spec['id'],'collector':'ckan','api_base':API,
       'package_slug':spec['slug'],
       'preferred_resource_names':[spec['resource_hint']],
-      'preferred_formats':['CSV','JSON','GEOJSON','XLSX','ZIP','XLS']}
+      'preferred_formats':['CSV','JSON','GEOJSON','XLSX','ZIP','XLS','XML']}
  package=resolve_ckan_package(cfg,http)
  resource=choose_ckan_resource(package,cfg)
  name=str(resource.get('name') or '')
  if spec['resource_hint'].lower() not in name.lower():
   raise ValueError('Expected named resource was not selected: '+name[:100])
  fmt=str(resource.get('format') or '').upper()
- if fmt not in ('CSV','JSON','GEOJSON','XLSX','ZIP','XLS'):
+ if fmt not in ('CSV','JSON','GEOJSON','XLSX','ZIP','XLS','XML'):
   raise ValueError('Unsupported resource format: '+fmt)
  size=resource.get('size')
  if size is not None and str(size).isdigit() and int(size)>MAX_BYTES:
@@ -82,7 +121,7 @@ def fetch(http,spec):
   raise ValueError('Resource exceeded download size budget')
  if not response.content:
   raise ValueError('Empty downloaded resource')
- rows=parse_tabular_bytes(response.content,url,fmt)
+ rows=parse_public_xml(response.content) if fmt=='XML' else parse_tabular_bytes(response.content,url,fmt)
  return [normalize_row(r) for r in rows],{'package_id':package['id'],'resource_id':resource['id'],
      'source_url':'https://open.toronto.ca/dataset/'+str(package.get('name') or spec['slug'])+'/',
      'resource_url':url,'format':fmt}
