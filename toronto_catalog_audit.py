@@ -139,8 +139,8 @@ def store_history(path, events):
         written.append({**e,'event_key':key})
         hashes.add(key)
     updated=existing
-    if updated and not updated.endswith('\\n'):updated+='\\n'
-    updated+=''.join(json.dumps(x,sort_keys=True,ensure_ascii=False)+'\\n' for x in written)
+    if updated and not updated.endswith('\n'):updated+='\n'
+    updated+=''.join(json.dumps(x,sort_keys=True,ensure_ascii=False)+'\n' for x in written)
     temp=path.with_suffix(path.suffix+'.tmp')
     temp.write_text(updated,encoding='utf-8')
     temp.replace(path)
