@@ -140,6 +140,16 @@ def render(data,out):
     if (data/'toronto_service_provider_signals_REVIEW_ONLY.csv').is_file():
      parts.append('<p><a href="toronto_service_provider_signals_REVIEW_ONLY.csv">Toronto provider-category research signals</a> — based only on post-baseline changes, with source evidence, commercial tags and independent qualification required.</p>')
    finally:tdb.close()
+ if (data/'mississauga_planning_sources.sqlite').is_file():
+  mdb=connection(data/'mississauga_planning_sources.sqlite')
+  if mdb:
+   try:
+    parts.append('<h2>Mississauga — Site Plans and Rezoning Applications</h2>')
+    parts.append('<p>Separate weekly planning archive. First observations are baselines; subsequent changes are research-only. Incomplete GIS downloads are never treated as deletions.</p>')
+    parts.append(table([('source_id','Source'),('observed_at','Checked'),('status','Result'),('fetched','Fetched'),('created','First-seen records'),('updated','Modified records')],rows(mdb,'SELECT source_id,observed_at,status,fetched,created,updated FROM runs ORDER BY id DESC LIMIT 20')))
+    if (data/'mississauga_planning_changes_REVIEW_ONLY.csv').is_file():
+     parts.append('<p><a href="mississauga_planning_changes_REVIEW_ONLY.csv">Planning record changes — research only</a></p>')
+   finally:mdb.close()
  parts.append('<h2>1 · Source health — Brampton</h2>')
  parts.append(table([('department','Department'),('title','Source'),('access_status','Status'),('records','Stored'),('last_run','Last run'),('detail','Last result'),('url','Official source')],B['sources']))
  parts.append('<h2>2 · Collection checkpoints</h2>')
