@@ -1,7 +1,7 @@
 """Brampton official-source archive: additive, source-faithful, no guessed business links.
 Run via python brampton_network.py. Never modifies Radar's original radar.sqlite.
 """
-import csv,hashlib,html,json,re,sqlite3,time,sys,os,random
+import csv,hashlib,html,json,re,sqlite3,time,sys,os,random,argparse
 from datetime import datetime,timezone
 from pathlib import Path
 from urllib.parse import urljoin
@@ -304,14 +304,19 @@ def report(con):
   parts.append('<tr>'+''.join('<td>'+html.escape(str(x))+'</td>' for x in (dept,title,status,count,detail[:240]))+'</tr>')
  parts.append('</table><p>Source discovery links are stored in brampton_sources.sqlite. Existing Radar databases are unchanged.</p>')
  dest.write_text(''.join(parts),encoding='utf-8');return dest
-def main():
+def main(argv=None):
+ parser=argparse.ArgumentParser(description='Collect Brampton government data')
+ parser.add_argument('--activities-only',action='store_true',help='Only resume permit-activity backfill')
+ parser.add_argument('--activity-limit',type=int,default=10000,help='Maximum activity rows in this run (up to 50000)')
+ args=parser.parse_args(argv)
  DATA.mkdir(exist_ok=True);con=sqlite3.connect(DB);setup(con);session=requests.Session()
  for sid,dept,title,url,adapter,freq in SOURCES:
+  if args.activities_only and sid!='brampton_permit_activity':continue
   stamp=utc();cur=con.execute('INSERT INTO runs(source_id,started,status) VALUES(?,?,?)',(sid,stamp,'RUNNING'));rid=cur.lastrowid;con.commit()
   print(f'Brampton: {title} ...',flush=True)
   try:
    if adapter=='arcgis_small':status,n,a,b,detail=arcgis_small_by_ids(con,session,sid,url,stamp)
-   elif adapter=='arcgis':status,n,a,b,detail=arcgis(con,session,sid,url,stamp,limit=75 if 'inspections' in sid else None)
+   elif adapter=='arcgis':status,n,a,b,detail=arcgis(con,session,sid,url,stamp,limit=75 if 'inspections' in sid else (min(50000,max(1,args.activity_limit)) if sid=='brampton_permit_activity' else None))
    elif adapter=='html_table':status,n,a,b,detail=webtable(con,session,sid,url,stamp)
    elif adapter=='html_table_extended':status,n,a,b,detail=webtable_extended(con,session,sid,url,stamp)
    elif adapter=='content_monitor':status,n,a,b,detail=content_monitor(con,session,sid,url,stamp)
