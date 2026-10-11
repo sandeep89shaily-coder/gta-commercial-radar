@@ -145,8 +145,9 @@ def arcgis_small_by_ids(con,session,sid,url,stamp,limit=1000):
  cursor=(-1 if previous and previous[1] else int(previous[0]) if previous else -1)
  pending=[x for x in ids if x>cursor][:max(1,limit)]
  seen=created=changed=0
- for pos in range(0,len(pending),min(50,int(meta.get('maxRecordCount') or 50))):
-  chunk=pending[pos:pos+50]
+ batch_size=max(1,min(50,int(meta.get('maxRecordCount') or 50)))
+ for pos in range(0,len(pending),batch_size):
+  chunk=pending[pos:pos+batch_size]
   body=get(session,qurl,{'objectIds':','.join(map(str,chunk)),'outFields':'*','returnGeometry':'false','f':'json'},timeout=(12,45)).json()
   if 'error' in body:raise ValueError(str(body['error']))
   keyed={}
