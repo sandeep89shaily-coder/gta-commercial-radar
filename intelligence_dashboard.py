@@ -137,6 +137,8 @@ def render(data,out):
     parts.append(table([('source_id','Source'),('observed_at','Latest check'),('status','Result'),('fetched','Records checked'),('created','New observations'),('updated','Modified')],rows(tdb,'SELECT source_id,observed_at,status,fetched,created,updated FROM runs ORDER BY id DESC LIMIT 20')))
     if (data/'toronto_priority_changes_REVIEW_ONLY.csv').is_file():
      parts.append('<p><a href="toronto_priority_changes_REVIEW_ONLY.csv">Dataset-level changes (review only)</a> — not yet independently qualified commercial opportunities.</p>')
+    if (data/'toronto_service_provider_signals_REVIEW_ONLY.csv').is_file():
+     parts.append('<p><a href="toronto_service_provider_signals_REVIEW_ONLY.csv">Toronto provider-category research signals</a> — based only on post-baseline changes, with source evidence, commercial tags and independent qualification required.</p>')
    finally:tdb.close()
  parts.append('<h2>1 · Source health — Brampton</h2>')
  parts.append(table([('department','Department'),('title','Source'),('access_status','Status'),('records','Stored'),('last_run','Last run'),('detail','Last result'),('url','Official source')],B['sources']))
