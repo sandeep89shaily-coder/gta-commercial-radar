@@ -5,7 +5,8 @@ Output: data/toronto_catalog_inventory.csv and .json
 Only replaces outputs after an entire successful catalogue scan.
 """
 from __future__ import annotations
-import csv, io, json, re
+import csv, io, json, re, sys
+from datetime import timedelta
 from datetime import datetime, timezone
 from pathlib import Path
 import requests
@@ -78,11 +79,23 @@ def audit(packages,sources):
         })
     return rows
 
-def run():
+def due(path, *, now=None, interval_days=7):
+    now=now or datetime.now(timezone.utc)
+    if not path.exists():return True
+    try:
+        metadata=json.loads(path.read_text(encoding='utf-8'))
+        at=datetime.fromisoformat(metadata['observed_at'].replace('Z','+00:00'))
+        return at.tzinfo is None or now-at>=timedelta(days=interval_days)
+    except (ValueError,KeyError,TypeError,OSError,json.JSONDecodeError):return True
+
+def run(*,force=False):
+    dest=ROOT/'data';dest.mkdir(exist_ok=True)
+    if not force and not due(dest/'toronto_catalog_inventory.json'):
+        print('Toronto catalogue: weekly audit not due; existing inventory retained')
+        return
     packages=fetch_catalog()
     sources=json.loads((ROOT/'config'/'sources.json').read_text(encoding='utf-8'))
     rows=audit(packages,sources)
-    dest=ROOT/'data';dest.mkdir(exist_ok=True)
     names=list(rows[0]) if rows else ['package_id','package_name','title']
     buffer=io.StringIO();writer=csv.DictWriter(buffer,fieldnames=names);writer.writeheader();writer.writerows(rows)
     summary={'observed_at':datetime.now(timezone.utc).isoformat(),
@@ -97,4 +110,4 @@ def run():
         temp.write_text(text,encoding='utf-8');temp.replace(output)
     print('Toronto catalogue inventory:',len(rows),'packages;',
           summary['priority_candidates'],'priority candidates; outputs in',dest)
-if __name__=='__main__':run()
+if __name__=='__main__':run(force='--force' in sys.argv[1:])
