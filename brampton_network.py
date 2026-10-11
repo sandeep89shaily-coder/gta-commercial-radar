@@ -34,7 +34,7 @@ LICENCE_CATEGORIES = [
  'Licensed-Horse-Riding-Establishments',
 ]
 for slug in LICENCE_CATEGORIES:
- SOURCES.append(('brampton_lic_'+slug.lower().replace('-','_'),'Licensing',slug.replace('-',' '),LIC+slug+'.aspx','html_table_extended','weekly'))
+ SOURCES.append(('brampton_lic_'+slug.lower().replace('-','_'),'Licensing',slug.replace('-',' '),(LIC+'Licensed-Contractors-HVAC.aspx' if slug=='Licensed-HVAC-Contractors' else LIC+slug+'.aspx'),'html_table_extended','weekly'))
 ROAD='https://maps1.brampton.ca/arcgis/rest/services/Roadworks/RoadClosuresAndConstruction/FeatureServer'
 for layer,name in [(0,'Road construction projects'),(1,'Active road closures'),(2,'Upcoming road closures'),(3,'All road projects'),(4,'All road closures')]:
  SOURCES.append((f'brampton_roadworks_{layer}','Public Works',name,ROAD+'/'+str(layer),'arcgis_small','weekly'))
@@ -106,11 +106,11 @@ def arcgis(con,session,sid,url,stamp,limit=None):
  # Refresh is bounded and resumes across runs as well; no removal inference.
  restarting=bool(row and row[1])
  if restarting:cursor=-1
- page=min(int(meta.get('maxRecordCount') or 1000),100 if 'inspections' in sid else 500)
+ page=min(int(meta.get('maxRecordCount') or 1000),25 if 'inspections' in sid else 500)
  seen=created=changed=0; end=False; max_oid=cursor
  while seen<limit:
   args={'where':f'{oid} > {cursor}','outFields':'*','returnGeometry':'false','orderByFields':f'{oid} ASC','resultRecordCount':min(page,limit-seen),'f':'json'}
-  body=get(session,qurl,args,timeout=(8,30),attempts=3).json()
+  body=get(session,qurl,args,timeout=(10,60) if 'inspections' in sid else (8,30),attempts=4 if 'inspections' in sid else 3).json()
   if 'error' in body:raise ValueError(str(body['error']))
   batch=body.get('features') or []
   if not batch:end=True;break
@@ -128,6 +128,45 @@ def arcgis(con,session,sid,url,stamp,limit=None):
  if end:
   con.execute('UPDATE arcgis_progress SET backfilled=1,notes=?,updated_at=? WHERE source_id=?',('full ID-range scanned; next run refreshes changed records',utc(),sid));con.commit()
  return ('OK' if end else 'PARTIAL'),seen,created,changed,f'{seen} in this run; source has ~{total} rows; checkpoint {oid}={cursor}; '+('full pass complete' if end else 'resumes next run')+'; no removals inferred'
+
+def arcgis_small_by_ids(con,session,sid,url,stamp,limit=1000):
+ # Small public layers can expose duplicate/missing OBJECTID attributes in features.
+ # Query an explicit ID list and retrieve each ID with objectIds; only checkpoint
+ # identifiers we actually received. Never infer removals from an incomplete read.
+ meta=get(session,url,{'f':'json'},timeout=(10,25)).json()
+ if 'error' in meta:raise ValueError(str(meta['error']))
+ oid=meta.get('objectIdField') or next((f.get('name') for f in meta.get('fields',[]) if f.get('type')=='esriFieldTypeOID'),None)
+ if not oid:raise ValueError('No official ArcGIS object ID field')
+ qurl=url+'/query'
+ index=get(session,qurl,{'where':'1=1','returnIdsOnly':'true','f':'json'},timeout=(10,40)).json()
+ if 'error' in index:raise ValueError(str(index['error']))
+ ids=sorted(set(int(x) for x in (index.get('objectIds') or [])))
+ previous=con.execute('SELECT last_oid,backfilled FROM arcgis_progress WHERE source_id=?',(sid,)).fetchone()
+ cursor=(-1 if previous and previous[1] else int(previous[0]) if previous else -1)
+ pending=[x for x in ids if x>cursor][:max(1,limit)]
+ seen=created=changed=0
+ for pos in range(0,len(pending),min(50,int(meta.get('maxRecordCount') or 50))):
+  chunk=pending[pos:pos+50]
+  body=get(session,qurl,{'objectIds':','.join(map(str,chunk)),'outFields':'*','returnGeometry':'false','f':'json'},timeout=(12,45)).json()
+  if 'error' in body:raise ValueError(str(body['error']))
+  keyed={}
+  for ft in body.get('features') or []:
+   attrs=ft.get('attributes') or {}
+   val=attrs.get(oid)
+   if val is not None and str(val).lstrip('-').isdigit():keyed[int(val)]=attrs
+  if set(chunk)-set(keyed):raise ValueError('ArcGIS incomplete ID response; checkpoint unchanged for current page')
+  for number in chunk:
+   a,b=put(con,sid,str(number),keyed[number],stamp)
+   seen+=1;created+=a;changed+=b
+  cursor=chunk[-1]
+  con.execute('INSERT INTO arcgis_progress(source_id,last_oid,total_estimate,backfilled,updated_at,notes) VALUES(?,?,?,?,?,?) ON CONFLICT(source_id) DO UPDATE SET last_oid=excluded.last_oid,total_estimate=excluded.total_estimate,backfilled=excluded.backfilled,updated_at=excluded.updated_at,notes=excluded.notes',(sid,cursor,len(ids),0,utc(),'ID-list checkpoint'))
+  con.commit()
+  time.sleep(.2)
+ complete=(not pending or cursor>=ids[-1] if ids else True)
+ if complete:
+  con.execute('INSERT INTO arcgis_progress(source_id,last_oid,total_estimate,backfilled,updated_at,notes) VALUES(?,?,?,?,?,?) ON CONFLICT(source_id) DO UPDATE SET last_oid=excluded.last_oid,total_estimate=excluded.total_estimate,backfilled=excluded.backfilled,updated_at=excluded.updated_at,notes=excluded.notes',(sid,cursor,len(ids),1,utc(),'ID-list full pass completed'))
+  con.commit()
+ return ('OK' if complete else 'PARTIAL'),seen,created,changed,f'{seen} records retrieved by explicit IDs; source has {len(ids)} IDs; checkpoint={cursor}; no removals inferred'
 
 LIC_FIELDS=['organization_name','operating_name','business_address','expiry_date','file_number']
 LIC_HEADERS=('organization name','contractor operating name','business address','expiry date','file number')
@@ -217,7 +256,7 @@ def webtable_extended(con,session,sid,url,stamp):
   for a in soup.find_all('a',href=True):
    title=(' '.join([a.get_text(' ',strip=True),a.get('title',''),a.get('aria-label','')])).lower()
    href=a['href']
-   if ('next' in title or 'pagefirstrow' in href.lower() and 'paged=true' in href.lower()) and 'pagefirstrow' in href.lower():
+   if ('next' in title or 'pagefirstrow' in href.lower() and 'paged=true' in href.lower()) and 'pagefirstrow' in href.lower() and 'pagedprev' not in href.lower():
     target=urljoin(response.url,href)
     if target not in visited and target.startswith('https://www.brampton.ca/'):
      nxt=target;break
@@ -271,7 +310,8 @@ def main():
   stamp=utc();cur=con.execute('INSERT INTO runs(source_id,started,status) VALUES(?,?,?)',(sid,stamp,'RUNNING'));rid=cur.lastrowid;con.commit()
   print(f'Brampton: {title} ...',flush=True)
   try:
-   if adapter in ('arcgis','arcgis_small'): status,n,a,b,detail=arcgis(con,session,sid,url,stamp,limit=200 if 'inspections' in sid else (1000 if adapter=='arcgis_small' else None))
+   if adapter=='arcgis_small':status,n,a,b,detail=arcgis_small_by_ids(con,session,sid,url,stamp)
+   elif adapter=='arcgis':status,n,a,b,detail=arcgis(con,session,sid,url,stamp,limit=75 if 'inspections' in sid else None)
    elif adapter=='html_table':status,n,a,b,detail=webtable(con,session,sid,url,stamp)
    elif adapter=='html_table_extended':status,n,a,b,detail=webtable_extended(con,session,sid,url,stamp)
    elif adapter=='content_monitor':status,n,a,b,detail=content_monitor(con,session,sid,url,stamp)
