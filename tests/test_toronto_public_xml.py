@@ -22,7 +22,7 @@ class TorontoXMLTests(unittest.TestCase):
   res={'id':'r','name':'Non-Competitive Contracts','format':'XML','url':'https://example.com/contract.xml'}
   with patch('toronto_public_records.resolve_ckan_package',return_value=pkg):
    with patch('toronto_public_records.choose_ckan_resource',return_value=res):
-    rows,meta=fetch(Http(),SPECS[0])
+    rows,meta=fetch(Http(),next(s for s in SPECS if s['id']=='toronto_noncompetitive_contracts'))
   self.assertEqual(len(rows),2)
   self.assertEqual(meta['format'],'XML')
 if __name__=='__main__':unittest.main()
