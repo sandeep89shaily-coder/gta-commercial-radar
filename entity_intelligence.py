@@ -7,7 +7,7 @@ from intelligence_dashboard import connection,rows,safe_url
 ROOT=Path(__file__).resolve().parent
 def normalize_address(s):
  s=re.sub(r'[^a-z0-9]+',' ',str(s or '').lower()).strip()
- return re.sub(r'\\s+',' ',s)
+ return re.sub(r'\s+',' ',s)
 def candidate_key(*items):return hashlib.sha256('|'.join(map(str,items)).encode()).hexdigest()[:24]
 def extract(data,max_records=25000,max_results=250):
  b=connection(data/'brampton_sources.sqlite')
