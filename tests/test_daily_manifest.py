@@ -26,7 +26,9 @@ class DailyManifestTests(unittest.TestCase):
  def test_optional_step_failure_is_partial(self):
   with tempfile.TemporaryDirectory() as td:
    data=Path(td);(data/'radar.sqlite').write_bytes(b'placeholder')
-   codes=[0]*len(daily_radar.STEPS);codes[8]=1
+   codes=[0]*len(daily_radar.STEPS)
+   optional_index=next(i for i,(_,_,required) in enumerate(daily_radar.STEPS) if not required)
+   codes[optional_index]=1
    class Done:
     def __init__(self,code):self.returncode=code
    with patch.object(daily_radar,'DATA',data),patch.object(daily_radar.subprocess,'run',side_effect=lambda *a,**k:Done(codes.pop(0))):
