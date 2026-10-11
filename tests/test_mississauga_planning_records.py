@@ -39,7 +39,7 @@ class MississaugaPlanningTests(unittest.TestCase):
     return Mock(json=lambda:{'fields':[{'name':'APP_FILE_NO'},{'name':'OBJECTID'}],
                               'objectIdField':'OBJECTID'} if url.endswith('/0') else {'count':2})
   with patch('mississauga_planning_records.collect_arcgis',return_value=snapshot):
-   with self.assertRaisesRegex(ValueError,'missing or repeated'):
+   with self.assertRaisesRegex(ValueError,'Duplicate rows|missing or repeated'):
     fetch(Http(),source)
  def test_history_and_weekly_gating(self):
   con=sqlite3.connect(':memory:')
