@@ -19,6 +19,12 @@ DB=DATA/'toronto_priority_sources.sqlite'
 API='https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action'
 MAX_BYTES=35*1024*1024
 SPECS=(
+ {'id':'toronto_open_solicitations','department':'Purchasing & Finance',
+  'slug':'tobids-all-open-solicitations','resource_hint':'All Solicitations',
+  'keys':('SOLICITATION_ID','CALL_NUMBER','CALL_NO','REQUEST_NUMBER','SOLICITATION_NUMBER','ID')},
+ {'id':'toronto_awarded_contracts','department':'Purchasing & Finance',
+  'slug':'tobids-awarded-contracts','resource_hint':'Awarded Contracts',
+  'keys':('AWARD_ID','CONTRACT_ID','CALL_NUMBER','CALL_NO','REQUEST_NUMBER','CONTRACT_NUMBER','ID')},
  {'id':'toronto_noncompetitive_contracts','department':'Purchasing & Finance',
   'slug':'tobids-non-competitive-contracts','resource_hint':'Non-Competitive Contracts',
   'keys':('CONTRACT_ID','CONTRACT_NUMBER','REFERENCE_NUMBER','SOLICITATION_NUMBER','ID')},
