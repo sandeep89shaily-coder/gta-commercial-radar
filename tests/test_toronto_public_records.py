@@ -54,7 +54,10 @@ class TorontoPublicRecordsTests(unittest.TestCase):
    with patch('toronto_public_records.choose_ckan_resource',return_value={'id':'r1','name':'Non-Competitive Contracts','format':'PDF','url':'https://open.toronto.ca/abc.pdf'}):
     with self.assertRaisesRegex(ValueError,'Unsupported resource'):fetch(HTTP(),self.spec)
  def test_all_sources_are_toronto_only(self):
-  self.assertEqual(len(SPECS),3)
+  self.assertEqual(len(SPECS),5)
   self.assertEqual({s['id'] for s in SPECS},{
+   'toronto_open_solicitations','toronto_awarded_contracts',
    'toronto_noncompetitive_contracts','toronto_road_restrictions','toronto_council_meeting_schedule'})
+  self.assertEqual([s['slug'] for s in SPECS[:2]],
+   ['tobids-all-open-solicitations','tobids-awarded-contracts'])
 if __name__=='__main__':unittest.main()
