@@ -7,7 +7,7 @@ class TorontoPublicRecordsTests(unittest.TestCase):
  def setUp(self):
   self.db=sqlite3.connect(':memory:')
   setup(self.db)
-  self.spec=SPECS[0]
+  self.spec=next(s for s in SPECS if s['id']=='toronto_noncompetitive_contracts')
   self.meta={'package_id':'package-1','resource_id':'resource-1',
              'resource_url':'https://ckan.toronto.example/contract.csv',
              'source_url':'https://open.toronto.ca/dataset/tobids-non-competitive-contracts/'}
