@@ -267,27 +267,59 @@ def webtable_extended(con,session,sid,url,stamp):
  return status,seen,created,changed,f'{seen} parsed rows across {pages} pages; completeness not established; no removals inferred'
 
 def content_monitor(con,session,sid,url,stamp):
- """Record meaningful page text and individual linked documents, not just a set of URLs."""
+ """Archive page text, linked-document metadata, and bounded public PDF text.
+
+ PDFs remain source-specific documents; failure to extract leaves an auditable
+ link entry and a PARTIAL status, not an invented document or silent success.
+ """
+ from urllib.parse import urlsplit
+ from io import BytesIO
  response=get(session,url,timeout=(8,25),attempts=2)
  soup=BeautifulSoup(response.text,'html.parser')
  for node in soup(['script','style','nav','footer','header']):node.decompose()
  main=soup.find('main') or soup.find(id='content') or soup.body or soup
- text=re.sub(r'\s+',' ',main.get_text(' ',strip=True))[:250000]
- if len(text)<50:raise ValueError('Little public text, likely JS-only content; not a structured feed')
+ page_text=re.sub(r'\s+',' ',main.get_text(' ',strip=True))[:250000]
+ if len(page_text)<50:raise ValueError('Little public text, likely JS-only content; not a structured feed')
  created=changed=0
- a,b=put(con,sid,'PAGE',{'url':response.url,'text':text},stamp);created+=a;changed+=b
- links=0
- for a in main.find_all('a',href=True):
-  link=urljoin(response.url,a['href'].strip())
-  if not link.startswith('https://') or any(x in link.lower() for x in ('login.aspx','signin','logout')):continue
-  title=a.get_text(' ',strip=True)[:250]
+ a,b=put(con,sid,'PAGE',{'url':response.url,'text':page_text},stamp);created+=a;changed+=b
+ links=[];pdf_links=[];errors=[]
+ allowed={'www.brampton.ca','www1.brampton.ca','brampton.ca','pub-brampton.escribemeetings.com'}
+ for anchor in main.find_all('a',href=True):
+  link=urljoin(response.url,anchor['href'].strip())
+  parts=urlsplit(link)
+  if parts.scheme!='https' or parts.hostname not in allowed:continue
+  if any(x in link.lower() for x in ('login.aspx','signin','logout')):continue
+  title=anchor.get_text(' ',strip=True)[:250]
   if not title:continue
-  if not (link.lower().endswith(('.pdf','.doc','.docx','.xlsx','.csv')) or any(x in title.lower() for x in ('agenda','minutes','report','project','contract','tender','budget','application','plan','notice'))):continue
-  key='LINK:'+digest(link)
-  aa,bb=put(con,sid,key,{'url':link,'label':title,'parent_url':response.url},stamp)
-  created+=aa;changed+=bb;links+=1
+  is_pdf=parts.path.lower().endswith('.pdf')
+  if not (is_pdf or parts.path.lower().endswith(('.doc','.docx','.xlsx','.csv')) or any(x in title.lower() for x in ('agenda','minutes','report','project','contract','tender','budget','application','plan','notice'))):continue
+  links.append((link,title))
+  aa,bb=put(con,sid,'LINK:'+digest(link),{'url':link,'label':title,'parent_url':response.url},stamp)
+  created+=aa;changed+=bb
+  if is_pdf:pdf_links.append((link,title))
  con.commit()
- return 'MONITOR',links+1,created,changed,f'Public page text snapshotted and {links} document/relevant links indexed; PDFs not yet extracted; no removals inferred'
+ # Bound document downloads to keep ordinary daily jobs predictable.
+ max_docs=max(0,min(8,int(os.getenv('BRAMPTON_PDFS_PER_SOURCE','3'))))
+ for link,title in pdf_links[:max_docs]:
+  try:
+   doc=get(session,link,timeout=(8,30),attempts=2)
+   data=doc.content
+   if len(data)>8*1024*1024:raise ValueError('Document above safe 8 MiB bound')
+   if not data.startswith(b'%PDF-'):raise ValueError('Not a PDF response')
+   from pypdf import PdfReader
+   reader=PdfReader(BytesIO(data))
+   if len(reader.pages)>120:raise ValueError('Document above safe 120-page bound')
+   extracted=' '.join((page.extract_text() or '') for page in reader.pages)
+   extracted=re.sub(r'\\s+',' ',extracted).strip()[:200000]
+   if not extracted:raise ValueError('No extractable PDF text (possibly scanned)')
+   aa,bb=put(con,sid,'DOCUMENT:'+digest(link),{'url':link,'label':title,'parent_url':response.url,'text':extracted,'pages':len(reader.pages),'sha256':hashlib.sha256(data).hexdigest()},stamp)
+   created+=aa;changed+=bb
+  except Exception as exc:
+   errors.append(title[:60]+': '+str(exc)[:100])
+ con.commit()
+ partial=bool(errors or len(pdf_links)>max_docs)
+ status='PARTIAL' if partial else 'MONITOR'
+ return status,len(links)+1,created,changed,f'{len(links)} links; {min(max_docs,len(pdf_links))-len(errors)} PDFs text-extracted; {len(errors)} PDF failures; {max(0,len(pdf_links)-max_docs)} deferred; no removals inferred'+('; '+errors[0] if errors else '')
 
 def discover(con,session,sid,url,stamp):
  response=get(session,url);soup=BeautifulSoup(response.text,'html.parser');count=0
