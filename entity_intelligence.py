@@ -8,6 +8,8 @@ ROOT=Path(__file__).resolve().parent
 def normalize_address(s):
  s=re.sub(r'[^a-z0-9]+',' ',str(s or '').lower()).strip()
  return re.sub(r'\s+',' ',s)
+def normalize_name(s):
+ return re.sub(r'[^a-z0-9]+',' ',str(s or '').lower()).strip()
 def candidate_key(*items):return hashlib.sha256('|'.join(map(str,items)).encode()).hexdigest()[:24]
 def extract(data,max_records=25000,max_results=250):
  b=connection(data/'brampton_sources.sqlite')
@@ -35,12 +37,17 @@ def extract(data,max_records=25000,max_results=250):
    if address not in index:continue
    for other in index[address][:5]:
     evidence_url=safe_url(obj.get('source_url'))
+    name_a=str(fields.get('organization_name') or fields.get('operating_name') or '')
+    name_b=str(other.get('company_name') or '')
+    same_name=bool(normalize_name(name_a) and normalize_name(name_a)==normalize_name(name_b))
+    classification='UNVERIFIED_NAME_AND_ADDRESS_MATCH' if same_name else 'UNVERIFIED_ADDRESS_MATCH'
+    reason=('Exact normalized name and address; independent identity confirmation still required' if same_name else 'Same normalized address; occupants may be unrelated')
     result.append({'candidate_id':candidate_key(r['source_id'],r['record_id'],other['source_id'],other['source_key']),
-     'name_a':str(fields.get('organization_name') or fields.get('operating_name') or ''),'name_b':other['company_name'],
+     'name_a':name_a,'name_b':name_b,
      'shared_address':fields.get('business_address',''),'source_a':r['source_id'],'key_a':r['record_id'],
      'source_b':other['source_id'],'key_b':other['source_key'],
-     'evidence_url':evidence_url,'classification':'UNVERIFIED_ADDRESS_MATCH',
-     'reason':'Same normalized street address; tenants, subsidiaries or unrelated occupants may share an address',
+     'evidence_url':evidence_url,'classification':classification,
+     'reason':reason,
      'verified_identity':'NO','publication_date_confirmed':'NO'})
     if len(result)>=max_results:return result
   return result
