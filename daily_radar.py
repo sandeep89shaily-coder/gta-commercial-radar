@@ -9,6 +9,7 @@ def stamp():return datetime.now(timezone.utc).isoformat(timespec='seconds')
 STEPS=[
  ('municipal_poll',('main.py','poll'),True),
  ('toronto_catalog_discovery',('toronto_catalog_audit.py',),False),
+ ('toronto_coverage_report',('toronto_coverage.py',),False),
  ('brampton',('brampton_network.py',),True),
  ('peel',('peel_pilot.py',),True),
  ('business_collection',('business_discovery.py','run'),True),
