@@ -28,13 +28,13 @@ LICENCE_CATEGORIES = [
  'Licensed-Fence-Installation-Contractors','Licensed-HVAC-Contractors',
  'Licensed-Payday-Loans','Licensed-Pawnbrokers','Licensed-Pet-Grooming',
  'Licensed-Pet-Shops','Licensed-Personal-Services','Licensed-Places-of-Amusement',
- 'Licensed-Places-of-Public-Assembly','Licensed-Plumbing-Contractors',
+ 'Licensed-Places-of-Public-Assembly','Licensed-Contractors-Plumbing',
  'Licensed-Pool-Contractors','Licensed-Salvage-Yards-Salvage-Shops',
  'Licensed-Second-Hand-Goods','Licensed-Wildlife-Removal',
  'Licensed-Horse-Riding-Establishments',
 ]
 for slug in LICENCE_CATEGORIES:
- SOURCES.append(('brampton_lic_'+('licensed-animal-kennels-or-doggie-daycare' if slug=='Licensed-Animal-Kennels-Doggie-Daycare' else slug).lower().replace('-','_'),'Licensing',slug.replace('-',' '),(LIC+'Licensed-Contractors-HVAC.aspx' if slug=='Licensed-HVAC-Contractors' else LIC+slug+'.aspx'),'html_table_extended','weekly'))
+ SOURCES.append(('brampton_lic_'+('licensed-animal-kennels-or-doggie-daycare' if slug=='Licensed-Animal-Kennels-Doggie-Daycare' else 'licensed-plumbing-contractors' if slug=='Licensed-Contractors-Plumbing' else slug).lower().replace('-','_'),'Licensing',slug.replace('-',' '),(LIC+'Licensed-Contractors-HVAC.aspx' if slug=='Licensed-HVAC-Contractors' else LIC+slug+'.aspx'),'html_table_extended','weekly'))
 ROAD='https://maps1.brampton.ca/arcgis/rest/services/Roadworks/RoadClosuresAndConstruction/FeatureServer'
 for layer,name in [(0,'Road construction projects'),(1,'Active road closures'),(2,'Upcoming road closures'),(3,'All road projects'),(4,'All road closures')]:
  SOURCES.append((f'brampton_roadworks_{layer}','Public Works',name,ROAD+'/'+str(layer),'arcgis_small','weekly'))
@@ -45,7 +45,7 @@ MONITOR_SOURCES=[
  ('brampton_construction_content','Public Works','Construction project announcements','https://www.brampton.ca/EN/residents/Roads-and-Traffic/pages/construction-projects.aspx'),
  ('brampton_stationary_licensing_content','Licensing','Stationary licensing news and categories','https://www.brampton.ca/EN/Business/Licensing/Pages/Stationary-Licensing.aspx'),
  ('brampton_mobile_licensing_content','Licensing','Mobile licensing announcements','https://www.brampton.ca/EN/Business/Licensing/Pages/Mobile-Licensing.aspx'),
- ('brampton_procurement_content','Procurement','Brampton procurement public page','https://www.brampton.ca/EN/Business/purchasing/Pages/welcome.aspx'),
+ ('brampton_procurement_content','Procurement','Brampton procurement public page','https://www.brampton.ca/EN/Business/Doing-Business-with-the-City/Pages/Understanding-Procurement.aspx'),
  ('brampton_economic_content','Economic Development','Business and investment public page','https://investbrampton.ca/'),
  ('brampton_budget_content','Finance','City budget and capital planning','https://www.brampton.ca/EN/City-Hall/Budget/Pages/Welcome.aspx'),
 ]
