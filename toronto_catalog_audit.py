@@ -5,7 +5,7 @@ Output: data/toronto_catalog_inventory.csv and .json
 Only replaces outputs after an entire successful catalogue scan.
 """
 from __future__ import annotations
-import csv, io, json, re, sys
+import csv, io, json, re, sys, hashlib
 from datetime import timedelta
 from datetime import datetime, timezone
 from pathlib import Path
@@ -82,7 +82,7 @@ def audit(packages,sources):
             'url':'https://open.toronto.ca/dataset/'+name+'/' if name else '',
             'resource_count':len(resources),
             'resource_formats':','.join(sorted({str(x.get('format') or '').upper() for x in resources if x.get('format')})),
-            'resource_ids':','.join(str(x['id']) for x in resources if x.get('id')),
+            'resource_ids':','.join(sorted(str(x['id']) for x in resources if x.get('id'))),
             'priority_families':','.join(classify(package)),
             'configured_exact_ids':','.join(match),
             'configured_enabled_ids':','.join(enabled),
@@ -90,6 +90,61 @@ def audit(packages,sources):
             'collector_alignment':'EXACT_CONFIGURED' if match else 'TITLE_SEARCH_POSSIBLE' if possible else 'NOT_CONFIGURED',
         })
     return rows
+
+PROVIDER_FIELDS = ('title', 'organization', 'modified', 'licence_id',
+                   'resource_ids', 'resource_formats', 'resource_count')
+
+def catalog_changes(previous, current, stamp):
+    """Observe published catalogue metadata; never assert record changes or deletion."""
+    if previous is None:
+        return []
+    old={p['package_id']:p for p in previous if p.get('package_id')}
+    new={p['package_id']:p for p in current if p.get('package_id')}
+    events=[]
+    for pid,now in new.items():
+        before=old.get(pid)
+        if before is None:
+            events.append({'observed_at':stamp, 'package_id':pid,
+                           'title':now.get('title',''), 'source_url':now.get('url',''),
+                           'event_type':'NEW_CATALOGUE_ENTRY',
+                           'details':{'note':'Publication listing discovered; not a new business or permit'}})
+            continue
+        changes={k:{'before':before.get(k,''),'after':now.get(k,'')}
+                 for k in PROVIDER_FIELDS if before.get(k,'')!=now.get(k,'')}
+        if changes:
+            events.append({'observed_at':stamp,'package_id':pid,
+                           'title':now.get('title',''), 'source_url':now.get('url',''),
+                           'event_type':'CATALOGUE_METADATA_CHANGED','details':changes})
+    for pid,before in old.items():
+        if pid not in new:
+            events.append({'observed_at':stamp,'package_id':pid,
+                           'title':before.get('title',''),'source_url':before.get('url',''),
+                           'event_type':'NOT_LISTED_IN_CURRENT_CATALOGUE',
+                           'details':{'note':'No deletion, unpublishing or business closure inferred'}})
+    return events
+
+def store_history(path, events):
+    """Deduplicate journal events by content, so interrupted audit retries are safe."""
+    existing=path.read_text(encoding='utf-8') if path.is_file() else ''
+    hashes=set()
+    for line in existing.splitlines():
+        if not line.strip():continue
+        obj=json.loads(line)  # Corrupted history must not be silently replaced.
+        hashes.add(str(obj.get('event_key') or ''))
+    written=[]
+    for e in events:
+        identity={k:v for k,v in e.items() if k!='observed_at'}
+        key=hashlib.sha256(json.dumps(identity,sort_keys=True,ensure_ascii=False).encode('utf-8')).hexdigest()
+        if key in hashes:continue
+        written.append({**e,'event_key':key})
+        hashes.add(key)
+    updated=existing
+    if updated and not updated.endswith('\\n'):updated+='\\n'
+    updated+=''.join(json.dumps(x,sort_keys=True,ensure_ascii=False)+'\\n' for x in written)
+    temp=path.with_suffix(path.suffix+'.tmp')
+    temp.write_text(updated,encoding='utf-8')
+    temp.replace(path)
+    return len(written)
 
 def due(path, *, now=None, interval_days=7):
     now=now or datetime.now(timezone.utc)
@@ -108,9 +163,22 @@ def run(*,force=False):
     packages=fetch_catalog()
     sources=json.loads((ROOT/'config'/'sources.json').read_text(encoding='utf-8'))
     rows=audit(packages,sources)
+    previous_path=dest/'toronto_catalog_inventory.json'
+    previous=None
+    if previous_path.exists():
+        old_report=json.loads(previous_path.read_text(encoding='utf-8'))
+        previous=old_report['packages']
+        if len(previous)!=old_report['package_count']:
+            raise RuntimeError('Previous Toronto inventory incomplete; history not modified')
+    observed_at=datetime.now(timezone.utc).isoformat()
+    changes=catalog_changes(previous,rows,observed_at)
+    history_written=store_history(dest/'toronto_catalog_change_history.jsonl',changes)
     names=list(rows[0]) if rows else ['package_id','package_name','title']
     buffer=io.StringIO();writer=csv.DictWriter(buffer,fieldnames=names);writer.writeheader();writer.writerows(rows)
-    summary={'observed_at':datetime.now(timezone.utc).isoformat(),
+    summary={'observed_at':observed_at,
+             'first_catalog_baseline':previous is None,
+             'catalogue_metadata_changes_observed':len(changes),
+             'catalogue_history_events_written':history_written,
              'source':'Toronto Open Data CKAN package_search','package_count':len(rows),
              'Toronto_existing_configured_sources':len([s for s in sources if str(s.get('jurisdiction','')).lower()=='toronto']),
              'priority_candidates':sum(bool(r['priority_families']) for r in rows),
@@ -121,5 +189,6 @@ def run(*,force=False):
         output=dest/filename;temp=dest/(filename+'.tmp')
         temp.write_text(text,encoding='utf-8');temp.replace(output)
     print('Toronto catalogue inventory:',len(rows),'packages;',
-          summary['priority_candidates'],'priority candidates; outputs in',dest)
+          summary['priority_candidates'],'priority candidates;',
+          len(changes),'catalogue metadata observations; outputs in',dest)
 if __name__=='__main__':run(force='--force' in sys.argv[1:])
