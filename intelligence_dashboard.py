@@ -150,6 +150,15 @@ def render(data,out):
     if (data/'mississauga_planning_changes_REVIEW_ONLY.csv').is_file():
      parts.append('<p><a href="mississauga_planning_changes_REVIEW_ONLY.csv">Planning record changes — research only</a></p>')
    finally:mdb.close()
+ if (data/'mississauga_procurement_sources.sqlite').is_file():
+  pdb=connection(data/'mississauga_procurement_sources.sqlite')
+  if pdb:
+   try:
+    parts.append('<h2>Mississauga — Public Procurement Portals</h2>')
+    parts.append('<p>Public-facing bids&amp;tenders / Bonfire monitoring only. Bid details may require registration. A monitored page is not proof of complete procurement coverage.</p>')
+    parts.append(table([('source_id','Source'),('url','Public portal'),('last_checked','Last check'),('status','State'),('parsed_bid_count','Bid listings parsed')],rows(pdb,'SELECT source_id,url,last_checked,status,parsed_bid_count FROM public_pages ORDER BY source_id')))
+    parts.append(table([('source_id','Source'),('observed_at','Checked'),('status','Run'),('fetched','Listing records')],rows(pdb,'SELECT source_id,observed_at,status,fetched FROM runs ORDER BY id DESC LIMIT 15')))
+   finally:pdb.close()
  parts.append('<h2>1 · Source health — Brampton</h2>')
  parts.append(table([('department','Department'),('title','Source'),('access_status','Status'),('records','Stored'),('last_run','Last run'),('detail','Last result'),('url','Official source')],B['sources']))
  parts.append('<h2>2 · Collection checkpoints</h2>')
