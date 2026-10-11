@@ -30,7 +30,8 @@ def main():
     # Reporting is offline/read-only and must run even if optional AI fails.
     dashboard_result=cmd('intelligence_dashboard.py')
     readiness_result=cmd('production_readiness.py')
+    health_result=cmd('radar_health.py')
     if dashboard_result: print('WARNING: consolidated dashboard generation failed')
     if readiness_result: print('WARNING: readiness report found a database failure')
-    return ai_result or dashboard_result or readiness_result
+    return ai_result or dashboard_result or readiness_result or health_result
 if __name__=='__main__':raise SystemExit(main())
