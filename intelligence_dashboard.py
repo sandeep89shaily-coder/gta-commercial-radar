@@ -121,6 +121,9 @@ def render(data,out):
    parts.append(table([('step','Step'),('status','Result'),('finished_at','Finished'),('exit_code','Exit code')],latest.get('steps',[])))
   except (ValueError,OSError,TypeError):parts.append('<p>Run manifest unreadable; validate scheduled collection.</p>')
  else:parts.append('<p>No completed daily run manifest yet. Scheduled execution unverified.</p>')
+ if (data/'toronto_department_coverage.html').is_file():
+  parts.append('<h2>Toronto — Department and Source Coverage</h2>')
+  parts.append('<p><a href="toronto_department_coverage.html">Open Toronto department and source audit</a> — identify missing priority CKAN feeds, publishing divisions, and configured collector health. <a href="toronto_gap_queue.csv">CSV research queue</a>. These are candidates, not confirmed records or opportunities.</p>')
  parts.append('<h2>1 · Source health — Brampton</h2>')
  parts.append(table([('department','Department'),('title','Source'),('access_status','Status'),('records','Stored'),('last_run','Last run'),('detail','Last result'),('url','Official source')],B['sources']))
  parts.append('<h2>2 · Collection checkpoints</h2>')
