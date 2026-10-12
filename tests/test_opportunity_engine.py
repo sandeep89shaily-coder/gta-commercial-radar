@@ -40,6 +40,23 @@ class MunicipalOpportunityTests(unittest.TestCase):
   self.assertEqual(audit['toronto_licence']['missing_or_invalid_date'],'1')
   self.assertEqual(audit['toronto_licence']['future_date'],'1')
   self.assertEqual(audit['toronto_licence']['selected_recent'],'0')
+ def test_old_permit_updated_today_is_detection_not_new_issuance(self):
+  db=sqlite3.connect(self.data/'radar.sqlite')
+  db.execute('CREATE TABLE changes (source_id TEXT,record_key TEXT,observed_at TEXT,normalized_json TEXT,change_type TEXT)')
+  from datetime import datetime
+  today=datetime.now().astimezone().isoformat(timespec='seconds')
+  old={'source_date':'2019-04-01','entity_name':'Example Shop','address':'5 King St','description':'commercial shop','commercial_relevance':'HIGH'}
+  db.execute('INSERT INTO changes VALUES (?,?,?,?,?)',('toronto_active_building_permits','old',today,json.dumps(old),'UPDATED'))
+  db.execute('INSERT INTO changes VALUES (?,?,?,?,?)',('toronto_active_building_permits','baseline',today,json.dumps(old),'NEW'))
+  db.commit();db.close()
+  rows,stats,_=collect(self.data)
+  updates=[x for x in rows if x['source_group']=='MUNICIPAL_CHANGE']
+  self.assertEqual(len(updates),1)
+  self.assertEqual(updates[0]['source_key'],'old')
+  self.assertEqual(updates[0]['event_date_basis'],'CHANGE_DETECTED_NOT_PERMIT_ISSUED')
+  self.assertEqual(updates[0]['selection_reason'],'MATERIAL_SOURCE_RECORD_UPDATED')
+  self.assertEqual(updates[0]['review_status'],'UNVERIFIED_NOT_FOR_SALE')
+  self.assertNotEqual(updates[0]['event_type'],'PERMIT_ISSUED')
  def test_address_only_match_not_verified(self):
   db=sqlite3.connect(self.data/'business_discovery.sqlite')
   db.execute('CREATE TABLE observations (source_id TEXT,source_key TEXT,company_name TEXT,address TEXT,city TEXT,industry TEXT,event_date TEXT,event_type TEXT,observed_at TEXT)')
