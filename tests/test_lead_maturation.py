@@ -1,7 +1,7 @@
 import csv,sqlite3
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from lead_maturation import mature,write_csv,group_recent
+from lead_maturation import mature,write_csv,group_recent,balanced_focus,rank
 
 def test_group_and_select_without_assuming_operator():
  with TemporaryDirectory() as tmp:
@@ -33,3 +33,24 @@ def test_empty_current_selection_clears_previous_investigations():
   with (d/'matured_opportunities_REVIEW_ONLY.csv').open(encoding='utf-8-sig') as f:
    assert not list(csv.DictReader(f))
   assert 'OLD INVESTIGATION' not in (d/'investigation_dashboard.html').read_text()
+
+def test_balanced_research_queue_preserves_alternative_sources():
+ rows=[]
+ for i in range(40):
+  rows.append({'investigation_id':f'update{i}','source_group':'MUNICIPAL_CHANGE','source_id':'toronto_permits','research_priority':'99'})
+ for i in range(12):
+  rows.append({'investigation_id':f'new{i}','source_group':'MUNICIPAL','source_id':'toronto_development','research_priority':'75'})
+ for i in range(8):
+  rows.append({'investigation_id':f'other{i}','source_group':'MUNICIPAL','source_id':'mississauga_permits','research_priority':'70'})
+ selection=balanced_focus(rows,30)
+ assert len(selection)==30
+ assert sum(r['source_group']=='MUNICIPAL_CHANGE' for r in selection)<=10
+ assert len({r['source_id'] for r in selection})==3
+ assert all(r['investigation_id'] for r in selection)
+
+def test_changed_and_residential_records_downranked():
+ base={'source_id':'toronto_active_building_permits','source_group':'MUNICIPAL','description':'commercial tenant construction','commercial_priority':'HIGH','address':'123 King St','company_name':'Example','evidence_url':'https://example.org/permit'}
+ changed={**base,'source_group':'MUNICIPAL_CHANGE'}
+ residential={**base,'description':'residential basement renovation','commercial_priority':'LOW'}
+ assert rank(base,[base],[])>rank(changed,[changed],[])
+ assert rank(base,[base],[])>rank(residential,[residential],[])
