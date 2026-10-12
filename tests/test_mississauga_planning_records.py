@@ -67,9 +67,9 @@ class MississaugaPlanningTests(unittest.TestCase):
    {'APP_FILE_NO':'','PLNG_APP_ID':601,'OBJECTID':1},
    {'APP_FILE_NO':'SP100','PLNG_APP_ID':601,'OBJECTID':2}],is_complete=True)
   with patch('mississauga_planning_records.collect_arcgis',return_value=snapshot):
-   with self.assertRaisesRegex(ValueError,
-                                'APP_FILE_NO missing=1 repeated=0; PLNG_APP_ID missing=0 repeated=1'):
-    fetch(Http(),source)
+   rows,_,spec=fetch(Http(),source)
+  self.assertEqual(spec['keys'],('OBJECTID',))
+  self.assertEqual(len(rows),2)
  def test_compound_identifiers_accepted_only_when_pairs_unique(self):
   source=load_sources()[0]
   class Http:
