@@ -149,7 +149,7 @@ def run(force=False):
  fields=['item_id','title','item_type','publisher','created','modified','tags',
          'priority_families','collections','configured_exact_ids','coverage_state','links']
  stream=io.StringIO();w=csv.DictWriter(stream,fieldnames=fields);w.writeheader()
- for item in items:w.writerow({k:','.join(v) if isinstance(v,list) else item.get(k,'') for k in fields})
+ for item in items:w.writerow({k:','.join(str(value) for value in item.get(k,[])) if isinstance(item.get(k),list) else item.get(k,'') for k in fields})
  for name,content in [('mississauga_catalog_inventory.json',json.dumps(result,indent=2,ensure_ascii=False)),
                       ('mississauga_catalog_inventory.csv',stream.getvalue())]:
   path=DATA/name;temp=path.with_suffix(path.suffix+'.tmp')

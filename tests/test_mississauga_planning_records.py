@@ -70,6 +70,21 @@ class MississaugaPlanningTests(unittest.TestCase):
    with self.assertRaisesRegex(ValueError,
                                 'APP_FILE_NO missing=1 repeated=0; PLNG_APP_ID missing=0 repeated=1'):
     fetch(Http(),source)
+ def test_compound_identifiers_accepted_only_when_pairs_unique(self):
+  source=load_sources()[0]
+  class Http:
+   def get(self,url,**kwargs):
+    return Mock(json=lambda:({'fields':[{'name':k} for k in
+                     ('APP_FILE_NO','PLNG_APP_ID','OBJECTID')],
+                     'objectIdField':'OBJECTID'} if url.endswith('/0') else {'count':3}))
+  snapshot=Mock(rows=[
+   {'APP_FILE_NO':'SP1','PLNG_APP_ID':'A','OBJECTID':1},
+   {'APP_FILE_NO':'SP1','PLNG_APP_ID':'B','OBJECTID':2},
+   {'APP_FILE_NO':'SP2','PLNG_APP_ID':'A','OBJECTID':3}],is_complete=True)
+  with patch('mississauga_planning_records.collect_arcgis',return_value=snapshot):
+   rows,_,spec=fetch(Http(),source)
+  self.assertEqual(spec['keys'],('APPLICATION_COMPOSITE_ID',))
+  self.assertEqual(len({r['APPLICATION_COMPOSITE_ID'] for r in rows}),3)
  def test_refresh_preserves_previously_chosen_identity(self):
   source=load_sources()[0]
   class Http:

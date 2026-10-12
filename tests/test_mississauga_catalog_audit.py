@@ -55,4 +55,20 @@ class MississaugaCatalogTests(unittest.TestCase):
   result=compare_existing(sample,current)[0]
   self.assertEqual(result['coverage_state'],'NOT_ID_VERIFIED')
   self.assertEqual(result['configured_exact_ids'],'')
+ def test_csv_export_with_list_fields(self):
+  import tempfile, json
+  from pathlib import Path
+  from unittest.mock import patch
+  import mississauga_catalog_audit as mod
+  item={'item_id':'a','title':'Permits','description':'new building',
+        'item_type':'dataset','publisher':'city','created':'','modified':'',
+        'tags':'commercial','priority_families':['construction_development'],
+        'collections':['dataset'],'links':['https://data.mississauga.ca/a']}
+  with tempfile.TemporaryDirectory() as tmp:
+   with patch.object(mod,'DATA',Path(tmp)), patch.object(mod,'inventory',return_value=([item],['dataset'])), patch.object(mod,'ROOT',Path(tmp)):
+    (Path(tmp)/'config').mkdir()
+    (Path(tmp)/'config'/'sources.json').write_text('[]')
+    mod.run(force=True)
+    result=(Path(tmp)/'mississauga_catalog_inventory.csv').read_text()
+    self.assertIn('construction_development',result)
 if __name__=='__main__':unittest.main()
