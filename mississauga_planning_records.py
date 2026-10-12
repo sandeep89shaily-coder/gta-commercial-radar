@@ -77,7 +77,9 @@ def fetch(http,source,preferred_identity=None):
  # city-published application ID is allowed ONLY when complete and unique.
  # Preserve the previously stored identity strategy on later weekly refreshes.
  candidates=('APP_FILE_NO','PLNG_APP_ID')
- if preferred_identity in candidates:
+ if preferred_identity=='APPLICATION_COMPOSITE_ID':
+  candidates=()
+ elif preferred_identity in candidates:
   candidates=(preferred_identity,)+tuple(x for x in candidates if x!=preferred_identity)
  quality=[]
  chosen=None
@@ -90,9 +92,19 @@ def fetch(http,source,preferred_identity=None):
   if missing==0 and repeated==0:
    chosen=key
    break
+ if not chosen and all(k in fieldnames for k in ('APP_FILE_NO','PLNG_APP_ID')):
+  # A compound identity is safe only if both fields are present on every row
+  # and each PAIR is unique. Do not use ArcGIS OBJECTID as a business identity.
+  pairs=[(str(row.get('APP_FILE_NO') or '').strip(),
+          str(row.get('PLNG_APP_ID') or '').strip()) for row in snapshot.rows]
+  if all(left and right for left,right in pairs) and len(set(pairs))==len(pairs):
+   chosen='APPLICATION_COMPOSITE_ID'
+   # Deterministic, unambiguous JSON encoding avoids separator collisions.
+   for row,(left,right) in zip(snapshot.rows,pairs):
+    row[chosen]=json.dumps([left,right],separators=(',',':'),ensure_ascii=False)
  if not chosen:
   raise ValueError('Planning application IDs missing or repeated; '+
-                   '; '.join(quality)+'; snapshot rejected')
+                   '; '.join(quality)+'; no complete unique composite ID; snapshot rejected')
  spec={'id':source['id'],'department':'City Planning','keys':(chosen,)}
  evidence={'package_id':layer,'resource_id':layer,
            'resource_url':layer+'/query',
