@@ -96,9 +96,11 @@ def collect(data,days=2,today=None,limit=100000,lookback_days=90):
             # only an explicitly provided source event date can create a lead.
             d=parse_date(r.get('event_date'))
             if d is None:
+                stats[(group,source,'missing_or_invalid_date')]+=1
                 stats[(group,'unknown_event_date')]+=1
                 continue
             if not cutoff<=d<=today:
+                stats[(group,source,'future_date' if d>today else 'older_than_window')]+=1
                 stats[(group,'outside_window')]+=1
                 continue
             name=r.get('company_name') or ''
@@ -110,6 +112,7 @@ def collect(data,days=2,today=None,limit=100000,lookback_days=90):
             key=str(r.get('source_key') or digest(group,source,name,addr,d))
             r.update(source_key=key,opportunity_id=digest(group,source,key),review_status='UNVERIFIED_NOT_FOR_SALE',selection_reason=('MUNICIPAL_SOURCE_EVENT_DATE' if group=='MUNICIPAL' else ('PEEL_POST_BASELINE_CHANGE_OBSERVED_DATE_NOT_ISSUE_DATE' if group=='PEEL_PROJECT' else 'EXPLICIT_FORMATION_OR_LICENCE_DATE')),maturity='DETECTED',identity_confidence='UNVERIFIED' if not valid(name) else 'NAMED_UNCONFIRMED',contact_quality='MISSING',commercial_priority=score(r),missing_information=';'.join(missing),related_record_count=1)
             rows.append(r);stats[(group,'selected')]+=1
+            stats[(group,source,'selected')]+=1
     dedup={r['opportunity_id']:r for r in rows}
     priority={'HIGH':2,'UNASSESSED':1,'LOW':0}
     ordered=sorted(dedup.values(),key=lambda r:(r['source_group'] in ('MUNICIPAL','PEEL_PROJECT'),priority.get(r['commercial_priority'],0),str(r.get('event_date') or ''),r['opportunity_id']),reverse=True)
@@ -169,6 +172,22 @@ def export(data,days=2,today=None,limit=500):
         w=csv.writer(f);w.writerow(['source_group','source_id','records_available','recent_events_selected','not_selected_in_window'])
         for (group,source),all_count in sorted(sources.items()):
             selected=counts.get((group,source),0);w.writerow([group,source,all_count,selected,all_count-selected])
+    # Exact reason breakdown for a zero-selection source. These categories are
+    # diagnostic only: an old or missing date is not a new commercial event.
+    with (data/'source_date_quality_audit.csv').open('w',encoding='utf-8-sig',newline='') as f:
+        w=csv.writer(f)
+        w.writerow(['source_group','source_id','records_available','selected_recent','missing_or_invalid_date','older_than_window','future_date','enrichment_only','unclassified'])
+        for (group,source),total in sorted(sources.items()):
+            selected=counts.get((group,source),0)
+            missing=stats[(group,source,'missing_or_invalid_date')]
+            older=stats[(group,source,'older_than_window')]
+            future=stats[(group,source,'future_date')]
+            enrichment=stats[(group,source,'enrichment_only')]
+            # Some legacy source families are excluded before date inspection.
+            if group=='BUSINESS_DISCOVERY':
+                enrichment=max(0,total-selected-missing-older-future)
+            w.writerow([group,source,total,selected,missing,older,future,enrichment,
+                        max(0,total-selected-missing-older-future-enrichment)])
     dashboard=['<!doctype html><html><meta charset="utf-8"><title>Radar opportunities</title><style>body{font:15px Segoe UI,Arial;max-width:1300px;margin:35px auto;color:#243246}table{border-collapse:collapse;width:100%;font-size:13px}td,th{border-bottom:1px solid #ddd;padding:9px;text-align:left}small{color:#555}</style><h1>GTA Radar — Municipal-led Opportunities</h1>']
     municipal=sum(r['source_group']=='MUNICIPAL' for r in rows)
     peel=sum(r['source_group']=='PEEL_PROJECT' for r in rows)
@@ -184,6 +203,7 @@ def export(data,days=2,today=None,limit=500):
     (data/'opportunity_dashboard.html').write_text(''.join(dashboard),encoding='utf-8')
     print(f'Municipal-led opportunity scan: {len(rows)} dated events; municipal={municipal}; peel post-baseline changes={peel}; explicit business events={business}; pending={len(backlog)}; newly queued={len(backlog)-before}; enrichment-only directory records={stats.get(("BUSINESS_DISCOVERY","enrichment_only"),0)}')
     print('Per-source audit:',data/'collector_opportunity_audit.csv')
+    print('Why sources have zero recent leads:',data/'source_date_quality_audit.csv')
     return len(rows),len(backlog)
 if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('--days',type=int,default=2);p.add_argument('--data-dir',default=str(ROOT/'data'));args=p.parse_args()
