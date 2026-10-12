@@ -1,7 +1,6 @@
 """Separate, additive Mississauga planning archive for two staged official GIS layers.
 
-Does not enable staged sources in the main Radar database. Records only complete
-official full snapshots with stable APP_FILE_NO identity. No removal inference.
+Does not enable staged sources in the main Radar database. Records only complete official snapshots; when application numbers repeat,\nretain distinct source features by validated ArcGIS row ID (not business IDs).\nNo removal inference, no direct sale-ready leads.
 Uses the shared proven version/observation archive schema.
 """
 from __future__ import annotations
@@ -77,7 +76,7 @@ def fetch(http,source,preferred_identity=None):
  # city-published application ID is allowed ONLY when complete and unique.
  # Preserve the previously stored identity strategy on later weekly refreshes.
  candidates=('APP_FILE_NO','PLNG_APP_ID')
- if preferred_identity=='APPLICATION_COMPOSITE_ID':
+ if preferred_identity in ('APPLICATION_COMPOSITE_ID',str(oid).upper()):
   candidates=()
  elif preferred_identity in candidates:
   candidates=(preferred_identity,)+tuple(x for x in candidates if x!=preferred_identity)
@@ -92,7 +91,7 @@ def fetch(http,source,preferred_identity=None):
   if missing==0 and repeated==0:
    chosen=key
    break
- if not chosen and all(k in fieldnames for k in ('APP_FILE_NO','PLNG_APP_ID')):
+ if not chosen and preferred_identity!=str(oid).upper() and all(k in fieldnames for k in ('APP_FILE_NO','PLNG_APP_ID')):
   # A compound identity is safe only if both fields are present on every row
   # and each PAIR is unique. Do not use ArcGIS OBJECTID as a business identity.
   pairs=[(str(row.get('APP_FILE_NO') or '').strip(),
@@ -103,8 +102,22 @@ def fetch(http,source,preferred_identity=None):
    for row,(left,right) in zip(snapshot.rows,pairs):
     row[chosen]=json.dumps([left,right],separators=(',',':'),ensure_ascii=False)
  if not chosen:
-  raise ValueError('Planning application IDs missing or repeated; '+
-                   '; '.join(quality)+'; no complete unique composite ID; snapshot rejected')
+  # City records can contain multiple features for the SAME application.
+  # Archive distinct source features by the city's ArcGIS row identifier,
+  # without pretending that these are distinct developments or sale-ready leads.
+  # This is a SEPARATE staged archive, never enabled in the main lead selector.
+  row_key=str(oid).upper()
+  if row_key not in fieldnames:
+   raise ValueError('ArcGIS ObjectID column not present; snapshot rejected')
+  missing,repeated=application_key_quality(snapshot.rows,row_key)
+  if missing or repeated:
+   raise ValueError('Planning application IDs missing or repeated; '+
+                    '; '.join(quality)+'; row IDs missing='+str(missing)+
+                    ' repeated='+str(repeated)+'; snapshot rejected')
+  chosen=row_key
+  print('Mississauga planning: archiving source rows by ArcGIS ObjectID; '+
+        'multiple rows may refer to one application; NOT separate commercial leads',
+        flush=True)
  spec={'id':source['id'],'department':'City Planning','keys':(chosen,)}
  evidence={'package_id':layer,'resource_id':layer,
            'resource_url':layer+'/query',
