@@ -153,14 +153,27 @@ def main_source_summary():
 
 
 def safe_error_tail(log_path):
-    """Only extract exception-summary lines, never distribute the full collector log."""
+    """Return the final exception message, not just 'Traceback'; never export raw logs."""
     if not log_path.is_file():
         return ""
-    with log_path.open(encoding="utf-8",errors="replace") as source:
-        lines = source.readlines()
-    interesting = [line.strip() for line in lines[-100:]
-                   if re.search(r"(?:^|\s)(?:ERROR|FAILED|Exception|Error|Traceback)\b", line)]
-    return redact(" | ".join(interesting[-3:]))
+    # Bound memory and avoid exposing stack frames, data rows or entire logs.
+    from collections import deque
+    with log_path.open(encoding="utf-8", errors="replace") as source:
+        tail = [line.strip() for line in deque(source, maxlen=100) if line.strip()]
+    if not tail:
+        return ""
+    # Python exceptions are usually named ValueError, requests.exceptions.HTTPError,
+    # etc. The original filter missed those and reported only 'Traceback'.
+    exception_line = re.compile(
+        r"(?:^|\s)(?:[\w.]+(?:Error|Exception|Exit)|ERROR|FAILED)\s*:", re.I)
+    matches = [line for line in tail if exception_line.search(line)]
+    if matches:
+        return redact(" | ".join(matches[-2:]))
+    # Non-Python failures can also return nonzero without a traceback.
+    fallback = [line for line in tail
+                if not line.startswith(("Traceback (most recent call last):",
+                                        'File "', "^"))]
+    return redact(fallback[-1] if fallback else "No error details in local log")
 
 
 def execute_step(name, command, timeout, logger=print):

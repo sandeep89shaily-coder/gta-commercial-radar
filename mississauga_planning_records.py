@@ -38,14 +38,29 @@ def validate_location(source):
  if str(source.get('query_url') or '').lower().split('?')[0]!=url.lower()+'/query':
   raise ValueError('Query URL does not match the configured layer')
 
-def fetch(http,source):
+def application_key_quality(rows, key):
+ """Count missing and repeated application IDs without exposing any record values."""
+ seen=set()
+ missing=repeated=0
+ for row in rows:
+  value=str(row.get(key) or '').strip()
+  if not value:
+   missing+=1
+  elif value in seen:
+   repeated+=1
+  else:
+   seen.add(value)
+ return missing,repeated
+
+def fetch(http,source,preferred_identity=None):
  validate_location(source)
  layer=source['url']
  response=http.get(layer,params={'f':'json'},timeout=(10,35))
  metadata=response.json()
  if 'error' in metadata:raise ValueError('ArcGIS layer metadata error: '+str(metadata['error']))
  fieldnames={str(f.get('name') or '').upper() for f in metadata.get('fields',[])}
- if 'APP_FILE_NO' not in fieldnames:raise ValueError('Application stable ID field missing')
+ if 'APP_FILE_NO' not in fieldnames and 'PLNG_APP_ID' not in fieldnames:
+  raise ValueError('No application ID field present in official layer')
  oid=metadata.get('objectIdField')
  if not oid or str(oid).upper() not in fieldnames:raise ValueError('ArcGIS ObjectID metadata missing')
  counter=http.get(source['query_url'],params={'where':source.get('server_where','1=1'),
@@ -58,9 +73,27 @@ def fetch(http,source):
                           http,progress=False,smart=False,force_full=True)
  if not snapshot.is_complete or len(snapshot.rows)!=count:
   raise ValueError('Mississauga planning snapshot incomplete')
- spec={'id':source['id'],'department':'City Planning','keys':('APP_FILE_NO',)}
- field,_=identify(snapshot.rows,spec)
- if field!='APP_FILE_NO':raise ValueError('Planning application IDs missing or repeated; snapshot rejected')
+ # A site plan may have an incomplete/repeated public file number. A second
+ # city-published application ID is allowed ONLY when complete and unique.
+ # Preserve the previously stored identity strategy on later weekly refreshes.
+ candidates=('APP_FILE_NO','PLNG_APP_ID')
+ if preferred_identity in candidates:
+  candidates=(preferred_identity,)+tuple(x for x in candidates if x!=preferred_identity)
+ quality=[]
+ chosen=None
+ for key in candidates:
+  if key not in fieldnames:
+   quality.append(key+' absent')
+   continue
+  missing,repeated=application_key_quality(snapshot.rows,key)
+  quality.append(key+' missing='+str(missing)+' repeated='+str(repeated))
+  if missing==0 and repeated==0:
+   chosen=key
+   break
+ if not chosen:
+  raise ValueError('Planning application IDs missing or repeated; '+
+                   '; '.join(quality)+'; snapshot rejected')
+ spec={'id':source['id'],'department':'City Planning','keys':(chosen,)}
  evidence={'package_id':layer,'resource_id':layer,
            'resource_url':layer+'/query',
            'source_url':layer,
@@ -98,7 +131,9 @@ def run():
     continue
    timestamp=datetime.now(timezone.utc).isoformat(timespec='seconds')
    try:
-    records,meta,spec=fetch(http,source)
+    prior=db.execute('SELECT identity_field FROM sources WHERE source_id=?',
+                     (sid,)).fetchone()
+    records,meta,spec=fetch(http,source,preferred_identity=prior[0] if prior else None)
     result=persist(db,spec,records,meta,timestamp)
     print('Mississauga planning:',json.dumps(result),flush=True)
    except Exception as exc:

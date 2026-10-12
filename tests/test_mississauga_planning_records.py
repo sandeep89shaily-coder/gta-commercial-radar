@@ -41,6 +41,48 @@ class MississaugaPlanningTests(unittest.TestCase):
   with patch('mississauga_planning_records.collect_arcgis',return_value=snapshot):
    with self.assertRaisesRegex(ValueError,'Duplicate rows|missing or repeated'):
     fetch(Http(),source)
+ def test_repeated_file_numbers_can_use_unique_city_application_ids(self):
+  source=load_sources()[0]
+  class Http:
+   def get(self,url,**kwargs):
+    return Mock(json=lambda:({'fields':[{'name':k} for k in
+                      ('APP_FILE_NO','PLNG_APP_ID','OBJECTID')],
+                      'objectIdField':'OBJECTID'} if url.endswith('/0') else {'count':2}))
+  snapshot=Mock(rows=[
+   {'APP_FILE_NO':'SP100','PLNG_APP_ID':601,'OBJECTID':1},
+   {'APP_FILE_NO':'SP100','PLNG_APP_ID':602,'OBJECTID':2}],is_complete=True)
+  with patch('mississauga_planning_records.collect_arcgis',return_value=snapshot):
+   rows,meta,spec=fetch(Http(),source)
+  self.assertEqual(spec['keys'],('PLNG_APP_ID',))
+  self.assertEqual(len(rows),2)
+  self.assertEqual(meta['reported_count'],2)
+ def test_rejects_when_both_application_keys_are_repeated_or_missing(self):
+  source=load_sources()[0]
+  class Http:
+   def get(self,url,**kwargs):
+    return Mock(json=lambda:({'fields':[{'name':k} for k in
+                      ('APP_FILE_NO','PLNG_APP_ID','OBJECTID')],
+                      'objectIdField':'OBJECTID'} if url.endswith('/0') else {'count':2}))
+  snapshot=Mock(rows=[
+   {'APP_FILE_NO':'','PLNG_APP_ID':601,'OBJECTID':1},
+   {'APP_FILE_NO':'SP100','PLNG_APP_ID':601,'OBJECTID':2}],is_complete=True)
+  with patch('mississauga_planning_records.collect_arcgis',return_value=snapshot):
+   with self.assertRaisesRegex(ValueError,
+                                'APP_FILE_NO missing=1 repeated=0; PLNG_APP_ID missing=0 repeated=1'):
+    fetch(Http(),source)
+ def test_refresh_preserves_previously_chosen_identity(self):
+  source=load_sources()[0]
+  class Http:
+   def get(self,url,**kwargs):
+    return Mock(json=lambda:({'fields':[{'name':k} for k in
+                      ('APP_FILE_NO','PLNG_APP_ID','OBJECTID')],
+                      'objectIdField':'OBJECTID'} if url.endswith('/0') else {'count':2}))
+  snapshot=Mock(rows=[
+   {'APP_FILE_NO':'SP100','PLNG_APP_ID':601,'OBJECTID':1},
+   {'APP_FILE_NO':'SP101','PLNG_APP_ID':602,'OBJECTID':2}],is_complete=True)
+  with patch('mississauga_planning_records.collect_arcgis',return_value=snapshot):
+   _,_,spec=fetch(Http(),source,preferred_identity='PLNG_APP_ID')
+  self.assertEqual(spec['keys'],('PLNG_APP_ID',))
  def test_history_and_weekly_gating(self):
   con=sqlite3.connect(':memory:')
   setup(con)

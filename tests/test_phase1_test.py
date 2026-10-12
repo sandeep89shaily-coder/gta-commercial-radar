@@ -43,6 +43,21 @@ class PhaseOneIntegrationHarnessTests(unittest.TestCase):
   self.assertNotIn('privateName',result)
   self.assertNotIn('superSecret',result)
   self.assertNotIn('jane@example.com',result)
+ def test_diagnostic_reports_terminal_http_error_not_only_traceback(self):
+  with tempfile.TemporaryDirectory() as folder:
+   logfile=Path(folder)/'catalogue.log'
+   logfile.write_text('Traceback (most recent call last):\n'
+                      '  File "mississauga_catalog_audit.py", line 55, in inventory\n'
+                      'requests.exceptions.HTTPError: 404 Client Error: Not Found for url\n')
+   result=t.safe_error_tail(logfile)
+   self.assertIn('HTTPError: 404',result)
+   self.assertNotIn('Traceback',result)
+   self.assertNotIn('mississauga_catalog_audit.py',result)
+ def test_non_python_failure_is_still_reported(self):
+  with tempfile.TemporaryDirectory() as folder:
+   logfile=Path(folder)/'failure.log'
+   logfile.write_text('Collector interrupted by service outage\n')
+   self.assertIn('service outage',t.safe_error_tail(logfile))
  def test_stage_preflight_does_not_create_empty_main_database(self):
   with tempfile.TemporaryDirectory() as folder:
    data=Path(folder)
