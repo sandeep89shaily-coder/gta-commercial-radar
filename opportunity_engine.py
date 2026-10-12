@@ -2,6 +2,7 @@
 No paid network calls. Read-only against existing collector stores.
 """
 import argparse,csv,hashlib,html,json,re,sqlite3
+from contextlib import closing
 from collections import Counter,defaultdict
 from datetime import datetime,date,timedelta,timezone
 from pathlib import Path
@@ -14,7 +15,7 @@ def digest(*parts):return hashlib.sha256('|'.join(map(str,parts)).encode('utf-8'
 def iter_municipal(data):
     p=data/'radar.sqlite'
     if not p.is_file():return
-    with sqlite3.connect(f'file:{p.as_posix()}?mode=ro',uri=True) as db:
+    with closing(sqlite3.connect(f'file:{p.as_posix()}?mode=ro',uri=True)) as db:
         db.row_factory=sqlite3.Row
         try:
             for raw in db.execute('SELECT source_id,record_key,source_date,normalized_json FROM records_current WHERE active=1'):
@@ -35,7 +36,7 @@ def iter_peel_project_changes(data):
     """
     p=data/'peel_pilot.sqlite'
     if not p.is_file():return
-    with sqlite3.connect(f'file:{p.as_posix()}?mode=ro',uri=True) as db:
+    with closing(sqlite3.connect(f'file:{p.as_posix()}?mode=ro',uri=True)) as db:
         db.row_factory=sqlite3.Row
         try:
             for raw in db.execute("""SELECT e.source_id,e.record_key,e.change_type,e.observed_at,
@@ -55,7 +56,7 @@ def iter_peel_project_changes(data):
 def iter_business(data):
     p=data/'business_discovery.sqlite'
     if not p.is_file():return
-    with sqlite3.connect(f'file:{p.as_posix()}?mode=ro',uri=True) as db:
+    with closing(sqlite3.connect(f'file:{p.as_posix()}?mode=ro',uri=True)) as db:
         db.row_factory=sqlite3.Row
         try:
             for raw in db.execute('SELECT source_id,source_key,company_name,address,city,industry,event_date,event_type,observed_at FROM observations WHERE event_date IS NOT NULL AND TRIM(event_date) != \'\''):
@@ -119,7 +120,7 @@ def enrich(rows,data):
     index=defaultdict(list)
     p=data/'business_discovery.sqlite'
     if p.is_file():
-        with sqlite3.connect(f'file:{p.as_posix()}?mode=ro',uri=True) as db:
+        with closing(sqlite3.connect(f'file:{p.as_posix()}?mode=ro',uri=True)) as db:
             try:
                 for name,addr,city,source in db.execute('SELECT company_name,address,city,source_id FROM observations'):
                     if valid(name) and len(norm(addr))>=9:index[(norm(addr),norm(city))].append((name,source))
@@ -158,7 +159,7 @@ def export(data,days=2,today=None,limit=500):
     # Include zero-event Peel sources; their baseline inventory is not a lead queue.
     pp=data/'peel_pilot.sqlite'
     if pp.is_file():
-        with sqlite3.connect(f'file:{pp.as_posix()}?mode=ro',uri=True) as db:
+        with closing(sqlite3.connect(f'file:{pp.as_posix()}?mode=ro',uri=True)) as db:
             try:
                 for source_id,n in db.execute('SELECT source_id,COUNT(*) FROM observations GROUP BY source_id'):
                     sources[('PEEL_PROJECT',source_id)]=n

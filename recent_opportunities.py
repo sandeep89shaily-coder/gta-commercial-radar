@@ -4,6 +4,7 @@ Read-only toward existing Radar databases. Deduped follow-up queue is persisted
 separately so daily overlapping windows do not repeatedly trigger investigations.
 """
 import csv, json, sqlite3, hashlib, re
+from contextlib import closing
 from pathlib import Path
 from datetime import datetime, timezone, timedelta, date
 
@@ -33,7 +34,7 @@ def collect(data,days=2,today=None,limit=250):
     results=[]
     business=data/'business_discovery.sqlite'
     if business.exists():
-        with sqlite3.connect(f'file:{business.as_posix()}?mode=ro',uri=True) as db:
+        with closing(sqlite3.connect(f'file:{business.as_posix()}?mode=ro',uri=True)) as db:
             db.row_factory=sqlite3.Row
             try:
                 for raw in db.execute('SELECT source_id,source_key,company_name,address,city,industry,event_date,event_type,observed_at FROM observations WHERE event_date IS NOT NULL AND event_date != ""'):
@@ -44,7 +45,7 @@ def collect(data,days=2,today=None,limit=250):
             except sqlite3.DatabaseError:pass
     radar=data/'radar.sqlite'
     if radar.exists():
-        with sqlite3.connect(f'file:{radar.as_posix()}?mode=ro',uri=True) as db:
+        with closing(sqlite3.connect(f'file:{radar.as_posix()}?mode=ro',uri=True)) as db:
             db.row_factory=sqlite3.Row
             try:
                 for raw in db.execute('SELECT source_id,record_key,source_date,normalized_json FROM records_current WHERE active=1 AND source_date IS NOT NULL AND source_date != "" AND source_date>=?',(cutoff.isoformat(),)):
