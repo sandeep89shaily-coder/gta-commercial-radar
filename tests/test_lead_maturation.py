@@ -18,3 +18,18 @@ def test_group_and_select_without_assuming_operator():
 def test_unknown_sites_not_merged():
  a=[{'opportunity_id':'a','address':''},{'opportunity_id':'b','address':''}]
  assert len(group_recent(a))==2
+
+def test_empty_current_selection_clears_previous_investigations():
+ with TemporaryDirectory() as tmp:
+  d=Path(tmp)
+  write_csv(d/'matured_opportunities_REVIEW_ONLY.csv',['investigation_id'],[{'investigation_id':'old'}])
+  write_csv(d/'research_priority_queue.csv',['investigation_id'],[{'investigation_id':'old'}])
+  (d/'investigation_dashboard.html').write_text('OLD INVESTIGATION')
+  write_csv(d/'opportunities_ALL_REVIEW_ONLY.csv',['opportunity_id'],[])
+  result=mature(d)
+  assert result['prioritized']==0
+  with (d/'research_priority_queue.csv').open(encoding='utf-8-sig') as f:
+   assert not list(csv.DictReader(f))
+  with (d/'matured_opportunities_REVIEW_ONLY.csv').open(encoding='utf-8-sig') as f:
+   assert not list(csv.DictReader(f))
+  assert 'OLD INVESTIGATION' not in (d/'investigation_dashboard.html').read_text()
