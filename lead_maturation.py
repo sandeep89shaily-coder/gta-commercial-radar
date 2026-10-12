@@ -97,6 +97,8 @@ def rank(r,linked,operator_names):
     desc=clean(r.get('description'))
     score=base
     if r.get('source_group') in ('MUNICIPAL','PEEL_PROJECT'): score+=12
+    if r.get('source_group')=='MUNICIPAL_CHANGE':score-=18
+    if r.get('commercial_priority')=='LOW':score-=28
     if any(x in desc for x in ('commercial','industrial','retail','restaurant','warehouse','office','factory','new construction','new building','fit out','tenant')):score+=18
     if any(x in desc for x in ('single family','residential','basement','detached dwelling','semi detached','interior alteration dwelling')):score-=27
     if r.get('commercial_priority')=='HIGH':score+=8
@@ -104,7 +106,40 @@ def rank(r,linked,operator_names):
     if r.get('company_name') and clean(r['company_name']) not in ('company unknown','unknown'):score+=6
     if len(linked)>1:score+=min(12,4*(len(linked)-1))
     if operator_names:score+=5
+    if r.get('evidence_url') or r.get('source_evidence_urls'):score+=7
+    if not r.get('address') and not r.get('company_name'):score-=12
     return max(0,min(score,100))
+
+def balanced_focus(opportunities,maximum):
+    """Cap change-only investigations and per-source concentration.
+
+    Preserve the complete sorted archive; quota applies solely to today's
+    review/research shortlist, never to collection or commercial eligibility.
+    """
+    maximum=max(0,maximum)
+    change_cap=max(1,maximum//3) if maximum else 0
+    source_cap=max(1,maximum//3) if maximum else 0
+    selected=[];seen=set();source_counts=Counter();changes=0
+    for r in opportunities:
+        if len(selected)>=maximum:break
+        sid=str(r.get('source_id') or '')
+        change=r.get('source_group')=='MUNICIPAL_CHANGE'
+        if change and changes>=change_cap:continue
+        if source_counts[sid]>=source_cap:continue
+        key=r.get('investigation_id')
+        if key in seen:continue
+        selected.append(r);seen.add(key)
+        source_counts[sid]+=1
+        if change:changes+=1
+    # Avoid leaving research slots unused when sources are genuinely scarce,
+    # while continuing to respect the change quota.
+    for r in opportunities:
+        if len(selected)>=maximum:break
+        if r.get('investigation_id') in seen:continue
+        if r.get('source_group')=='MUNICIPAL_CHANGE' and changes>=change_cap:continue
+        selected.append(r);seen.add(r.get('investigation_id'))
+        if r.get('source_group')=='MUNICIPAL_CHANGE':changes+=1
+    return selected
 
 def mature(data,maximum=50):
     data=Path(data)
@@ -140,10 +175,11 @@ def mature(data,maximum=50):
     opportunities.sort(key=lambda r:(int(r['research_priority']),r.get('event_date',''),r.get('investigation_id','')),reverse=True)
     write_csv(data/'matured_opportunities_REVIEW_ONLY.csv',OUT_FIELDS,opportunities)
     # Restrict research budget/workload; all potential opportunities remain in full export.
-    focus=opportunities[:max(0,maximum)]
+    focus=balanced_focus(opportunities,maximum)
     write_csv(data/'research_priority_queue.csv',OUT_FIELDS,focus)
     page=['<!doctype html><html><meta charset="utf-8"><title>GTA Radar Intelligence</title><style>body{font:15px Segoe UI,Arial;max-width:1250px;margin:35px auto;color:#223349}table{width:100%;border-collapse:collapse}td,th{padding:9px;border-bottom:1px solid #ddd;text-align:left}small{color:#555}</style><h1>GTA Radar — Prioritized Investigation</h1>']
     page.append(f'<p><b>{len(current):,}</b> recent source events grouped into <b>{len(opportunities):,}</b> location/event investigations. <b>{len(focus):,}</b> queued for research. No operating identities or contacts are automatically verified.</p>')
+    page.append('<p>Change-only detections are capped at one third of the review shortlist. Source concentration is limited when alternatives exist. These are NOT verified leads.</p>')
     page.append('<p>Missing information remains a research task. All source observations are preserved separately. Shared addresses are possible matches, not proof of ownership, tenancy or franchise operation.</p>')
     page.append('<table><tr><th>Priority</th><th>Event type</th><th>Source</th><th>Business</th><th>Address</th><th>Events</th><th>Possible operator (unverified)</th><th>Evidence</th></tr>')
     for r in focus:
