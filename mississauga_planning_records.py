@@ -1,7 +1,6 @@
 """Separate, additive Mississauga planning archive for two staged official GIS layers.
 
-Does not enable staged sources in the main Radar database. Records only complete
-official full snapshots with stable APP_FILE_NO identity. No removal inference.
+Does not enable staged sources in the main Radar database. Records only complete official snapshots; when application numbers repeat,\nretain distinct source features by validated ArcGIS row ID (not business IDs).\nNo removal inference, no direct sale-ready leads.
 Uses the shared proven version/observation archive schema.
 """
 from __future__ import annotations
@@ -103,8 +102,22 @@ def fetch(http,source,preferred_identity=None):
    for row,(left,right) in zip(snapshot.rows,pairs):
     row[chosen]=json.dumps([left,right],separators=(',',':'),ensure_ascii=False)
  if not chosen:
-  raise ValueError('Planning application IDs missing or repeated; '+
-                   '; '.join(quality)+'; no complete unique composite ID; snapshot rejected')
+  # City records can contain multiple features for the SAME application.
+  # Archive distinct source features by the city's ArcGIS row identifier,
+  # without pretending that these are distinct developments or sale-ready leads.
+  # This is a SEPARATE staged archive, never enabled in the main lead selector.
+  row_key=str(oid).upper()
+  if row_key not in fieldnames:
+   raise ValueError('ArcGIS ObjectID column not present; snapshot rejected')
+  missing,repeated=application_key_quality(snapshot.rows,row_key)
+  if missing or repeated:
+   raise ValueError('Planning application IDs missing or repeated; '+
+                    '; '.join(quality)+'; row IDs missing='+str(missing)+
+                    ' repeated='+str(repeated)+'; snapshot rejected')
+  chosen=row_key
+  print('Mississauga planning: archiving source rows by ArcGIS ObjectID; '+
+        'multiple rows may refer to one application; NOT separate commercial leads',
+        flush=True)
  spec={'id':source['id'],'department':'City Planning','keys':(chosen,)}
  evidence={'package_id':layer,'resource_id':layer,
            'resource_url':layer+'/query',
