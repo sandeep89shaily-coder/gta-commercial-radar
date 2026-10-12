@@ -110,7 +110,16 @@ def mature(data,maximum=50):
     data=Path(data)
     current=read_csv(data/'opportunities_ALL_REVIEW_ONLY.csv')
     if not current:
+        # A no-event run must invalidate yesterday's visible and research
+        # outputs; otherwise the dashboard can display stale candidates.
+        write_csv(data/'matured_opportunities_REVIEW_ONLY.csv',OUT_FIELDS,[])
         write_csv(data/'research_priority_queue.csv',OUT_FIELDS,[])
+        (data/'investigation_dashboard.html').write_text(
+            '<!doctype html><html><meta charset="utf-8"><title>GTA Radar Intelligence</title>'
+            '<h1>GTA Radar — Prioritized Investigation</h1>'
+            '<p>No qualifying recent events in the current selection window.</p>'
+            '<p>Historical records remain archived; zero sale-ready leads are claimed.</p></html>',
+            encoding='utf-8')
         return dict(observations=0,groups=0,prioritized=0,with_operator_hints=0)
     ix=identity_index(data)
     grouped=group_recent(current)
