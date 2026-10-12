@@ -76,7 +76,7 @@ def fetch(http,source,preferred_identity=None):
  # city-published application ID is allowed ONLY when complete and unique.
  # Preserve the previously stored identity strategy on later weekly refreshes.
  candidates=('APP_FILE_NO','PLNG_APP_ID')
- if preferred_identity=='APPLICATION_COMPOSITE_ID':
+ if preferred_identity in ('APPLICATION_COMPOSITE_ID',str(oid).upper()):
   candidates=()
  elif preferred_identity in candidates:
   candidates=(preferred_identity,)+tuple(x for x in candidates if x!=preferred_identity)
@@ -91,7 +91,7 @@ def fetch(http,source,preferred_identity=None):
   if missing==0 and repeated==0:
    chosen=key
    break
- if not chosen and all(k in fieldnames for k in ('APP_FILE_NO','PLNG_APP_ID')):
+ if not chosen and preferred_identity!=str(oid).upper() and all(k in fieldnames for k in ('APP_FILE_NO','PLNG_APP_ID')):
   # A compound identity is safe only if both fields are present on every row
   # and each PAIR is unique. Do not use ArcGIS OBJECTID as a business identity.
   pairs=[(str(row.get('APP_FILE_NO') or '').strip(),
