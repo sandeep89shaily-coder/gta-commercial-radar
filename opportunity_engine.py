@@ -27,6 +27,41 @@ def iter_municipal(data):
                 description=str(normalized.get('description') or normalized.get('work_description') or '')
                 yield dict(source_id=raw['source_id'],source_key=raw['record_key'],company_name=name,entity_name=name,address=addr,city=normalized.get('region',''),industry=normalized.get('industry',''),event_date=raw['source_date'] or normalized.get('event_date',''),event_type=normalized.get('event_type',''),observed_at='',buyer_categories='commercial_insurance;commercial_hvac;security_access',evidence_url=normalized.get('evidence_url',''),description=description,commercial_relevance=normalized.get('commercial_relevance',''),source_group='MUNICIPAL',is_primary_municipal='YES')
         except sqlite3.DatabaseError as e: print('Municipal database unreadable:',str(e)[:120])
+def iter_municipal_updates(data):
+    """Post-baseline material updates are detection events, NOT newly issued permits.
+
+    A dated UPDATED entry only exists after comparison against an existing stored
+    record. Its observed timestamp denotes when Radar detected the change.
+    Historical first-seen NEW records are deliberately excluded.
+    """
+    p=data/'radar.sqlite'
+    if not p.is_file():return
+    with closing(sqlite3.connect(f'file:{p.as_posix()}?mode=ro',uri=True)) as db:
+        db.row_factory=sqlite3.Row
+        try:
+            for raw in db.execute("""SELECT source_id,record_key,observed_at,normalized_json
+                    FROM changes WHERE change_type='UPDATED'"""):
+                try: info=json.loads(raw['normalized_json'] or '{}')
+                except (ValueError,TypeError):continue
+                if not isinstance(info,dict):continue
+                name=str(info.get('entity_name') or '')
+                address=str(info.get('address') or '')
+                yield dict(source_id=raw['source_id'],source_key=raw['record_key'],
+                    company_name=name,entity_name=name,address=address,
+                    city=info.get('region',''),industry='',
+                    event_date=raw['observed_at'],event_type='SOURCE_RECORD_UPDATED',
+                    observed_at=raw['observed_at'],
+                    buyer_categories='commercial_insurance;commercial_hvac;security_access',
+                    evidence_url=info.get('evidence_url',''),
+                    description=info.get('description',''),
+                    commercial_relevance=info.get('commercial_relevance',''),
+                    source_group='MUNICIPAL_CHANGE',is_primary_municipal='YES',
+                    event_date_basis='CHANGE_DETECTED_NOT_PERMIT_ISSUED',
+                    opportunity_type=info.get('event_type',''),
+                    selection_reason='MATERIAL_SOURCE_RECORD_UPDATED')
+        except sqlite3.DatabaseError as e:
+            print('Municipal change history unreadable:',str(e)[:120])
+
 def iter_peel_project_changes(data):
     """Only genuine post-baseline changes qualify for consideration.
 
@@ -85,7 +120,7 @@ def collect(data,days=2,today=None,limit=100000,lookback_days=90):
     today=today or datetime.now().astimezone().date()
     cutoff=today-timedelta(days=days)
     rows=[];stats=Counter();sources=Counter()
-    for group,iterator in [('MUNICIPAL',iter_municipal(data)),('PEEL_PROJECT',iter_peel_project_changes(data)),('BUSINESS_DISCOVERY',iter_business(data))]:
+    for group,iterator in [('MUNICIPAL',iter_municipal(data)),('MUNICIPAL_CHANGE',iter_municipal_updates(data)),('PEEL_PROJECT',iter_peel_project_changes(data)),('BUSINESS_DISCOVERY',iter_business(data))]:
         for r in iterator:
             source=str(r.get('source_id') or '')
             sources[(group,source)]+=1
@@ -110,12 +145,14 @@ def collect(data,days=2,today=None,limit=100000,lookback_days=90):
             if not valid(addr):missing.append('LOCATION_UNRESOLVED')
             missing+=['CONTACT_UNVERIFIED','DECISION_MAKER_UNKNOWN']
             key=str(r.get('source_key') or digest(group,source,name,addr,d))
-            r.update(source_key=key,opportunity_id=digest(group,source,key),review_status='UNVERIFIED_NOT_FOR_SALE',selection_reason=('MUNICIPAL_SOURCE_EVENT_DATE' if group=='MUNICIPAL' else ('PEEL_POST_BASELINE_CHANGE_OBSERVED_DATE_NOT_ISSUE_DATE' if group=='PEEL_PROJECT' else 'EXPLICIT_FORMATION_OR_LICENCE_DATE')),maturity='DETECTED',identity_confidence='UNVERIFIED' if not valid(name) else 'NAMED_UNCONFIRMED',contact_quality='MISSING',commercial_priority=score(r),missing_information=';'.join(missing),related_record_count=1)
+            r.update(source_key=key,opportunity_id=digest(group,source,key),review_status='UNVERIFIED_NOT_FOR_SALE',selection_reason=(r.get('selection_reason') or ('MUNICIPAL_SOURCE_EVENT_DATE' if group=='MUNICIPAL' else ('PEEL_POST_BASELINE_CHANGE_OBSERVED_DATE_NOT_ISSUE_DATE' if group=='PEEL_PROJECT' else 'EXPLICIT_FORMATION_OR_LICENCE_DATE'))),maturity='DETECTED',identity_confidence='UNVERIFIED' if not valid(name) else 'NAMED_UNCONFIRMED',contact_quality='MISSING',commercial_priority=score(r),missing_information=';'.join(missing),related_record_count=1)
             rows.append(r);stats[(group,'selected')]+=1
             stats[(group,source,'selected')]+=1
+    # Keep one detection per source record within a run window; do not count
+    # several revisions as separate sales opportunities.
     dedup={r['opportunity_id']:r for r in rows}
     priority={'HIGH':2,'UNASSESSED':1,'LOW':0}
-    ordered=sorted(dedup.values(),key=lambda r:(r['source_group'] in ('MUNICIPAL','PEEL_PROJECT'),priority.get(r['commercial_priority'],0),str(r.get('event_date') or ''),r['opportunity_id']),reverse=True)
+    ordered=sorted(dedup.values(),key=lambda r:(r['source_group'] in ('MUNICIPAL','MUNICIPAL_CHANGE','PEEL_PROJECT'),priority.get(r['commercial_priority'],0),str(r.get('event_date') or ''),r['opportunity_id']),reverse=True)
     return ordered,stats,sources
 
 def enrich(rows,data):
@@ -190,9 +227,10 @@ def export(data,days=2,today=None,limit=500):
                         max(0,total-selected-missing-older-future-enrichment)])
     dashboard=['<!doctype html><html><meta charset="utf-8"><title>Radar opportunities</title><style>body{font:15px Segoe UI,Arial;max-width:1300px;margin:35px auto;color:#243246}table{border-collapse:collapse;width:100%;font-size:13px}td,th{border-bottom:1px solid #ddd;padding:9px;text-align:left}small{color:#555}</style><h1>GTA Radar — Municipal-led Opportunities</h1>']
     municipal=sum(r['source_group']=='MUNICIPAL' for r in rows)
+    changes=sum(r['source_group']=='MUNICIPAL_CHANGE' for r in rows)
     peel=sum(r['source_group']=='PEEL_PROJECT' for r in rows)
-    business=len(rows)-municipal-peel
-    dashboard.append(f'<p><b>{len(rows):,}</b> dated events in recent window: <b>{municipal:,}</b> municipal, <b>{peel:,}</b> Peel project changes, and <b>{business:,}</b> explicit business events. Directory observations remain enrichment-only. No source records were deleted. Leads are not yet verified for sale.</p>')
+    business=len(rows)-municipal-changes-peel
+    dashboard.append(f'<p><b>{len(rows):,}</b> dated events in recent window: <b>{municipal:,}</b> dated municipal records, <b>{changes:,}</b> post-baseline municipal updates (change-detection dates, not new issuances), <b>{peel:,}</b> Peel project changes, and <b>{business:,}</b> explicit business events. Directory observations remain enrichment-only. No source records were deleted. Leads are not yet verified for sale.</p>')
     dashboard.append('<h2>Collection coverage</h2><table><tr><th>Group</th><th>Source</th><th>Available records</th><th>Recent candidates</th></tr>')
     for (group,source),n in sorted(sources.items()):dashboard.append(f'<tr><td>{html.escape(group)}</td><td>{html.escape(source)}</td><td>{n:,}</td><td>{counts.get((group,source),0):,}</td></tr>')
     dashboard.append('</table><h2>Recent opportunities</h2><table><tr><th>Source</th><th>Business / unresolved</th><th>Address</th><th>Event date</th><th>Stage</th><th>Priority</th></tr>')
@@ -201,7 +239,7 @@ def export(data,days=2,today=None,limit=500):
         dashboard.append('<tr>'+''.join('<td>'+esc(v)+'</td>' for v in (r['source_id'],r.get('company_name') or 'COMPANY UNKNOWN',r.get('address') or 'LOCATION UNRESOLVED',r.get('event_date'),r.get('maturity'),r.get('commercial_priority')) )+'</tr>')
     dashboard.append('</table><p><small>Peel baseline projects stay as evidence and are NOT fresh leads. Peel post-baseline changes use an observed change date, NOT an official issue date. Other records use source event dates. An address match is only a possible identity, never verified ownership.</small></p></html>')
     (data/'opportunity_dashboard.html').write_text(''.join(dashboard),encoding='utf-8')
-    print(f'Municipal-led opportunity scan: {len(rows)} dated events; municipal={municipal}; peel post-baseline changes={peel}; explicit business events={business}; pending={len(backlog)}; newly queued={len(backlog)-before}; enrichment-only directory records={stats.get(("BUSINESS_DISCOVERY","enrichment_only"),0)}')
+    print(f'Municipal-led opportunity scan: {len(rows)} dated events; municipal dated={municipal}; municipal updates={changes}; peel post-baseline changes={peel}; explicit business events={business}; pending={len(backlog)}; newly queued={len(backlog)-before}; enrichment-only directory records={stats.get(("BUSINESS_DISCOVERY","enrichment_only"),0)}')
     print('Per-source audit:',data/'collector_opportunity_audit.csv')
     print('Why sources have zero recent leads:',data/'source_date_quality_audit.csv')
     return len(rows),len(backlog)
