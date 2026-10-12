@@ -73,12 +73,20 @@ def collect_public_page(url,session):
     except Exception as e:return {},type(e).__name__+': '+str(e)[:160]
 
 def research(data,fetch=False,max_pages=20):
-    candidates=read_csv(data/'research_priority_queue.csv')
-    if not candidates:candidates=read_csv(data/'recent_queue_pending.csv')
-    if not candidates:
-        candidates=read_csv(data/'business_leads_REVIEW_ONLY.csv')
-    if not candidates:
-        candidates=read_csv(data/'lead_candidates.csv')
+    # A present but empty priority queue is intentional: no current leads.
+    # Historical fallback is for older installations that do not yet create
+    # this file, never for a modern run with zero qualifying events.
+    priority=data/'research_priority_queue.csv'
+    if priority.is_file():
+        candidates=read_csv(priority)
+    else:
+        recent=data/'recent_queue_pending.csv'
+        if recent.is_file():
+            candidates=read_csv(recent)
+        else:
+            candidates=read_csv(data/'business_leads_REVIEW_ONLY.csv')
+            if not candidates:
+                candidates=read_csv(data/'lead_candidates.csv')
     evidence=read_csv(data/'research_sources.csv')
     byid={}
     for row in evidence:
