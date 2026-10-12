@@ -24,6 +24,22 @@ class MunicipalOpportunityTests(unittest.TestCase):
   self.assertEqual(export(self.data),(3,3))
   with (self.data/'collector_opportunity_audit.csv').open(encoding='utf-8-sig') as f: audits=list(csv.DictReader(f))
   self.assertEqual(sum(int(r['recent_events_selected']) for r in audits),3)
+ def test_date_quality_audit_explains_zero_selected_feeds(self):
+  db=sqlite3.connect(self.data/'radar.sqlite')
+  db.execute('INSERT INTO records_current VALUES (?,?,?,?,1)',
+             ('mississauga_permit','old','2020-01-01',json.dumps({'address':'10 King St'})))
+  db.execute('INSERT INTO records_current VALUES (?,?,?,?,1)',
+             ('toronto_licence','missing','',json.dumps({'entity_name':'Test'})))
+  db.execute('INSERT INTO records_current VALUES (?,?,?,?,1)',
+             ('toronto_licence','future','2099-01-01',json.dumps({'entity_name':'Test'})))
+  db.commit();db.close()
+  export(self.data)
+  with (self.data/'source_date_quality_audit.csv').open(encoding='utf-8-sig') as f:
+   audit={r['source_id']:r for r in csv.DictReader(f)}
+  self.assertEqual(audit['mississauga_permit']['older_than_window'],'1')
+  self.assertEqual(audit['toronto_licence']['missing_or_invalid_date'],'1')
+  self.assertEqual(audit['toronto_licence']['future_date'],'1')
+  self.assertEqual(audit['toronto_licence']['selected_recent'],'0')
  def test_address_only_match_not_verified(self):
   db=sqlite3.connect(self.data/'business_discovery.sqlite')
   db.execute('CREATE TABLE observations (source_id TEXT,source_key TEXT,company_name TEXT,address TEXT,city TEXT,industry TEXT,event_date TEXT,event_type TEXT,observed_at TEXT)')
