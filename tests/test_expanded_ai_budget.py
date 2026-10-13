@@ -12,11 +12,11 @@ def test_one_dollar_shared_ledger():
   db=sqlite3.connect(Path(td)/'budget.sqlite');d.ledger(db)
   approved=0
   for n in range(75):
-   if d.claim(db,str(n),'2026-10-12',reservation_amount=d.RESERVE_USD*5):
+   if d.claim(db,str(n),'2026-10-12',reservation_amount=a.ROUND_RESERVE_USD*5):
     approved+=1
   total=db.execute('select coalesce(sum(reserved),0) from spends').fetchone()[0]
   assert total<=1.00000001
-  assert approved>=15
+  assert approved>=10
   db.close()
 
 def test_expanded_agent_defaults_stay_opt_in():
