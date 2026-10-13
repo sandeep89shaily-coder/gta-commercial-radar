@@ -101,7 +101,7 @@ def investigate_one(key,row):
            {'role':'user','content':json.dumps({'address':address,'description':row.get('description','')[:450],
                                                 'source_id':row.get('source_id',''),'event_date':row.get('event_date','')})}]
  searched=0;pages=0;seen=[];page_text=[];cost=0
- for turn in range(3):
+ for turn in range(5):
   choice,usage=api_call(key,messages)
   cost+=(int(usage.get('prompt_tokens',0))*INPUT_RATE_USD_M+
          int(usage.get('completion_tokens',0))*OUTPUT_RATE_USD_M)/1e6
@@ -125,20 +125,20 @@ def investigate_one(key,row):
    try:args=json.loads(fn.get('arguments') or '{}')
    except ValueError:args={}
    name=fn.get('name')
-   if name=='search_public' and searched<3:
+   if name=='search_public' and searched<5:
     searched+=1;result=search_public(args.get('query',''))
-   elif name=='read_public_page' and pages<3:
+   elif name=='read_public_page' and pages<5:
     pages+=1;result=read_public_page(args.get('url',''))
     if result.get('url'):
      seen.append(result['url']);page_text.append(result.get('text',''))
    else:result={'error':'Unknown tool or research limit reached'}
-   messages.append({'role':'tool','tool_call_id':call.get('id',''),'content':json.dumps(result,ensure_ascii=True)[:10000]})
+   messages.append({'role':'tool','tool_call_id':call.get('id',''),'content':json.dumps(result,ensure_ascii=True)[:1700]})
  # Limit reached, no fabricated final synthesis.
  return {'caveats':'Tool or AI-round limit reached; requires human review',
          'evidence_urls':' | '.join(seen),'searches':searched,'pages':pages},cost
 
-def run(data,confirm_paid=False,max_leads=3):
- data=Path(data);rows=read_csv(data/'research_priority_queue.csv')[:max(0,min(max_leads,3))]
+def run(data,confirm_paid=False,max_leads=20):
+ data=Path(data);rows=read_csv(data/'research_priority_queue.csv')[:max(0,min(max_leads,20))]
  if not confirm_paid:
   print('Research agent DRY RUN; candidates=',len(rows),'DeepSeek calls=0. To authorize charges, pass --confirm-paid.')
   return 0
@@ -152,7 +152,7 @@ def run(data,confirm_paid=False,max_leads=3):
    if f.tell()==0:w.writeheader()
    for row in rows:
     cid=candidate_id(row)
-    reservation=claim(db,cid,day,reservation_amount=RESERVE_USD*3)
+    reservation=claim(db,cid,day,reservation_amount=RESERVE_USD*5)
     if reservation is None:continue
     status='ERROR';answer={};actual=None
     try:
@@ -171,6 +171,6 @@ def main():
  p=argparse.ArgumentParser()
  p.add_argument('--data-dir',type=Path,default=ROOT/'data')
  p.add_argument('--confirm-paid',action='store_true')
- p.add_argument('--max-leads',type=int,default=3)
+ p.add_argument('--max-leads',type=int,default=20)
  a=p.parse_args();return run(a.data_dir,a.confirm_paid,a.max_leads)
 if __name__=='__main__':raise SystemExit(main())
