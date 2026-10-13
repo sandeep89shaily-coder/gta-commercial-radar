@@ -23,8 +23,9 @@ STEPS=[
  ('business_export',('business_discovery.py','export'),False),
  ('opportunity_engine',('opportunity_engine.py','--days','2'),False),
  ('lead_maturation',('lead_maturation.py',),False),
+ ('daily_top_ten',('daily_top_ten.py',),False),
  ('lead_research',('lead_research.py',),False),
- ('optional_deepseek',('deepseek_daily.py',),False),
+ # Paid DeepSeek remains available by its separate, opt-in launcher; never in daily collection.
  ('intelligence_dashboard',('intelligence_dashboard.py',),True),
  ('readiness_report',('production_readiness.py',),False),
  ('health_report',('radar_health.py',),True),
