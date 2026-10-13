@@ -49,13 +49,13 @@ def secure_url(url):
  except ValueError:return ''
 
 def search_public(query):
- if not isinstance(query,str) or len(query)>180:return []
+ if not isinstance(query,str) or not query.strip() or len(query)>180:return {'error':'Invalid or empty search query','results':[]}
  from urllib.parse import quote_plus
  url='https://www.bing.com/search?'+urlencode({'q':query,'format':'rss'})
  try:
   req=Request(url,headers={'User-Agent':'GTACommercialRadar/1.0 RSS research'})
   with urlopen(req,timeout=12) as response:
-   if response.status!=200 or 'xml' not in response.headers.get('Content-Type','').lower():return []
+   if response.status!=200 or 'xml' not in response.headers.get('Content-Type','').lower():return {'error':'Search provider did not return RSS XML','results':[]}
    body=response.read(140000)
   root=ElementTree.fromstring(body)
   out=[]
@@ -64,8 +64,8 @@ def search_public(query):
    if urlparse(link).scheme!='https':continue
    out.append({'title':(item.findtext('title') or '')[:140],'url':link,
                'snippet':(item.findtext('description') or '')[:250],'verification':'SEARCH_ONLY'})
-  return out
- except (OSError,ValueError,ElementTree.ParseError):return []
+  return {'results':out,'error':'' if out else 'Search returned no indexed results'}
+ except (OSError,ValueError,ElementTree.ParseError) as e:return {'results':[],'error':'Search provider unavailable: '+type(e).__name__}
 
 def read_public_page(url):
  u=secure_url(url)
@@ -134,7 +134,7 @@ def investigate_one(key,row):
    answer.update(searches=searched,pages=pages)
    return answer,cost
   messages.append(msg)
-  for call in calls[:2]:
+  for call in calls:
    fn=call.get('function') or {}
    try:args=json.loads(fn.get('arguments') or '{}')
    except ValueError:args={}
@@ -146,9 +146,9 @@ def investigate_one(key,row):
     if result.get('url'):
      seen.append(result['url']);page_text.append(result.get('text',''))
    else:result={'error':'Unknown tool or research limit reached'}
-   brief=json.dumps(result,ensure_ascii=True)[:1100]
+   brief=json.dumps(result,ensure_ascii=True)[:2200]
    messages.append({'role':'tool','tool_call_id':call.get('id',''),'content':brief})
-   findings.append((name+': '+brief)[:900])
+   findings.append((name+': '+brief)[:1800])
   # Compact completed tool cycles into a bounded research notebook instead of
   # accumulating huge transcript and repeatedly causing input-preflight errors.
   notebook='\\n'.join(findings[-8:])[:5800]
