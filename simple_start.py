@@ -84,6 +84,8 @@ def main():
     command('opportunity_engine.py','--days','2')
     command('lead_maturation.py')
     command('first_ten_leads.py')
+    print('Checking evidence readiness for the first 3 opportunities (free dry run)...')
+    command('pilot_evidence.py')
     command('lead_research.py')
     queue=DATA/'lead_research_REVIEW_ONLY.csv'
     with queue.open(encoding='utf-8-sig',newline='') as f:
