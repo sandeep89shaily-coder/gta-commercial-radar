@@ -1,36 +1,48 @@
-"""Free public-web reachability check for the research agent. No AI or API key access."""
-import sys
+"""Free relevance-aware public-web check. Never calls DeepSeek or accesses API keys."""
+import re
+from urllib.parse import urlparse
 from deepseek_research_agent import search_public,read_public_page
 
+ADDRESS='37 Shorncliffe Road'
+QUERY='"37 Shorncliffe Road" Toronto development'
+ADDRESS_RE=re.compile(r'\b37\s+Shorncliffe\s+(?:Road|Rd\.?|St\.?)\b',re.I)
+
 def main():
- print('GTA COMMERCIAL RADAR - FREE RESEARCH WEB CHECK',flush=True)
- print('No DeepSeek requests. No AI cost. No research budget ledger changes.',flush=True)
- queries=['37 Shorncliffe Road Toronto industrial self-storage development',
-          'City of Toronto development applications']
- checked=0
- for query in queries:
-  print('\nSEARCH:',query,flush=True)
-  outcome=search_public(query)
-  if isinstance(outcome,list):
-   outcome={'results':outcome,'error':'Legacy search result format'}
-  hits=outcome.get('results') or []
-  print('Search results:',len(hits),'error:',outcome.get('error') or 'none',flush=True)
-  for hit in hits[:2]:
-   url=hit.get('url','')
-   if not url:continue
-   print('Trying page:',url[:160],flush=True)
-   page=read_public_page(url)
-   checked+=1
-   if page.get('url') and len(page.get('text',''))>=100:
-    print('PASS: Retrieved',len(page['text']),'characters from public page.',flush=True)
-    print('Diagnosis: Search and page reading are available for this source.',flush=True)
-    return 0
-   print('Page unavailable:',page.get('error','Insufficient readable page text'),flush=True)
- if checked==0:
-  print('FAIL: No searchable HTTPS page URLs were returned.',flush=True)
- else:
-  print('FAIL: Search yielded links, but none of the sampled pages were readable.',flush=True)
- print('No AI investigation was attempted or paid for.',flush=True)
+ print('GTA COMMERCIAL RADAR - FREE PROJECT RESEARCH VALIDATION',flush=True)
+ print('No AI usage; no DeepSeek cost; no ledger changes.',flush=True)
+ print('Looking for evidence ABOUT 37 Shorncliffe Road, not just a reachable webpage.',flush=True)
+ outcome=search_public(QUERY)
+ hits=outcome.get('results',[]) if isinstance(outcome,dict) else outcome
+ error=outcome.get('error','') if isinstance(outcome,dict) else ''
+ print('Search result count:',len(hits),'provider error:',error or 'none',flush=True)
+ if not hits:
+  print('FAIL: Search returned no project evidence. Do not run paid AI.',flush=True)
+  return 1
+ eligible=[]
+ for hit in hits:
+  title=(hit.get('title') or '')
+  snippet=(hit.get('snippet') or '')
+  url=hit.get('url') or ''
+  relevant=bool(ADDRESS_RE.search(title+' '+snippet+' '+url.replace('-',' ')))
+  print('Search hit:',title[:100],'relevant:',relevant,flush=True)
+  if relevant and urlparse(url).scheme=='https':
+   eligible.append(url)
+ if not eligible:
+  print('FAIL: No search hit identifies the exact project address. Unrelated web pages are NOT a pass.',flush=True)
+  return 1
+ for url in eligible[:5]:
+  print('Reading candidate:',url[:160],flush=True)
+  page=read_public_page(url)
+  if not page.get('url'):
+   print('Page not usable:',page.get('error','unknown'),flush=True)
+   continue
+  content=page.get('text','')
+  if ADDRESS_RE.search(content):
+   print('PASS: Public page actually mentions 37 Shorncliffe Road; ',len(content),'characters retrieved.',flush=True)
+   print('Public discovery and relevance verified. This does NOT verify a developer, contact or sale-ready lead.',flush=True)
+   return 0
+  print('REJECTED: Page does not mention the exact project address.',flush=True)
+ print('FAIL: No retrieved page verifies the exact project address. No AI spending recommended.',flush=True)
  return 1
 
 if __name__=='__main__':
