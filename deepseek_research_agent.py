@@ -90,7 +90,7 @@ def api_call(key,messages):
  payload={'model':MODEL,'messages':messages,'tools':TOOLS,'tool_choice':'auto','max_tokens':MAX_OUTPUT_TOKENS,'stream':False}
  b=json.dumps(payload,ensure_ascii=True).encode()
  # Preflight protects against unbounded prompt accumulation; no truncating JSON.
- if len(b)>MAX_INPUT_TOKENS:raise ValueError('AI input preflight cap exceeded')
+ if len(b)>MAX_INPUT_TOKENS*4:raise ValueError('AI input preflight cap exceeded')
  req=Request(API,data=b,headers={'Authorization':'Bearer '+key,'Content-Type':'application/json'})
  with urlopen(req,timeout=65) as f:result=json.load(f)
  return result['choices'][0],result.get('usage',{})
