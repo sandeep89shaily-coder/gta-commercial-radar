@@ -13,6 +13,9 @@ from deepseek_daily import key_from_windows,claim,complete,ledger,INPUT_RATE_USD
 from lead_research import candidate_id,read_csv,UA
 
 ROOT=Path(__file__).resolve().parent
+# Reserve each full AI round at the maximum allowed serialized request size.
+# All payload bytes are ASCII due to ensure_ascii=True; token count cannot exceed byte count.
+ROUND_RESERVE_USD=(MAX_INPUT_TOKENS*4*INPUT_RATE_USD_M+MAX_OUTPUT_TOKENS*OUTPUT_RATE_USD_M)/1_000_000
 COLUMNS=['candidate_id','address','status','summary','project_stage','operating_company',
 'developer','contractor','business_contact','buyer_fit','evidence_urls','caveats','searches','pages','researched_at']
 TOOLS=[{'type':'function','function':{'name':'search_public','description':'Search public web news/index RSS for a project or company; results are unverified search leads','parameters':{'type':'object','properties':{'query':{'type':'string'}},'required':['query']}}},{'type':'function','function':{'name':'read_public_page','description':'Read a publicly accessible HTML page that appeared in search results, subject to robots and security rules','parameters':{'type':'object','properties':{'url':{'type':'string'}},'required':['url']}}}]
@@ -152,7 +155,7 @@ def run(data,confirm_paid=False,max_leads=20):
    if f.tell()==0:w.writeheader()
    for row in rows:
     cid=candidate_id(row)
-    reservation=claim(db,cid,day,reservation_amount=RESERVE_USD*5)
+    reservation=claim(db,cid,day,reservation_amount=ROUND_RESERVE_USD*5)
     if reservation is None:continue
     status='ERROR';answer={};actual=None
     try:
