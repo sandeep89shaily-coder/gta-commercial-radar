@@ -159,9 +159,9 @@ def investigate_one(key,row):
          'evidence_urls':' | '.join(seen),'searches':searched,'pages':pages},cost
 
 def run(data,confirm_paid=False,max_leads=2):
- data=Path(data);rows=read_csv(data/'research_priority_queue.csv')[:max(0,min(max_leads,2))]
+ data=Path(data);rows=read_csv(data/'research_priority_queue.csv');target=max(0,min(max_leads,2))
  if not confirm_paid:
-  print('Research agent DRY RUN; candidates=',len(rows),'DeepSeek calls=0. To authorize charges, pass --confirm-paid.')
+  print('Research agent DRY RUN; candidates=',min(target,len(rows)),'DeepSeek calls=0. To authorize charges, pass --confirm-paid.')
   return 0
  key=key_from_windows()
  if not key:print('DeepSeek key missing; no investigation or charge');return 0
@@ -171,10 +171,15 @@ def run(data,confirm_paid=False,max_leads=2):
   with output.open('a',newline='',encoding='utf-8-sig') as f:
    w=csv.DictWriter(f,fieldnames=COLUMNS); 
    if f.tell()==0:w.writeheader()
+   attempted=0;skipped=0;success=0;errors=0
    for row in rows:
+    if attempted>=target:break
     cid=candidate_id(row)
     reservation=claim(db,cid,day,reservation_amount=ROUND_RESERVE_USD*20)
-    if reservation is None:continue
+    if reservation is None:
+     skipped+=1;continue
+    attempted+=1
+    print('Investigating',attempted,'of',target,':',row.get('address','(unknown address)'),flush=True)
     status='ERROR';answer={};actual=None
     try:
      answer,actual=investigate_one(key,row)
@@ -184,6 +189,11 @@ def run(data,confirm_paid=False,max_leads=2):
     result={k:answer.get(k,'') for k in COLUMNS}
     result.update(candidate_id=cid,address=row.get('address',''),status=status,researched_at=datetime.datetime.now().isoformat())
     w.writerow(result);f.flush()
+    if status=='ERROR':errors+=1
+    else:success+=1
+    print('Result:',status,'searches=',answer.get('searches',0),'pages=',answer.get('pages',0),'details=',str(answer.get('caveats',''))[:150],flush=True)
+  used=db.execute('SELECT COALESCE(SUM(reserved),0) FROM spends WHERE date=?',(day,)).fetchone()[0]
+  print('Run summary: attempted=',attempted,'completed=',success,'errors=',errors,'skipped prior/budget=',skipped,'reserved today USD=',round(used,4),'of',1.0,flush=True)
   print('DeepSeek agent complete; review-only output:',output)
  finally:db.close()
  return 0
