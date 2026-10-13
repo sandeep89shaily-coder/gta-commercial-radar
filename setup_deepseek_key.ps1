@@ -1,9 +1,9 @@
 $ErrorActionPreference = 'Stop'
 try {
-    $root = Split-Path -Parent $MyInvocation.MyCommand.Path
-    $folder = Join-Path $root 'settings'
+    if (-not $env:LOCALAPPDATA) { throw 'LOCALAPPDATA is unavailable.' }
+    $folder = Join-Path $env:LOCALAPPDATA 'GTACommercialRadar'
     $target = Join-Path $folder 'deepseek_key.dpapi'
-    Write-Host 'DeepSeek API key setup (Windows account encrypted)'
+    Write-Host 'DeepSeek API key setup (Windows account encrypted, outside GitHub)'
     Write-Host 'Your key will not be shown, sent to GitHub, or stored as plain text.'
     $secret = Read-Host 'Paste your DeepSeek API key and press Enter' -AsSecureString
     if ($secret.Length -lt 10) { throw 'No valid-looking key entered; nothing was changed.' }

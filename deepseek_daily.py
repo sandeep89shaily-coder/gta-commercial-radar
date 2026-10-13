@@ -23,8 +23,14 @@ API='https://api.deepseek.com/chat/completions'
 def key_from_windows():
     k=os.environ.get('DEEPSEEK_API_KEY','').strip()
     if k:return k
-    path=ROOT/'settings'/'deepseek_key.dpapi'
-    if os.name!='nt' or not path.is_file():return ''
+    if os.name!='nt':return ''
+    # New credential location outside Git-controlled files. Legacy read-only
+    # fallback remains until the user has migrated and rotated their key.
+    local=os.environ.get('LOCALAPPDATA','').strip()
+    preferred=(Path(local)/'GTACommercialRadar'/'deepseek_key.dpapi') if local else None
+    old=ROOT/'settings'/'deepseek_key.dpapi'
+    path=preferred if preferred and preferred.is_file() else old
+    if not path.is_file():return ''
     script=("$ErrorActionPreference='Stop';$s=Get-Content -Raw -LiteralPath '"+str(path).replace("'","''")+"' | ConvertTo-SecureString;"
             "$p=[Runtime.InteropServices.Marshal]::SecureStringToBSTR($s);try{[Runtime.InteropServices.Marshal]::PtrToStringBSTR($p)}finally{[Runtime.InteropServices.Marshal]::ZeroFreeBSTR($p)}")
     r=subprocess.run(['powershell','-NoProfile','-NonInteractive','-Command',script],capture_output=True,text=True,timeout=20)

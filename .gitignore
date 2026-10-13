@@ -43,3 +43,7 @@ venv/
 Thumbs.db
 .vscode/
 .idea/
+
+# DeepSeek credentials must never be committed
+settings/
+*.dpapi
