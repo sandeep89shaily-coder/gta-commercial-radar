@@ -9,7 +9,7 @@ from urllib.parse import urlencode,urlparse
 from urllib.robotparser import RobotFileParser
 from xml.etree import ElementTree
 from urllib.request import Request,urlopen
-from deepseek_daily import key_from_windows,claim,complete,ledger,INPUT_RATE_USD_M,OUTPUT_RATE_USD_M,MAX_OUTPUT_TOKENS,MAX_INPUT_TOKENS,MODEL,API
+from deepseek_daily import key_from_windows,claim,complete,ledger,INPUT_RATE_USD_M,OUTPUT_RATE_USD_M,MAX_OUTPUT_TOKENS,MAX_INPUT_TOKENS,RESERVE_USD,MODEL,API
 from lead_research import candidate_id,read_csv,UA
 
 ROOT=Path(__file__).resolve().parent
@@ -90,7 +90,7 @@ def api_call(key,messages):
  payload={'model':MODEL,'messages':messages,'tools':TOOLS,'tool_choice':'auto','max_tokens':MAX_OUTPUT_TOKENS,'stream':False}
  b=json.dumps(payload,ensure_ascii=True).encode()
  # Preflight protects against unbounded prompt accumulation; no truncating JSON.
- if len(b)>MAX_INPUT_TOKENS*3:raise ValueError('AI input preflight cap exceeded')
+ if len(b)>MAX_INPUT_TOKENS:raise ValueError('AI input preflight cap exceeded')
  req=Request(API,data=b,headers={'Authorization':'Bearer '+key,'Content-Type':'application/json'})
  with urlopen(req,timeout=65) as f:result=json.load(f)
  return result['choices'][0],result.get('usage',{})
@@ -149,7 +149,7 @@ def run(data,confirm_paid=False,max_leads=3):
    if f.tell()==0:w.writeheader()
    for row in rows:
     cid=candidate_id(row)
-    reservation=claim(db,cid,day)
+    reservation=claim(db,cid,day,reservation_amount=RESERVE_USD*3)
     if reservation is None:continue
     status='ERROR';answer={};actual=None
     try:
