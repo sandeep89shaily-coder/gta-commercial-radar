@@ -74,11 +74,17 @@ def read_public_page(url):
  try:
   robots=p.scheme+'://'+p.netloc+'/robots.txt'
   req=Request(robots,headers={'User-Agent':UA})
-  with urlopen(req,timeout=8) as f:
-   if f.status!=200:return {'error':'No readable robots policy'}
-   lines=f.read(120000).decode('utf-8',errors='replace').splitlines()
-  rp=RobotFileParser();rp.parse(lines)
-  if not rp.can_fetch(UA,u):return {'error':'Robots disallows retrieval'}
+  try:
+   with urlopen(req,timeout=8) as f:
+    if f.status!=200:return {'error':'Robots policy status '+str(f.status)}
+    lines=f.read(120000).decode('utf-8',errors='replace').splitlines()
+   rp=RobotFileParser();rp.parse(lines)
+   if not rp.can_fetch(UA,u):return {'error':'Robots disallows retrieval'}
+  except HTTPError as err:
+   # RFC 9309: 4xx robots policy (e.g. 404) means no robots restrictions.
+   if err.code not in (400,401,403,404,410,429):return {'error':'Robots policy unavailable: HTTP '+str(err.code)}
+   if err.code==429:return {'error':'Robots rate-limited: HTTP 429'}
+   if err.code in (401,403):return {'error':'Robots policy access denied: HTTP '+str(err.code)}
   import requests
   session=requests.Session();session.trust_env=False
   # DNS was checked; prevent redirects, including cross-host redirects.
@@ -117,6 +123,7 @@ def investigate_one(key,row):
  searched=0;pages=0;seen=[];page_text=[];cost=0;findings=[]
  for turn in range(20):
   choice,usage=api_call(key,messages)
+  if choice.get('finish_reason')=='length':raise ValueError('DeepSeek response was truncated before completion; no conclusions accepted')
   cost+=(int(usage.get('prompt_tokens',0))*INPUT_RATE_USD_M+
          int(usage.get('completion_tokens',0))*OUTPUT_RATE_USD_M)/1e6
   msg=choice.get('message',{})
@@ -183,17 +190,17 @@ def run(data,confirm_paid=False,max_leads=2):
     status='ERROR';answer={};actual=None
     try:
      answer,actual=investigate_one(key,row)
-     status='RESEARCH_REVIEW_ONLY'
+     status='SOURCE_READ_REVIEW_ONLY' if answer.get('evidence_urls') else 'NO_SOURCE_EVIDENCE'
     except Exception as e:answer={'caveats':type(e).__name__+': '+str(e)[:330]}
     finally:complete(db,reservation,status,actual)
     result={k:answer.get(k,'') for k in COLUMNS}
     result.update(candidate_id=cid,address=row.get('address',''),status=status,researched_at=datetime.datetime.now().isoformat())
     w.writerow(result);f.flush()
     if status=='ERROR':errors+=1
-    else:success+=1
+    elif status=='SOURCE_READ_REVIEW_ONLY':success+=1
     print('Result:',status,'searches=',answer.get('searches',0),'pages=',answer.get('pages',0),'details=',str(answer.get('caveats',''))[:150],flush=True)
   used=db.execute('SELECT COALESCE(SUM(reserved),0) FROM spends WHERE date=?',(day,)).fetchone()[0]
-  print('Run summary: attempted=',attempted,'completed=',success,'errors=',errors,'skipped prior/budget=',skipped,'reserved today USD=',round(used,4),'of',1.0,flush=True)
+  print('Run summary: attempted=',attempted,'with_sources=',success,'errors=',errors,'skipped prior/budget=',skipped,'reserved today USD=',round(used,4),'of',1.0,flush=True)
   print('DeepSeek agent complete; review-only output:',output)
  finally:db.close()
  return 0
