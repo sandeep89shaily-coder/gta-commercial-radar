@@ -26,7 +26,7 @@ def test_skip_previous_attempts_and_take_two_new_candidates():
   assert called==['1 Example Street','2 Example Street']
   with (d/'autonomous_deepseek_REVIEW_ONLY.csv').open(encoding='utf-8-sig',newline='') as f:results=list(csv.DictReader(f))
   assert len(results)==2
-  assert all(x['status']=='RESEARCH_REVIEW_ONLY' for x in results)
+  assert all(x['status']=='NO_SOURCE_EVIDENCE' for x in results)
   assert all(x['searches']=='2' for x in results)
 
 def test_multiple_tool_calls_all_get_replies():
