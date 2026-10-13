@@ -23,4 +23,4 @@ def test_public_url_rejects_internal_targets_without_dns():
   assert agent.secure_url('https://127.0.0.1')==''
   assert agent.secure_url('http://toronto.ca')==''
   assert agent.secure_url('https://toronto.ca:444')==''
-  assert agent.secure_url('https://toronto.ca.evil.test')=='' if False else True
+  assert agent.secure_url('https://toronto.ca.evil.test')==''
