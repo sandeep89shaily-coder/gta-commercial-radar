@@ -100,7 +100,7 @@ def investigate_one(key,row):
  messages=[{'role':'system','content':SYSTEM},
            {'role':'user','content':json.dumps({'address':address,'description':row.get('description','')[:450],
                                                 'source_id':row.get('source_id',''),'event_date':row.get('event_date','')})}]
- searched=0;pages=0;seen=[];outputs=[];cost=0
+ searched=0;pages=0;seen=[];page_text=[];cost=0
  for turn in range(3):
   choice,usage=api_call(key,messages)
   cost+=(int(usage.get('prompt_tokens',0))*INPUT_RATE_USD_M+
@@ -112,9 +112,11 @@ def investigate_one(key,row):
    except (ValueError,TypeError):answer={}
    allowed=set(seen)
    answer['evidence_urls']=' | '.join(u for u in answer.get('evidence_urls',[]) if u in allowed) if isinstance(answer.get('evidence_urls'),list) else ''
+   supporting_text=' '.join(page_text).lower()
    for k in ('operating_company','developer','contractor','business_contact'):
-    # Withhold field when no underlying page was actually read.
-    if not seen:answer[k]=''
+    value=str(answer.get(k,'') or '').strip()
+    # Do not promote AI guesses without exact supporting source text.
+    if not value or value.lower() not in supporting_text:answer[k]=''
    answer.update(searches=searched,pages=pages)
    return answer,cost
   messages.append(msg)
@@ -127,7 +129,8 @@ def investigate_one(key,row):
     searched+=1;result=search_public(args.get('query',''))
    elif name=='read_public_page' and pages<3:
     pages+=1;result=read_public_page(args.get('url',''))
-    if result.get('url'):seen.append(result['url'])
+    if result.get('url'):
+     seen.append(result['url']);page_text.append(result.get('text',''))
    else:result={'error':'Unknown tool or research limit reached'}
    messages.append({'role':'tool','tool_call_id':call.get('id',''),'content':json.dumps(result,ensure_ascii=True)[:10000]})
  # Limit reached, no fabricated final synthesis.
