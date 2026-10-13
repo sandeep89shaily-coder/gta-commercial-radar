@@ -15,7 +15,7 @@ def test_search_only_dry_run_does_not_spend():
   assert not (d/'deepseek_budget.sqlite').exists()
 
 def test_search_requires_short_query_and_errors_are_graceful():
- assert agent.search_public('x'*181)==[]
+ assert 'error' in agent.search_public('x'*181)
 
 def test_public_url_rejects_internal_targets_without_dns():
  with patch.object(agent,'public_host',return_value=False):
