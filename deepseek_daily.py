@@ -35,13 +35,13 @@ def ledger(db):
     db.execute('CREATE TABLE IF NOT EXISTS spends (id INTEGER PRIMARY KEY, date TEXT NOT NULL, candidate TEXT NOT NULL, reserved REAL NOT NULL, actual REAL, status TEXT NOT NULL, created_at TEXT DEFAULT CURRENT_TIMESTAMP)')
     db.commit()
 
-def claim(db,candidate,day):
+def claim(db,candidate,day,reservation_amount=RESERVE_USD):
     db.execute('BEGIN IMMEDIATE')
     spent=db.execute('SELECT COALESCE(SUM(reserved),0),COUNT(*) FROM spends WHERE date=?',(day,)).fetchone()
     previous=db.execute("SELECT COUNT(*) FROM spends WHERE date=? AND candidate=?",(day,candidate)).fetchone()[0]
-    if previous or spent[1]>=MAX_LEADS or spent[0]+RESERVE_USD>BUDGET+1e-10:
+    if previous or spent[1]>=MAX_LEADS or spent[0]+reservation_amount>BUDGET+1e-10:
         db.rollback();return None
-    cur=db.execute('INSERT INTO spends(date,candidate,reserved,status) VALUES(?,?,?,?)',(day,candidate,RESERVE_USD,'RESERVED'))
+    cur=db.execute('INSERT INTO spends(date,candidate,reserved,status) VALUES(?,?,?,?)',(day,candidate,reservation_amount,'RESERVED'))
     db.commit();return cur.lastrowid
 
 def complete(db,id,status,actual=None):
