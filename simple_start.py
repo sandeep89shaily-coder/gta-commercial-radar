@@ -83,6 +83,7 @@ def main():
     command('business_discovery.py','export')
     command('opportunity_engine.py','--days','2')
     command('lead_maturation.py')
+    command('first_ten_leads.py')
     command('lead_research.py')
     queue=DATA/'lead_research_REVIEW_ONLY.csv'
     with queue.open(encoding='utf-8-sig',newline='') as f:
@@ -94,7 +95,7 @@ def main():
     else:
         print('Candidate queue is ready. Only DeepSeek will be used for paid AI analysis.')
         print('To enable automatic DeepSeek analysis, run INSTALL_DAILY.bat once.')
-    for output in ('brampton_collection_report.html','investigation_dashboard.html','opportunity_dashboard.html','lead_research_dashboard.html','business_dashboard.html'):
+    for output in ('first_10_leads_dashboard.html','brampton_collection_report.html','investigation_dashboard.html','opportunity_dashboard.html','lead_research_dashboard.html','business_dashboard.html'):
         p=DATA/output
         if p.exists():
             print('Results:',p)
