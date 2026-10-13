@@ -4,6 +4,7 @@ Public Bing RSS discovery (best effort; no search-page scraping). DeepSeek calls
 search_public and read_public_page on demand. No external model or paid search.
 """
 import argparse,csv,datetime,html,ipaddress,json,re,socket,sqlite3
+from urllib.error import HTTPError
 from pathlib import Path
 from urllib.parse import urlencode,urlparse
 from urllib.robotparser import RobotFileParser
@@ -90,12 +91,17 @@ def read_public_page(url):
  except Exception as e:return {'error':type(e).__name__}
 
 def api_call(key,messages):
- payload={'model':MODEL,'messages':messages,'tools':TOOLS,'tool_choice':'auto','max_tokens':MAX_OUTPUT_TOKENS,'stream':False}
+ payload={'model':MODEL,'messages':messages,'tools':TOOLS,'tool_choice':'auto','thinking':{'type':'disabled'},'max_tokens':MAX_OUTPUT_TOKENS,'stream':False}
  b=json.dumps(payload,ensure_ascii=True).encode()
  # Preflight protects against unbounded prompt accumulation; no truncating JSON.
- if len(b)>MAX_INPUT_TOKENS*4:raise ValueError('AI input preflight cap exceeded')
+ if len(b)>MAX_INPUT_TOKENS*4:raise ValueError('AI input preflight cap exceeded: '+str(len(b))+' bytes; research history too long')
  req=Request(API,data=b,headers={'Authorization':'Bearer '+key,'Content-Type':'application/json'})
- with urlopen(req,timeout=65) as f:result=json.load(f)
+ try:
+  with urlopen(req,timeout=65) as f:result=json.load(f)
+ except HTTPError as err:
+  # Provider error body explains malformed tool calls; never print request or API key.
+  detail=err.read(1200).decode('utf-8',errors='replace')
+  raise ValueError('DeepSeek HTTP '+str(err.code)+': '+detail[:350]) from None
  return result['choices'][0],result.get('usage',{})
 
 def investigate_one(key,row):
@@ -161,7 +167,7 @@ def run(data,confirm_paid=False,max_leads=20):
     try:
      answer,actual=investigate_one(key,row)
      status='RESEARCH_REVIEW_ONLY'
-    except Exception as e:answer={'caveats':type(e).__name__+': '+str(e)[:100]}
+    except Exception as e:answer={'caveats':type(e).__name__+': '+str(e)[:330]}
     finally:complete(db,reservation,status,actual)
     result={k:answer.get(k,'') for k in COLUMNS}
     result.update(candidate_id=cid,address=row.get('address',''),status=status,researched_at=datetime.datetime.now().isoformat())
