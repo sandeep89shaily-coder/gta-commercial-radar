@@ -8,8 +8,8 @@ from urllib.error import HTTPError
 
 ROOT=Path(__file__).resolve().parent
 DATA=ROOT/'data'
-BUDGET=0.50
-MAX_LEADS=50
+BUDGET=1.00
+MAX_LEADS=75
 # Deliberately conservative upper-bound rates for this single supported model.
 # Before any provider price change, owner must validate these bounds remain safe.
 MODEL='deepseek-flash'
@@ -98,7 +98,7 @@ def main():
                 if ident is None:
                     budget_count=db.execute('SELECT COALESCE(SUM(reserved),0),COUNT(*) FROM spends WHERE date=?',(day,)).fetchone()
                     if budget_count[0]+RESERVE_USD>BUDGET or budget_count[1]>=MAX_LEADS:
-                        print('Daily budget or 50-lead cap reached. Stopping safely.');break
+                        print('Daily budget or 75-lead cap reached. Stopping safely.');break
                     continue
                 status='ERROR';obj={};actual=None
                 try:
