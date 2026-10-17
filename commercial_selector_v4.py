@@ -11,6 +11,7 @@ import json
 import re
 import sqlite3
 from collections import Counter
+from contextlib import closing
 from pathlib import Path
 from urllib.parse import quote_plus, urlparse
 
@@ -102,7 +103,7 @@ def load_metadata(db_path, rows):
         return {}
     result = {}
     try:
-        with sqlite3.connect(p.resolve().as_uri() + '?mode=ro', uri=True) as db:
+        with closing(sqlite3.connect(p.resolve().as_uri() + '?mode=ro', uri=True)) as db:
             for sid, key in {(str(r.get('source_id') or ''), str(r.get('source_key') or '')) for r in rows}:
                 found = db.execute('SELECT source_date,normalized_json FROM records_current WHERE source_id=? AND record_key=? AND active=1', (sid, key)).fetchone()
                 if not found:
