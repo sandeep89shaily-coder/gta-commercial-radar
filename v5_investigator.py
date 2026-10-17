@@ -6,6 +6,7 @@ lead RESEARCH, never automatic permission to sell/contact or proof of procuremen
 """
 from __future__ import annotations
 import csv
+from contextlib import closing
 import datetime as dt
 import hashlib
 import html
@@ -220,7 +221,7 @@ def _ledger(path):
 def _legacy_reserved(db_path,day):
     if not db_path or not Path(db_path).is_file():return 0.0
     try:
-        with sqlite3.connect('file:'+Path(db_path).resolve().as_posix()+'?mode=ro',uri=True,timeout=3) as db:
+        with closing(sqlite3.connect('file:'+Path(db_path).resolve().as_posix()+'?mode=ro',uri=True,timeout=3)) as db:
             return float(db.execute('SELECT COALESCE(SUM(reserved),0) FROM spends WHERE date=?',(day,)).fetchone()[0] or 0)
     except (sqlite3.Error,OSError,ValueError):
         # Presence of an unreadable old ledger means we cannot safely price the day.
