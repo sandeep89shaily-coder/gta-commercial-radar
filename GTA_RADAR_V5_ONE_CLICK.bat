@@ -232,7 +232,7 @@ def main():
     print_step('Found collector database: '+str(db))
     output=root/'GTA_RADAR_RESULTS'
     output.mkdir(parents=True,exist_ok=True)
-    if existing:
+    if existing and existing.stat().st_mtime >= db.stat().st_mtime:
         source=existing
         stats={'input':'Existing opportunity export','lookback_days':'As exported',
                'source_rows':'Existing export was used without editing'}
