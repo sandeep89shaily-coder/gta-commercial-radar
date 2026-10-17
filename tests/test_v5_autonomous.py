@@ -1,4 +1,5 @@
 import unittest, tempfile, csv, json, datetime as dt, hashlib, sqlite3, subprocess, sys
+from contextlib import closing
 from pathlib import Path
 import v5_investigator as v
 
@@ -44,7 +45,7 @@ class V5EvidenceTests(unittest.TestCase):
     def test_legacy_spend_cap(self):
         with tempfile.TemporaryDirectory() as name:
             d=Path(name);self.seed(d)
-            with sqlite3.connect(d/'deepseek_budget.sqlite') as db:
+            with closing(sqlite3.connect(d/'deepseek_budget.sqlite')) as db:
                 db.execute('CREATE TABLE spends (date TEXT,reserved REAL)')
                 db.execute('INSERT INTO spends VALUES (?,?)',('2026-10-17',0.49))
             result=v.run(d,key='placeholder',today=dt.date(2026,10,17),
@@ -65,7 +66,7 @@ class V5OneClickTests(unittest.TestCase):
             data.mkdir(parents=True)
             dbfile=data/'radar.sqlite'
             date=dt.date.today().isoformat()
-            with sqlite3.connect(dbfile) as db:
+            with closing(sqlite3.connect(dbfile)) as db:
                 db.execute('CREATE TABLE records_current(source_id TEXT,record_key TEXT,source_date TEXT,normalized_json TEXT,active INTEGER,PRIMARY KEY(source_id,record_key))')
                 db.execute('CREATE TABLE changes(source_id TEXT,record_key TEXT,observed_at TEXT,change_type TEXT,normalized_json TEXT)')
                 info={'description':'Retail interior finish commercial restaurant','entity_name':'Fictional Foods',
