@@ -24,6 +24,7 @@ STEPS=[
  ('opportunity_engine',('opportunity_engine.py','--days','2'),False),
  ('lead_maturation',('lead_maturation.py',),False),
  ('commercial_selection_v2',('commercial_selection_v2.py',),False),
+ ('commercial_selector_v4',('commercial_selector_v4.py',),False),
  ('lead_research',('lead_research.py',),False),
  # Paid DeepSeek remains available by its separate, opt-in launcher; never in daily collection.
  ('intelligence_dashboard',('intelligence_dashboard.py',),True),
