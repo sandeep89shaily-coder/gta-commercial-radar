@@ -48,6 +48,7 @@ class V5EvidenceTests(unittest.TestCase):
             with closing(sqlite3.connect(d/'deepseek_budget.sqlite')) as db:
                 db.execute('CREATE TABLE spends (date TEXT,reserved REAL)')
                 db.execute('INSERT INTO spends VALUES (?,?)',('2026-10-17',0.49))
+                db.commit()
             result=v.run(d,key='placeholder',today=dt.date(2026,10,17),
                 search=lambda q:['https://example.org/permit'],fetch=lambda u:'622 Fogal Rd',
                 post=lambda x:self.fail('AI called'))
