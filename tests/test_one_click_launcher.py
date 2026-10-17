@@ -32,6 +32,7 @@ class OneClickSmoke(unittest.TestCase):
                 record("26 999999 BLD | 01","Single detached dwelling basement apartment")
                 db.execute("INSERT INTO changes VALUES (?,?,?,?,?)",("toronto_active_building_permits","26 123456 BLD | 01",today+"T09:00:00","UPDATED",json.dumps(main)))
                 db.commit()
+            db.close()  # sqlite3 context managers do not close connections on Windows.
             original_hash = hashlib.sha256(dbfile.read_bytes()).digest()
             execution = subprocess.run([sys.executable,"-x",str(LAUNCHER),"--root",str(root),"--no-open"],capture_output=True,text=True,timeout=40)
             self.assertEqual(execution.returncode,0,execution.stdout+"\n"+execution.stderr)
