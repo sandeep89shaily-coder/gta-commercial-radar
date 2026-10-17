@@ -4,6 +4,7 @@ import json
 import sqlite3
 import tempfile
 import unittest
+from contextlib import closing
 from pathlib import Path
 import commercial_selector_v4 as v4
 
@@ -50,7 +51,7 @@ class V4RegressionTests(unittest.TestCase):
     def test_read_only_status_metadata(self):
         with tempfile.TemporaryDirectory() as td:
             path=Path(td)/'radar.sqlite'
-            with sqlite3.connect(path) as db:
+            with closing(sqlite3.connect(path)) as db:
                 db.execute('CREATE TABLE records_current(source_id TEXT,record_key TEXT,active INTEGER,source_date TEXT,normalized_json TEXT)')
                 db.execute('INSERT INTO records_current VALUES(?,?,?,?,?)',
                     ('toronto_active_building_permits','26 233562 BLD|00',1,'2026-10-11',
