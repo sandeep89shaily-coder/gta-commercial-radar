@@ -102,7 +102,7 @@ def load_metadata(db_path, rows):
         return {}
     result = {}
     try:
-        with sqlite3.connect(f'file:{p.resolve().as_posix()}?mode=ro', uri=True) as db:
+        with sqlite3.connect(p.resolve().as_uri() + '?mode=ro', uri=True) as db:
             for sid, key in {(str(r.get('source_id') or ''), str(r.get('source_key') or '')) for r in rows}:
                 found = db.execute('SELECT source_date,normalized_json FROM records_current WHERE source_id=? AND record_key=? AND active=1', (sid, key)).fetchone()
                 if not found:
