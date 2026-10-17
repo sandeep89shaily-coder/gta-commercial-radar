@@ -220,6 +220,10 @@ def main():
     parser.add_argument('--root',type=Path,default=None,help='Developer/test override for workspace search')
     parser.add_argument('--no-open',action='store_true',help='Developer/test flag to skip opening browser')
     parser.add_argument('--days',type=int,default=90,help='Review lookback in days for fallback export')
+    parser.add_argument('--unattended',action='store_true')
+    parser.add_argument('--no-schedule',action='store_true')
+    parser.add_argument('--no-ai',action='store_true')
+    parser.add_argument('--offline',action='store_true',help='Test without internet')
     args=parser.parse_args()
     if not 1<=args.days<=365:
         parser.error('--days must be between 1 and 365')
@@ -259,11 +263,36 @@ def main():
               'source_stats':stats,'projects_for_research':len(projects),
               'disclaimer':'Source dates are not verified permit issue dates. Report is research-only, not sale-ready. No source polling or paid AI performed.'}
     (output/'RUN_DETAILS.json').write_text(json.dumps(manifest,indent=2),encoding='utf-8')
-    print_step('Finished. Found '+str(len(projects))+' research projects (NOT verified sales leads).')
-    print_step('Report saved: '+str(report))
-    if not args.no_open:
+    print_step('V5: investigating projects using public source evidence...')
+    v5=embedded_v5()
+    key='' if args.no_ai else v5.key_from_windows()
+    if not key and not args.no_ai and not args.unattended and not args.offline and os.name=='nt':
+        print_step('DeepSeek is not connected. Enter your API key once or press Enter to skip.')
+        try:candidate=getpass.getpass('DeepSeek API key (hidden, optional): ').strip()
+        except (EOFError,KeyboardInterrupt):candidate=''
+        if candidate:
+            if v5.save_key_windows(candidate):key=candidate;print_step('Key encrypted for this Windows user.')
+            else:print_step('Could not encrypt key. Continuing without paid AI.')
+    if args.offline:
+        research=v5.run(output,projects_file=output/'CANDIDATES_V4_ALL_REVIEW_ONLY.csv',
+                        results_dir=output,key='',run_ai=False,search=lambda q:[],fetch=lambda u:'',legacy_budget_dir=db.parent)
+    else:
+        research=v5.run(output,projects_file=output/'CANDIDATES_V4_ALL_REVIEW_ONLY.csv',
+                        results_dir=output,key=key,run_ai=not args.no_ai,legacy_budget_dir=db.parent)
+    print_step('V5: '+str(research['processed'])+' examined, '+str(research['with_public_pages'])+' with public evidence.')
+    if not research['deepseek_configured']:print_step('No paid AI calls: DeepSeek not configured or disabled.')
+    latest=dt.datetime.fromtimestamp(db.stat().st_mtime).astimezone().strftime('%Y-%m-%d %H:%M')
+    dashboard=output/'GTA_RADAR_V5_DASHBOARD.html'
+    page=dashboard.read_text(encoding='utf-8')
+    banner='<p><b>Existing municipal data last modified: '+html.escape(latest)+'. This investigation does not refresh collectors.</b></p>'
+    dashboard.write_text(page.replace('<body>','<body>'+banner,1),encoding='utf-8')
+    if not args.no_schedule and not args.unattended:print_step(activate_daily(Path(__file__).resolve()))
+    print_step('Finished. Found '+str(len(projects))+' V4 projects (NOT verified sales leads).')
+    report=output/'GTA_RADAR_V5_DASHBOARD.html'
+    print_step('V5 dashboard saved: '+str(report))
+    if not args.no_open and not args.unattended:
         show_report(report)
-    print_step('Done. No original database files were changed.')
+    print_step('Done. No original database or collector files were changed.')
     return 0
 
 
