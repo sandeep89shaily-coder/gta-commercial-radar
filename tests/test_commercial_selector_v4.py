@@ -56,6 +56,7 @@ class V4RegressionTests(unittest.TestCase):
                 db.execute('INSERT INTO records_current VALUES(?,?,?,?,?)',
                     ('toronto_active_building_permits','26 233562 BLD|00',1,'2026-10-11',
                      json.dumps({'status':'Under Review','evidence_url':'https://example.com/permit/1'})))
+                db.commit()
             info=v4.load_metadata(path,[row('Industrial warehouse expansion')])
             result=v4.summarize([row('Industrial warehouse expansion')],info)
             self.assertEqual(result['current_source_status'],'Under Review')
