@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+from contextlib import closing
 import datetime as dt
 import html
 import json
@@ -67,7 +68,7 @@ def choose_database(workspace):
             last = json.loads(previous.read_text(encoding='utf-8'))
             pinned = Path(last.get('database_read_only') or '')
             if pinned.is_file() and pinned.resolve().is_relative_to(ws.resolve()):
-                with sqlite3.connect(f'{pinned.resolve().as_uri()}?mode=ro', uri=True, timeout=4) as conn:
+                with closing(sqlite3.connect(f'{pinned.resolve().as_uri()}?mode=ro', uri=True, timeout=4)) as conn:
                     if conn.execute("SELECT count(*) FROM sqlite_master WHERE type='table' AND name='records_current'").fetchone()[0]:
                         return pinned.resolve()
         except (OSError, ValueError, sqlite3.Error, TypeError):
@@ -79,7 +80,7 @@ def choose_database(workspace):
         try:
             if not db.is_file() or db.stat().st_size < 100:
                 continue
-            with sqlite3.connect(f'{db.resolve().as_uri()}?mode=ro', uri=True, timeout=4) as con:
+            with closing(sqlite3.connect(f'{db.resolve().as_uri()}?mode=ro', uri=True, timeout=4)) as con:
                 ok = con.execute("SELECT count(*) FROM sqlite_master WHERE type='table' AND name='records_current'").fetchone()[0]
             if not ok:
                 continue
