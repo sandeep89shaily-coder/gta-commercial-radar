@@ -146,78 +146,137 @@ def atomic_json(path, obj):
 
 
 def evidence_queries(row):
-    addr = ' '.join(str(row.get('address') or '').split())
-    company = str(row.get('company_name') or '').strip()
-    desc = str(row.get('description') or '').strip()
-    keys = []
-    if addr:
-        # Exact project address is usually stronger than a general commercial term.
-        simple = re.sub(r',?\s*(?:ON|Ontario|Canada)\b.*$', '', addr, flags=re.I).strip(', ')
-        keys.extend([f'"{simple}" planning developer construction',
-                     f'"{simple}" business opening permit',
-                     f'"{simple}" commercial development Toronto Brampton Mississauga'])
-    if company and company.casefold() not in ('unknown', 'none'):
-        keys.append(f'"{company}" {addr[:50]} project')
-    if not keys:
-        return []
-    return list(dict.fromkeys(keys))[:4]
+    """Target civic addresses, source IDs and identifiable companies, not broad leads."""
+    address=' '.join(str(row.get('address') or '').split()).split(',')[0].strip()
+    company=str(row.get('company_name') or '').strip()
+    ident=str(row.get('source_keys') or '').split(' | ')[0].strip()
+    sid=str(row.get('source_id') or '').lower()
+    queries=[]
+    if address:
+        queries.extend([f'"{address}" development application',
+                        f'"{address}" construction developer',
+                        f'"{address}" commercial building project'])
+        expanded=re.sub(r'\b(RD|ST|AVE|CRT|DR|BLVD)\b',
+                        lambda m:{'RD':'Road','ST':'Street','AVE':'Avenue','CRT':'Court',
+                                  'DR':'Drive','BLVD':'Boulevard'}[m.group().upper()],
+                        address,flags=re.I)
+        if expanded.lower()!=address.lower():
+            queries.append(f'"{expanded}" project')
+    if 8<=len(ident)<=75 and not ident.isdigit():
+        queries.append(f'"{ident}" {"Toronto planning" if "toronto" in sid else "Ontario permit"}')
+    if company and company.lower() not in ('unknown','none','n/a'):
+        queries.append(f'"{company}" "{address[:45]}"')
+    return list(dict.fromkeys(queries))[:6]
 
 
-def discover_improved(row, search, fetch, max_searches=4, max_pages=5):
-    """Only a fetched, corroborated public page qualifies as AI evidence.
+def normalized_location(value):
+    parts=re.sub(r'[^a-z0-9]+',' ',str(value or '').lower()).split()
+    alias={'rd':'road','st':'street','ave':'avenue','crt':'court',
+           'dr':'drive','blvd':'boulevard','hwy':'highway','pkwy':'parkway'}
+    return ' '.join(alias.get(t,t) for t in parts)
 
-    RSS links and snippets merely propose URLs; they are not verification.
-    The existing v5 get_html enforces public HTTPS, robots and no redirects.
-    """
+
+def evidence_matches(row,page):
+    """Require a real fetched page containing the address, company or source ID."""
+    body=normalized_location(page)
+    addr=normalized_location((str(row.get('address') or '').splitlines() or [''])[0].split(',')[0])
+    match=re.search(r'\b(\d{2,6})\s+([a-z]{3,})(?:\s+([a-z]{3,}))?',addr)
+    if match:
+        number,street,second=match.groups()
+        if street in {'old','north','south','east','west'} and second:
+            street+=' '+second
+        if re.search(r'\b'+re.escape(number)+r'\s+'+re.escape(street)+r'\b',body):
+            return True
+    name=str(row.get('company_name') or '').strip().lower()
+    if name not in {'','unknown','none','n/a'} and len(name)>=9 and normalized_location(name) in body:
+        return True
+    for identifier in re.split(r'[|;]',str(row.get('source_keys') or ''))[:5]:
+        identifier=identifier.strip()
+        if len(identifier)>=9 and re.search('[a-z]',identifier,re.I) and normalized_location(identifier) in body:
+            return True
+    return False
+
+
+def news_rss_search(query):
+    """Secondary free RSS discovery, with separate verification of every found page."""
+    from urllib.request import Request,urlopen
+    from urllib.parse import urlencode
+    from xml.etree import ElementTree
+    url='https://news.google.com/rss/search?'+urlencode(
+        {'q':query[:140],'hl':'en-CA','gl':'CA','ceid':'CA:en'})
+    try:
+        with urlopen(Request(url,headers={'User-Agent':'GTACommercialRadarResearch/1.0'}),timeout=10) as res:
+            data=res.read(90001)
+        if len(data)>90000:return []
+        tree=ElementTree.fromstring(data);results=[]
+        for item in tree.findall('.//item')[:8]:
+            link=(item.findtext('link') or '').strip()
+            if link.startswith('https://') and link not in results:results.append(link)
+        return results
+    except (OSError,ValueError,ElementTree.ParseError):return []
+
+
+def discover_improved(row,search,fetch,max_searches=6,max_pages=4):
+    """Bounded, verified source discovery. No search snippet counts as evidence."""
     import v5_investigator as v5
-    urls = []
-    direct = str(row.get('record_source_url') or '').strip()
-    if direct.startswith('https://'):
-        urls.append(direct)
+    urls=[]
+    direct=str(row.get('record_source_url') or '').strip()
+    if direct.startswith('https://'):urls.append(direct)
     if str(row.get('source_id') or '').startswith('ero_'):
-        source_key = str(row.get('source_keys') or '').strip()
-        if re.fullmatch(r'\d{3}-\d{3,5}', source_key):
-            urls.append('https://ero.ontario.ca/notice/' + source_key)
-    searches = 0
-    for query in evidence_queries(row)[:max_searches]:
-        searches += 1
+        key=str(row.get('source_keys') or '').strip()
+        if re.fullmatch(r'\d{3}-\d{3,5}',key):
+            urls.append('https://ero.ontario.ca/notice/'+key)
+    attempts=0;queries=evidence_queries(row)
+    for query in queries[:max_searches]:
+        attempts+=1
         try:
             for url in search(query)[:8]:
-                if url not in urls and urlparse(url).scheme == 'https':
+                if isinstance(url,str) and urlparse(url).scheme=='https' and url not in urls:
                     urls.append(url)
-        except Exception:
-            continue
-    evidence = []
-    attempted_urls = 0
-    for url in urls[:22]:
-        if len(evidence) >= max_pages or attempted_urls >= 12:
-            break
-        attempted_urls += 1
-        try:
-            content = fetch(url)
-        except Exception:
-            continue
-        if content and v5.location_match(row, content):
-            evidence.append({'url': url, 'text': content[:2600]})
-    return evidence, searches
+        except Exception:continue
+    evidence=[];visited=set()
+    def check(urls_to_check,cap):
+        for url in urls_to_check:
+            if len(evidence)>=max_pages or len(visited)>=cap:break
+            if url in visited:continue
+            visited.add(url)
+            try:body=fetch(url)
+            except Exception:continue
+            if body and evidence_matches(row,body):
+                evidence.append({'url':url,'text':body[:2600]})
+    check(urls,14)
+    # Never make network calls in mocked/isolated tests.
+    if not evidence and search is getattr(v5,'search_rss',None) and queries:
+        for q in queries[:2]:
+            attempts+=1
+            for url in news_rss_search(q)[:5]:
+                if url not in urls:urls.append(url)
+        check(urls,20)
+    return evidence,attempts
 
 
-def select_unresearched(rows, limit, previous, day):
+def select_unresearched(rows,limit,previous,day):
     import v5_investigator as v5
-    # Preserve the prior priority policy, but skip projects researched in the last
-    # seven days. Repeated reviews are not additional leads.
-    reviewed = {}
-    for identifier, old in (previous or {}).items():
+    reviewed=set()
+    for identifier,old in (previous or {}).items():
         try:
-            date = dt.date.fromisoformat(str(old.get('researched_at') or '')[:10])
-            if 0 <= (day - date).days < 7:
-                reviewed[identifier] = old
-        except ValueError:
-            pass
-    candidates = [r for r in rows if r.get('project_id') not in reviewed
-                  and not v5.CLOSED.search(str(r.get('current_source_status') or ''))]
-    # Preserve V5 ordering, and its five-pilot-project prioritization.
-    return v5_original_queue(candidates, limit, previous, day)
+            age=(day-dt.date.fromisoformat(str(old.get('researched_at') or '')[:10])).days
+            status=str(old.get('status') or '')
+            # Failed source discovery gets a fresh attempt tomorrow, not in seven days.
+            cooldown=1 if status in {'NO_CORROBORATED_PAGE','AI_ERROR_REVIEW',
+                                      'EVIDENCE_ONLY_AI_NOT_CONFIGURED'} else 7
+            if 0<=age<cooldown:reviewed.add(identifier)
+        except (ValueError,TypeError):pass
+    remaining=[row for row in rows
+               if row.get('project_id') not in reviewed
+               and not v5.CLOSED.search(str(row.get('current_source_status') or ''))]
+    original_order=v5_original_queue(remaining,len(remaining),previous,day)
+    priorities={'PERMIT_REVIEW':0,'BUSINESS_REVIEW':1,'PLANNING_WATCH':2,
+                'OTHER_WATCH':3,'SOURCE_UPDATE_WATCH':4}
+    # Preserve earlier ordering within each lane but prioritize genuine permits.
+    original_order.sort(key=lambda row:(priorities.get(row.get('lane'),5),
+                                         -int(row.get('review_priority') or 0)))
+    return original_order[:max(0,limit)]
 
 
 v5_original_queue = None
@@ -272,7 +331,10 @@ def render_dashboard(results, state):
             f'<p><b>Collector database:</b> <span class="mono">{esc(state.get("database", ""))}</span></p>',
             f'<p><b>Window:</b> most recent 48 hours by source event/change date. <b>Projects this run:</b> {esc(state.get("projects",0))}. '
             f'<b>Projects investigated:</b> {esc(state.get("investigated",0))}. '
-            f'<b>Corroborated pages:</b> {esc(state.get("with_public_pages",0))}. '
+            f'<b>Projects with corroborated pages:</b> {esc(state.get("with_public_pages",0))}. '
+            f'<b>DeepSeek calls attempted:</b> {esc(state.get("ai_calls_attempted",0))}; '
+            f'<b>AI analyses completed:</b> {esc(state.get("ai_calls_succeeded",0))}; '
+            f'<b>Without corroborated evidence:</b> {esc(state.get("no_corroboration",0))}. '
             f'<b>DeepSeek budget reserved today:</b> US${esc(state.get("reserved_usd",0))} / $0.50 (local safeguard, not provider cap).</p>']
     if status != 'SUCCESS':
         page.append('<article><h2>Collection attention needed</h2><p>Not all collection steps succeeded. '
@@ -379,6 +441,19 @@ def pipeline(workspace, database=None, *, run_collectors=True, run_research=True
             state['with_public_pages'] = outcome['with_public_pages']
             state['reserved_usd'] = outcome['reserved_usd']
             state['ai_configured'] = outcome['deepseek_configured']
+            # Count actual provider attempts separately from mere project searches.
+            research_file=out/'GTA_RADAR_V5_INVESTIGATIONS.csv'
+            today_rows=[]
+            if research_file.is_file():
+                with research_file.open(encoding='utf-8-sig',newline='') as f:
+                    today_rows=[r for r in csv.DictReader(f)
+                                if str(r.get('researched_at') or '').startswith(day.isoformat())]
+            state['ai_calls_succeeded']=sum(r.get('status')=='AI_EVIDENCE_REVIEW' for r in today_rows)
+            state['ai_calls_failed']=sum(r.get('status')=='AI_ERROR_REVIEW' for r in today_rows)
+            state['ai_calls_attempted']=state['ai_calls_succeeded']+state['ai_calls_failed']
+            state['no_corroboration']=sum(r.get('status')=='NO_CORROBORATED_PAGE' for r in today_rows)
+            state['research_searches']=sum(int(r.get('searches') or 0) for r in today_rows)
+            state['evidence_pages_read']=sum(int(r.get('web_pages') or 0) for r in today_rows)
         else:
             state['note'] = 'AI investigation disabled for this test; no charge.'
         return state
