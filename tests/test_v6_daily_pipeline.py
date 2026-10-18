@@ -1,4 +1,5 @@
 import csv
+from contextlib import closing
 import datetime as dt
 import importlib.util
 import json
@@ -20,9 +21,10 @@ class V6Tests(unittest.TestCase):
         self.ws=Path(self.tmp.name)/'new data';self.ws.mkdir()
         self.data=self.ws/'GTA_RADAR_DAILY_48H'/'data';self.data.mkdir(parents=True)
         self.db=self.data/'radar.sqlite'
-        with sqlite3.connect(self.db) as db:
+        with closing(sqlite3.connect(self.db)) as db:
             db.execute('CREATE TABLE records_current (source_id TEXT, record_key TEXT, source_date TEXT, normalized_json TEXT, active INTEGER)')
             db.execute("INSERT INTO records_current VALUES('toronto_active_building_permits','A1','2026-10-18','{}',1)")
+            db.commit()
         self.results=self.ws/'GTA_RADAR_RESULTS'
 
     def tearDown(self):self.tmp.cleanup()
