@@ -28,7 +28,7 @@ class V6Tests(unittest.TestCase):
     def tearDown(self):self.tmp.cleanup()
 
     def test_finds_existing_database_without_creating_another(self):
-        self.assertEqual(v6.choose_database(self.ws),self.db)
+        self.assertEqual(v6.choose_database(self.ws).resolve(),self.db.resolve())
         self.assertEqual(len(list(self.ws.rglob('radar.sqlite'))),1)
 
     def test_makes_no_stale_export_when_collectors_fail(self):
