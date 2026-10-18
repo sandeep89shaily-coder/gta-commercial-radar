@@ -335,7 +335,10 @@ def run(data_dir,projects_file=None,results_dir=None,*,key=None,search=search_rs
     src=Path(projects_file or (data/'CANDIDATES_V4_ALL_REVIEW_ONLY.csv'))
     rows=read_rows(src)
     if not src.is_file():raise FileNotFoundError('V4 candidate CSV missing: '+str(src))
-    now=dt.datetime.now(dt.timezone.utc).isoformat(timespec='seconds')
+    # Respect the injected research date in tests and reproducible historical runs.
+    when = (dt.datetime.combine(today, dt.time(hour=12), tzinfo=dt.timezone.utc)
+            if today is not None else dt.datetime.now(dt.timezone.utc))
+    now=when.isoformat(timespec='seconds')
     day=(today or dt.date.today()).isoformat()
     key=key if key is not None else key_from_windows()
     previous={r['project_id']:r for r in read_rows(out/'GTA_RADAR_V5_INVESTIGATIONS.csv')}
