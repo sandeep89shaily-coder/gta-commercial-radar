@@ -226,13 +226,14 @@ class DurableResearchQueueTests(unittest.TestCase):
         newer = dict(row, description='New issuance recorded for commercial works')
         self.assertEqual(len(queue.build([newer],[],{'project-5':old},FIXED)),1)
 
-    def test_permit_first_and_old_watch_record_eventually_ages_forward(self):
+    def test_permit_first_and_old_health_inspection_never_reaches_ai(self):
         older = make_row(1,'SOURCE_UPDATE_WATCH')
+        older['source_id']='peel_health_food'
         older['_queued_on'] = (FIXED-dt.timedelta(days=80)).isoformat()
         fresh = make_row(2,'PERMIT_REVIEW')
         fresh['_queued_on'] = FIXED.isoformat()
         ready = queue.due([fresh,older],{},FIXED)
-        self.assertEqual(ready[0]['project_id'],'project-1')
+        self.assertEqual([r['project_id'] for r in ready],['project-2'])
 
 
 if __name__ == '__main__':
