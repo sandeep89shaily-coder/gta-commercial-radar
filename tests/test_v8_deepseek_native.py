@@ -68,8 +68,14 @@ class NativeDeepseekTests(unittest.TestCase):
    self.assertEqual(rows[0]['status'],'AI_SOURCE_RECORD_REVIEW')
    self.assertEqual(rows[0]['contact'],'')
  def test_budget_enforced_before_search(self):
-  self.db.execute('INSERT INTO spends VALUES(?,?,?,?,?)',(self.day,'old',0.4995,None,'DONE'));self.db.commit()
+  self.db.execute('INSERT INTO spends VALUES(?,?,?,?,?)',(self.day,'old',0.9995,None,'DONE'));self.db.commit()
   self.assertFalse(mod.ledger_claim(self.db,self.day,'S8:another:0',mod.SEARCH_COST))
+ def test_half_dollar_of_prior_reservations_does_not_block_one_dollar_limit(self):
+  self.assertEqual(mod.DAILY_LIMIT,1.00)
+  self.db.execute('INSERT INTO spends VALUES(?,?,?,?,?)',(self.day,'old',0.4995,None,'DONE'));self.db.commit()
+  self.assertTrue(mod.ledger_claim(self.db,self.day,'S8:another:0',mod.SEARCH_COST))
+  total=self.db.execute('SELECT SUM(reserved) FROM spends WHERE day=?',(self.day,)).fetchone()[0]
+  self.assertLessEqual(total,1.00)
  def test_no_key_no_api(self):
   with tempfile.TemporaryDirectory() as tmp:
    path=Path(tmp);csvfile=path/'p.csv'
