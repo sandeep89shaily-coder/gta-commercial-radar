@@ -315,7 +315,16 @@ def render_dashboard(results, state):
             investigations = list(csv.DictReader(inp))
     current = state.get('investigation_date', '')
     new = investigations
-    new.sort(key=lambda x: (x.get('status') != 'AI_EVIDENCE_REVIEW', x.get('status') or '', x.get('address') or ''))
+    # Deferred and source-only records stay in the automated research CSV queue,
+    # never in the evidence-backed lead list.
+    pending = [r for r in new if r.get('status') in
+               ('AI_BUDGET_DEFERRED','NO_DEEPSEEK_KEY','INSUFFICIENT_SOURCE_RECORD')
+               or r.get('lead_maturity')=='SOURCE_RECORD_OBSERVED']
+    visible = [r for r in new if r not in pending]
+    visible.sort(key=lambda x: (
+        x.get('lead_maturity')!='PUBLIC_OPERATOR_CONTACT_IDENTIFIED',
+        x.get('lead_maturity')!='PROJECT_AND_OPERATOR_IDENTIFIED',
+        x.get('status')!='AI_EVIDENCE_REVIEW', x.get('address') or ''))
     status = state.get('status') or 'UNKNOWN'
     css = ('body{font:15px Segoe UI,Arial,sans-serif;background:#f5f7fa;color:#1d2939;max-width:1100px;margin:35px auto;padding:0 20px}'
            'article{background:#fff;border:1px solid #dfe5ed;border-radius:9px;padding:18px;margin:14px 0}'
@@ -329,6 +338,8 @@ def render_dashboard(results, state):
             f'<p><b>Window:</b> most recent 48 hours by source event/change date. <b>Projects this run:</b> {esc(state.get("projects",0))}. '
             f'<b>Projects investigated:</b> {esc(state.get("investigated",0))}. '
             f'<b>Projects with corroborated pages:</b> {esc(state.get("with_public_pages",0))}. '
+            f'<b>Source-backed projects:</b> {esc(state.get("source_backed_projects",0))}; '
+            f'<b>Public operator contacts identified:</b> {esc(state.get("publicly_contactable",0))}. '
             f'<b>Native DeepSeek Search requests:</b> {esc(state.get("native_searches",0))}; '
             f'<b>Native DeepSeek Fetch requests:</b> {esc(state.get("native_fetches",0))}; '
             f'<b>Flash analyses attempted:</b> {esc(state.get("ai_calls_attempted",0))}; '
@@ -344,18 +355,25 @@ def render_dashboard(results, state):
     for step in state.get('steps', []):
         page.append(f'<p><b>{esc(step["step"])}</b>: {esc(step["status"])} '
                     f'<span class="muted">({esc(step.get("detail", ""))})</span></p>')
-    page.append('<h2>Project investigations from this run</h2>')
-    if not new:
-        page.append('<p>No new independent investigations in this run. The report will not relabel old investigations as new.</p>')
-    for v in new:
+    page.append('<h2>Evidence-backed commercial intelligence</h2>')
+    page.append('<p>Project evidence is assessed automatically. A project does not imply '
+                'that a supplier purchase is underway.</p>')
+    if pending:
+        page.append('<p><b>'+str(len(pending))+'</b> records remain in the automatic '
+                    'research queue (source-only or budget-deferred). No manual work '
+                    'is required to keep them queued.</p>')
+    if not visible:
+        page.append('<p>No additional evidence-backed project was established in this run. '
+                    'Unresolved records remain queued for later automated discovery.</p>')
+    for v in visible:
         page.append(f'<article><h3>{esc(v.get("address") or v.get("project_id"))}</h3>'
                     f'<p><span class="pill">{esc(v.get("status"))}</span> — {esc(v.get("project_stage"))}</p>'
                     f'<p><b>Company/operator:</b> {esc(v.get("operator")) or "Unknown"} '
                     f'· <b>Developer:</b> {esc(v.get("developer")) or "Unknown"}</p>'
                     f'<p><b>Possible services:</b> {esc(v.get("buyer_fit")) or "Unverified"}</p>'
-                    f'<p><b>Public contact:</b> {esc(v.get("contact")) or "Not verified"}</p>'
-                    f'<p><b>Evidence level:</b> {esc(v.get("record_evidence_level")) or "Not established"}</p>'
-                    f'<p><b>Next verification:</b> {esc(v.get("next_verification")) or "Manual verification needed"}</p>'
+                    f'<p><b>Public contact:</b> {esc(v.get("contact")) or "Not identified"}</p>'
+                    f'<p><b>Research maturity:</b> {esc(v.get("lead_maturity")) or "Prior-version record"}</p>'
+                    f'<p><b>Next system action:</b> {esc(v.get("next_system_action") or v.get("next_verification")) or "Continue scheduled research"}</p>'
                     f'<p class="muted">{esc(v.get("caveats"))}</p>')
         for url in str(v.get('source_urls') or '').split(' | '):
             if safe_link(url):
@@ -442,6 +460,8 @@ def pipeline(workspace, database=None, *, run_collectors=True, run_research=True
             outcome = investigator(data, out, max_projects=max_projects)
             state['investigated'] = outcome['processed']
             state['with_public_pages'] = outcome['with_public_pages']
+            state['source_backed_projects']=outcome.get('source_backed_projects',0)
+            state['publicly_contactable']=outcome.get('publicly_contactable',0)
             state['reserved_usd'] = outcome['reserved_usd']
             state['ai_configured'] = outcome['deepseek_configured']
             state['native_searches']=outcome.get('native_searches',0)
