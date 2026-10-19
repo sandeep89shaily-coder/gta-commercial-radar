@@ -16,6 +16,7 @@ from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
 import v5_investigator as v5
+from lead_qualification import grade
 
 ROOT_API='https://api.deepseek.com'
 MODEL='deepseek-flash'
@@ -30,7 +31,8 @@ DAILY_LIMIT=0.50
 MAX_SEARCHES=3
 MAX_FETCHES=2
 FIELDS=v5.FIELDS+['evidence_level','next_verification','api_attempted',
-                  'native_searches','native_fetches','native_model_calls','source_type']
+                  'native_searches','native_fetches','native_model_calls','source_type',
+                  'lead_maturity','evidence_tier','independent_hosts','next_system_action','sale_ready']
 PRIORITY={'PERMIT_REVIEW':0,'BUSINESS_REVIEW':1,'PLANNING_WATCH':2,
           'OTHER_WATCH':3,'SOURCE_UPDATE_WATCH':4}
 
@@ -106,15 +108,53 @@ def matches(row, content):
 
 
 def fetch_native(row, key, db, day, legacy, transport=None):
+    """Prefer original public records, then search results relevant to the project.
+
+    Search snippets only choose which URLs to Fetch. They never establish a fact.
+    Model data is untrusted and must pass the existing exact-address/ID matching.
+    """
     evidence=[];seen=set();calls={'search':0,'fetch':0,'errors':[]}
     ident=str(row['project_id'])
-    # Search content is often returned directly at Search cost; fetch missing content.
+    possibilities={}
+
+    def append(url,content,kind):
+        if safe_url(url) and content and matches(row,content) and url not in {e['url'] for e in evidence}:
+            evidence.append({'url':url,'text':content[:2300],'kind':kind})
+            return True
+        return False
+
+    def fetch_one(url):
+        if not safe_url(url) or url in seen or calls['fetch']>=MAX_FETCHES:
+            return
+        seen.add(url)
+        charge='F8:'+ident+':'+hashlib.sha256(url.encode()).hexdigest()[:14]
+        if not ledger_claim(db,day,charge,FETCH_COST,legacy):
+            calls['errors'].append('FETCH_BUDGET_OR_PREVIOUS');return
+        try:
+            page=request('/v1/tools/fetch',{'url':url},key,transport)
+            content=str(page.get('content') or '')[:6500]
+            ledger_finish(db,day,charge,'DONE' if content else 'NONBILLABLE',FETCH_COST if content else 0)
+            calls['fetch']+=1
+            append(url,content,'FETCHED_MARKDOWN')
+        except Exception as exc:
+            ledger_finish(db,day,charge,'ERROR',None)
+            calls['errors'].append('FETCH_'+type(exc).__name__)
+
+    direct=str(row.get('record_source_url') or '').strip()
+    if safe_url(direct):
+        fetch_one(direct)
+    if str(row.get('source_id') or '').startswith('ero_'):
+        key_id=str(row.get('source_keys') or '').strip()
+        if re.fullmatch(r'\d{3}-\d{3,5}',key_id):
+            fetch_one('https://ero.ontario.ca/notice/'+key_id)
+
     for i,q in enumerate(queries(row)):
-        charge=f'S8:{ident}:{i}'
+        if len(evidence)>=3:break
+        charge='S8:'+ident+':'+str(i)
         if not ledger_claim(db,day,charge,SEARCH_COST,legacy):
             calls['errors'].append('SEARCH_BUDGET_OR_PREVIOUS');break
         try:
-            data=request('/v1/tools/search',{'query':q,'count':7,'need_content':True},key,transport)
+            data=request('/v1/tools/search',{'query':q,'count':12,'need_content':True},key,transport)
             entries=data.get('results',[])
             if not isinstance(entries,list):raise ValueError('Malformed Search results')
             ledger_finish(db,day,charge,'DONE' if entries else 'NONBILLABLE',SEARCH_COST if entries else 0)
@@ -122,30 +162,21 @@ def fetch_native(row, key, db, day, legacy, transport=None):
         except Exception as exc:
             ledger_finish(db,day,charge,'ERROR',None)
             calls['errors'].append('SEARCH_'+type(exc).__name__);continue
-        for entry in entries[:7]:
-            url=entry.get('url','') if isinstance(entry,dict) else ''
-            if not safe_url(url) or url in seen:continue
-            seen.add(url)
+        for entry in entries[:12]:
+            if not isinstance(entry,dict):continue
+            url=entry.get('url','')
+            if not safe_url(url):continue
             content=str(entry.get('content') or '')[:6500]
-            source_kind='SEARCH_PAGE_CONTENT'
-            # Search may return a short excerpt unrelated to the actual civic address.
-            # Ask Fetch for the full page when needed, rather than discarding the hit.
-            if not matches(row,content) and calls['fetch']<MAX_FETCHES:
-                charge_f=f'F8:{ident}:{hashlib.sha256(url.encode()).hexdigest()[:14]}'
-                if ledger_claim(db,day,charge_f,FETCH_COST,legacy):
-                    try:
-                        page=request('/v1/tools/fetch',{'url':url},key,transport)
-                        content=str(page.get('content') or '')[:6500]
-                        ledger_finish(db,day,charge_f,'DONE' if content else 'NONBILLABLE',FETCH_COST if content else 0)
-                        calls['fetch']+=1
-                        source_kind='FETCHED_MARKDOWN'
-                    except Exception as exc:
-                        ledger_finish(db,day,charge_f,'ERROR',None)
-                        calls['errors'].append('FETCH_'+type(exc).__name__)
-            if matches(row,content):
-                evidence.append({'url':url,'text':content[:2300],'kind':source_kind})
-            if len(evidence)>=3:break
-        if len(evidence)>=2:break
+            if append(url,content,'SEARCH_PAGE_CONTENT'):
+                continue
+            snippet=' '.join(str(entry.get(k) or '') for k in ('title','snippet','summary'))
+            if matches(row,snippet):
+                score=float(entry.get('rerank_score') or 0)+float(entry.get('authority') or 0)/4
+                possibilities[url]=max(possibilities.get(url,0),score)
+    # Fetch the most project-relevant results; never spend on random search hits.
+    for url,score in sorted(possibilities.items(),key=lambda p:-p[1]):
+        if len(evidence)>=3 or calls['fetch']>=MAX_FETCHES:break
+        fetch_one(url)
     return evidence,calls
 
 
@@ -262,13 +293,16 @@ def run(projects_file,results_dir,legacy_data_dir=None,*,key=None,transport=None
                         ledger_finish(db,day,name,'ERROR',None)
                         item.update(status='AI_ERROR_REVIEW',caveats=type(exc).__name__+': '+str(exc)[:140])
                         counts['errors']+=1
+            item.update(grade(row,item,evidence))
             if stat['errors']:
                 item['caveats']=(str(item.get('caveats') or '')+'; discovery diagnostics: '+', '.join(stat['errors'][:3]))[:600]
             current.append(item);previous[cid]=item
             v5.write_rows(out/'GTA_RADAR_V8_INVESTIGATIONS.csv',list(previous.values()),columns=FIELDS)
             v5.write_rows(out/'GTA_RADAR_V6_LATEST_INVESTIGATIONS.csv',current,columns=FIELDS)
         reserved=float(db.execute('SELECT COALESCE(SUM(reserved),0) FROM spends WHERE day=?',(day,)).fetchone()[0] or 0)
+        actionable=sum(x.get('lead_maturity')=='PUBLIC_OPERATOR_CONTACT_IDENTIFIED' for x in current)
+        sourced=sum(x.get('lead_maturity') in ('PROJECT_EVIDENCE_FOUND','PROJECT_AND_OPERATOR_IDENTIFIED','PUBLIC_OPERATOR_CONTACT_IDENTIFIED') for x in current)
         return dict(processed=len(current),current_invocations=len(current),deepseek_configured=bool(key),
                     reserved_usd=round(reserved+legacy,5),no_corroboration=len(current)-counts['with_public_pages'],
-                    **counts)
+                    publicly_contactable=actionable,source_backed_projects=sourced,**counts)
     finally:db.close()
