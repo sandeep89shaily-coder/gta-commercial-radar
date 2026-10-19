@@ -102,8 +102,11 @@ def build(current_rows, queued_rows, history, today):
         row['lane']=canonical_lane(row)
         old = history.get(ident, {})
         same_source = not old.get('input_fingerprint') or old.get('input_fingerprint') == fingerprint(row)
-        if old.get('status') == 'AI_EVIDENCE_REVIEW' and same_source:
-            continue
+        if (old.get('status') == 'AI_EVIDENCE_REVIEW' and same_source
+                and old.get('project_evidence_verified') == 'YES'):
+            continue  # Only project-specific evidence passed under the new rule.
+        # Legacy AI_EVIDENCE_REVIEW rows have no strict evidence field; retain
+        # and automatically retry them rather than grandfathering directories.
         pending.append(row)
     return pending
 
