@@ -314,7 +314,7 @@ def run(projects_file,results_dir,legacy_data_dir=None,*,key=None,transport=None
     due=queue.due(enrolled,previous,now)
     counts=dict(native_searches=0,native_fetches=0,ai_calls_attempted=0,
                 ai_calls_succeeded=0,with_public_pages=0,ai_budget_deferred=0,
-                errors=0,source_only_ai_calls=0)
+                errors=0,source_only_ai_calls=0,duplicate_model_skipped=0)
     current=[];start=time.monotonic();reason='QUEUE_DRAINED'
     # Reserve enough headroom for a complete discovery+Flash attempt before
     # beginning another project. Never strand 25 entries as 'budget deferred'.
@@ -327,10 +327,18 @@ def run(projects_file,results_dir,legacy_data_dir=None,*,key=None,transport=None
                 reason='RUNTIME_WINDOW';break
             if not key:
                 reason='NO_DEEPSEEK_KEY';break
+            cid=row['project_id']
+            # Retried or source-updated projects might already have a model
+            # request in the shared ledger for this date. Skip those projects,
+            # not the rest of the queue, and avoid paying to search them again.
+            model_name='M8:'+cid
+            if db.execute('SELECT 1 FROM spends WHERE day=? AND candidate=?',
+                          (day,model_name)).fetchone():
+                counts['duplicate_model_skipped']+=1
+                continue
             spent=effective_spend(db,day)[0]
             if spent+legacy+job_ceiling>DAILY_LIMIT+1e-9:
                 reason='DAILY_USD_LIMIT';break
-            cid=row['project_id']
             item={field:'' for field in FIELDS}
             item.update(project_id=cid,address=row.get('address',''),
                         source_id=row.get('source_id',''),priority=row.get('lane',''),
@@ -350,11 +358,15 @@ def run(projects_file,results_dir,legacy_data_dir=None,*,key=None,transport=None
                 item.update(status='INSUFFICIENT_SOURCE_RECORD',
                             caveats='No project description or corroborating content.')
             else:
-                name='M8:'+cid
+                name=model_name
                 if not ledger_claim(db,day,name,MODEL_RESERVE,legacy):
-                    # Can happen if another earlier run already reserved this
-                    # candidate. Preserve it in backlog without declaring success.
-                    reason='DAILY_LIMIT_OR_PREVIOUS_REQUEST'
+                    # Distinguish a concurrent/same-day duplicate from a real
+                    # budget shortage. Never let one duplicate stop all work.
+                    if db.execute('SELECT 1 FROM spends WHERE day=? AND candidate=?',
+                                  (day,name)).fetchone():
+                        counts['duplicate_model_skipped']+=1
+                        continue
+                    reason='DAILY_USD_LIMIT'
                     counts['ai_budget_deferred']+=1
                     break
                 item['api_attempted']='YES';counts['ai_calls_attempted']+=1
