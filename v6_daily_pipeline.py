@@ -285,63 +285,16 @@ v5_original_queue = None
 
 
 def investigate(data_dir, results_dir, max_projects=MAX_INVESTIGATIONS, *, enable_ai=True):
-    """DeepSeek independently plans searches BEFORE web evidence is discovered."""
-    global v5_original_queue
-    import v5_investigator as v5
-    import v6_deepseek_planner as planner
-    old_discover=v5.discover
-    old_select=v5.select_queue
-    v5_original_queue=old_select
-    out=Path(results_dir);out.mkdir(parents=True,exist_ok=True)
-    ledger=v5._ledger(out/'v5_ai_budget.sqlite')
-    key=v5.key_from_windows() if enable_ai else ''
-    day=dt.date.today().isoformat()
-    legacy=v5._legacy_reserved(Path(data_dir)/'deepseek_budget.sqlite',day)
-    counts={'attempted':0,'completed':0,'failed':0,'deferred':0}
-    touched=[];plans=[]
-    def proactive_discovery(row,search=v5.search_rss,fetch=v5.get_html,**kwargs):
-        touched.append(row.get('project_id') or '')
-        candidate=dict(row)
-        result=planner.research(candidate,key,ledger,day=day,legacy_spend=legacy)
-        plans.append({'project_id':candidate.get('project_id'),
-                      'status':result['status'],'queries':result.get('queries',[])})
-        if result.get('attempted'):
-            counts['attempted']+=1
-            counts['completed' if result['status']=='PLANNED' else 'failed']+=1
-        elif result['status']=='BUDGET_OR_DUPLICATE':
-            counts['deferred']+=1
-        candidate['_deepseek_queries']=result.get('queries',[])
-        return discover_improved(candidate,search=search,fetch=fetch,**kwargs)
-    try:
-        v5.discover=proactive_discovery
-        v5.select_queue=select_unresearched
-        outcome=v5.run(out,projects_file=out/'CANDIDATES_V4_ALL_REVIEW_ONLY.csv',
-                       results_dir=out,max_projects=max_projects,run_ai=enable_ai,
-                       legacy_budget_dir=data_dir)
-        # Isolate work from this invocation; never mix older same-day records.
-        with (out/'GTA_RADAR_V5_INVESTIGATIONS.csv').open(
-                encoding='utf-8-sig',newline='') as f:
-            history={r.get('project_id'):r for r in csv.DictReader(f)}
-        current=[history[cid] for cid in touched if cid in history]
-        v5.write_rows(out/'GTA_RADAR_V6_LATEST_INVESTIGATIONS.csv',current)
-        atomic_json(out/'GTA_RADAR_V6_AI_SEARCH_PLANS.json',plans)
-        outcome.update(ai_plans_attempted=counts['attempted'],
-                       ai_plans_completed=counts['completed'],
-                       ai_plans_failed=counts['failed'],
-                       ai_plans_deferred=counts['deferred'],
-                       ai_calls_attempted=sum(r.get('status') in
-                           ('AI_EVIDENCE_REVIEW','AI_ERROR_REVIEW') for r in current),
-                       ai_calls_succeeded=sum(r.get('status')=='AI_EVIDENCE_REVIEW'
-                           for r in current),
-                       no_corroboration=sum(r.get('status')=='NO_CORROBORATED_PAGE'
-                           for r in current),current_invocations=len(current))
-        return outcome
-    finally:
-        ledger.close()
-        v5.discover=old_discover
-        v5.select_queue=old_select
-        v5_original_queue=None
+    """One meaningful DeepSeek call per project, with or without web evidence.
 
+    No paid search plans. Source-only model output is explicitly unverified.
+    """
+    import v7_deepseek_research as researcher
+    results = Path(results_dir)
+    return researcher.run(results / 'CANDIDATES_V4_ALL_REVIEW_ONLY.csv',
+                          results, legacy_data_dir=data_dir,
+                          key=None if enable_ai else '',
+                          max_projects=max_projects)
 
 def render_dashboard(results, state):
     """User-facing report must reveal when collectors failed or when no fresh events exist."""
@@ -376,11 +329,10 @@ def render_dashboard(results, state):
             f'<p><b>Window:</b> most recent 48 hours by source event/change date. <b>Projects this run:</b> {esc(state.get("projects",0))}. '
             f'<b>Projects investigated:</b> {esc(state.get("investigated",0))}. '
             f'<b>Projects with corroborated pages:</b> {esc(state.get("with_public_pages",0))}. '
-            f'<b>DeepSeek research plans attempted:</b> {esc(state.get("ai_plans_attempted",0))}; '
-            f'<b>Research plans completed:</b> {esc(state.get("ai_plans_completed",0))}; '
-            f'<b>Planning deferred:</b> {esc(state.get("ai_plans_deferred",0))}; '
-            f'<b>DeepSeek evidence analyses attempted:</b> {esc(state.get("ai_calls_attempted",0))}; '
-            f'<b>AI analyses completed:</b> {esc(state.get("ai_calls_succeeded",0))}; '
+            f'<b>Substantive DeepSeek calls attempted:</b> {esc(state.get("ai_calls_attempted",0))}; '
+            f'<b>DeepSeek analyses completed:</b> {esc(state.get("ai_calls_succeeded",0))}; '
+            f'<b>Source-record-only analyses (unverified):</b> {esc(state.get("source_only_ai_calls",0))}; '
+            f'<b>Budget-deferred projects:</b> {esc(state.get("ai_budget_deferred",0))}; '
             f'<b>Without corroborated evidence:</b> {esc(state.get("no_corroboration",0))}. '
             f'<b>DeepSeek budget reserved today:</b> US${esc(state.get("reserved_usd",0))} / $0.50 (local safeguard, not provider cap).</p>']
     if status != 'SUCCESS':
@@ -400,6 +352,8 @@ def render_dashboard(results, state):
                     f'· <b>Developer:</b> {esc(v.get("developer")) or "Unknown"}</p>'
                     f'<p><b>Possible services:</b> {esc(v.get("buyer_fit")) or "Unverified"}</p>'
                     f'<p><b>Public contact:</b> {esc(v.get("contact")) or "Not verified"}</p>'
+                    f'<p><b>Evidence level:</b> {esc(v.get("record_evidence_level")) or "Not established"}</p>'
+                    f'<p><b>Next verification:</b> {esc(v.get("next_verification")) or "Manual verification needed"}</p>'
                     f'<p class="muted">{esc(v.get("caveats"))}</p>')
         for url in str(v.get('source_urls') or '').split(' | '):
             if safe_link(url):
@@ -494,6 +448,8 @@ def pipeline(workspace, database=None, *, run_collectors=True, run_research=True
             state['ai_plans_deferred']=outcome.get('ai_plans_deferred',0)
             state['ai_calls_attempted']=outcome.get('ai_calls_attempted',0)
             state['ai_calls_succeeded']=outcome.get('ai_calls_succeeded',0)
+            state['source_only_ai_calls']=outcome.get('source_only_ai_calls',0)
+            state['ai_budget_deferred']=outcome.get('ai_budget_deferred',0)
             state['no_corroboration']=outcome.get('no_corroboration',0)
             state['investigated']=outcome.get('current_invocations',outcome['processed'])
         else:
