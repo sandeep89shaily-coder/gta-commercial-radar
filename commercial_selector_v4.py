@@ -14,6 +14,7 @@ from collections import Counter
 from contextlib import closing
 from pathlib import Path
 from urllib.parse import quote_plus, urlparse
+from commercial_research_policy import INSPECTION, PERMIT, research_route, lead_sector
 
 ROOT = Path(__file__).resolve().parent
 OUTPUT_FIELDS = [
@@ -22,6 +23,7 @@ OUTPUT_FIELDS = [
     'event_date', 'date_basis', 'source_record_date', 'source_record_date_basis',
     'current_source_status', 'source_group', 'record_source_url',
     'service_hypotheses', 'review_reason', 'review_status', 'manual_research_url',
+    'research_route', 'lead_sector',
 ]
 EXCLUDED_FIELDS = ['source_id', 'source_key', 'address', 'description', 'reason']
 
@@ -41,7 +43,8 @@ SERVICES = [
     ('Security/access control', re.compile(r'\b(security|access control|surveillance|alarm system)\b', re.I)),
 ]
 LANE_ORDER = {'PERMIT_REVIEW': 0, 'BUSINESS_REVIEW': 1,
-              'PLANNING_WATCH': 2, 'SOURCE_UPDATE_WATCH': 3, 'OTHER_WATCH': 4}
+              'PLANNING_WATCH': 2, 'ENVIRONMENT_WATCH':3,
+              'SOURCE_UPDATE_WATCH': 4, 'OTHER_WATCH': 5,'ENRICHMENT_ONLY':6}
 
 
 def safe_url(value):
@@ -70,14 +73,21 @@ def classify(row):
         return 'EXCLUDE_RESIDENTIAL_LED', 'Residential-led construction is outside commercial-only lead scope'
     if not COMMERCIAL.search(d) and not ('licen' in sid.lower() and row.get('company_name')):
         return 'EXCLUDE_NO_COMMERCIAL', 'No specific commercial activity established'
+    if INSPECTION.search(sid):
+        return 'ENRICHMENT_ONLY', 'Routine health inspection is company context, not a new commercial purchasing trigger'
     if PLANNING.search(sid):
         return 'PLANNING_WATCH', 'Planning-stage activity; no issued permit or purchasing event confirmed'
+    if PERMIT.search(sid) or 'building_permit' in sid:
+        return 'PERMIT_REVIEW', 'Commercial permit work, not proof of permit issuance or purchasing intent'
+    if 'environmental_instrument' in sid:
+        return 'ENVIRONMENT_WATCH', 'Environmental regulatory proposal; supplier demand not established'
+    if 'licen' in sid.lower() or group == 'BUSINESS_DISCOVERY':
+        kind=research_route({'source_id':sid,'description':d,'lane':'BUSINESS_REVIEW'})
+        if kind=='ENRICHMENT_ONLY':
+            return 'ENRICHMENT_ONLY', 'Existing business record with no evidenced opening or expansion'
+        return 'BUSINESS_REVIEW', 'Commercial business-opening or expansion record; independently verify timing'
     if group in ('MUNICIPAL_CHANGE', 'PEEL_PROJECT') or 'CHANGE_DETECTED' in str(row.get('event_date_basis') or ''):
         return 'SOURCE_UPDATE_WATCH', 'A detected record update is not a new permit or opening'
-    if 'building_permit' in sid or 'permit' in sid:
-        return 'PERMIT_REVIEW', 'Commercial permit record; issuance and activity still require confirmation'
-    if 'licen' in sid.lower() or group == 'BUSINESS_DISCOVERY':
-        return 'BUSINESS_REVIEW', 'Commercial business record; opening and operator still need confirmation'
     return 'OTHER_WATCH', 'Commercial reference with insufficient evidence of actionable activity'
 
 
@@ -148,7 +158,7 @@ def summarize(members, metadata):
     direct_urls = [safe_url(x.get('evidence_url') or x.get('source_url')) for x in members]
     direct = next((x for x in direct_urls if x), '') or safe_url(meta.get('evidence_url'))
     company = next((str(x.get('company_name') or '').strip() for x in members if str(x.get('company_name') or '').strip().upper() not in ('', 'UNKNOWN', 'NONE')), 'UNKNOWN')
-    score = {'PERMIT_REVIEW': 55, 'BUSINESS_REVIEW': 48, 'PLANNING_WATCH': 20, 'SOURCE_UPDATE_WATCH': 12, 'OTHER_WATCH': 8}.get(lane, 0)
+    score = {'PERMIT_REVIEW': 70, 'BUSINESS_REVIEW': 55, 'PLANNING_WATCH': 35, 'ENVIRONMENT_WATCH':25,'SOURCE_UPDATE_WATCH': 12, 'OTHER_WATCH': 8}.get(lane, 0)
     if ACTION.search(fulltext) and lane in ('PERMIT_REVIEW', 'BUSINESS_REVIEW'):
         score += 10
     if company != 'UNKNOWN':
@@ -165,7 +175,7 @@ def summarize(members, metadata):
     search = ' '.join(x for x in (f'"{address}"' if address else '', city, company if company != 'UNKNOWN' else '', key) if x)
     raw_basis = str(chosen.get('event_date_basis') or chosen.get('date_basis') or '')
     date_basis = ('SOURCE RECORD UPDATE OBSERVED — NOT ISSUANCE/OPENING'
-                  if lane == 'SOURCE_UPDATE_WATCH' or group == 'MUNICIPAL_CHANGE'
+                  if group == 'MUNICIPAL_CHANGE' or lane == 'SOURCE_UPDATE_WATCH'
                   else ('PLANNING APPLICATION DATE — VERIFY' if lane == 'PLANNING_WATCH'
                         else ('SOURCE EVENT DATE — NOT VERIFIED ISSUANCE/OPENING' if group == 'MUNICIPAL'
                               else 'REPORTED SOURCE/OBSERVATION DATE — VERIFY')))
@@ -182,6 +192,8 @@ def summarize(members, metadata):
         'record_source_url': direct, 'service_hypotheses': service_hypotheses(fulltext, kinds),
         'review_reason': reason, 'review_status': 'RESEARCH ONLY — OPERATOR, DATE AND DEMAND UNVERIFIED',
         'manual_research_url': 'https://www.google.com/search?q=' + quote_plus(search[:240]),
+        'research_route':research_route({'source_id':sid,'lane':lane,'description':fulltext}),
+        'lead_sector':lead_sector({'source_id':sid,'description':fulltext}),
     }
 
 
@@ -229,11 +241,13 @@ def run(input_csv, output_dir, db_path=None):
         seen.add(ident)
         groups.setdefault(group_key(r), []).append(r)
     counts = Counter()
-    selected, excluded = [], []
+    selected, excluded, enriched = [], [], []
     for group in groups.values():
         item = summarize(group, metadata)
         counts[item['lane']] += 1
-        if item['lane'].startswith('EXCLUDE'):
+        if item['lane']=='ENRICHMENT_ONLY' or item['research_route']=='ENRICHMENT_ONLY':
+            enriched.append(item)
+        elif item['lane'].startswith('EXCLUDE'):
             for record in group:
                 excluded.append({'source_id': record.get('source_id'), 'source_key': record.get('source_key'),
                                  'address': record.get('address'), 'description': record.get('description'),
@@ -242,11 +256,12 @@ def run(input_csv, output_dir, db_path=None):
             selected.append(item)
     selected.sort(key=lambda r: (LANE_ORDER[r['lane']], -r['review_priority'], r['project_id']))
     write_csv(output / 'CANDIDATES_V4_ALL_REVIEW_ONLY.csv', OUTPUT_FIELDS, selected)
+    write_csv(output / 'CANDIDATES_V4_ENRICHMENT_ONLY.csv', OUTPUT_FIELDS, enriched)
     write_csv(output / 'CANDIDATES_V4_EXCLUDED_AUDIT.csv', EXCLUDED_FIELDS, excluded)
     write_csv(output / 'CANDIDATES_V4_COUNTS.csv', ['category', 'count'],
               [{'category': k, 'count': v} for k, v in sorted(counts.items())])
     (output / 'commercial_candidates_v4.html').write_text(render_html(selected, counts), encoding='utf-8')
-    print('V4:', len(source), 'input records;', len(selected), 'unique projects for research;', len(excluded), 'records excluded')
+    print('V4:', len(source), 'input records;', len(selected), 'actionable projects for AI;', len(enriched), 'company-enrichment records;', len(excluded), 'records excluded')
     print('By lane:', dict(counts))
     return selected
 
