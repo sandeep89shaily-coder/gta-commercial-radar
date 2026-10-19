@@ -209,7 +209,9 @@ def analyze(row,evidence,key,transport=None):
     if not isinstance(values,dict):raise ValueError('AI response not an object')
     allowed={e['url'] for e in evidence}
     claimed=values.get('source_urls',[])
-    approved=[x for x in claimed if x in allowed] if isinstance(claimed,list) else []
+    # Source URLs come from matched Search page content/Fetch, not the model's
+    # optional citation list; never discard actual evidence when AI omits a URL.
+    approved=list(dict.fromkeys(e['url'] for e in evidence if e.get('text') and e.get('url') in allowed))
     source_text=' '.join(str(row.get(k) or '') for k in ('description','company_name','address','source_keys'))
     page_text=' '.join(e['text'] for e in evidence)
     text=(source_text+' '+page_text).casefold()
@@ -246,7 +248,8 @@ def run(projects_file,results_dir,legacy_data_dir=None,*,key=None,transport=None
     db=v5._ledger(out/'v5_ai_budget.sqlite')
     legacy=v5._legacy_reserved(Path(legacy_data_dir or out)/'deepseek_budget.sqlite',day)
     previous={r['project_id']:r for r in read_csv(out/'GTA_RADAR_V8_INVESTIGATIONS.csv') if r.get('project_id')}
-    good=lambda r: r.get('status') in ('AI_EVIDENCE_REVIEW','AI_SOURCE_RECORD_REVIEW')
+    # Uncorroborated source-only analyses are retried tomorrow, not frozen for a week.
+    good=lambda r: r.get('status')=='AI_EVIDENCE_REVIEW'
     candidates=[]
     for row in rows:
         cid=row.get('project_id','')
