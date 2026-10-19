@@ -174,12 +174,14 @@ def once_lock(results, stale_hours=None):
     kernel_path = root / "V6_PROCESS.oslock"
     marker = root / "V6_RUNNING.lock"
     handle = kernel_path.open("a+b")
+    locked = False
     try:
         handle.seek(0, os.SEEK_END)
         if handle.tell() == 0:
             handle.write(b"0")
             handle.flush()
         _acquire_os_lock(handle)
+        locked = True
         if marker.exists():
             stat = marker.stat()
             try:
@@ -212,5 +214,8 @@ def once_lock(results, stale_hours=None):
                          + identity + "\n")
         return RunLock(handle, marker, identity)
     except Exception:
-        _release_os_lock(handle)
+        if locked:
+            _release_os_lock(handle)
+        else:
+            handle.close()
         raise
