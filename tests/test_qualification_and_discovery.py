@@ -45,7 +45,7 @@ class EvidenceQualificationTests(unittest.TestCase):
                     ]}
                 if path.endswith('fetch'):
                     fetched.append(payload['url'])
-                    return {'title':'Building project','content':'1430 Birchmount Road Toronto development'}
+                    return {'title':'Building project','content':'Commercial development project at 1430 Birchmount Road Toronto'}
                 self.fail('No model request expected')
             evidence, counts=v8.fetch_native(ROW,'test',db,'2026-10-19',0,fake)
             db.close()
