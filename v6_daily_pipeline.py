@@ -24,7 +24,7 @@ from urllib.parse import quote_plus, urlparse
 
 VERSION = '6.0'
 ROOT = Path(__file__).resolve().parent
-MAX_INVESTIGATIONS = 25
+MAX_INVESTIGATIONS = 0  # 0 means process every queued project until time or $1/day budget stops the run
 MAX_LOG_BYTES = 32000
 TASK_NAME = 'GTA Commercial Radar V6'
 PREVIOUS_TASK = 'GTA Commercial Radar V5'
@@ -345,7 +345,10 @@ def render_dashboard(results, state):
             f'<b>Flash analyses attempted:</b> {esc(state.get("ai_calls_attempted",0))}; '
             f'<b>DeepSeek analyses completed:</b> {esc(state.get("ai_calls_succeeded",0))}; '
             f'<b>Source-record-only analyses (unverified):</b> {esc(state.get("source_only_ai_calls",0))}; '
-            f'<b>Budget-deferred projects:</b> {esc(state.get("ai_budget_deferred",0))}; '
+            f'<b>Still awaiting first AI analysis:</b> {esc(state.get("queue_initial_uninvestigated",0))}; '
+            f'<b>Total persistent research queue:</b> {esc(state.get("queue_total",0))}; '
+            f'<b>Ready for the next run:</b> {esc(state.get("queue_due",0))}; '
+            f'<b>Current AI stop reason:</b> {esc(state.get("queue_stop_reason","NOT_RUN"))}; '
             f'<b>Without corroborated evidence:</b> {esc(state.get("no_corroboration",0))}. '
             f'<b>DeepSeek budget reserved today:</b> US${esc(state.get("reserved_usd",0))} / $1.00 (local safeguard, not provider cap).</p>']
     if status != 'SUCCESS':
@@ -358,10 +361,16 @@ def render_dashboard(results, state):
     page.append('<h2>Evidence-backed commercial intelligence</h2>')
     page.append('<p>Project evidence is assessed automatically. A project does not imply '
                 'that a supplier purchase is underway.</p>')
-    if pending:
-        page.append('<p><b>'+str(len(pending))+'</b> records remain in the automatic '
-                    'research queue (source-only or budget-deferred). No manual work '
-                    'is required to keep them queued.</p>')
+    if state.get('queue_total',0):
+        page.append('<p><b>'+esc(state.get('queue_total'))+
+                    '</b> projects remain in the persistent research backlog, including '+
+                    esc(state.get('queue_initial_uninvestigated',0))+
+                    ' awaiting their first successful AI analysis. They will survive '+
+                    'the 48-hour source window and resume automatically on later days. '+
+                    'No manual verification is required to keep them queued.</p>')
+    if state.get('queue_stop_reason') in ('DAILY_USD_LIMIT','RUNTIME_WINDOW','OPTIONAL_RUN_LIMIT'):
+        page.append('<p><b>Collection succeeded; AI research remains incomplete.</b> '+
+                    'Further investigations will continue automatically within the US$1 daily budget.</p>')
     if not visible:
         page.append('<p>No additional evidence-backed project was established in this run. '
                     'Unresolved records remain queued for later automated discovery.</p>')
@@ -474,6 +483,10 @@ def pipeline(workspace, database=None, *, run_collectors=True, run_research=True
             state['ai_calls_succeeded']=outcome.get('ai_calls_succeeded',0)
             state['source_only_ai_calls']=outcome.get('source_only_ai_calls',0)
             state['ai_budget_deferred']=outcome.get('ai_budget_deferred',0)
+            state['queue_total']=outcome.get('queue_total',0)
+            state['queue_due']=outcome.get('queue_due',0)
+            state['queue_initial_uninvestigated']=outcome.get('queue_initial_uninvestigated',0)
+            state['queue_stop_reason']=outcome.get('queue_stop_reason','UNKNOWN')
             state['no_corroboration']=outcome.get('no_corroboration',0)
             state['investigated']=outcome.get('current_invocations',outcome['processed'])
         else:
@@ -510,10 +523,12 @@ def main(argv=None):
         say('Running live collection first. Existing history will be preserved as collectors update it.')
         state=pipeline(workspace, db, run_collectors=not args.offline_test,
                        run_research=not args.no_ai, results_dir=args.results_dir,
-                       max_projects=min(50, max(1,args.max_projects)))
+                       max_projects=min(5000, max(0,args.max_projects)))
         dest=Path(args.results_dir or (workspace/'GTA_RADAR_RESULTS')) / 'GTA_RADAR_V6_DASHBOARD.html'
         say('Run status: '+state['status']+'; projects: '+str(state.get('projects',0))+
-            '; researched: '+str(state.get('investigated',0)))
+            '; AI researched now: '+str(state.get('investigated',0))+
+            '; persistent queue: '+str(state.get('queue_total',0))+
+            '; stop reason: '+str(state.get('queue_stop_reason','NOT_RUN')))
         if state.get('error') or state.get('note'): say(state.get('error') or state.get('note'))
         say('Dashboard: ' + str(dest))
         if not args.unattended and dest.exists():

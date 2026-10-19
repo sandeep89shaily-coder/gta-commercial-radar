@@ -58,7 +58,7 @@ class V6Tests(unittest.TestCase):
             with (Path(dst)/'CANDIDATES_V4_ALL_REVIEW_ONLY.csv').open('w',newline='') as f:
                 w=csv.DictWriter(f,fieldnames=['project_id','address']);w.writeheader();w.writerow({'project_id':'A','address':'100 Office Rd'})
         def investigator(data,results,max_projects):
-            events.append('investigator');self.assertEqual(max_projects,25)
+            events.append('investigator');self.assertEqual(max_projects,0)
             return {'processed':1,'with_public_pages':1,'reserved_usd':0.02,'deepseek_configured':True}
         outcome=v6.pipeline(self.ws,self.db,collector=collector,selector=selector,investigator=investigator)
         self.assertEqual(outcome['status'],'SUCCESS')

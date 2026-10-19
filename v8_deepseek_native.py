@@ -11,12 +11,14 @@ import hashlib
 import ipaddress
 import json
 import re
+import time
 from pathlib import Path
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
 import v5_investigator as v5
 from lead_qualification import grade
+import v8_ai_queue as queue
 
 ROOT_API='https://api.deepseek.com'
 MODEL='deepseek-flash'
@@ -32,7 +34,8 @@ MAX_SEARCHES=3
 MAX_FETCHES=2
 FIELDS=v5.FIELDS+['evidence_level','next_verification','api_attempted',
                   'native_searches','native_fetches','native_model_calls','source_type',
-                  'lead_maturity','evidence_tier','independent_hosts','next_system_action','sale_ready']
+                  'lead_maturity','evidence_tier','independent_hosts','next_system_action','sale_ready',
+                  'input_fingerprint','investigated_local_date']
 PRIORITY={'PERMIT_REVIEW':0,'BUSINESS_REVIEW':1,'PLANNING_WATCH':2,
           'OTHER_WATCH':3,'SOURCE_UPDATE_WATCH':4}
 
@@ -68,6 +71,15 @@ def ledger_finish(db,day,name,status,actual=None):
     if status=='NONBILLABLE':
         db.execute('UPDATE spends SET reserved=0,actual=0,status=? WHERE day=? AND candidate=?',
                    (status,day,name))
+    elif status=='DONE' and actual is not None:
+        # After a successful provider response, release unnecessary model
+        # reservation while retaining up to 3x reported usage as a cushion.
+        # Errors/unknown charges keep their full original reservation.
+        db.execute('''UPDATE spends
+                      SET reserved=MAX(?,MIN(reserved,?)),
+                          actual=?,status=?
+                      WHERE day=? AND candidate=?''',
+                   (actual,actual*3,actual,status,day,name))
     else:
         db.execute('UPDATE spends SET actual=?,status=? WHERE day=? AND candidate=?',
                    (actual,status,day,name))
@@ -239,73 +251,119 @@ def read_csv(path):
     with Path(path).open(encoding='utf-8-sig',newline='') as f:return list(csv.DictReader(f))
 
 
-def run(projects_file,results_dir,legacy_data_dir=None,*,key=None,transport=None,max_projects=25,today=None):
+def run(projects_file,results_dir,legacy_data_dir=None,*,key=None,transport=None,
+        max_projects=0,today=None,max_runtime_seconds=1800):
+    """Investigate ALL queued candidates over consecutive runs, under $1/day.
+
+    The old V8 discarded everything past the first 25 and lost records after the
+    48-hour export aged out. A durable CSV backlog now retains unfinished work.
+    max_projects=0 means no arbitrary count ceiling; time and daily spend still
+    bound one run. Never write a budget-deferred record as an investigation.
+    """
     out=Path(results_dir);out.mkdir(parents=True,exist_ok=True)
-    rows=read_csv(projects_file)
-    if not Path(projects_file).exists():raise FileNotFoundError(str(projects_file))
+    if not Path(projects_file).is_file():
+        raise FileNotFoundError(str(projects_file))
     now=today or dt.date.today();day=now.isoformat()
     key=v5.key_from_windows() if key is None else key
     db=v5._ledger(out/'v5_ai_budget.sqlite')
     legacy=v5._legacy_reserved(Path(legacy_data_dir or out)/'deepseek_budget.sqlite',day)
-    previous={r['project_id']:r for r in read_csv(out/'GTA_RADAR_V8_INVESTIGATIONS.csv') if r.get('project_id')}
-    # Uncorroborated source-only analyses are retried tomorrow, not frozen for a week.
-    good=lambda r: r.get('status')=='AI_EVIDENCE_REVIEW'
-    candidates=[]
-    for row in rows:
-        cid=row.get('project_id','')
-        if not cid or v5.CLOSED.search(str(row.get('current_source_status') or '')):continue
-        old=previous.get(cid,{})
-        try:age=(now-dt.date.fromisoformat(str(old.get('researched_at') or '')[:10])).days
-        except (ValueError,TypeError):age=999
-        if 0<=age<(7 if good(old) else 1):continue
-        candidates.append(row)
-    candidates.sort(key=lambda r:(PRIORITY.get(r.get('lane'),9),-int(r.get('review_priority') or 0)))
-    current=[];counts=dict(native_searches=0,native_fetches=0,ai_calls_attempted=0,
-                           ai_calls_succeeded=0,with_public_pages=0,ai_budget_deferred=0,
-                           errors=0,source_only_ai_calls=0)
+    history_path=out/'GTA_RADAR_V8_INVESTIGATIONS.csv'
+    queue_path=out/'GTA_RADAR_V8_PENDING_QUEUE.csv'
+    previous={r['project_id']:r for r in read_csv(history_path) if r.get('project_id')}
+    enrolled=queue.build(read_csv(projects_file), queue.load(queue_path), previous, now)
+    queue.save(queue_path,enrolled)  # Checkpoint BEFORE any external API call.
+    due=queue.due(enrolled,previous,now)
+    counts=dict(native_searches=0,native_fetches=0,ai_calls_attempted=0,
+                ai_calls_succeeded=0,with_public_pages=0,ai_budget_deferred=0,
+                errors=0,source_only_ai_calls=0)
+    current=[];start=time.monotonic();reason='QUEUE_DRAINED'
+    # Reserve enough headroom for a complete discovery+Flash attempt before
+    # beginning another project. Never strand 25 entries as 'budget deferred'.
+    job_ceiling=MODEL_RESERVE+MAX_SEARCHES*SEARCH_COST+MAX_FETCHES*FETCH_COST
     try:
-        for row in candidates[:max(0,max_projects)]:
-            cid=row['project_id'];item={f:'' for f in FIELDS}
-            item.update(project_id=cid,address=row.get('address',''),source_id=row.get('source_id',''),
-                        priority=row.get('lane',''),researched_at=dt.datetime.now(dt.timezone.utc).isoformat(timespec='seconds'))
+        for row in due:
+            if max_projects>0 and len(current)>=max_projects:
+                reason='OPTIONAL_RUN_LIMIT';break
+            if time.monotonic()-start>=max_runtime_seconds:
+                reason='RUNTIME_WINDOW';break
             if not key:
-                item.update(status='NO_DEEPSEEK_KEY',caveats='DeepSeek API key not configured.');current.append(item);continue
+                reason='NO_DEEPSEEK_KEY';break
+            spent=float(db.execute('SELECT COALESCE(SUM(reserved),0) FROM spends WHERE day=?',(day,)).fetchone()[0] or 0)
+            if spent+legacy+job_ceiling>DAILY_LIMIT+1e-9:
+                reason='DAILY_USD_LIMIT';break
+            cid=row['project_id']
+            item={field:'' for field in FIELDS}
+            item.update(project_id=cid,address=row.get('address',''),
+                        source_id=row.get('source_id',''),priority=row.get('lane',''),
+                        researched_at=dt.datetime.now(dt.timezone.utc).isoformat(timespec='seconds'),
+                        investigated_local_date=day,input_fingerprint=queue.fingerprint(row))
             evidence,stat=fetch_native(row,key,db,day,legacy,transport)
-            item.update(web_pages=len(evidence),searches=stat['search'],native_searches=stat['search'],
-                        native_fetches=stat['fetch'],source_urls=' | '.join(e['url'] for e in evidence),
+            item.update(web_pages=len(evidence),searches=stat['search'],
+                        native_searches=stat['search'],native_fetches=stat['fetch'],
+                        source_urls=' | '.join(e['url'] for e in evidence),
                         evidence_level='FETCHED_PAGE_MATCHED' if evidence else 'SOURCE_RECORD_ONLY')
-            counts['native_searches']+=stat['search'];counts['native_fetches']+=stat['fetch']
+            counts['native_searches']+=stat['search']
+            counts['native_fetches']+=stat['fetch']
             counts['with_public_pages']+=bool(evidence)
-            source_record=bool(str(row.get('description') or '').strip() or str(row.get('company_name') or '').strip())
+            source_record=bool(str(row.get('description') or '').strip() or
+                               str(row.get('company_name') or '').strip())
             if not source_record and not evidence:
-                item.update(status='INSUFFICIENT_SOURCE_RECORD',caveats='No project description or corroborating content.')
+                item.update(status='INSUFFICIENT_SOURCE_RECORD',
+                            caveats='No project description or corroborating content.')
             else:
                 name='M8:'+cid
                 if not ledger_claim(db,day,name,MODEL_RESERVE,legacy):
-                    item.update(status='AI_BUDGET_DEFERRED',caveats='Daily shared budget or same-day duplicate.')
+                    # Can happen if another earlier run already reserved this
+                    # candidate. Preserve it in backlog without declaring success.
+                    reason='DAILY_LIMIT_OR_PREVIOUS_REQUEST'
                     counts['ai_budget_deferred']+=1
-                else:
-                    item['api_attempted']='YES';counts['ai_calls_attempted']+=1
-                    try:
-                        answer,actual=analyze(row,evidence,key,transport)
-                        item.update(answer)
-                        item.update(status='AI_EVIDENCE_REVIEW' if evidence else 'AI_SOURCE_RECORD_REVIEW',ai_used='YES')
-                        ledger_finish(db,day,name,'DONE',actual)
-                        counts['ai_calls_succeeded']+=1;counts['source_only_ai_calls']+=not evidence
-                    except Exception as exc:
-                        ledger_finish(db,day,name,'ERROR',None)
-                        item.update(status='AI_ERROR_REVIEW',caveats=type(exc).__name__+': '+str(exc)[:140])
-                        counts['errors']+=1
+                    break
+                item['api_attempted']='YES';counts['ai_calls_attempted']+=1
+                try:
+                    answer,actual=analyze(row,evidence,key,transport)
+                    item.update(answer)
+                    item.update(status='AI_EVIDENCE_REVIEW' if evidence else 'AI_SOURCE_RECORD_REVIEW',ai_used='YES')
+                    ledger_finish(db,day,name,'DONE',actual)
+                    counts['ai_calls_succeeded']+=1
+                    counts['source_only_ai_calls']+=not evidence
+                except Exception as exc:
+                    ledger_finish(db,day,name,'ERROR',None)
+                    item.update(status='AI_ERROR_REVIEW',
+                                caveats=type(exc).__name__+': '+str(exc)[:140])
+                    counts['errors']+=1
             item.update(grade(row,item,evidence))
             if stat['errors']:
-                item['caveats']=(str(item.get('caveats') or '')+'; discovery diagnostics: '+', '.join(stat['errors'][:3]))[:600]
-            current.append(item);previous[cid]=item
-            v5.write_rows(out/'GTA_RADAR_V8_INVESTIGATIONS.csv',list(previous.values()),columns=FIELDS)
+                item['caveats']=(str(item.get('caveats') or '')+
+                                 '; discovery diagnostics: '+', '.join(stat['errors'][:3]))[:600]
+            current.append(item)
+            previous[cid]=item
+            # A fully corroborated project is finished until its source changes.
+            # Source-only AI results remain eligible for a later evidence recheck.
+            if item.get('status')=='AI_EVIDENCE_REVIEW':
+                enrolled=[r for r in enrolled if r['project_id']!=cid]
+            v5.write_rows(history_path,list(previous.values()),columns=FIELDS)
             v5.write_rows(out/'GTA_RADAR_V6_LATEST_INVESTIGATIONS.csv',current,columns=FIELDS)
-        reserved=float(db.execute('SELECT COALESCE(SUM(reserved),0) FROM spends WHERE day=?',(day,)).fetchone()[0] or 0)
-        actionable=sum(x.get('lead_maturity')=='PUBLIC_OPERATOR_CONTACT_IDENTIFIED' for x in current)
-        sourced=sum(x.get('lead_maturity') in ('PROJECT_EVIDENCE_FOUND','PROJECT_AND_OPERATOR_IDENTIFIED','PUBLIC_OPERATOR_CONTACT_IDENTIFIED') for x in current)
+            queue.save(queue_path,enrolled)
+
+        if not current:
+            # Never display an older run as the current run.
+            v5.write_rows(out/'GTA_RADAR_V6_LATEST_INVESTIGATIONS.csv',[],columns=FIELDS)
+        queue.save(queue_path,enrolled)
+        spent=float(db.execute('SELECT COALESCE(SUM(reserved),0) FROM spends WHERE day=?',(day,)).fetchone()[0] or 0)
+        outstanding=queue.due(enrolled,previous,now)
+        initial_pending=sum(previous.get(row['project_id'],{}).get('status')
+                            not in ('AI_EVIDENCE_REVIEW','AI_SOURCE_RECORD_REVIEW')
+                            for row in enrolled)
+        sourced=sum(r.get('lead_maturity') in ('PROJECT_EVIDENCE_FOUND',
+                          'PROJECT_AND_OPERATOR_IDENTIFIED','PUBLIC_OPERATOR_CONTACT_IDENTIFIED') for r in current)
+        contacts=sum(r.get('lead_maturity')=='PUBLIC_OPERATOR_CONTACT_IDENTIFIED' for r in current)
         return dict(processed=len(current),current_invocations=len(current),deepseek_configured=bool(key),
-                    reserved_usd=round(reserved+legacy,5),no_corroboration=len(current)-counts['with_public_pages'],
-                    publicly_contactable=actionable,source_backed_projects=sourced,**counts)
-    finally:db.close()
+                    reserved_usd=round(spent+legacy,5),
+                    no_corroboration=len(current)-counts['with_public_pages'],
+                    publicly_contactable=contacts,source_backed_projects=sourced,
+                    queue_total=len(enrolled),queue_due=len(outstanding),
+                    queue_initial_uninvestigated=initial_pending,
+                    queue_stop_reason=reason,queue_file=str(queue_path),
+                    **counts)
+    finally:
+        db.close()
