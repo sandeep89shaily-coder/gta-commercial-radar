@@ -353,6 +353,10 @@ def render_dashboard(results, state):
         return s if urlparse(s).scheme == 'https' and urlparse(s).hostname else ''
     investigations = []
     history = rdir / 'GTA_RADAR_V6_LATEST_INVESTIGATIONS.csv'
+    # Compatibility with historical manually generated reports. Production
+    # always emits the latest-run file above, preventing same-day overcounting.
+    if not history.exists():
+        history = rdir / 'GTA_RADAR_V5_INVESTIGATIONS.csv'
     if history.exists():
         with history.open('r', newline='', encoding='utf-8-sig') as inp:
             investigations = list(csv.DictReader(inp))
