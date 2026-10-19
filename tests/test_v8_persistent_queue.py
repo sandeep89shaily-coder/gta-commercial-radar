@@ -117,6 +117,43 @@ class DurableResearchQueueTests(unittest.TestCase):
             self.assertTrue(deepseek.ledger_claim(db,FIXED.isoformat(),'M8:p2',
                                                   deepseek.MODEL_RESERVE))
 
+    def test_old_completed_calls_do_not_exhaust_today_at_reserved_rate(self):
+        # Before this repair, 110 inexpensive completed calls used up a full
+        # day because the software summed reserved dollars instead of actual.
+        with closing(deepseek.v5._ledger(self.folder/'v5_ai_budget.sqlite')) as db:
+            for i in range(110):
+                db.execute('INSERT INTO spends VALUES(?,?,?,?,?)',
+                           (FIXED.isoformat(), 'old-' + str(i), 0.008,
+                            0.00035, 'DONE'))
+            db.commit()
+            effective,completed,unknown,nominal=deepseek.effective_spend(db,FIXED.isoformat())
+            self.assertAlmostEqual(completed, 0.0385)
+            self.assertAlmostEqual(effective, 0.0385)
+            self.assertAlmostEqual(unknown,0)
+            self.assertAlmostEqual(nominal,0.88)
+        export(self.source, [make_row(n) for n in range(10)])
+        result=self.run_ai(FIXED)
+        self.assertEqual(result['ai_calls_succeeded'],10)
+        self.assertEqual(result['queue_initial_uninvestigated'],0)
+        self.assertLess(result['reserved_usd'],0.10)
+        self.assertGreater(result['nominal_reservations_usd'],0.88)
+
+    def test_unknown_costs_still_hold_reservations_until_reconciled(self):
+        with closing(deepseek.v5._ledger(self.folder/'v5_ai_budget.sqlite')) as db:
+            db.execute('INSERT INTO spends VALUES(?,?,?,?,?)',
+                       (FIXED.isoformat(),'unknown-response',0.75,None,'ERROR'))
+            db.execute('INSERT INTO spends VALUES(?,?,?,?,?)',
+                       (FIXED.isoformat(),'done-with-no-usage',0.20,None,'DONE'))
+            db.execute('INSERT INTO spends VALUES(?,?,?,?,?)',
+                       (FIXED.isoformat(),'known-success',0.008,0.001,'DONE'))
+            db.commit()
+            effective,completed,unknown,nominal=deepseek.effective_spend(db,FIXED.isoformat())
+            self.assertAlmostEqual(effective,0.951)
+            self.assertAlmostEqual(completed,0.001)
+            self.assertAlmostEqual(unknown,0.95)
+            self.assertFalse(deepseek.ledger_claim(db,FIXED.isoformat(),'too-large',0.05))
+            self.assertTrue(deepseek.ledger_claim(db,FIXED.isoformat(),'small',0.01))
+
     def test_utc_evening_timestamp_uses_local_calendar_day(self):
         previous = {'researched_at': '2026-10-19T01:30:00+00:00'}
         eastern = dt.timezone(dt.timedelta(hours=-4))
