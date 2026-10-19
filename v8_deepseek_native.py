@@ -52,11 +52,30 @@ def request(path, payload, key, transport=None):
         return json.load(response)
 
 
+def effective_spend(db,day):
+    """Count provider-usage estimates for successful calls, full reservations for
+    unresolved/failed requests. Missing provider usage never counts as zero.
+    """
+    sql = """SELECT
+              COALESCE(SUM(CASE WHEN status='DONE' AND actual IS NOT NULL
+                           AND actual>=0 THEN actual ELSE reserved END),0),
+              COALESCE(SUM(CASE WHEN status='DONE' AND actual IS NOT NULL
+                           AND actual>=0 THEN actual ELSE 0 END),0),
+              COALESCE(SUM(CASE WHEN status='DONE' AND actual IS NOT NULL
+                           AND actual>=0 THEN 0 ELSE reserved END),0),
+              COALESCE(SUM(reserved),0)
+             FROM spends WHERE day=?"""
+    budget_used, completed_estimate, uncertain_holds, nominal_reservations = (
+        db.execute(sql,(day,)).fetchone())
+    return (float(budget_used),float(completed_estimate),
+            float(uncertain_holds),float(nominal_reservations))
+
+
 def ledger_claim(db,day,name,reserve,legacy=0):
     db.execute('BEGIN IMMEDIATE')
     try:
         prior=db.execute('SELECT 1 FROM spends WHERE day=? AND candidate=?',(day,name)).fetchone()
-        used=float(db.execute('SELECT COALESCE(SUM(reserved),0) FROM spends WHERE day=?',(day,)).fetchone()[0] or 0)
+        used=effective_spend(db,day)[0]
         if prior or used+legacy+reserve>DAILY_LIMIT+1e-9:
             db.rollback();return False
         db.execute('INSERT INTO spends(day,candidate,reserved,actual,status) VALUES(?,?,?,?,?)',
@@ -192,6 +211,27 @@ def fetch_native(row, key, db, day, legacy, transport=None):
     return evidence,calls
 
 
+def model_usage_cost(usage, when=None):
+    """USD cost estimate from provider-reported token counts and published
+    Flash peak/off-peak prices. A missing or inconsistent usage breakdown is
+    charged at the non-cache rate; missing usage stays uncertain, not zero.
+    Chinese holidays are conservatively treated as normal weekdays.
+    """
+    try:
+        inp=int(usage.get('prompt_tokens',0))
+        out=int(usage.get('completion_tokens',0))
+        if inp<=0 or out<=0:return None
+        hit=int(usage.get('prompt_cache_hit_tokens',0))
+        miss=int(usage.get('prompt_cache_miss_tokens',inp-hit))
+        if hit<0 or miss<0 or hit+miss!=inp:hit,miss=0,inp
+    except (TypeError,ValueError,AttributeError):
+        return None
+    instant=(when or dt.datetime.now(dt.timezone.utc)).astimezone(dt.timezone.utc)
+    peak=instant.weekday()<5 and (1<=instant.hour<4 or 6<=instant.hour<10)
+    hit_price,miss_price,output_price=(.006,.30,1.20) if peak else (.003,.15,.60)
+    return (hit*hit_price+miss*miss_price+out*output_price)/1_000_000
+
+
 def analyze(row,evidence,key,transport=None):
     facts={k:str(row.get(k) or '')[:200] for k in
            ('address','city','source_id','source_keys','company_name','description',
@@ -241,8 +281,7 @@ def analyze(row,evidence,key,transport=None):
     out['source_urls']=' | '.join(approved)
     out['evidence_level']='FETCHED_PAGE_MATCHED' if approved else 'SOURCE_RECORD_ONLY'
     use=answer.get('usage',{})
-    input_tokens=int(use.get('prompt_tokens',0));output_tokens=int(use.get('completion_tokens',0))
-    actual=(input_tokens*.30+output_tokens*1.20)/1e6 if input_tokens and output_tokens else None
+    actual=model_usage_cost(use)
     return out,actual
 
 
@@ -288,7 +327,7 @@ def run(projects_file,results_dir,legacy_data_dir=None,*,key=None,transport=None
                 reason='RUNTIME_WINDOW';break
             if not key:
                 reason='NO_DEEPSEEK_KEY';break
-            spent=float(db.execute('SELECT COALESCE(SUM(reserved),0) FROM spends WHERE day=?',(day,)).fetchone()[0] or 0)
+            spent=effective_spend(db,day)[0]
             if spent+legacy+job_ceiling>DAILY_LIMIT+1e-9:
                 reason='DAILY_USD_LIMIT';break
             cid=row['project_id']
@@ -349,7 +388,7 @@ def run(projects_file,results_dir,legacy_data_dir=None,*,key=None,transport=None
             # Never display an older run as the current run.
             v5.write_rows(out/'GTA_RADAR_V6_LATEST_INVESTIGATIONS.csv',[],columns=FIELDS)
         queue.save(queue_path,enrolled)
-        spent=float(db.execute('SELECT COALESCE(SUM(reserved),0) FROM spends WHERE day=?',(day,)).fetchone()[0] or 0)
+        spent,confirmed_estimate,uncertain_holds,nominal_reservations=effective_spend(db,day)
         outstanding=queue.due(enrolled,previous,now)
         initial_pending=sum(previous.get(row['project_id'],{}).get('status')
                             not in ('AI_EVIDENCE_REVIEW','AI_SOURCE_RECORD_REVIEW')
@@ -359,6 +398,9 @@ def run(projects_file,results_dir,legacy_data_dir=None,*,key=None,transport=None
         contacts=sum(r.get('lead_maturity')=='PUBLIC_OPERATOR_CONTACT_IDENTIFIED' for r in current)
         return dict(processed=len(current),current_invocations=len(current),deepseek_configured=bool(key),
                     reserved_usd=round(spent+legacy,5),
+                    charged_estimate_usd=round(confirmed_estimate,5),
+                    unresolved_reservations_usd=round(uncertain_holds+legacy,5),
+                    nominal_reservations_usd=round(nominal_reservations+legacy,5),
                     no_corroboration=len(current)-counts['with_public_pages'],
                     publicly_contactable=contacts,source_backed_projects=sourced,
                     queue_total=len(enrolled),queue_due=len(outstanding),
