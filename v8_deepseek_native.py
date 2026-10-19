@@ -170,7 +170,7 @@ def fetch_native(row, key, db, day, legacy, transport=None):
             if append(url,content,'SEARCH_PAGE_CONTENT'):
                 continue
             snippet=' '.join(str(entry.get(k) or '') for k in ('title','snippet','summary'))
-            if matches(row,snippet):
+            if matches(row,snippet) or not snippet.strip():
                 score=float(entry.get('rerank_score') or 0)+float(entry.get('authority') or 0)/4
                 possibilities[url]=max(possibilities.get(url,0),score)
     # Fetch the most project-relevant results; never spend on random search hits.
