@@ -60,8 +60,12 @@ def grade(row, answer, evidence):
         stage='SOURCE_RECORD_OBSERVED'
         action='Automated official-source discovery remains pending.'
     elif operator_sourced and contact_sourced and service:
-        stage='PUBLIC_COMPANY_CHANNEL_IDENTIFIED'
-        action='Public business contact channel found; operator involvement and upcoming procurement remain unconfirmed.'
+        if answer.get('contact_source_url'):
+            stage='PUBLIC_COMPANY_CHANNEL_IDENTIFIED'
+            action='Public business contact channel found; operator involvement and purchasing remain unconfirmed.'
+        else:
+            stage='PUBLIC_OPERATOR_CONTACT_IDENTIFIED'
+            action='Company and public contact are on a project-linked page; confirm timing and buying need.'
     elif operator_sourced:
         stage='PROJECT_AND_OPERATOR_IDENTIFIED'
         action='Continue automated contact and service relevance discovery.'
