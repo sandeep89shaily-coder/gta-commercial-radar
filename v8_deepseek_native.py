@@ -315,8 +315,8 @@ def find_public_business_contact(row, operator, key, db, day, legacy, transport=
         body=str(result.get('content') or '')[:9000]
         if not body or name.casefold() not in body.casefold():continue
         # Prefer business role addresses; don't harvest personal mailbox IDs.
-        email=re.search(r'\\b(?:info|contact|office|sales|admin|enquiries|inquiries)@[a-z0-9.-]+\\.[a-z]{2,}\\b',body,re.I)
-        phone=re.search(r'(?<!\\d)(?:\\+1[. -]?)?\\(?[2-9]\\d{2}\\)?[. -]?[2-9]\\d{2}[. -]?\\d{4}(?!\\d)',body)
+        email=re.search(r'\b(?:info|contact|office|sales|admin|enquiries|inquiries)@[a-z0-9.-]+\.[a-z]{2,}\b',body,re.I)
+        phone=re.search(r'(?<!\d)(?:\+1[. -]?)?\(?[2-9]\d{2}\)?[. -]?[2-9]\d{2}[. -]?\d{4}(?!\d)',body)
         contact=(email.group(0) if email else (phone.group(0) if phone else ''))
         if not contact:continue
         return {'contact':contact,'contact_source_url':url,
