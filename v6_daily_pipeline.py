@@ -347,7 +347,7 @@ def render_dashboard(results, state):
             f'<b>Source-record-only analyses (unverified):</b> {esc(state.get("source_only_ai_calls",0))}; '
             f'<b>Budget-deferred projects:</b> {esc(state.get("ai_budget_deferred",0))}; '
             f'<b>Without corroborated evidence:</b> {esc(state.get("no_corroboration",0))}. '
-            f'<b>DeepSeek budget reserved today:</b> US${esc(state.get("reserved_usd",0))} / $0.50 (local safeguard, not provider cap).</p>']
+            f'<b>DeepSeek budget reserved today:</b> US${esc(state.get("reserved_usd",0))} / $1.00 (local safeguard, not provider cap).</p>']
     if status != 'SUCCESS':
         page.append('<article><h2>Collection attention needed</h2><p>Not all collection steps succeeded. '
                     'Do not interpret this as a complete or fully fresh GTA picture.</p></article>')

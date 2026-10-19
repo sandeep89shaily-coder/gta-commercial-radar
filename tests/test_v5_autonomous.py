@@ -28,7 +28,7 @@ class V5EvidenceTests(unittest.TestCase):
                       post=mocked_ai,today=dt.date(2026,10,17))
             first=v.run(d,**args)
             self.assertEqual(len(calls),1)
-            self.assertLessEqual(first['reserved_usd'],0.50)
+            self.assertLessEqual(first['reserved_usd'],1.00)
             candidate=v.read_rows(d/'GTA_RADAR_V5_INVESTIGATIONS.csv')[0]
             self.assertEqual(candidate['developer'],'Real Builders Inc')
             self.assertEqual(candidate['operator'],'')
@@ -47,12 +47,12 @@ class V5EvidenceTests(unittest.TestCase):
             d=Path(name);self.seed(d)
             with closing(sqlite3.connect(d/'deepseek_budget.sqlite')) as db:
                 db.execute('CREATE TABLE spends (date TEXT,reserved REAL)')
-                db.execute('INSERT INTO spends VALUES (?,?)',('2026-10-17',0.49))
+                db.execute('INSERT INTO spends VALUES (?,?)',('2026-10-17',0.99))
                 db.commit()
             result=v.run(d,key='placeholder',today=dt.date(2026,10,17),
                 search=lambda q:['https://example.org/permit'],fetch=lambda u:'622 Fogal Rd',
                 post=lambda x:self.fail('AI called'))
-            self.assertLessEqual(result['reserved_usd'],0.50)
+            self.assertLessEqual(result['reserved_usd'],1.00)
             self.assertEqual(v.read_rows(d/'GTA_RADAR_V5_INVESTIGATIONS.csv')[0]['status'],'DAILY_BUDGET_OR_ALREADY_USED')
     def test_refused_application_not_selected(self):
         r=self.row();closed=dict(r,project_id='closed',current_source_status='Refused')

@@ -15,7 +15,7 @@ This release connects the **existing** municipal and business collectors to the 
 
 ## Cost and safety
 
-- Retains the existing V5 local DeepSeek budget ledger and checks earlier DeepSeek reservations in the existing collection data directory. Local reservation limit: **US$0.50/day**. This is **not** a provider-enforced billing cap; other external clients can spend separately.
+- Retains the existing V5 local DeepSeek budget ledger and checks earlier DeepSeek reservations in the existing collection data directory. Local reservation limit: **US$1.00/day**. This is **not** a provider-enforced billing cap; other external clients can spend separately.
 - `DEEPSEEK_API_KEY` is read from the existing Windows DPAPI credential (or environment variable); no secrets in source files or reports. If no key, research proceeds without paid AI.
 - The coordinator never deletes or replaces original collector DBs. **Successful polling updates the original databases** as intended; do not interpret it as a read-only process. A V6 lock prevents concurrent V6 writers.
 - Existing V4 and V5 results remain in `GTA_RADAR_RESULTS`. An investigation is **REVIEW ONLY**, not a promise that a company is buying, that a permit is issued, or that contact information is cleared for outreach.

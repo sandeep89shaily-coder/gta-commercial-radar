@@ -27,7 +27,7 @@ def main():
         print('Automatic scheduling was blocked by Windows:',(r.stderr or r.stdout).strip())
         print('Your current installation remains untouched.');return 1
     print('Daily run installed at 6:00 AM local PC time (while your PC is on).')
-    print('Daily DeepSeek limit: USD $0.50 maximum reserved; 50 leads maximum.')
+    print('Daily DeepSeek limit: USD $1.00 maximum reserved; 50 leads maximum.')
     print('The first setup START_RADAR.bat must have completed before daily jobs can run.')
     return 0
 if __name__=='__main__':raise SystemExit(main())

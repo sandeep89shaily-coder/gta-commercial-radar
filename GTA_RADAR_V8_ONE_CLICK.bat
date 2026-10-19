@@ -22,7 +22,7 @@ if errorlevel 1 (
  exit /b 1
 )
 echo Running collection, native DeepSeek discovery, and Flash analysis...
-echo The same US$0.50/day software allowance includes earlier Radar DeepSeek usage.
+echo The same US$1.00/day software allowance includes earlier Radar DeepSeek usage.
 %PY% -u "%LOCALAPPDATA%\GTACommercialRadar\V8\v6_daily_pipeline.py"
 set "RESULT=%ERRORLEVEL%"
 if not "%RESULT%"=="0" echo Please send a screenshot of this window if an error occurred.
