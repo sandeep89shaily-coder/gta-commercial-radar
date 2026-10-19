@@ -289,7 +289,7 @@ def investigate(data_dir, results_dir, max_projects=MAX_INVESTIGATIONS, *, enabl
 
     No paid search plans. Source-only model output is explicitly unverified.
     """
-    import v7_deepseek_research as researcher
+    import v8_deepseek_native as researcher
     results = Path(results_dir)
     return researcher.run(results / 'CANDIDATES_V4_ALL_REVIEW_ONLY.csv',
                           results, legacy_data_dir=data_dir,
@@ -329,7 +329,9 @@ def render_dashboard(results, state):
             f'<p><b>Window:</b> most recent 48 hours by source event/change date. <b>Projects this run:</b> {esc(state.get("projects",0))}. '
             f'<b>Projects investigated:</b> {esc(state.get("investigated",0))}. '
             f'<b>Projects with corroborated pages:</b> {esc(state.get("with_public_pages",0))}. '
-            f'<b>Substantive DeepSeek calls attempted:</b> {esc(state.get("ai_calls_attempted",0))}; '
+            f'<b>Native DeepSeek Search requests:</b> {esc(state.get("native_searches",0))}; '
+            f'<b>Native DeepSeek Fetch requests:</b> {esc(state.get("native_fetches",0))}; '
+            f'<b>Flash analyses attempted:</b> {esc(state.get("ai_calls_attempted",0))}; '
             f'<b>DeepSeek analyses completed:</b> {esc(state.get("ai_calls_succeeded",0))}; '
             f'<b>Source-record-only analyses (unverified):</b> {esc(state.get("source_only_ai_calls",0))}; '
             f'<b>Budget-deferred projects:</b> {esc(state.get("ai_budget_deferred",0))}; '
@@ -442,6 +444,8 @@ def pipeline(workspace, database=None, *, run_collectors=True, run_research=True
             state['with_public_pages'] = outcome['with_public_pages']
             state['reserved_usd'] = outcome['reserved_usd']
             state['ai_configured'] = outcome['deepseek_configured']
+            state['native_searches']=outcome.get('native_searches',0)
+            state['native_fetches']=outcome.get('native_fetches',0)
             state['ai_plans_attempted']=outcome.get('ai_plans_attempted',0)
             state['ai_plans_completed']=outcome.get('ai_plans_completed',0)
             state['ai_plans_failed']=outcome.get('ai_plans_failed',0)
