@@ -45,14 +45,15 @@ def build(root):
         pid=item.get('project_id')
         source=candidates.get(pid,{})
         merged={**source,**{k:v for k,v in item.items() if v}}
-        if research_route(merged)=='ENRICHMENT_ONLY':
-            continue
-        # The new strict project-matcher is a new provenance rule. Old V8 rows
-        # lack this field and require revalidation, not automatic qualification.
+        # Old V8 source-only/false-positive page matches do not carry the
+        # strict project-evidence field. Preserve as recheck work, even when
+        # their description is absent from the rolling 48h export.
         verified=item.get('project_evidence_verified')=='YES'
         if not verified:
             if item.get('status')=='AI_EVIDENCE_REVIEW':
                 legacy.append(merged)
+            continue
+        if research_route(merged)=='ENRICHMENT_ONLY':
             continue
         if not item.get('source_urls'):
             continue
