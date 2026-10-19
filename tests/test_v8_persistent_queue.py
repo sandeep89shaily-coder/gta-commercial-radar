@@ -102,6 +102,20 @@ class DurableResearchQueueTests(unittest.TestCase):
         self.assertEqual(state['ai_calls_attempted'], 0)
         self.assertEqual(deepseek.read_csv(self.folder/'GTA_RADAR_V6_LATEST_INVESTIGATIONS.csv'),[])
 
+    def test_confirmed_usage_releases_only_excess_reservation(self):
+        with deepseek.v5._ledger(self.folder/'v5_ai_budget.sqlite') as db:
+            self.assertTrue(deepseek.ledger_claim(db,FIXED.isoformat(),'M8:p1',
+                                                  deepseek.MODEL_RESERVE))
+            deepseek.ledger_finish(db,FIXED.isoformat(),'M8:p1','DONE',0.0002)
+            spent,actual=db.execute(
+                "SELECT reserved,actual FROM spends WHERE candidate='M8:p1'"
+            ).fetchone()
+            self.assertAlmostEqual(actual,0.0002)
+            self.assertAlmostEqual(spent,0.0006)
+            self.assertGreater(spent,0)
+            self.assertTrue(deepseek.ledger_claim(db,FIXED.isoformat(),'M8:p2',
+                                                  deepseek.MODEL_RESERVE))
+
     def test_utc_evening_timestamp_uses_local_calendar_day(self):
         previous = {'researched_at': '2026-10-19T01:30:00+00:00'}
         eastern = dt.timezone(dt.timedelta(hours=-4))
