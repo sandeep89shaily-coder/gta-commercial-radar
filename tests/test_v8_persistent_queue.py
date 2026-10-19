@@ -219,9 +219,19 @@ class DurableResearchQueueTests(unittest.TestCase):
         self.assertEqual(queue.due(waiting, {'project-2':old},FIXED+dt.timedelta(days=1)),[])
         self.assertEqual(len(queue.due(waiting, {'project-2':old},FIXED+dt.timedelta(days=14))),1)
 
+    def test_legacy_project_evidence_requeued_for_automatic_strict_recheck(self):
+        row=make_row(9)
+        old={'status':'AI_EVIDENCE_REVIEW',
+             'input_fingerprint':queue.fingerprint(row),
+             'source_urls':'https://unrelated-directory.example/9'}
+        pending=queue.build([row],[],{'project-9':old},FIXED)
+        self.assertEqual(len(pending),1)
+        self.assertEqual(queue.due(pending,{'project-9':old},FIXED)[0]['project_id'],'project-9')
+
     def test_identical_evidence_backed_projects_are_not_paid_for_again(self):
         row = make_row(5)
-        old = {'status':'AI_EVIDENCE_REVIEW','input_fingerprint':queue.fingerprint(row)}
+        old = {'status':'AI_EVIDENCE_REVIEW','input_fingerprint':queue.fingerprint(row),
+               'project_evidence_verified':'YES'}
         self.assertEqual(queue.build([row],[],{'project-5':old},FIXED),[])
         newer = dict(row, description='New issuance recorded for commercial works')
         self.assertEqual(len(queue.build([newer],[],{'project-5':old},FIXED)),1)
