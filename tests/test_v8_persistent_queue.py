@@ -154,6 +154,23 @@ class DurableResearchQueueTests(unittest.TestCase):
             self.assertFalse(deepseek.ledger_claim(db,FIXED.isoformat(),'too-large',0.05))
             self.assertTrue(deepseek.ledger_claim(db,FIXED.isoformat(),'small',0.01))
 
+    def test_published_cache_and_off_peak_flash_rates(self):
+        usage={'prompt_tokens':1000,'prompt_cache_hit_tokens':800,
+               'prompt_cache_miss_tokens':200,'completion_tokens':500}
+        off=dt.datetime(2026,10,19,13,0,tzinfo=dt.timezone.utc)
+        peak=dt.datetime(2026,10,19,8,0,tzinfo=dt.timezone.utc)
+        self.assertAlmostEqual(deepseek.model_usage_cost(usage,off),
+                               (800*.003+200*.15+500*.60)/1e6)
+        self.assertAlmostEqual(deepseek.model_usage_cost(usage,peak),
+                               (800*.006+200*.30+500*1.20)/1e6)
+        self.assertIsNone(deepseek.model_usage_cost({},off))
+        partial={'prompt_tokens':1000,'completion_tokens':500}
+        self.assertAlmostEqual(deepseek.model_usage_cost(partial,off),
+                               (1000*.15+500*.60)/1e6)
+        incoherent=dict(usage,prompt_cache_hit_tokens=2000)
+        self.assertAlmostEqual(deepseek.model_usage_cost(incoherent,off),
+                               (1000*.15+500*.60)/1e6)
+
     def test_utc_evening_timestamp_uses_local_calendar_day(self):
         previous = {'researched_at': '2026-10-19T01:30:00+00:00'}
         eastern = dt.timezone(dt.timedelta(hours=-4))
