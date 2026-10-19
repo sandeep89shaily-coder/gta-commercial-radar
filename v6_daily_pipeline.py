@@ -350,7 +350,10 @@ def render_dashboard(results, state):
             f'<b>Ready for the next run:</b> {esc(state.get("queue_due",0))}; '
             f'<b>Current AI stop reason:</b> {esc(state.get("queue_stop_reason","NOT_RUN"))}; '
             f'<b>Without corroborated evidence:</b> {esc(state.get("no_corroboration",0))}. '
-            f'<b>DeepSeek budget reserved today:</b> US${esc(state.get("reserved_usd",0))} / $1.00 (local safeguard, not provider cap).</p>']
+            f'<b>DeepSeek daily budget used (completed-token estimates + unknown holds):</b> US${esc(state.get("reserved_usd",0))} / $1.00. '
+            f'<b>Completed API-call cost estimate:</b> US${esc(state.get("charged_estimate_usd",0))}; '
+            f'<b>Uncertain charges still reserved:</b> US${esc(state.get("unresolved_reservations_usd",0))}. '
+            f'These are local estimates, not DeepSeek account billing.</p>']
     if status != 'SUCCESS':
         page.append('<article><h2>Collection attention needed</h2><p>Not all collection steps succeeded. '
                     'Do not interpret this as a complete or fully fresh GTA picture.</p></article>')
@@ -472,6 +475,8 @@ def pipeline(workspace, database=None, *, run_collectors=True, run_research=True
             state['source_backed_projects']=outcome.get('source_backed_projects',0)
             state['publicly_contactable']=outcome.get('publicly_contactable',0)
             state['reserved_usd'] = outcome['reserved_usd']
+            state['charged_estimate_usd'] = outcome.get('charged_estimate_usd',0)
+            state['unresolved_reservations_usd'] = outcome.get('unresolved_reservations_usd',0)
             state['ai_configured'] = outcome['deepseek_configured']
             state['native_searches']=outcome.get('native_searches',0)
             state['native_fetches']=outcome.get('native_fetches',0)
