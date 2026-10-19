@@ -211,6 +211,27 @@ def fetch_native(row, key, db, day, legacy, transport=None):
     return evidence,calls
 
 
+def model_usage_cost(usage, when=None):
+    """USD cost estimate from provider-reported token counts and published
+    Flash peak/off-peak prices. A missing or inconsistent usage breakdown is
+    charged at the non-cache rate; missing usage stays uncertain, not zero.
+    Chinese holidays are conservatively treated as normal weekdays.
+    """
+    try:
+        inp=int(usage.get('prompt_tokens',0))
+        out=int(usage.get('completion_tokens',0))
+        if inp<=0 or out<=0:return None
+        hit=int(usage.get('prompt_cache_hit_tokens',0))
+        miss=int(usage.get('prompt_cache_miss_tokens',inp-hit))
+        if hit<0 or miss<0 or hit+miss!=inp:hit,miss=0,inp
+    except (TypeError,ValueError,AttributeError):
+        return None
+    instant=(when or dt.datetime.now(dt.timezone.utc)).astimezone(dt.timezone.utc)
+    peak=instant.weekday()<5 and (1<=instant.hour<4 or 6<=instant.hour<10)
+    hit_price,miss_price,output_price=(.006,.30,1.20) if peak else (.003,.15,.60)
+    return (hit*hit_price+miss*miss_price+out*output_price)/1_000_000
+
+
 def analyze(row,evidence,key,transport=None):
     facts={k:str(row.get(k) or '')[:200] for k in
            ('address','city','source_id','source_keys','company_name','description',
@@ -260,8 +281,7 @@ def analyze(row,evidence,key,transport=None):
     out['source_urls']=' | '.join(approved)
     out['evidence_level']='FETCHED_PAGE_MATCHED' if approved else 'SOURCE_RECORD_ONLY'
     use=answer.get('usage',{})
-    input_tokens=int(use.get('prompt_tokens',0));output_tokens=int(use.get('completion_tokens',0))
-    actual=(input_tokens*.30+output_tokens*1.20)/1e6 if input_tokens and output_tokens else None
+    actual=model_usage_cost(use)
     return out,actual
 
 
