@@ -33,7 +33,7 @@ FAKE_V5._legacy_reserved=lambda path,day:0.0
 FAKE_V6=types.ModuleType('v6_daily_pipeline')
 FAKE_V6.discover_improved=lambda *a,**kw:([],2)
 with patch.dict(sys.modules,{'v5_investigator':FAKE_V5,'v6_daily_pipeline':FAKE_V6}):
-    spec=importlib.util.spec_from_file_location('_test_v7_module',Path(__file__).with_name('v7_deepseek_research.py'))
+    spec=importlib.util.spec_from_file_location('_test_v7_module',(Path(__file__).resolve().parent.parent / 'v7_deepseek_research.py'))
     mod=importlib.util.module_from_spec(spec);sys.modules[spec.name]=mod;spec.loader.exec_module(mod)
 
 class V7Tests(unittest.TestCase):
