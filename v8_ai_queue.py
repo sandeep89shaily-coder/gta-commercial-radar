@@ -12,12 +12,13 @@ import hashlib
 import json
 import re
 from pathlib import Path
+from commercial_research_policy import research_route, canonical_lane
 
 META = ('_queued_on', '_fingerprint')
 FINISHED = {'AI_EVIDENCE_REVIEW', 'AI_SOURCE_RECORD_REVIEW'}
 CLOSED = re.compile(r'\b(closed|refused|withdrawn|cancelled|canceled|rejected|denied|inactive)\b', re.I)
 LANES = {'PERMIT_REVIEW':0, 'BUSINESS_REVIEW':1, 'PLANNING_WATCH':2,
-         'OTHER_WATCH':3, 'SOURCE_UPDATE_WATCH':4}
+         'ENVIRONMENT_WATCH':3, 'OTHER_WATCH':4, 'SOURCE_UPDATE_WATCH':5}
 SIGNATURE_FIELDS = ('project_id', 'source_id', 'source_keys', 'address',
                     'company_name', 'description', 'current_source_status',
                     'record_source_url', 'permit_types')
@@ -78,22 +79,27 @@ def days_since(date, now):
 
 def build(current_rows, queued_rows, history, today):
     """Join fresh candidates to retained backlog; never lose aged-out records."""
-    combined = {r['project_id']: dict(r) for r in queued_rows if r.get('project_id')}
+    combined = {r['project_id']: dict(r) for r in queued_rows
+                if r.get('project_id') and research_route(r)!='ENRICHMENT_ONLY'}
     for r in current_rows:
         ident = r.get('project_id')
-        if not ident or CLOSED.search(str(r.get('current_source_status') or '')):
+        if (not ident or research_route(r)=='ENRICHMENT_ONLY'
+                or CLOSED.search(str(r.get('current_source_status') or ''))):
             continue
         old = combined.get(ident, {})
         added = dict(old)
         added.update(r)
         added['_queued_on'] = old.get('_queued_on') or today.isoformat()
+        added['lane'] = canonical_lane(added)
         added['_fingerprint'] = fingerprint(added)
         combined[ident] = added
 
     pending = []
     for ident, row in combined.items():
-        if CLOSED.search(str(row.get('current_source_status') or '')):
+        if (research_route(row)=='ENRICHMENT_ONLY'
+                or CLOSED.search(str(row.get('current_source_status') or ''))):
             continue
+        row['lane']=canonical_lane(row)
         old = history.get(ident, {})
         same_source = not old.get('input_fingerprint') or old.get('input_fingerprint') == fingerprint(row)
         if old.get('status') == 'AI_EVIDENCE_REVIEW' and same_source:
@@ -105,6 +111,8 @@ def build(current_rows, queued_rows, history, today):
 def due(pending, history, today):
     ready = []
     for row in pending:
+        if research_route(row)=='ENRICHMENT_ONLY':
+            continue
         old = history.get(row['project_id'], {})
         same_source = not old.get('input_fingerprint') or old.get('input_fingerprint') == fingerprint(row)
         age = days_since(local_attempt_date(old), today)
@@ -121,14 +129,15 @@ def due(pending, history, today):
             age = max(0, (today - dt.date.fromisoformat(queued[:10])).days)
         except ValueError:
             age = 0
-        base = LANES.get(row.get('lane'), 5) * 7
-        # Old backlog gains priority, so ongoing new permits cannot starve it.
-        effective = max(0, base - min(35, age // 2))
+        # Lane remains the primary sort key. Old health-inspection or source
+        # updates must NEVER outrank active commercial permits by aging.
+        base = LANES.get(canonical_lane(row), 6)
+        effective = base
         prior = history.get(row.get('project_id'), {})
         followup = prior.get('status') == 'AI_SOURCE_RECORD_REVIEW'
         try:
             score = int(row.get('review_priority') or 0)
         except ValueError:
             score = 0
-        return (followup, effective, -score, queued, row.get('project_id', ''))
+        return (effective, followup, -min(365, age), -score, queued, row.get('project_id', ''))
     return sorted(ready, key=rank)
