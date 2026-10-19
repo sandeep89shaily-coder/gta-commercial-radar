@@ -128,7 +128,7 @@ class DurableResearchQueueTests(unittest.TestCase):
         second=deepseek.run(self.source,self.folder,key='test-only',transport=tracked_api,
                            max_projects=0,today=FIXED)
         self.assertEqual(second['queue_stop_reason'],'QUEUE_DRAINED')
-        self.assertEqual(second['duplicate_model_skipped'],3)
+        self.assertEqual(second['duplicate_model_skipped'],1)  # other two entered evidence-recheck cooldown
         self.assertEqual(second['ai_calls_attempted'],0)
         self.assertEqual(paths,[])
 
