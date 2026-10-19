@@ -76,10 +76,10 @@ def ledger_finish(db,day,name,status,actual=None):
         # reservation while retaining up to 3x reported usage as a cushion.
         # Errors/unknown charges keep their full original reservation.
         db.execute('''UPDATE spends
-                      SET reserved=MAX(actual,MIN(reserved,actual*3)),
+                      SET reserved=MAX(?,MIN(reserved,?)),
                           actual=?,status=?
                       WHERE day=? AND candidate=?''',
-                   (actual,status,day,name))
+                   (actual,actual*3,actual,status,day,name))
     else:
         db.execute('UPDATE spends SET actual=?,status=? WHERE day=? AND candidate=?',
                    (actual,status,day,name))
