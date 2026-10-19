@@ -44,6 +44,9 @@ def grade(row, answer, evidence):
     operator=str(answer.get('operator') or '').strip()
     contact=str(answer.get('contact') or '').strip()
     service=str(answer.get('buyer_fit') or '').strip()
+    page_text=' '.join(str(e.get('text') or '') for e in (evidence or [])).casefold()
+    operator_sourced=bool(operator and operator.casefold() in page_text)
+    contact_sourced=bool(contact and contact.casefold() in page_text)
     closed=bool(re.search(r'\b(closed|refused|withdrawn|cancelled|denied)\b',
                           str(row.get('current_source_status') or ''),re.I))
     if closed:
@@ -52,10 +55,10 @@ def grade(row, answer, evidence):
     elif tier=='COLLECTOR_RECORD_ONLY':
         stage='SOURCE_RECORD_OBSERVED'
         action='Automated official-source discovery remains pending.'
-    elif operator and contact and service:
+    elif operator_sourced and contact_sourced and service:
         stage='PUBLIC_OPERATOR_CONTACT_IDENTIFIED'
         action='Business contact and project are sourced; automatically check project timing and service relevance.'
-    elif operator:
+    elif operator_sourced:
         stage='PROJECT_AND_OPERATOR_IDENTIFIED'
         action='Continue automated contact and service relevance discovery.'
     else:
