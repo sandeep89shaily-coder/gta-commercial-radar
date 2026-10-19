@@ -21,6 +21,7 @@ import traceback
 import webbrowser
 from pathlib import Path
 from urllib.parse import quote_plus, urlparse
+from radar_run_lock import once_lock
 
 VERSION = '6.0'
 ROOT = Path(__file__).resolve().parent
@@ -117,25 +118,6 @@ def run_step(name, args, log_dir, timeout=1200, cwd=ROOT, env=None):
     return {'step': name, 'status': status, 'exit_code': code, 'detail': detail,
             'started_utc': started, 'finished_utc': dt.datetime.now(dt.timezone.utc).isoformat(timespec='seconds'),
             'log': str(file)}
-
-
-def once_lock(results, stale_hours=16):
-    """Protect scheduled runs from concurrent database writers (no stale-lock deletion)."""
-    path = Path(results) / 'V6_RUNNING.lock'
-    if path.exists():
-        try:
-            age_hours = (dt.datetime.now().timestamp() - path.stat().st_mtime) / 3600
-            if age_hours > stale_hours:
-                path.unlink(missing_ok=True)  # Timed stages cannot run for 16 hours.
-        except OSError:
-            pass
-    try:
-        descriptor = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
-    except FileExistsError:
-        raise RuntimeError('A V6 run may already be active. Only one run can use this database at a time.')
-    with os.fdopen(descriptor, 'w') as f:
-        f.write(str(os.getpid()) + '\n' + dt.datetime.now(dt.timezone.utc).isoformat())
-    return path
 
 
 def atomic_json(path, obj):
