@@ -83,8 +83,11 @@ class V7Tests(unittest.TestCase):
         twice=mod.run(self.projects,self.p,key='demo',post=self.response,max_projects=1,today=self.date)
         self.assertEqual(once['ai_calls_succeeded'],1)
         self.assertEqual(twice['ai_calls_succeeded'],1) # moves to second previously unprocessed project
-        with ledger(self.p/'v5_ai_budget.sqlite') as db:
+        db=ledger(self.p/'v5_ai_budget.sqlite')
+        try:
             self.assertEqual(db.execute('SELECT COUNT(*) FROM spends').fetchone()[0],2)
+        finally:
+            db.close()
         third=mod.run(self.projects,self.p,key='demo',post=lambda *_:self.fail('duplicate call'),max_projects=1,today=self.date)
         self.assertEqual(third['ai_calls_attempted'],0)
     def test_no_key_zero_api_calls(self):
@@ -92,8 +95,12 @@ class V7Tests(unittest.TestCase):
         self.assertEqual(state['ai_calls_attempted'],0)
         self.assertEqual(state['no_key_count'],2)
     def test_shared_budget_blocks_call_even_without_web(self):
-        with ledger(self.p/'v5_ai_budget.sqlite') as db:
+        db=ledger(self.p/'v5_ai_budget.sqlite')
+        try:
             db.execute('INSERT INTO spends VALUES (?,?,?,?,?)',(self.date.isoformat(),'OLD_V6_PLAN',.49,.05,'DONE'))
+            db.commit()
+        finally:
+            db.close()
         state=mod.run(self.projects,self.p,key='demo',post=lambda *_:self.fail('over budget'),max_projects=2,today=self.date)
         self.assertEqual(state['ai_calls_attempted'],0)
         self.assertEqual(state['ai_budget_deferred'],2)
