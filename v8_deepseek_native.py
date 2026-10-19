@@ -18,6 +18,7 @@ from urllib.request import Request, urlopen
 
 import v5_investigator as v5
 from lead_qualification import grade
+from commercial_research_policy import project_evidence, directory_url, research_route, lead_sector
 import v8_ai_queue as queue
 
 ROOT_API='https://api.deepseek.com'
@@ -35,7 +36,9 @@ MAX_FETCHES=2
 FIELDS=v5.FIELDS+['evidence_level','next_verification','api_attempted',
                   'native_searches','native_fetches','native_model_calls','source_type',
                   'lead_maturity','evidence_tier','independent_hosts','next_system_action','sale_ready',
-                  'input_fingerprint','investigated_local_date']
+                  'input_fingerprint','investigated_local_date',
+                  'contact_source_url','contact_provenance','lead_sector',
+                  'project_evidence_verified']
 PRIORITY={'PERMIT_REVIEW':0,'BUSINESS_REVIEW':1,'PLANNING_WATCH':2,
           'OTHER_WATCH':3,'SOURCE_UPDATE_WATCH':4}
 
@@ -132,10 +135,9 @@ def queries(row):
     return [q[:128] for q in dict.fromkeys(terms) if q.strip()][:MAX_SEARCHES]
 
 
-def matches(row, content):
-    """Require exact civic address (normalizing abbreviations), source ID, or company."""
-    from v6_daily_pipeline import evidence_matches
-    return bool(content and evidence_matches(row,content))
+def matches(row, content, url=''):
+    """Require evidence of the specific project, not just a matching business."""
+    return bool(content and project_evidence(row,content,url))
 
 
 def fetch_native(row, key, db, day, legacy, transport=None):
@@ -149,7 +151,7 @@ def fetch_native(row, key, db, day, legacy, transport=None):
     possibilities={}
 
     def append(url,content,kind):
-        if safe_url(url) and content and matches(row,content) and url not in {e['url'] for e in evidence}:
+        if safe_url(url) and content and matches(row,content,url) and url not in {e['url'] for e in evidence}:
             evidence.append({'url':url,'text':content[:2300],'kind':kind})
             return True
         return False
@@ -201,7 +203,7 @@ def fetch_native(row, key, db, day, legacy, transport=None):
             if append(url,content,'SEARCH_PAGE_CONTENT'):
                 continue
             snippet=' '.join(str(entry.get(k) or '') for k in ('title','snippet','summary'))
-            if matches(row,snippet) or not snippet.strip():
+            if matches(row,snippet,url) or not snippet.strip():
                 score=float(entry.get('rerank_score') or 0)+float(entry.get('authority') or 0)/4
                 possibilities[url]=max(possibilities.get(url,0),score)
     # Fetch the most project-relevant results; never spend on random search hits.
@@ -285,6 +287,43 @@ def analyze(row,evidence,key,transport=None):
     return out,actual
 
 
+def find_public_business_contact(row, operator, key, db, day, legacy, transport=None):
+    """Search once for a publicly listed business channel, not a guessed
+    decision-maker or personal contact. Never use directories as verification.
+    Only run after project evidence tied a named operator to the record.
+    """
+    name=str(operator or '').strip()
+    if not name or name.lower() in ('unknown','none'):
+        return {},0
+    charge='C8:'+hashlib.sha256((str(row['project_id'])+':'+name).encode()).hexdigest()[:24]
+    if not ledger_claim(db,day,charge,SEARCH_COST,legacy):
+        return {},0
+    try:
+        data=request('/v1/tools/search',{'query':'"'+name[:100]+'" Ontario official website contact phone email',
+                                         'count':6,'need_content':True},key,transport)
+        entries=data.get('results') or []
+        if not isinstance(entries,list):raise ValueError('Bad business search results')
+        ledger_finish(db,day,charge,'DONE' if entries else 'NONBILLABLE',
+                      SEARCH_COST if entries else 0)
+    except Exception:
+        ledger_finish(db,day,charge,'ERROR',None)
+        return {},0
+    for result in entries[:6]:
+        if not isinstance(result,dict):continue
+        url=str(result.get('url') or '')
+        if not safe_url(url) or directory_url(url):continue
+        body=str(result.get('content') or '')[:9000]
+        if not body or name.casefold() not in body.casefold():continue
+        # Prefer business role addresses; don't harvest personal mailbox IDs.
+        email=re.search(r'\b(?:info|contact|office|sales|admin|enquiries|inquiries)@[a-z0-9.-]+\.[a-z]{2,}\b',body,re.I)
+        phone=re.search(r'(?<!\d)(?:\+1[. -]?)?\(?[2-9]\d{2}\)?[. -]?[2-9]\d{2}[. -]?\d{4}(?!\d)',body)
+        contact=(email.group(0) if email else (phone.group(0) if phone else ''))
+        if not contact:continue
+        return {'contact':contact,'contact_source_url':url,
+                'contact_provenance':'PUBLIC_MATCHING_COMPANY_PAGE'},1
+    return {},1
+
+
 def read_csv(path):
     if not Path(path).exists():return []
     with Path(path).open(encoding='utf-8-sig',newline='') as f:return list(csv.DictReader(f))
@@ -309,12 +348,21 @@ def run(projects_file,results_dir,legacy_data_dir=None,*,key=None,transport=None
     history_path=out/'GTA_RADAR_V8_INVESTIGATIONS.csv'
     queue_path=out/'GTA_RADAR_V8_PENDING_QUEUE.csv'
     previous={r['project_id']:r for r in read_csv(history_path) if r.get('project_id')}
-    enrolled=queue.build(read_csv(projects_file), queue.load(queue_path), previous, now)
+    fresh=read_csv(projects_file)
+    saved=queue.load(queue_path)
+    enrichment_path=out/'GTA_RADAR_V8_COMPANY_ENRICHMENT.csv'
+    archived={r['project_id']:r for r in queue.load(enrichment_path) if r.get('project_id')}
+    for item in saved+fresh:
+        if item.get('project_id') and research_route(item)=='ENRICHMENT_ONLY':
+            archived[item['project_id']]=dict(item)
+    queue.save(enrichment_path,list(archived.values()))
+    enrolled=queue.build(fresh, saved, previous, now)
     queue.save(queue_path,enrolled)  # Checkpoint BEFORE any external API call.
     due=queue.due(enrolled,previous,now)
     counts=dict(native_searches=0,native_fetches=0,ai_calls_attempted=0,
                 ai_calls_succeeded=0,with_public_pages=0,ai_budget_deferred=0,
-                errors=0,source_only_ai_calls=0,duplicate_model_skipped=0)
+                errors=0,source_only_ai_calls=0,duplicate_model_skipped=0,
+                company_contact_searches=0,company_contacts_discovered=0)
     current=[];start=time.monotonic();reason='QUEUE_DRAINED'
     # Reserve enough headroom for a complete discovery+Flash attempt before
     # beginning another project. Never strand 25 entries as 'budget deferred'.
@@ -382,6 +430,16 @@ def run(projects_file,results_dir,legacy_data_dir=None,*,key=None,transport=None
                     item.update(status='AI_ERROR_REVIEW',
                                 caveats=type(exc).__name__+': '+str(exc)[:140])
                     counts['errors']+=1
+            if (item.get('status')=='AI_EVIDENCE_REVIEW'
+                    and item.get('operator') and not item.get('contact')):
+                extra,ns=find_public_business_contact(row,item['operator'],key,db,day,legacy,transport)
+                counts['company_contact_searches']+=ns
+                counts['native_searches']+=ns
+                if extra:
+                    item.update(extra)
+                    counts['company_contacts_discovered']+=1
+            item['project_evidence_verified']='YES' if evidence else 'NO'
+            item['lead_sector']=lead_sector(row)
             item.update(grade(row,item,evidence))
             if stat['errors']:
                 item['caveats']=(str(item.get('caveats') or '')+
@@ -407,7 +465,7 @@ def run(projects_file,results_dir,legacy_data_dir=None,*,key=None,transport=None
                             for row in enrolled)
         sourced=sum(r.get('lead_maturity') in ('PROJECT_EVIDENCE_FOUND',
                           'PROJECT_AND_OPERATOR_IDENTIFIED','PUBLIC_OPERATOR_CONTACT_IDENTIFIED') for r in current)
-        contacts=sum(r.get('lead_maturity')=='PUBLIC_OPERATOR_CONTACT_IDENTIFIED' for r in current)
+        contacts=sum(r.get('lead_maturity') in ('PUBLIC_COMPANY_CHANNEL_IDENTIFIED','PUBLIC_OPERATOR_CONTACT_IDENTIFIED') for r in current)
         return dict(processed=len(current),current_invocations=len(current),deepseek_configured=bool(key),
                     reserved_usd=round(spent+legacy,5),
                     charged_estimate_usd=round(confirmed_estimate,5),

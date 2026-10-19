@@ -12,7 +12,7 @@ def response(p):
  if p=='/v1/tools/search':
   return {'results':[{'url':'https://developer.example/project',
        'content':'Project at 1430 Birchmount Road Toronto by Primepoint Ltd; tenant spaces for lease.'}]}
- if p=='/v1/tools/fetch':return {'title':'Developer','content':'1430 Birchmount Road Toronto'}
+ if p=='/v1/tools/fetch':return {'title':'Developer','content':'Industrial development project at 1430 Birchmount Road Toronto'}
  if p=='/chat/completions':
   return {'choices':[{'finish_reason':'stop','message':{'content':
           '{"operator":"", "developer":"Primepoint Ltd", "contact":"fake@example.com",'

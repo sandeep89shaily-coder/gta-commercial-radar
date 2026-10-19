@@ -41,11 +41,11 @@ class EvidenceQualificationTests(unittest.TestCase):
                         {'url':'https://irrelevant.example/a','title':'Holiday sale','snippet':'vacation',
                          'summary':'Cheap holidays','content':'','rerank_score':3},
                         {'url':'https://developer.example/project','title':'1430 Birchmount Road Toronto','snippet':'Industrial property development',
-                         'summary':'Commercial project at 1430 Birchmount Road','content':'','rerank_score':1},
+                         'summary':'Commercial project at 1430 Birchmount Road Toronto','content':'','rerank_score':1},
                     ]}
                 if path.endswith('fetch'):
                     fetched.append(payload['url'])
-                    return {'title':'Building project','content':'1430 Birchmount Road Toronto development'}
+                    return {'title':'Building project','content':'Commercial development project at 1430 Birchmount Road Toronto'}
                 self.fail('No model request expected')
             evidence, counts=v8.fetch_native(ROW,'test',db,'2026-10-19',0,fake)
             db.close()

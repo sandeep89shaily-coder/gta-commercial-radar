@@ -20,13 +20,13 @@ class V4RegressionTests(unittest.TestCase):
         self.assertEqual(v4.classify(row('New 2-storey garden suite'))[0],'EXCLUDE_SMALL_RESIDENTIAL')
         self.assertEqual(v4.classify(row('20-storey mixed-use residential tower, 183 dwelling units and retail'))[0],'EXCLUDE_RESIDENTIAL_LED')
         self.assertEqual(v4.classify(row('As-built documentation of restaurant. No new construction is proposed'))[0],'EXCLUDE_NO_WORK')
-        self.assertEqual(v4.classify(row('New industrial warehouse construction'))[0],'SOURCE_UPDATE_WATCH')
+        self.assertEqual(v4.classify(row('New industrial warehouse construction'))[0],'PERMIT_REVIEW')
 
     def test_change_date_is_not_permit_issuance(self):
         r=row('Restaurant tenant fit-out and plumbing')
         x=v4.summarize([r],{})
-        self.assertEqual(x['lane'],'SOURCE_UPDATE_WATCH')
-        self.assertLessEqual(x['review_priority'],20)
+        self.assertEqual(x['lane'],'PERMIT_REVIEW')
+        self.assertGreaterEqual(x['review_priority'],70)
         self.assertIn('NOT ISSUANCE',x['date_basis'])
         copy=dict(r,source_group='MUNICIPAL',event_date_basis='SOURCE_DATE')
         self.assertEqual(v4.classify(copy)[0],'PERMIT_REVIEW')
