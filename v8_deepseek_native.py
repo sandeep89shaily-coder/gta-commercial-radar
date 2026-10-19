@@ -465,7 +465,7 @@ def run(projects_file,results_dir,legacy_data_dir=None,*,key=None,transport=None
                             for row in enrolled)
         sourced=sum(r.get('lead_maturity') in ('PROJECT_EVIDENCE_FOUND',
                           'PROJECT_AND_OPERATOR_IDENTIFIED','PUBLIC_OPERATOR_CONTACT_IDENTIFIED') for r in current)
-        contacts=sum(r.get('lead_maturity')=='PUBLIC_OPERATOR_CONTACT_IDENTIFIED' for r in current)
+        contacts=sum(r.get('lead_maturity') in ('PUBLIC_COMPANY_CHANNEL_IDENTIFIED','PUBLIC_OPERATOR_CONTACT_IDENTIFIED') for r in current)
         return dict(processed=len(current),current_invocations=len(current),deepseek_configured=bool(key),
                     reserved_usd=round(spent+legacy,5),
                     charged_estimate_usd=round(confirmed_estimate,5),
