@@ -315,7 +315,8 @@ def render_dashboard(results, state):
     page = [f'<!doctype html><html><head><meta charset="utf-8"><title>GTA Radar V6</title><style>{css}</style></head><body>',
             '<h1>GTA Commercial Radar — daily intelligence</h1>',
             f'<p><b>Run state: {esc(status)}</b> · {esc(state.get("started_local", ""))}</p>',
-            '<p><b>Research only:</b> a municipal record, source update or AI suggestion is not a verified sales lead. No buying intent is assumed.</p>',
+            '<p><b>Research only:</b> an application or AI suggestion is not proof of purchasing intent. No unverified project is sale-ready.</p>',
+             '<p><b>Commercial intelligence:</b> <a href="GTA_RADAR_LEAD_INTELLIGENCE.html">Open classified opportunities and contact dashboard</a>.</p>',
             f'<p><b>Collector database:</b> <span class="mono">{esc(state.get("database", ""))}</span></p>',
             f'<p><b>Window:</b> most recent 48 hours by source event/change date. <b>Projects this run:</b> {esc(state.get("projects",0))}. '
             f'<b>Projects investigated:</b> {esc(state.get("investigated",0))}. '
@@ -324,6 +325,8 @@ def render_dashboard(results, state):
             f'<b>Public operator contacts identified:</b> {esc(state.get("publicly_contactable",0))}. '
             f'<b>Native DeepSeek Search requests:</b> {esc(state.get("native_searches",0))}; '
             f'<b>Native DeepSeek Fetch requests:</b> {esc(state.get("native_fetches",0))}; '
+             f'<b>Company contact searches:</b> {esc(state.get("company_contact_searches",0))}; '
+             f'<b>Public company channels found:</b> {esc(state.get("company_contacts_discovered",0))}; '
             f'<b>Flash analyses attempted:</b> {esc(state.get("ai_calls_attempted",0))}; '
             f'<b>Duplicate AI requests safely skipped:</b> {esc(state.get("duplicate_model_skipped",0))}; '
             f'<b>DeepSeek analyses completed:</b> {esc(state.get("ai_calls_succeeded",0))}; '
@@ -344,6 +347,13 @@ def render_dashboard(results, state):
     for step in state.get('steps', []):
         page.append(f'<p><b>{esc(step["step"])}</b>: {esc(step["status"])} '
                     f'<span class="muted">({esc(step.get("detail", ""))})</span></p>')
+    if state.get('lead_reports'):
+        reports=state['lead_reports']
+        page.append('<p><b>Strictly corroborated commercial prospects:</b> '+
+                    esc(reports.get('project_opportunities',0))+
+                    ' · <b>Public company contact channels:</b> '+esc(reports.get('public_company_contacts',0))+
+                    ' · <b>Company-only enrichment records (not sales triggers):</b> '+
+                    esc(reports.get('company_enrichment',0))+'</p>')
     page.append('<h2>Evidence-backed commercial intelligence</h2>')
     page.append('<p>Project evidence is assessed automatically. A project does not imply '
                 'that a supplier purchase is underway.</p>')
@@ -468,6 +478,8 @@ def pipeline(workspace, database=None, *, run_collectors=True, run_research=True
             state['ai_plans_failed']=outcome.get('ai_plans_failed',0)
             state['ai_plans_deferred']=outcome.get('ai_plans_deferred',0)
             state['ai_calls_attempted']=outcome.get('ai_calls_attempted',0)
+            state['company_contact_searches']=outcome.get('company_contact_searches',0)
+            state['company_contacts_discovered']=outcome.get('company_contacts_discovered',0)
             state['duplicate_model_skipped']=outcome.get('duplicate_model_skipped',0)
             state['ai_calls_succeeded']=outcome.get('ai_calls_succeeded',0)
             state['source_only_ai_calls']=outcome.get('source_only_ai_calls',0)
@@ -478,6 +490,8 @@ def pipeline(workspace, database=None, *, run_collectors=True, run_research=True
             state['queue_stop_reason']=outcome.get('queue_stop_reason','UNKNOWN')
             state['no_corroboration']=outcome.get('no_corroboration',0)
             state['investigated']=outcome.get('current_invocations',outcome['processed'])
+            from commercial_lead_reports import build as build_commercial_reports
+            state['lead_reports']=build_commercial_reports(out)
         else:
             state['note'] = 'AI investigation disabled for this test; no charge.'
         return state
