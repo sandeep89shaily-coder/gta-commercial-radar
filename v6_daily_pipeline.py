@@ -325,6 +325,7 @@ def render_dashboard(results, state):
             f'<b>Native DeepSeek Search requests:</b> {esc(state.get("native_searches",0))}; '
             f'<b>Native DeepSeek Fetch requests:</b> {esc(state.get("native_fetches",0))}; '
             f'<b>Flash analyses attempted:</b> {esc(state.get("ai_calls_attempted",0))}; '
+            f'<b>Duplicate AI requests safely skipped:</b> {esc(state.get("duplicate_model_skipped",0))}; '
             f'<b>DeepSeek analyses completed:</b> {esc(state.get("ai_calls_succeeded",0))}; '
             f'<b>Source-record-only analyses (unverified):</b> {esc(state.get("source_only_ai_calls",0))}; '
             f'<b>Still awaiting first AI analysis:</b> {esc(state.get("queue_initial_uninvestigated",0))}; '
@@ -467,6 +468,7 @@ def pipeline(workspace, database=None, *, run_collectors=True, run_research=True
             state['ai_plans_failed']=outcome.get('ai_plans_failed',0)
             state['ai_plans_deferred']=outcome.get('ai_plans_deferred',0)
             state['ai_calls_attempted']=outcome.get('ai_calls_attempted',0)
+            state['duplicate_model_skipped']=outcome.get('duplicate_model_skipped',0)
             state['ai_calls_succeeded']=outcome.get('ai_calls_succeeded',0)
             state['source_only_ai_calls']=outcome.get('source_only_ai_calls',0)
             state['ai_budget_deferred']=outcome.get('ai_budget_deferred',0)
