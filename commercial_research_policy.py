@@ -11,13 +11,13 @@ from urllib.parse import urlparse
 INSPECTION=re.compile(r'(health|food_premis|dinesafe|food_inspection|restaurant_inspection|inspection_result)',re.I)
 PERMIT=re.compile(r'(building_permit|active_building_permit|construction_permit|permit_application)',re.I)
 PLANNING=re.compile(r'(planning|development_application|site_plan|zoning_application)',re.I)
-ENVIRONMENT=re.compile(r'(environmental_instrument|environmental_compliance|\\bero_\\b)',re.I)
+ENVIRONMENT=re.compile(r'(environmental_instrument|environmental_compliance|\bero_\b)',re.I)
 BUSINESS=re.compile(r'(licen[cs]|business_discovery|business_regist)',re.I)
-PROJECT=re.compile(r'\\b(construction|construct\\w*|renovat\\w*|alterat\\w*|installation|retrofit|expan\\w*|fit[ -]?out|interior|new building|addition|new restaurant|new (?:business|facility|store|warehouse|factory)|change of use|convert\\w*|modification|replacement|demolition|tenant improvement|mechanical|electrical|plumbing|sprinkler)\\b',re.I)
-BUSINESS_TRIGGER=re.compile(r'\\b(new (?:store|restaurant|business|facility|office|location)|opening|opened|relocation|expand\\w*|newly registered|first licen[cs]e|change of use)\\b',re.I)
-ENV_TRIGGER=re.compile(r'\\b(approval|amendment|compliance|emission|industrial|air|noise|wastewater|facility|proposal|permit)\\b',re.I)
-DIRECTORY=re.compile(r'(yellowpages|pagesjaunes|allbiz|wheree|mapquest|canpages|squareyards|zillow|tripadvisor|ubereats|yelp|opencorporates|reviews\\.)',re.I)
-PROJECT_LANGUAGE=re.compile(r'\\b(permit|planning|project|site plan|construction|alteration|renovation|expansion|fit[ -]?out|development|redevelop|new building|addition|interior alterations|work described|application|environmental compliance approval|eca)\\b',re.I)
+PROJECT=re.compile(r'\b(construction|construct\w*|renovat\w*|alterat\w*|installation|retrofit|expan\w*|fit[ -]?out|interior|new building|addition|new restaurant|new (?:business|facility|store|warehouse|factory)|change of use|convert\w*|modification|replacement|demolition|tenant improvement|mechanical|electrical|plumbing|sprinkler)\b',re.I)
+BUSINESS_TRIGGER=re.compile(r'\b(new (?:store|restaurant|business|facility|office|location)|opening|opened|relocation|expand\w*|newly registered|first licen[cs]e|change of use)\b',re.I)
+ENV_TRIGGER=re.compile(r'\b(approval|amendment|compliance|emission|industrial|air|noise|wastewater|facility|proposal|permit)\b',re.I)
+DIRECTORY=re.compile(r'(yellowpages|pagesjaunes|allbiz|wheree|mapquest|canpages|squareyards|zillow|tripadvisor|ubereats|yelp|opencorporates|reviews\.)',re.I)
+PROJECT_LANGUAGE=re.compile(r'\b(permit|planning|project|site plan|construction|alteration|renovation|expansion|fit[ -]?out|development|redevelop|new building|addition|interior alterations|work described|application|environmental compliance approval|eca)\b',re.I)
 CITY_NAMES=('Toronto','Brampton','Mississauga','Caledon','Vaughan','Markham','Richmond Hill','Oakville','Burlington','Milton','Hamilton','Oshawa','Ajax','Pickering','Whitby','Kitchener','Waterloo','Cambridge','Guelph','Niagara Falls','St Catharines','Owen Sound')
 CITY_EXCLUDES={'on','ontario','canada','gta'}
 
@@ -90,7 +90,7 @@ def city_for(row):
     if city.strip() and city.strip().lower() not in CITY_EXCLUDES:
         return city.strip()
     for name in sorted(CITY_NAMES,key=len,reverse=True):
-        if re.search(r'\\b'+re.escape(name)+r'\\b',address,re.I):
+        if re.search(r'\b'+re.escape(name)+r'\b',address,re.I):
             return name
     sid=str(row.get('source_id') or '').lower()
     if sid.startswith('toronto_'):return 'Toronto'
@@ -125,7 +125,7 @@ def _civic_address(row):
 def _source_id_tokens(row):
     tokens=[]
     for k in str(row.get('source_keys') or '').split(' | '):
-        m=re.search(r'\\b(\\d{2})\\s+(\\d{5,8})\\b',k)
+        m=re.search(r'\b(\d{2})\s+(\d{5,8})\b',k)
         if m:tokens.append(_norm(m.group(0)))
         elif len(k)>=9 and any(x.isalpha() for x in k):
             tokens.append(_norm(k))
@@ -150,10 +150,10 @@ def project_evidence(row, content, url=''):
     if not body or directory_url(url):
         return False
     for identifier in _source_id_tokens(row):
-        if len(identifier)>=9 and re.search(r'\\b'+re.escape(identifier)+r'\\b',body):
+        if len(identifier)>=9 and re.search(r'\b'+re.escape(identifier)+r'\b',body):
             return True
     addr=_civic_address(row)
-    if not addr or not re.search(r'\\b'+re.escape(addr)+r'\\b',body):
+    if not addr or not re.search(r'\b'+re.escape(addr)+r'\b',body):
         return False
     city=city_for(row)
     if city and _norm(city) not in body:
