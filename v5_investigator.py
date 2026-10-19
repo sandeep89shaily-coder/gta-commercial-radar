@@ -26,7 +26,7 @@ from urllib.error import HTTPError
 from urllib.robotparser import RobotFileParser
 from xml.etree import ElementTree
 
-DAILY_BUDGET = 0.50  # USD; conservative local software reservation, NOT an API-provider cap
+DAILY_BUDGET = 1.00  # USD; local daily software limit, NOT an API-provider cap
 MAX_PROJECTS = 8
 MODEL = 'deepseek-chat'
 API = 'https://api.deepseek.com/chat/completions'
@@ -314,7 +314,7 @@ def audit_report(rows,results,output,summary):
            '<h1>GTA Radar — Investigated Projects V5</h1>',
            '<p><b>RESEARCH ONLY. Not qualified sales leads.</b> Never treat source detection as opening or permit issuance.</p>',
            '<p>Run state: '+status+' | V4 candidates: '+str(len(rows))+' | Projects examined: '+str(len(results))+
-           ' | DeepSeek estimated reserved spend: $'+escape(summary.get('reserved_usd',0))+' USD | Budget $0.50/day</p>']
+           ' | DeepSeek estimated reserved spend: $'+escape(summary.get('reserved_usd',0))+' USD | Budget $1.00/day</p>']
     for r in results:
         parts+=['<article><h3>'+escape(r['address'] or r['project_id'])+'</h3>',
                 '<p><b>'+escape(r['status'])+'</b> — '+escape(r['project_stage'])+'</p>',
