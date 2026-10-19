@@ -1,5 +1,6 @@
 """Regression coverage for all-project DeepSeek investigation and durable backlog."""
 import csv
+from contextlib import closing
 import datetime as dt
 import sqlite3
 import tempfile
@@ -88,7 +89,7 @@ class DurableResearchQueueTests(unittest.TestCase):
 
     def test_budget_suspends_without_marking_records_investigated(self):
         export(self.source, [make_row(n) for n in range(3)])
-        with deepseek.v5._ledger(self.folder/'v5_ai_budget.sqlite') as db:
+        with closing(deepseek.v5._ledger(self.folder/'v5_ai_budget.sqlite')) as db:
             db.execute('INSERT INTO spends VALUES(?,?,?,?,?)',
                        (FIXED.isoformat(), 'prior', 0.995, 0.995, 'DONE'))
             db.commit()
@@ -103,7 +104,7 @@ class DurableResearchQueueTests(unittest.TestCase):
         self.assertEqual(deepseek.read_csv(self.folder/'GTA_RADAR_V6_LATEST_INVESTIGATIONS.csv'),[])
 
     def test_confirmed_usage_releases_only_excess_reservation(self):
-        with deepseek.v5._ledger(self.folder/'v5_ai_budget.sqlite') as db:
+        with closing(deepseek.v5._ledger(self.folder/'v5_ai_budget.sqlite')) as db:
             self.assertTrue(deepseek.ledger_claim(db,FIXED.isoformat(),'M8:p1',
                                                   deepseek.MODEL_RESERVE))
             deepseek.ledger_finish(db,FIXED.isoformat(),'M8:p1','DONE',0.0002)
