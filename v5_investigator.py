@@ -231,7 +231,7 @@ def _legacy_reserved(db_path,day):
 def _claim(db,day,cid,legacy_spend=0):
     try:
         db.execute('BEGIN IMMEDIATE')
-        spent=float(db.execute('SELECT COALESCE(SUM(reserved),0) FROM spends WHERE day=?',(day,)).fetchone()[0] or 0)
+        spent=float(db.execute("SELECT COALESCE(SUM(CASE WHEN status='DONE' AND actual IS NOT NULL AND actual>=0 THEN actual ELSE reserved END),0) FROM spends WHERE day=?",(day,)).fetchone()[0] or 0)
         previous=db.execute('SELECT 1 FROM spends WHERE day=? AND candidate=?',(day,cid)).fetchone()
         if previous or spent+legacy_spend+RESERVATION>DAILY_BUDGET+1e-9:
             db.rollback();return False
@@ -379,7 +379,7 @@ def run(data_dir,projects_file=None,results_dir=None,*,key=None,search=search_rs
         # Preserve earlier rows in output history instead of overwriting them when queue changes.
         combined=dict(previous);combined.update({r['project_id']:r for r in research})
         write_rows(out/'GTA_RADAR_V5_INVESTIGATIONS.csv',list(combined.values()))
-        spent=ledger.execute('SELECT COALESCE(SUM(reserved),0) FROM spends WHERE day=?',(day,)).fetchone()[0]
+        spent=ledger.execute("SELECT COALESCE(SUM(CASE WHEN status='DONE' AND actual IS NOT NULL AND actual>=0 THEN actual ELSE reserved END),0) FROM spends WHERE day=?",(day,)).fetchone()[0]
         summary=dict(status='FINISHED',v4_candidates=len(rows),processed=len(research),researched_new=attempted,
                      cached_today=cached,with_public_pages=online,deepseek_configured=bool(key and run_ai),
                      reserved_usd=round(float(spent)+legacy,4),disclaimer='All findings require human review. No lead approved for sale.')
