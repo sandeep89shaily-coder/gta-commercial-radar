@@ -87,6 +87,44 @@ def _source_company(record, role):
     return name,role or "published_source_entity"
 
 
+def _toronto_collector_verification(row,data_dir,source):
+    """Trade sub-records may share a primary permit. Confirm exact saved keys
+    rather than merging by address. This does NOT claim a live CKAN lookup.
+    """
+    ans={k:"" for k in FIELDS}
+    ans.update(official_verification_level="NOT_VERIFIED",
+               official_verification_note="No exact Toronto permit trade records")
+    raw=[x.strip() for x in clean(row.get("source_keys")).split(" | ") if x.strip()]
+    if not raw or len(raw)>12 or any(not PERMIT_ID.fullmatch(x) for x in raw):
+        return ans
+    parent=[]
+    for key in raw:
+        found=re.match(r"^(\d{2}\s+\d{5,8})\s+[A-Z]{2,4}\|\d+$",key,re.I)
+        if not found:return ans
+        parent.append(" ".join(found.group(1).split()))
+    if len(set(parent))!=1:return ans
+    matches=[source_record(data_dir,source["id"],key) for key in raw]
+    valid=[m for m in matches if m]
+    if not valid:return ans
+    statuses={clean(m.get("status")) for m in valid if clean(m.get("status"))}
+    dates=[clean(m.get("_db_source_date")) for m in valid if clean(m.get("_db_source_date"))]
+    companies=[clean(m.get("entity_name")) for m in valid if clean(m.get("entity_name"))]
+    ans.update(official_permit_id=parent[0],
+               official_verification_level="COLLECTOR_SOURCE_MATCH" if len(valid)==len(raw)
+                   else "PARTIAL_COLLECTOR_SOURCE_MATCH",
+               official_status=" | ".join(sorted(statuses))[:200],
+               official_status_basis="exact trade records in local Toronto collector; NOT live status",
+               official_source_date=max(dates) if dates else "",
+               official_record_url=clean(source.get("official_page")),
+               official_company=companies[0] if companies else "",
+               official_company_role="published_source_entity" if companies else "",
+               official_verification_note=(
+                   f"{len(valid)} of {len(raw)} exact Toronto trade keys in collector. "
+                   "Trade statuses may vary; check original source before treating as current."
+               ))
+    return ans
+
+
 def verify(row,data_dir,transport=None,live=True):
     """Return source veracity and business-role distinctions.
 
@@ -99,6 +137,8 @@ def verify(row,data_dir,transport=None,live=True):
     result.update(official_verification_level="NOT_VERIFIED",
                   official_verification_note="Exact source record unavailable")
     if not s:return result
+    if sid=='toronto_active_building_permits':
+        return _toronto_collector_verification(row,data_dir,s)
     ident=exact_id(row,s)
     if not ident:return result
     result["official_permit_id"]=ident
