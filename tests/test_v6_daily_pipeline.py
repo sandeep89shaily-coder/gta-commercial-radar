@@ -69,19 +69,19 @@ class V6Tests(unittest.TestCase):
 
     def test_ai_exception_writes_diagnostic_and_retains_checkpoint(self):
         (self.data/'opportunities_ALL_REVIEW_ONLY.csv').write_text(
-            'source_id,source_key,description,address\\n'
-            'toronto_active_building_permits,permit-1,Office renovation,\\n',
+            'source_id,source_key,description,address\n'
+            'toronto_active_building_permits,permit-1,Office renovation,\n',
             encoding='utf-8')
         def selector(source, out, db):
             (Path(out)/'CANDIDATES_V4_ALL_REVIEW_ONLY.csv').write_text(
-                'project_id,source_id,address,description\\n'
-                'project-1,toronto_active_building_permits,,Office renovation\\n',
+                'project_id,source_id,address,description\n'
+                'project-1,toronto_active_building_permits,,Office renovation\n',
                 encoding='utf-8')
         def investigator(*_args,**_kwargs):
             latest=self.results/'GTA_RADAR_V6_LATEST_INVESTIGATIONS.csv'
             latest.write_text(
-                'project_id,investigated_local_date,status\\n'
-                'project-1,2026-10-20,AI_EVIDENCE_REVIEW\\n',encoding='utf-8')
+                'project_id,investigated_local_date,status\n'
+                'project-1,2026-10-20,AI_EVIDENCE_REVIEW\n',encoding='utf-8')
             raise IndexError('list index out of range')
         outcome=v6.pipeline(self.ws,self.db,run_collectors=False,selector=selector,
                             investigator=investigator,results_dir=self.results,
