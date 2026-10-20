@@ -402,7 +402,7 @@ def run(projects_file,results_dir,legacy_data_dir=None,*,key=None,transport=None
             official=verify_official_record(row,legacy_data_dir or out,
                 transport=official_transport,
                 live=counts['official_queries']<max_official_checks)
-            if official.get('official_checked_at'):
+            if official.get('official_live_attempted')=='YES':
                 counts['official_queries']+=1
             if official.get('official_verification_level')=='OFFICIAL_ID_AND_STATUS_MATCH':
                 counts['official_live_matches']+=1
