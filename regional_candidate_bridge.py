@@ -72,7 +72,8 @@ def bridge(database,output_dir,*,today=None,max_days=180,per_source=18,per_regio
                     address=str(d.get("address") or "").strip()
                     if not desc or not address or not key:continue
                     eligible[sid]+=1
-                    pool[sid].append((date,str(key),d))
+                    if len(pool[sid])<per_source:
+                        pool[sid].append((date,str(key),d))
             except sqlite3.Error:
                 # The old database is not mutated, and no empty-success
                 # assertion is made if the expected schema is missing.
@@ -115,3 +116,32 @@ def bridge(database,output_dir,*,today=None,max_days=180,per_source=18,per_regio
     _write(out/"GTA_RADAR_REGIONAL_SOURCE_CANDIDATES.csv",FIELDS,candidates)
     _write(out/"GTA_RADAR_REGIONAL_COVERAGE.csv",STATS,stats)
     return candidates,stats
+
+
+def selection_input(base_csv, database, output, today=None):
+    """Union 48-hour events and balanced sourced regional inventory for V4.
+
+    Never overwrite the collector's 48h source file. Dedupe by the pair of
+    source ID and exact published record key, not by address.
+    """
+    base=Path(base_csv);out=Path(output)
+    regional,inventory=bridge(database,out,today=today)
+    with base.open(encoding="utf-8-sig",newline="") as f:
+        current=list(csv.DictReader(f))
+    seen=set();combined=[]
+    for r in current+regional:
+        key=(str(r.get("source_id") or ""),str(r.get("source_key") or ""))
+        if not all(key) or key in seen:continue
+        seen.add(key);combined.append(r)
+    fields=list(dict.fromkeys([k for r in combined for k in r] + FIELDS))
+    _write(out/"GTA_RADAR_COMBINED_SELECTION_INPUT.csv",fields,combined)
+    original=len({(str(r.get("source_id") or ""),str(r.get("source_key") or ""))
+                  for r in current if r.get("source_id") and r.get("source_key")})
+    return out/"GTA_RADAR_COMBINED_SELECTION_INPUT.csv",{
+        "regional_source_records_added":max(0,len(combined)-original),
+        "regional_source_records_considered":len(regional),
+        "regional_regions_represented":sorted({r["region"] for r in inventory
+                                               if r["selected_for_research"]}),
+        "staged_sources_not_enabled":sum(r["reason"].startswith("STAGED_DISABLED") for r in inventory),
+        "regional_sources_with_projects":sum(bool(r["selected_for_research"]) for r in inventory),
+    }
