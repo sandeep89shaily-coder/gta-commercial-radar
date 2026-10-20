@@ -14,7 +14,10 @@ FIELDS=['project_id','address','city','source_id','lane','operator','developer',
         'project_stage','buyer_fit','contact','contact_source_url',
         'evidence_tier','source_urls','record_source_url',
         'lead_maturity','research_status','opportunity_strength',
-        'next_system_action','sale_ready']
+        'next_system_action','sale_ready','official_permit_id','official_status',
+        'official_status_basis','official_company','official_company_role',
+        'official_record_url','official_source_date','official_verification_level',
+        'related_company','related_company_role','related_company_contact','related_company_contact_url']
 
 
 def read(path):
@@ -78,6 +81,12 @@ def build(root):
             'next_system_action':item.get('next_system_action',''),
             'sale_ready':'NO',
         }
+        for field in ('official_permit_id','official_status','official_status_basis',
+                      'official_company','official_company_role','official_record_url',
+                      'official_source_date','official_verification_level',
+                      'related_company','related_company_role',
+                      'related_company_contact','related_company_contact_url'):
+            record[field]=item.get(field,'')
         opportunities.append(record)
         if record['opportunity_strength']=='PUBLIC_COMPANY_CHANNEL':
             contacts.append(record)
@@ -135,7 +144,12 @@ def build(root):
         doc.append('<article><h3>'+esc(item['address'] or item['project_id'])+
             '</h3><p><b>Commercial class:</b> '+esc(item['lane'])+
             ' · <b>Evidence:</b> '+esc(item['evidence_tier'])+
+            '</p><p><b>Permit ID:</b> '+esc(item['official_permit_id'] or 'Not identified')+
+            ' · <b>Official stage:</b> '+esc(item['official_status'] or 'Not available')+
+            ' · <b>Verification:</b> '+esc(item['official_verification_level'] or 'No exact record')+
             '</p><p><b>Business:</b> '+esc(item['operator'] or item['developer'] or 'Not identified')+
+            ' · <b>Related '+esc(item['related_company_role'] or 'company')+':</b> '+
+            esc(item['related_company'] or 'Not identified')+
             ' · <b>Public channel:</b> '+esc(item['contact'] or 'Not identified')+
             '</p><p><b>Potential services:</b> '+esc(item['buyer_fit'] or 'Not established')+
             '</p><small>'+esc(item['next_system_action'])+'</small><p>')
