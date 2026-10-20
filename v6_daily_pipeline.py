@@ -325,6 +325,8 @@ def render_dashboard(results, state):
             f'<b>Public operator contacts identified:</b> {esc(state.get("publicly_contactable",0))}. '
             f'<b>Native DeepSeek Search requests:</b> {esc(state.get("native_searches",0))}; '
             f'<b>Native DeepSeek Fetch requests:</b> {esc(state.get("native_fetches",0))}; '
+             f'<b>Exact official permit/status matches:</b> {esc(state.get("official_live_matches",0))}; '
+             f'<b>Local source-only exact matches:</b> {esc(state.get("official_local_matches",0))}; '
              f'<b>Company contact searches:</b> {esc(state.get("company_contact_searches",0))}; '
              f'<b>Public company channels found:</b> {esc(state.get("company_contacts_discovered",0))}; '
             f'<b>Flash analyses attempted:</b> {esc(state.get("ai_calls_attempted",0))}; '
@@ -495,6 +497,9 @@ def pipeline(workspace, database=None, *, run_collectors=True, run_research=True
             state['ai_configured'] = outcome['deepseek_configured']
             state['native_searches']=outcome.get('native_searches',0)
             state['native_fetches']=outcome.get('native_fetches',0)
+            state['official_queries']=outcome.get('official_queries',0)
+            state['official_live_matches']=outcome.get('official_live_matches',0)
+            state['official_local_matches']=outcome.get('official_local_matches',0)
             state['ai_plans_attempted']=outcome.get('ai_plans_attempted',0)
             state['ai_plans_completed']=outcome.get('ai_plans_completed',0)
             state['ai_plans_failed']=outcome.get('ai_plans_failed',0)
