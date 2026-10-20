@@ -343,7 +343,9 @@ def render_dashboard(results, state):
             f'<b>Uncertain charges still reserved:</b> US${esc(state.get("unresolved_reservations_usd",0))}. '
             f'These are local estimates, not DeepSeek account billing.</p>']
     if status != 'SUCCESS':
-        page.append('<article><h2>Run attention needed</h2><p>Some processing did not finish. '
+        incomplete_collector=any(step.get('status')!='SUCCESS' for step in state.get('steps',[]))
+        heading='Collection attention needed' if incomplete_collector else 'Run attention needed'
+        page.append('<article><h2>'+heading+'</h2><p>Some processing did not finish. '
                     'A completed collection step is not the same as completed AI research.</p>')
         if state.get('error'):
             page.append('<p><b>Failure stage:</b> '+esc(state.get('error_stage','UNKNOWN'))+
