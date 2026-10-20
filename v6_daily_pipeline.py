@@ -325,6 +325,8 @@ def render_dashboard(results, state):
             f'<b>Public operator contacts identified:</b> {esc(state.get("publicly_contactable",0))}. '
             f'<b>Native DeepSeek Search requests:</b> {esc(state.get("native_searches",0))}; '
             f'<b>Native DeepSeek Fetch requests:</b> {esc(state.get("native_fetches",0))}; '
+             f'<b>Exact official permit/status matches:</b> {esc(state.get("official_live_matches",0))}; '
+             f'<b>Local source-only exact matches:</b> {esc(state.get("official_local_matches",0))}; '
              f'<b>Company contact searches:</b> {esc(state.get("company_contact_searches",0))}; '
              f'<b>Public company channels found:</b> {esc(state.get("company_contacts_discovered",0))}; '
             f'<b>Flash analyses attempted:</b> {esc(state.get("ai_calls_attempted",0))}; '
@@ -343,6 +345,17 @@ def render_dashboard(results, state):
     if status != 'SUCCESS':
         page.append('<article><h2>Collection attention needed</h2><p>Not all collection steps succeeded. '
                     'Do not interpret this as a complete or fully fresh GTA picture.</p></article>')
+    if state.get('regional_regions_represented') is not None:
+        page.append('<p><b>Regional archive supplement:</b> '+
+                    esc(state.get('regional_source_records_added',0))+
+                    ' distinct source-dated records outside/alongside the rolling 48h feed. '+
+                    '<b>Regions represented:</b> '+
+                    esc(', '.join(state.get('regional_regions_represented') or []) or 'None')+
+                    '. These are NOT newly issued permits. '+
+                    '<a href="GTA_RADAR_REGIONAL_COVERAGE.csv">Regional collection gaps and coverage</a>.</p>')
+    if state.get('regional_bridge_error'):
+        page.append('<p><b>Regional supplement unavailable:</b> '+
+                    esc(state['regional_bridge_error'])+'. Other collectors continue.</p>')
     page.append('<h2>Collection steps</h2>')
     for step in state.get('steps', []):
         page.append(f'<p><b>{esc(step["step"])}</b>: {esc(step["status"])} '
@@ -452,10 +465,21 @@ def pipeline(workspace, database=None, *, run_collectors=True, run_research=True
                 state['status'] = 'PARTIAL'
                 state['note'] = 'Opportunity export generation failed; old exports NOT used.'
                 return state
-        if selector is None:
+        use_default_selector = selector is None
+        if use_default_selector:
             import commercial_selector_v4 as v4
             selector = v4.run
-        selector(data / 'opportunities_ALL_REVIEW_ONLY.csv', out, db)
+        selection_file=data / 'opportunities_ALL_REVIEW_ONLY.csv'
+        if use_default_selector and db.is_file():
+            try:
+                from regional_candidate_bridge import selection_input
+                selection_file,regional_summary=selection_input(selection_file,db,out,today=day)
+                state.update(regional_summary)
+            except (OSError,ValueError,sqlite3.DatabaseError) as exc:
+                # Never misrepresent uncollected regions as successfully covered,
+                # and never damage the primary 48-hour collector output.
+                state['regional_bridge_error']=type(exc).__name__+': '+str(exc)[:180]
+        selector(selection_file, out, db)
         projects = out / 'CANDIDATES_V4_ALL_REVIEW_ONLY.csv'
         if not projects.exists():
             raise RuntimeError('V4 did not produce a candidate CSV.')
@@ -473,6 +497,9 @@ def pipeline(workspace, database=None, *, run_collectors=True, run_research=True
             state['ai_configured'] = outcome['deepseek_configured']
             state['native_searches']=outcome.get('native_searches',0)
             state['native_fetches']=outcome.get('native_fetches',0)
+            state['official_queries']=outcome.get('official_queries',0)
+            state['official_live_matches']=outcome.get('official_live_matches',0)
+            state['official_local_matches']=outcome.get('official_local_matches',0)
             state['ai_plans_attempted']=outcome.get('ai_plans_attempted',0)
             state['ai_plans_completed']=outcome.get('ai_plans_completed',0)
             state['ai_plans_failed']=outcome.get('ai_plans_failed',0)

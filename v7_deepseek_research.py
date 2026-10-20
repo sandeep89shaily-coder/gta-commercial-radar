@@ -140,7 +140,11 @@ def run(projects_file,results_dir,legacy_data_dir=None,*,key=None,post=None,
     candidates=_read(projects_file)
     previous={r['project_id']:r for r in _read(out/'GTA_RADAR_V7_INVESTIGATIONS.csv') if r.get('project_id')}
     date=(today or dt.date.today()).isoformat()
-    timestamp=dt.datetime.now(dt.timezone.utc).isoformat(timespec='seconds')
+    utc_now=dt.datetime.now(dt.timezone.utc)
+    # Honor the explicitly resolved research date: tests, replayed history and
+    # local runs must not silently move into tomorrow at UTC midnight.
+    timestamp=(dt.datetime.combine(today,utc_now.timetz()).isoformat(timespec='seconds')
+               if today is not None else utc_now.isoformat(timespec='seconds'))
     if key is None:key=v5.key_from_windows()
     ledger=v5._ledger(out/'v5_ai_budget.sqlite')
     legacy=v5._legacy_reserved(Path(legacy_data_dir or out)/'deepseek_budget.sqlite',date)
