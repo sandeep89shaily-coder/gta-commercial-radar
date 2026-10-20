@@ -101,7 +101,13 @@ def _civic_address(row):
     """Normalize the civic building number and complete street name, not just
     the first token of a street. Suite prefixes and postal codes are discarded.
     """
-    text=str(row.get('address') or '').splitlines()[0].split(',')[0]
+    # Several valid municipal records (notably regulatory and some regional
+    # feeds) omit civic addresses. A blank string has no splitlines()[0];
+    # earlier versions crashed the entire daily investigation with IndexError.
+    lines=str(row.get('address') or '').splitlines()
+    if not lines:
+        return ''
+    text=lines[0].split(',')[0]
     # Strip a 1-3078 suite prefix, retaining 3078.
     tokens=_norm(text).split()
     if not tokens:return ''

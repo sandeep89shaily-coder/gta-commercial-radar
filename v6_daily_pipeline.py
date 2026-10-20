@@ -343,8 +343,21 @@ def render_dashboard(results, state):
             f'<b>Uncertain charges still reserved:</b> US${esc(state.get("unresolved_reservations_usd",0))}. '
             f'These are local estimates, not DeepSeek account billing.</p>']
     if status != 'SUCCESS':
-        page.append('<article><h2>Collection attention needed</h2><p>Not all collection steps succeeded. '
-                    'Do not interpret this as a complete or fully fresh GTA picture.</p></article>')
+        incomplete_collector=any(step.get('status')!='SUCCESS' for step in state.get('steps',[]))
+        heading='Collection attention needed' if incomplete_collector else 'Run attention needed'
+        page.append('<article><h2>'+heading+'</h2><p>Some processing did not finish. '
+                    'A completed collection step is not the same as completed AI research.</p>')
+        if state.get('error'):
+            page.append('<p><b>Failure stage:</b> '+esc(state.get('error_stage','UNKNOWN'))+
+                        ' · <b>Error:</b> '+esc(state['error'])+'</p>')
+            if state.get('error_log'):
+                page.append('<p><b>Diagnostic file:</b> <code>'+
+                            esc(state['error_log'])+'</code></p>')
+        if state.get('checkpointed_investigations_today') is not None:
+            page.append('<p><b>Research records checkpointed for this date:</b> '+
+                        esc(state['checkpointed_investigations_today'])+
+                        '. This is not necessarily the count from this run.</p>')
+        page.append('</article>')
     if state.get('regional_regions_represented') is not None:
         page.append('<p><b>Regional archive supplement:</b> '+
                     esc(state.get('regional_source_records_added',0))+
@@ -465,6 +478,7 @@ def pipeline(workspace, database=None, *, run_collectors=True, run_research=True
                 state['status'] = 'PARTIAL'
                 state['note'] = 'Opportunity export generation failed; old exports NOT used.'
                 return state
+        state['active_stage']='COMMERCIAL_SELECTION'
         use_default_selector = selector is None
         if use_default_selector:
             import commercial_selector_v4 as v4
@@ -486,6 +500,7 @@ def pipeline(workspace, database=None, *, run_collectors=True, run_research=True
         with projects.open(encoding='utf-8-sig',newline='') as f:
             state['projects'] = sum(1 for _ in csv.DictReader(f))
         if run_research:
+            state['active_stage']='DEEPSEEK_RESEARCH'
             outcome = investigator(data, out, max_projects=max_projects)
             state['investigated'] = outcome['processed']
             state['with_public_pages'] = outcome['with_public_pages']
@@ -517,6 +532,7 @@ def pipeline(workspace, database=None, *, run_collectors=True, run_research=True
             state['queue_stop_reason']=outcome.get('queue_stop_reason','UNKNOWN')
             state['no_corroboration']=outcome.get('no_corroboration',0)
             state['investigated']=outcome.get('current_invocations',outcome['processed'])
+            state['active_stage']='COMMERCIAL_REPORTING'
             from commercial_lead_reports import build as build_commercial_reports
             state['lead_reports']=build_commercial_reports(out)
         else:
@@ -525,6 +541,30 @@ def pipeline(workspace, database=None, *, run_collectors=True, run_research=True
     except Exception as exc:
         state['status'] = 'FAILED'
         state['error'] = type(exc).__name__ + ': ' + str(exc)[:250]
+        diagnostic=traceback.format_exc(limit=18)[-6000:]
+        state['error_stage']=state.get('active_stage','UNKNOWN')
+        # Preserve enough detail to identify the exact crashing line next time,
+        # without retaining API keys, HTTP headers, or municipal input payloads.
+        # Format traceback stack + exception only; do not log API responses.
+        log=out/'V6_LOGS'/'pipeline_error.log'
+        try:
+            log.parent.mkdir(parents=True,exist_ok=True)
+            log.write_text(diagnostic,encoding='utf-8')
+            state['error_log']=str(log)
+        except OSError:
+            state['error_log']='COULD_NOT_WRITE_DIAGNOSTIC'
+        # V8 checkpoints its investigation history before every next project.
+        # A top-level failure should not imply AI accomplished nothing; show
+        # how many completed/reviewed records were checkpointed today.
+        checkpoint=out/'GTA_RADAR_V6_LATEST_INVESTIGATIONS.csv'
+        try:
+            if checkpoint.is_file():
+                with checkpoint.open(encoding='utf-8-sig',newline='') as handle:
+                    state['checkpointed_investigations_today']=sum(
+                        1 for rec in csv.DictReader(handle)
+                        if rec.get('investigated_local_date')==day.isoformat())
+        except (OSError,csv.Error):
+            pass
         return state
     finally:
         state['finished_local'] = dt.datetime.now().astimezone().isoformat(timespec='seconds')

@@ -68,6 +68,23 @@ class CommercialPipelinePolicyTests(unittest.TestCase):
         self.assertEqual(ordered[0]['lane'],'PERMIT_REVIEW')
         self.assertNotIn('old-food',[r['project_id'] for r in enrolled])
 
+    def test_missing_address_never_crashes_public_project_verification(self):
+        # Municipal sources may have a valid project ID/description but no
+        # street address; older code raised IndexError via splitlines()[0].
+        for address in ('', None, '\\n'):
+            row={'source_id':'brampton_building_permits',
+                 'source_keys':'26 155543 BLD|00','address':address,
+                 'city':'Brampton',
+                 'description':'Interior alteration to commercial building'}
+            with self.subTest(address=address):
+                self.assertEqual(policy._civic_address(row),'')
+                self.assertFalse(policy.project_evidence(
+                    row,'Commercial alteration of a different address in Brampton',
+                    'https://city.example/projects/elsewhere'))
+                self.assertTrue(policy.project_evidence(
+                    row,'Official permit 26 155543 BLD was submitted',
+                    'https://city.example/projects/permit'))
+
     def test_matching_operator_only_or_wrong_city_never_verifies_project(self):
         row={'project_id':'peel-304','source_id':'brampton_building_permits',
              'address':'3078 Mayfield Road, Brampton, ON','city':'Brampton',
