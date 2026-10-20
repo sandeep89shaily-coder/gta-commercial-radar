@@ -343,8 +343,19 @@ def render_dashboard(results, state):
             f'<b>Uncertain charges still reserved:</b> US${esc(state.get("unresolved_reservations_usd",0))}. '
             f'These are local estimates, not DeepSeek account billing.</p>']
     if status != 'SUCCESS':
-        page.append('<article><h2>Collection attention needed</h2><p>Not all collection steps succeeded. '
-                    'Do not interpret this as a complete or fully fresh GTA picture.</p></article>')
+        page.append('<article><h2>Run attention needed</h2><p>Some processing did not finish. '
+                    'A completed collection step is not the same as completed AI research.</p>')
+        if state.get('error'):
+            page.append('<p><b>Failure stage:</b> '+esc(state.get('error_stage','UNKNOWN'))+
+                        ' · <b>Error:</b> '+esc(state['error'])+'</p>')
+            if state.get('error_log'):
+                page.append('<p><b>Diagnostic file:</b> <code>'+
+                            esc(state['error_log'])+'</code></p>')
+        if state.get('checkpointed_investigations_today') is not None:
+            page.append('<p><b>Research records checkpointed for this date:</b> '+
+                        esc(state['checkpointed_investigations_today'])+
+                        '. This is not necessarily the count from this run.</p>')
+        page.append('</article>')
     if state.get('regional_regions_represented') is not None:
         page.append('<p><b>Regional archive supplement:</b> '+
                     esc(state.get('regional_source_records_added',0))+
