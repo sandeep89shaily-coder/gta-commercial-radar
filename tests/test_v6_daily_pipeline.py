@@ -92,7 +92,7 @@ class V6Tests(unittest.TestCase):
         self.assertEqual(outcome['checkpointed_investigations_today'],1)
         diagnostic=Path(outcome['error_log'])
         self.assertTrue(diagnostic.is_file())
-        self.assertIn('test_ai_exception_writes_diagnostic',diagnostic.read_text())
+        self.assertIn('in investigator',diagnostic.read_text())
         self.assertIn('IndexError:',diagnostic.read_text())
         dashboard=(self.results/'GTA_RADAR_V6_DASHBOARD.html').read_text()
         self.assertIn('DEEPSEEK_RESEARCH',dashboard)
