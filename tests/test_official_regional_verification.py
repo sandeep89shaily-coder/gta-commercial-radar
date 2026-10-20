@@ -1,5 +1,6 @@
 """Regression cases for municipal exact-ID verification and regional coverage."""
 import csv
+from contextlib import closing
 import datetime as dt
 import json
 import sqlite3
@@ -15,7 +16,7 @@ import commercial_selector_v4 as v4
 DAY=dt.date(2026,10,19)
 
 def setup_db(path, rows):
-    with sqlite3.connect(path) as db:
+    with closing(sqlite3.connect(path)) as db:
         db.execute('CREATE TABLE records_current (source_id TEXT, record_key TEXT, '
                    'source_date TEXT, normalized_json TEXT, active INTEGER)')
         for sid,key,date,record in rows:
