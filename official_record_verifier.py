@@ -95,7 +95,8 @@ def _toronto_collector_verification(row,data_dir,source):
     ans.update(official_verification_level="NOT_VERIFIED",
                official_verification_note="No exact Toronto permit trade records")
     raw=[x.strip() for x in clean(row.get("source_keys")).split(" | ") if x.strip()]
-    if not raw or len(raw)>12 or any(not PERMIT_ID.fullmatch(x) for x in raw):
+    if not raw or len(raw)>12 or any(not re.fullmatch(
+            r"\d{2}\s+\d{5,8}\s+[A-Z]{2,4}\|\d+",x,re.I) for x in raw):
         return ans
     parent=[]
     for key in raw:
