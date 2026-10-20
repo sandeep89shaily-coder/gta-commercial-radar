@@ -44,7 +44,13 @@ class ExactGovernmentRecordVerificationTests(unittest.TestCase):
                 "Industrial warehouse expansion",status="Application"),
             row("york_region_active_development_applications","YR-12",
                 "2026-09-29","North Planning Ltd","12 Main Street",
-                "New warehouse development",region="York")
+                "New warehouse development",region="York"),
+            row("toronto_active_building_permits","26 233562 BLD|00",
+                "2026-10-18","","25 The West Mall","Commercial tenant space alterations",
+                status="Under Review",region="Toronto"),
+            row("toronto_active_building_permits","26 233562 HVA|00",
+                "2026-10-18","","25 The West Mall","HVAC permit work",
+                status="Application",region="Toronto")
         ])
 
     def test_mississauga_exact_status_and_no_invented_operator(self):
@@ -74,6 +80,21 @@ class ExactGovernmentRecordVerificationTests(unittest.TestCase):
         self.assertEqual(result['official_company'],'Sourced Builder Inc')
         self.assertEqual(result['official_company_role'],'builder')
         self.assertIn('local collector',result['official_status_basis'])
+
+    def test_toronto_multiple_trade_keys_verify_without_address_linking(self):
+        project=dict(source_id="toronto_active_building_permits",
+                     source_keys="26 233562 BLD|00 | 26 233562 HVA|00",
+                     address="25 The West Mall",city="Toronto")
+        result=official.verify(project,self.root,
+             transport=lambda url:self.fail("CKAN exact-key page API unavailable"))
+        self.assertEqual(result["official_permit_id"],"26 233562")
+        self.assertEqual(result["official_verification_level"],"COLLECTOR_SOURCE_MATCH")
+        self.assertIn("Under Review",result["official_status"])
+        self.assertIn("Application",result["official_status"])
+        self.assertIn("NOT live",result["official_status_basis"])
+        bad=dict(project,source_keys="26 233562 BLD|00 | 26 995544 HVA|00")
+        result=official.verify(bad,self.root,live=False)
+        self.assertEqual(result["official_verification_level"],"NOT_VERIFIED")
 
     def test_wrong_id_or_wrong_address_cannot_corrobate(self):
         candidate=dict(source_id="mississauga_issued_building_permits",
