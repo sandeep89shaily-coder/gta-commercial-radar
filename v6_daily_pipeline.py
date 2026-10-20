@@ -343,6 +343,17 @@ def render_dashboard(results, state):
     if status != 'SUCCESS':
         page.append('<article><h2>Collection attention needed</h2><p>Not all collection steps succeeded. '
                     'Do not interpret this as a complete or fully fresh GTA picture.</p></article>')
+    if state.get('regional_regions_represented') is not None:
+        page.append('<p><b>Regional archive supplement:</b> '+
+                    esc(state.get('regional_source_records_added',0))+
+                    ' distinct source-dated records outside/alongside the rolling 48h feed. '+
+                    '<b>Regions represented:</b> '+
+                    esc(', '.join(state.get('regional_regions_represented') or []) or 'None')+
+                    '. These are NOT newly issued permits. '+
+                    '<a href="GTA_RADAR_REGIONAL_COVERAGE.csv">Regional collection gaps and coverage</a>.</p>')
+    if state.get('regional_bridge_error'):
+        page.append('<p><b>Regional supplement unavailable:</b> '+
+                    esc(state['regional_bridge_error'])+'. Other collectors continue.</p>')
     page.append('<h2>Collection steps</h2>')
     for step in state.get('steps', []):
         page.append(f'<p><b>{esc(step["step"])}</b>: {esc(step["status"])} '
@@ -452,10 +463,21 @@ def pipeline(workspace, database=None, *, run_collectors=True, run_research=True
                 state['status'] = 'PARTIAL'
                 state['note'] = 'Opportunity export generation failed; old exports NOT used.'
                 return state
-        if selector is None:
+        use_default_selector = selector is None
+        if use_default_selector:
             import commercial_selector_v4 as v4
             selector = v4.run
-        selector(data / 'opportunities_ALL_REVIEW_ONLY.csv', out, db)
+        selection_file=data / 'opportunities_ALL_REVIEW_ONLY.csv'
+        if use_default_selector and db.is_file():
+            try:
+                from regional_candidate_bridge import selection_input
+                selection_file,regional_summary=selection_input(selection_file,db,out,today=day)
+                state.update(regional_summary)
+            except (OSError,ValueError,sqlite3.DatabaseError) as exc:
+                # Never misrepresent uncollected regions as successfully covered,
+                # and never damage the primary 48-hour collector output.
+                state['regional_bridge_error']=type(exc).__name__+': '+str(exc)[:180]
+        selector(selection_file, out, db)
         projects = out / 'CANDIDATES_V4_ALL_REVIEW_ONLY.csv'
         if not projects.exists():
             raise RuntimeError('V4 did not produce a candidate CSV.')
