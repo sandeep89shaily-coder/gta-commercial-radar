@@ -478,7 +478,14 @@ def run(projects_file,results_dir,legacy_data_dir=None,*,key=None,transport=None
                 if not evidence:
                     item['evidence_level']='OFFICIAL_PERMIT_ID_VERIFIED'
             item['lead_sector']=lead_sector(row)
-            item.update(grade(research_row,item,evidence))
+            grade_result=grade(research_row,item,evidence)
+            if official_verified and not evidence:
+                # Exact live government ID/status is authoritative project
+                # evidence even when generic search returns no webpages.
+                grade_result['evidence_tier']='OFFICIAL_ID_AND_STATUS_MATCH'
+                grade_result['lead_maturity']='OFFICIAL_PROJECT_STATUS_IDENTIFIED'
+                grade_result['next_system_action']='Identify operator, contractor and public business channels; timing still uncertain.'
+            item.update(grade_result)
             if stat['errors']:
                 item['caveats']=(str(item.get('caveats') or '')+
                                  '; discovery diagnostics: '+', '.join(stat['errors'][:3]))[:600]
