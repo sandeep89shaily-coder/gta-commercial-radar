@@ -278,6 +278,16 @@ def analyze(row,evidence,key,transport=None):
     for field in ('operator','developer'):
         val=str(values.get(field) or '').strip()[:140]
         out[field]=val if val and val.casefold() in text else ''
+    # Applicant or builder in an official permit is NOT proof of operation.
+    # Distinct public project context is needed to assert that separate role.
+    official_company=str(row.get('official_company') or '').strip()
+    official_role=str(row.get('official_company_role') or '').strip()
+    if (official_role in ('builder','applicant','application_name')
+            and official_company and
+            out.get('operator','').casefold()==official_company.casefold()
+            and not re.search(r'\\b(?:operator|operates|operated by|tenant|occupant)\\b',
+                              page_text,re.I)):
+        out['operator']=''
     val=str(values.get('contact') or '').strip()[:160]
     out['contact']=val if approved and val and val.casefold() in page_text.casefold() else ''
     for field in ('project_stage','buyer_fit','next_verification','caveats'):
