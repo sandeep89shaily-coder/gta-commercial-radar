@@ -285,7 +285,7 @@ def analyze(row,evidence,key,transport=None):
     if (official_role in ('builder','applicant','application_name')
             and official_company and
             out.get('operator','').casefold()==official_company.casefold()
-            and not re.search(r'\\b(?:operator|operates|operated by|tenant|occupant)\\b',
+            and not re.search(r'\b(?:operator|operates|operated by|tenant|occupant)\b',
                               page_text,re.I)):
         out['operator']=''
     val=str(values.get('contact') or '').strip()[:160]
