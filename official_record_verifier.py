@@ -77,7 +77,7 @@ def published_query(s, ident):
     if sid not in MAP or s.get("collector")!="arcgis":
         return ""
     query=clean(s.get("query_url"))
-    if not query.startswith("https://") or not PERMIT_ID.fullmatch(ident):
+    if not query.startswith("https://") or len(str(ident))>160:
         return ""
     key_fields=MAP[sid][0]
     names=key_fields if isinstance(key_fields,tuple) else (key_fields,)
@@ -85,7 +85,7 @@ def published_query(s, ident):
     if len(names)!=len(values) or not all(PERMIT_ID.fullmatch(v) for v in values):
         return ""
     # Pure numeric values are numeric in some ArcGIS layers (ObjectID, year).
-    sql=lambda v:v if re.fullmatch(r"\\d{1,10}",v) else "'"+v.replace("'","''")+"'"
+    sql=lambda v:v if re.fullmatch(r"\d{1,10}",v) else "'"+v.replace("'","''")+"'"
     where=" AND ".join(name+" = "+sql(value) for name,value in zip(names,values))
     return query+"?"+urlencode({"where":where,"outFields":"*","returnGeometry":"false","f":"json"})
 
