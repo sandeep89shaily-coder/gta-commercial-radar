@@ -44,7 +44,9 @@ FIELDS=v5.FIELDS+['evidence_level','next_verification','api_attempted',
                   'project_evidence_verified','related_company','related_company_role',
                   'related_company_contact','related_company_contact_url',
                   'contact_source_quality','related_company_contact_quality',
-                  'owner','tenant','contractor',*LIFECYCLE_FIELDS,*OFFICIAL_FIELDS]
+                  'owner','tenant','contractor','source_keys','description',
+                  'current_source_status','source_record_date','record_source_url',
+                  'record_source_url_basis',*LIFECYCLE_FIELDS,*OFFICIAL_FIELDS]
 PRIORITY={'PERMIT_REVIEW':0,'BUSINESS_REVIEW':1,'PLANNING_WATCH':2,
           'OTHER_WATCH':3,'SOURCE_UPDATE_WATCH':4}
 
@@ -430,6 +432,12 @@ def run(projects_file,results_dir,legacy_data_dir=None,*,key=None,transport=None
             item={field:'' for field in FIELDS}
             item.update(project_id=cid,address=row.get('address',''),
                         source_id=row.get('source_id',''),priority=row.get('lane',''),
+                        source_keys=row.get('source_keys',''),
+                        description=row.get('description',''),
+                        current_source_status=row.get('current_source_status',''),
+                        source_record_date=row.get('source_record_date',''),
+                        record_source_url=row.get('record_source_url',''),
+                        record_source_url_basis=row.get('record_source_url_basis',''),
                         researched_at=dt.datetime.now(dt.timezone.utc).isoformat(timespec='seconds'),
                         investigated_local_date=day,input_fingerprint=queue.fingerprint(row))
             official=verify_official_record(row,legacy_data_dir or out,
@@ -530,7 +538,8 @@ def run(projects_file,results_dir,legacy_data_dir=None,*,key=None,transport=None
             previous[cid]=item
             # A fully corroborated project is finished until its source changes.
             # Source-only AI results remain eligible for a later evidence recheck.
-            if item.get('status')=='AI_EVIDENCE_REVIEW':
+            if (item.get('status')=='AI_EVIDENCE_REVIEW'
+                    and item.get('project_evidence_verified')=='YES'):
                 enrolled=[r for r in enrolled if r['project_id']!=cid]
             v5.write_rows(history_path,list(previous.values()),columns=FIELDS)
             v5.write_rows(out/'GTA_RADAR_V6_LATEST_INVESTIGATIONS.csv',current,columns=FIELDS)
