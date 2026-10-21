@@ -150,6 +150,7 @@ class GrowthTests(unittest.TestCase):
 
     def test_legacy_bad_contacts_remain_visible_not_promoted(self):
         rows=[dict(project_id='P1',source_id='toronto_active_building_permits',
+                   lane='PERMIT_REVIEW',description='Commercial office fit-out',
                    address='55 King St',operator='Canada Life Assurance Company',
                    contact='866-292-7825',
                    contact_source_url='https://www.gov.nu.ca/documents/Canada-Life-Managers-2004.pdf',
@@ -157,6 +158,7 @@ class GrowthTests(unittest.TestCase):
                    source_urls='https://toronto.ca/permit/p1',
                    evidence_tier='OFFICIAL_PAGE_MATCHED'),
               dict(project_id='P2',source_id='toronto_active_building_permits',
+                   lane='PERMIT_REVIEW',description='Industrial warehouse expansion',
                    address='125 Queen St',operator='Sample Industries Ltd.',
                    contact='info@sampleindustries.ca',
                    contact_source_url='https://sampleindustries.ca/contact',
