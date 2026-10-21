@@ -15,13 +15,15 @@ from contextlib import closing
 from pathlib import Path
 
 from official_record_verifier import SOURCES
+from commercial_selector_v4 import classify
 
 VALID_REGIONS={"Peel","Toronto","York","Halton","Durham","Hamilton","Waterloo","Niagara"}
 PRIORITY={"Peel":0,"York":1,"Halton":2,"Durham":3,"Hamilton":4,"Waterloo":5,"Niagara":6,"Toronto":7}
 FIELDS=["source_id","source_key","source_group","description","address","city",
         "company_name","event_date","event_date_basis","evidence_url"]
 STATS=["source_id","jurisdiction","region","configured_enabled","records_in_database",
-       "eligible_source_dated_records","selected_for_research","reason"]
+       "eligible_source_dated_records","commercial_qualified_records",
+       "rejected_noncommercial_records","selected_for_research","reason"]
 IGNORED={"health_inspection","permit_history"}
 
 def _date(value):
@@ -39,7 +41,7 @@ def _write(path,fields,rows):
         w=csv.DictWriter(file,fieldnames=fields,extrasaction="ignore")
         w.writeheader();w.writerows(rows)
 
-def bridge(database,output_dir,*,today=None,max_days=180,per_source=18,per_region=50):
+def bridge(database,output_dir,*,today=None,max_days=180,per_source=60,per_region=180):
     """Read-only balanced regional supplement + honest coverage inventory.
 
     Records are NOT relabeled as "new" simply because imported recently.
@@ -50,7 +52,8 @@ def bridge(database,output_dir,*,today=None,max_days=180,per_source=18,per_regio
     by_source={s["id"]:s for s in SOURCES
                if s.get("region") in VALID_REGIONS
                and s.get("family") in ("permit","planning_application","industrial_regulatory")}
-    db_counts=defaultdict(int);eligible=defaultdict(int);pool=defaultdict(list)
+    db_counts=defaultdict(int);eligible=defaultdict(int)
+    qualifying=defaultdict(int);noncommercial=defaultdict(int);pool=defaultdict(list)
     if database.is_file():
         with closing(sqlite3.connect(database.resolve().as_uri()+"?mode=ro",uri=True)) as con:
             try:
@@ -72,6 +75,18 @@ def bridge(database,output_dir,*,today=None,max_days=180,per_source=18,per_regio
                     address=str(d.get("address") or "").strip()
                     if not desc or not address or not key:continue
                     eligible[sid]+=1
+                    candidate={'source_id':sid, 'source_key':str(key),
+                               'source_group':'REGIONAL_ARCHIVED_SOURCE',
+                               'description':desc,'address':address,
+                               'company_name':str(d.get('entity_name') or '')}
+                    lane,_=classify(candidate)
+                    # A first-60 slice can contain ONLY residential permits.
+                    # Filter before any quota or ranking; do not falsely label
+                    # the unqualified records as research opportunities.
+                    if lane.startswith('EXCLUDE') or lane=='ENRICHMENT_ONLY':
+                        noncommercial[sid]+=1
+                        continue
+                    qualifying[sid]+=1
                     if len(pool[sid])<per_source:
                         pool[sid].append((date,str(key),d))
             except sqlite3.Error:
@@ -101,8 +116,8 @@ def bridge(database,output_dir,*,today=None,max_days=180,per_source=18,per_regio
             label="STAGED_DISABLED_NOT_COLLECTED_OR_NO_DATED_RECORDS"
         elif db_counts[sid]==0:
             label="NO_ACTIVE_SOURCE_RECORDS_IN_LOCAL_DATABASE"
-        elif eligible[sid]==0:
-            label="NO_RECENT_SOURCE_DATED_COMMERCIAL_RECORDS"
+        elif qualifying[sid]==0:
+            label="NO_RECENT_QUALIFYING_COMMERCIAL_ACTIVITY"
         else:
             label="PER_REGION_OR_SOURCE_CAP"
         stats.append(dict(source_id=sid,jurisdiction=s.get("jurisdiction",""),
@@ -110,6 +125,8 @@ def bridge(database,output_dir,*,today=None,max_days=180,per_source=18,per_regio
                           configured_enabled=str(bool(s.get("enabled"))),
                           records_in_database=db_counts[sid],
                           eligible_source_dated_records=eligible[sid],
+                          commercial_qualified_records=qualifying[sid],
+                          rejected_noncommercial_records=noncommercial[sid],
                           selected_for_research=source_counts[sid],
                           reason=label))
     out=Path(output_dir)
@@ -145,3 +162,50 @@ def selection_input(base_csv, database, output, today=None):
         "staged_sources_not_enabled":sum(r["reason"].startswith("STAGED_DISABLED") for r in inventory),
         "regional_sources_with_projects":sum(bool(r["selected_for_research"]) for r in inventory),
     }
+
+
+OUTCOME_FIELDS=['source_id','jurisdiction','region','regional_source_candidates',
+                'passed_commercial_selector','not_selected_after_filter',
+                'collection_state']
+
+def selection_outcomes(results_dir):
+    """Show where regional archival records stop, without claiming AI verified them.
+
+    A project may be grouped from several Toronto trade keys, but all other
+    source keys are exact matches; comparison uses project_id AND source_id.
+    """
+    results_dir=Path(results_dir)
+    regional=results_dir/'GTA_RADAR_REGIONAL_SOURCE_CANDIDATES.csv'
+    selected=results_dir/'CANDIDATES_V4_ALL_REVIEW_ONLY.csv'
+    coverage=results_dir/'GTA_RADAR_REGIONAL_COVERAGE.csv'
+    if not (regional.is_file() and selected.is_file() and coverage.is_file()):
+        return {}
+    with regional.open(encoding='utf-8-sig',newline='') as f:
+        incoming=list(csv.DictReader(f))
+    with selected.open(encoding='utf-8-sig',newline='') as f:
+        passed=list(csv.DictReader(f))
+    with coverage.open(encoding='utf-8-sig',newline='') as f:
+        inventory=list(csv.DictReader(f))
+    selected_keys=set()
+    for item in passed:
+        sid=str(item.get('source_id') or '')
+        for key in str(item.get('source_keys') or '').split(' | '):
+            selected_keys.add((sid,key.strip()))
+    from collections import Counter
+    taken=Counter(r['source_id'] for r in incoming
+                  if (r['source_id'],r['source_key']) in selected_keys)
+    rows=[]
+    for info in inventory:
+        sid=info['source_id']
+        count=sum(r['source_id']==sid for r in incoming)
+        rows.append({'source_id':sid,'jurisdiction':info['jurisdiction'],
+                     'region':info['region'],'regional_source_candidates':count,
+                     'passed_commercial_selector':taken[sid],
+                     'not_selected_after_filter':max(0,count-taken[sid]),
+                     'collection_state':('CONFIGURED_ENABLED' if info.get('configured_enabled')=='True'
+                                         else 'HISTORICAL_STAGED_NOT_ENABLED')})
+    _write(results_dir/'GTA_RADAR_REGIONAL_SELECTION_OUTCOMES.csv',OUTCOME_FIELDS,rows)
+    return {'regional_source_candidates':len(incoming),
+            'regional_passed_selector':sum(taken.values()),
+            'regional_selector_regions':sorted({r['region'] for r in rows
+                                                 if r['passed_commercial_selector']})}
