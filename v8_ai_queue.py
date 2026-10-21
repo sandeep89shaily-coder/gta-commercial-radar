@@ -14,6 +14,7 @@ import re
 from pathlib import Path
 from commercial_research_policy import research_route, canonical_lane
 from official_record_verifier import BY_ID
+from opportunity_lifecycle import classify_status
 
 META = ('_queued_on', '_fingerprint')
 FINISHED = {'AI_EVIDENCE_REVIEW', 'AI_SOURCE_RECORD_REVIEW'}
@@ -104,7 +105,9 @@ def build(current_rows, queued_rows, history, today):
         old = history.get(ident, {})
         same_source = not old.get('input_fingerprint') or old.get('input_fingerprint') == fingerprint(row)
         if (old.get('status') == 'AI_EVIDENCE_REVIEW' and same_source
-                and old.get('project_evidence_verified') == 'YES'):
+                and old.get('project_evidence_verified') == 'YES'
+                and old.get('project_identity_confidence') in
+                    ('EXACT_LIVE_OFFICIAL','EXACT_LOCAL_COLLECTOR','EXACT_ID_ON_PUBLIC_PAGE')):
             continue  # Only project-specific evidence passed under the new rule.
         # Legacy AI_EVIDENCE_REVIEW rows have no strict evidence field; retain
         # and automatically retry them rather than grandfathering directories.
@@ -152,6 +155,11 @@ def due(pending, history, today):
         same_source = not old.get('input_fingerprint') or old.get('input_fingerprint') == fingerprint(row)
         age = days_since(local_attempt_date(old), today)
         if same_source:
+            if (old.get('status')=='AI_EVIDENCE_REVIEW'
+                    and old.get('project_identity_confidence') not in
+                        ('EXACT_LIVE_OFFICIAL','EXACT_LOCAL_COLLECTOR','EXACT_ID_ON_PUBLIC_PAGE')
+                    and 0 <= age < 7):
+                continue  # Retain address-only history, retry at most weekly
             if old.get('status') == 'AI_SOURCE_RECORD_REVIEW' and 0 <= age < 14:
                 continue  # AI analyzed; schedule later independent-evidence recheck
             if old.get('status') in ('AI_ERROR_REVIEW', 'INSUFFICIENT_SOURCE_RECORD') and age == 0:
@@ -174,5 +182,11 @@ def due(pending, history, today):
             score = int(row.get('review_priority') or 0)
         except ValueError:
             score = 0
-        return (effective, followup, -min(365, age), -score, queued, row.get('project_id', ''))
+        status_order={'PRE_APPROVAL':0,'PRE_ISSUANCE':1,'APPROVED_NOT_ISSUED':2,
+                      'PERMIT_ISSUED':3,'UNKNOWN':4,'INSPECTION_STAGE':5,
+                      'COMPLETED':8,'BLOCKED_OR_INACTIVE':9}
+        # These are rankings from the local record, NOT a claim of live stage.
+        status_rank=status_order.get(classify_status(row.get('current_source_status')),4)
+        return (effective,status_rank,followup,-min(365,age),-score,
+                queued,row.get('project_id',''))
     return fair_regional_order(sorted(ready, key=rank))
