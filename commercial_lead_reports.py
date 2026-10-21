@@ -10,6 +10,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 from commercial_research_policy import research_route, directory_url, canonical_lane
 from company_contact_policy import company_owned_page, legacy_contact_quality
+from opportunity_lifecycle import assess, LIFECYCLE_FIELDS
 
 FIELDS=['project_id','address','city','source_id','lane','operator','developer',
         'project_stage','buyer_fit','contact','contact_source_url',
@@ -20,7 +21,7 @@ FIELDS=['project_id','address','city','source_id','lane','operator','developer',
         'official_record_url','official_source_date','official_verification_level',
         'related_company','related_company_role','related_company_contact','related_company_contact_url',
         'related_company_contact_quality','contact_source_quality','contact_provenance',
-        'unverified_contact','unverified_contact_source_url','record_source_url_basis']
+        'unverified_contact','unverified_contact_source_url','record_source_url_basis',*LIFECYCLE_FIELDS]
 
 
 def read(path):
@@ -81,10 +82,22 @@ def build(root):
     contacts=[]
     legacy=[]
     questionable_contacts=0
+    every_research_record=[]
     for item in investigations:
         pid=item.get('project_id')
         source=candidates.get(pid,{})
         merged={**source,**{k:v for k,v in item.items() if v}}
+        lifecycle=assess(merged,item)
+        # Recent runs persist lifecycle results assessed with page text; historic
+        # rows only had URLs and must not inherit unjustified exact-ID status.
+        for name in LIFECYCLE_FIELDS:
+            if item.get(name) and name!='lifecycle_source_age_days':
+                lifecycle[name]=item[name]
+        audit={k:str(merged.get(k) or '') for k in FIELDS}
+        audit.update(lifecycle)
+        audit.update(project_id=pid or '',research_status=item.get('status',''),
+                     sale_ready='NO')
+        every_research_record.append(audit)
         # Keep all prior research, but do not grandfather unsourced web hits.
         verified=item.get('project_evidence_verified')=='YES'
         if not verified:
@@ -136,6 +149,7 @@ def build(root):
                       'related_company_contact','related_company_contact_url',
                       'related_company_contact_quality'):
             record[field]=item.get(field,'')
+        record.update(lifecycle)
         opportunities.append(record)
         if first_party:
             contacts.append(record)
@@ -145,7 +159,14 @@ def build(root):
         strength={'PUBLIC_COMPANY_CHANNEL':0,'IDENTIFIED_PROJECT_OPERATOR':1,'CORROBORATED_PROJECT_ONLY':2}
         return (order.get(item['lane'],9),strength.get(item['opportunity_strength'],9),
                 item['project_id'])
-    opportunities.sort(key=rank)
+    review_order={'EARLY_STAGE_PROJECT_REVIEW':0,'PRE_ISSUANCE_REVIEW':1,
+                  'APPROVED_STAGE_REVIEW':2,'ISSUED_PERMIT_TIMING_CHECK':3,
+                  'INSPECTION_STAGE_WORK':4,'STATUS_REFRESH_REQUIRED':5,
+                  'SOURCE_STATUS_UNCLEAR':6,'EXACT_PROJECT_VERIFICATION_NEEDED':7,
+                  'HISTORICAL_OR_INACTIVE':8}
+    opportunities.sort(key=lambda r:(review_order.get(r['opportunity_class'],9),
+                                    -int(r.get('opportunity_review_priority') or 0),
+                                    *rank(r)))
     contacts.sort(key=rank)
     pending=[]
     for item in backlog:
@@ -169,12 +190,21 @@ def build(root):
     write(root/'GTA_RADAR_AUTOMATED_RESEARCH_QUEUE.csv',pending)
     write(root/'GTA_RADAR_COMPANY_ENRICHMENT.csv',enrichment_rows)
     write(root/'GTA_RADAR_LEGACY_EVIDENCE_RECHECK.csv',legacy)
+    every_research_record.sort(key=lambda r:(
+        review_order.get(r.get('opportunity_class'),9),
+        -int(r.get('opportunity_review_priority') or 0),r.get('project_id','')))
+    write(root/'GTA_RADAR_GENUINE_OPPORTUNITY_REVIEW.csv',every_research_record)
     summary=dict(project_opportunities=len(opportunities),
                  public_company_contacts=len(contacts),backlog=len(pending),
                  company_enrichment=len(enrichment_rows),legacy_rechecks=len(legacy),
                   contact_sources_requiring_recheck=questionable_contacts,
                   regions_with_reported_prospects=len({r['region'] for r in regional_rows}),
-                  region_report='GTA_RADAR_VERIFIED_REGIONAL_OUTCOMES.csv')
+                  region_report='GTA_RADAR_VERIFIED_REGIONAL_OUTCOMES.csv',
+                  opportunity_review_records=len(every_research_record),
+                  early_stage_review=sum(r['opportunity_class']=='EARLY_STAGE_PROJECT_REVIEW' for r in every_research_record),
+                  issued_stage_review=sum(r['opportunity_class']=='ISSUED_PERMIT_TIMING_CHECK' for r in every_research_record),
+                  historical_or_inactive=sum(r['opportunity_class']=='HISTORICAL_OR_INACTIVE' for r in every_research_record),
+                  exact_project_verification_needed=sum(r['opportunity_class']=='EXACT_PROJECT_VERIFICATION_NEEDED' for r in every_research_record))
     def esc(t):return html.escape(str(t or ''),quote=True)
     doc=['<!doctype html><html><head><meta charset="utf-8"><title>GTA Radar Leads</title>',
          '<style>body{font:15px Segoe UI,Arial;max-width:1150px;margin:25px auto;background:#f5f7fa;color:#1f2937;padding:0 16px}',
@@ -189,6 +219,12 @@ def build(root):
          ' · <b>Company enrichment records:</b> '+str(len(enrichment_rows))+
          ' · <b>Legacy evidence requiring project-specific recheck:</b> '+str(len(legacy))+
          ' · <b>Unverified historical contact references:</b> '+str(questionable_contacts)+'</p>',
+         '<p><b>Lifecycle qualification:</b> '+
+         str(summary['early_stage_review'])+' early-stage reviews · '+
+         str(summary['issued_stage_review'])+' issued-permit timing checks · '+
+         str(summary['exact_project_verification_needed'])+' requiring exact project verification. '+
+         'These are research classes, not confirmed unawarded jobs.</p>',
+         '<p><a href="GTA_RADAR_GENUINE_OPPORTUNITY_REVIEW.csv">All researched projects by genuine opportunity review class</a></p>',
          '<p>Project counts by location and official evidence: '+
          '<a href="GTA_RADAR_VERIFIED_REGIONAL_OUTCOMES.csv">Regional outcomes</a></p>',
          '<p>Download CSV: <a href="GTA_RADAR_PROJECT_OPPORTUNITIES.csv">Promising projects</a> · ',
@@ -203,12 +239,17 @@ def build(root):
             '</p><p><b>Permit ID:</b> '+esc(item['official_permit_id'] or 'Not identified')+
             ' · <b>Official stage:</b> '+esc(item['official_status'] or 'Not available')+
             ' · <b>Verification:</b> '+esc(item['official_verification_level'] or 'No exact record')+
+            ' · <b>Lifecycle:</b> '+esc(item.get('lifecycle_stage') or 'Unknown')+
             '</p><p><b>Business:</b> '+esc(item['operator'] or item['developer'] or 'Not identified')+
             ' · <b>Related '+esc(item['related_company_role'] or 'company')+':</b> '+
             esc(item['related_company'] or 'Not identified')+
             ' · <b>Public channel:</b> '+esc(item['contact'] or 'Not confirmed')+
+            '</p><p><b>Opportunity review class:</b> '+
+            esc(item.get('opportunity_class') or 'Not assessed')+
+            ' · <b>Supplier contract:</b> '+esc(item.get('supplier_contract_status') or 'Unknown')+
             '</p><p><b>Potential services:</b> '+esc(item['buyer_fit'] or 'Not established')+
-            '</p><small>'+esc(item['next_system_action'])+'</small><p>')
+            '</p><small>'+esc(item.get('opportunity_next_action') or item['next_system_action'])+
+            '</small><p>'+esc(item.get('project_identity_warning') or '')+'</p><p>')
         for u in str(item['source_urls']).split(' | '):
             if urlparse(u).scheme=='https' and urlparse(u).hostname:
                 doc.append('<a href="'+esc(u)+'" rel="noopener noreferrer">Project evidence</a> · ')
