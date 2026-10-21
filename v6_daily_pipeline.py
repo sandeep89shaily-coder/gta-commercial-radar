@@ -379,11 +379,18 @@ def render_dashboard(results, state):
                     f'<span class="muted">({esc(step.get("detail", ""))})</span></p>')
     if state.get('lead_reports'):
         reports=state['lead_reports']
-        page.append('<p><b>Strictly corroborated commercial prospects:</b> '+
+        page.append('<p><b>Researched commercial prospect records (not necessarily current jobs):</b> '+
                     esc(reports.get('project_opportunities',0))+
                     ' · <b>Public company contact channels:</b> '+esc(reports.get('public_company_contacts',0))+
                     ' · <b>Company-only enrichment records (not sales triggers):</b> '+
                     esc(reports.get('company_enrichment',0))+'</p>')
+        page.append('<p><b>Genuine-opportunity review:</b> '+
+                    esc(reports.get('early_stage_review',0))+' early-stage · '+
+                    esc(reports.get('issued_stage_review',0))+' issued-permit timing checks · '+
+                    esc(reports.get('historical_or_inactive',0))+' historical/inactive · '+
+                    esc(reports.get('exact_project_verification_needed',0))+' exact-ID verification required. '+
+                    '<a href="GTA_RADAR_GENUINE_OPPORTUNITY_REVIEW.csv">Open full lifecycle review</a>. '+
+                    'No listed project is automatically an open supplier contract.</p>')
     page.append('<h2>Evidence-backed commercial intelligence</h2>')
     page.append('<p>Project evidence is assessed automatically. A project does not imply '
                 'that a supplier purchase is underway.</p>')
