@@ -11,6 +11,7 @@ from urllib.parse import urlparse
 from commercial_research_policy import research_route, directory_url, canonical_lane
 from company_contact_policy import company_owned_page, legacy_contact_quality
 from opportunity_lifecycle import assess, LIFECYCLE_FIELDS
+from commercial_opportunity_shortlist import qualify, sort_key, SHORTLIST_FIELDS
 
 FIELDS=['project_id','address','city','source_id','lane','operator','developer',
         'project_stage','buyer_fit','contact','contact_source_url',
@@ -21,7 +22,9 @@ FIELDS=['project_id','address','city','source_id','lane','operator','developer',
         'official_record_url','official_source_date','official_verification_level',
         'related_company','related_company_role','related_company_contact','related_company_contact_url',
         'related_company_contact_quality','contact_source_quality','contact_provenance',
-        'unverified_contact','unverified_contact_source_url','record_source_url_basis',*LIFECYCLE_FIELDS]
+        'unverified_contact','unverified_contact_source_url','record_source_url_basis',
+         'description','source_keys','current_source_status','source_record_date',
+         'official_description',*LIFECYCLE_FIELDS,*SHORTLIST_FIELDS]
 
 
 def read(path):
@@ -97,6 +100,7 @@ def build(root):
         audit.update(lifecycle)
         audit.update(project_id=pid or '',research_status=item.get('status',''),
                      sale_ready='NO')
+        audit.update(qualify(audit))
         every_research_record.append(audit)
         # Keep all prior research, but do not grandfather unsourced web hits.
         verified=item.get('project_evidence_verified')=='YES'
@@ -150,6 +154,10 @@ def build(root):
                       'related_company_contact_quality'):
             record[field]=item.get(field,'')
         record.update(lifecycle)
+        for source_field in ('description','source_keys','current_source_status',
+                             'source_record_date','official_description'):
+            record[source_field]=merged.get(source_field,'')
+        record.update(qualify(record))
         opportunities.append(record)
         if first_party:
             contacts.append(record)
@@ -164,9 +172,9 @@ def build(root):
                   'INSPECTION_STAGE_WORK':4,'STATUS_REFRESH_REQUIRED':5,
                   'SOURCE_STATUS_UNCLEAR':6,'EXACT_PROJECT_VERIFICATION_NEEDED':7,
                   'HISTORICAL_OR_INACTIVE':8}
-    opportunities.sort(key=lambda r:(review_order.get(r['opportunity_class'],9),
-                                    -int(r.get('opportunity_review_priority') or 0),
-                                    *rank(r)))
+    qualifier_order={'PRIORITY_INVESTIGATION':0,'PROMISING_MORE_RESEARCH':1}
+    opportunities.sort(key=lambda r:(qualifier_order.get(r['qualification_group'],2),
+                                     sort_key(r),*rank(r)))
     contacts.sort(key=rank)
     pending=[]
     for item in backlog:
@@ -194,6 +202,13 @@ def build(root):
         review_order.get(r.get('opportunity_class'),9),
         -int(r.get('opportunity_review_priority') or 0),r.get('project_id','')))
     write(root/'GTA_RADAR_GENUINE_OPPORTUNITY_REVIEW.csv',every_research_record)
+    # No fixed top-N; leave every unqualified row in an explicit evidence-gap file.
+    qualified=[r for r in every_research_record if r['qualification_group']=='PRIORITY_INVESTIGATION']
+    needs_review=[r for r in every_research_record if r['qualification_group']!='PRIORITY_INVESTIGATION']
+    qualified.sort(key=sort_key)
+    needs_review.sort(key=lambda r:(r['qualification_group'],*sort_key(r)))
+    write(root/'GTA_RADAR_QUALIFIED_OPPORTUNITY_SHORTLIST.csv',qualified)
+    write(root/'GTA_RADAR_OPPORTUNITY_RESEARCH_GAPS.csv',needs_review)
     summary=dict(project_opportunities=len(opportunities),
                  public_company_contacts=len(contacts),backlog=len(pending),
                  company_enrichment=len(enrichment_rows),legacy_rechecks=len(legacy),
@@ -204,7 +219,10 @@ def build(root):
                   early_stage_review=sum(r['opportunity_class']=='EARLY_STAGE_PROJECT_REVIEW' for r in every_research_record),
                   issued_stage_review=sum(r['opportunity_class']=='ISSUED_PERMIT_TIMING_CHECK' for r in every_research_record),
                   historical_or_inactive=sum(r['opportunity_class']=='HISTORICAL_OR_INACTIVE' for r in every_research_record),
-                  exact_project_verification_needed=sum(r['opportunity_class']=='EXACT_PROJECT_VERIFICATION_NEEDED' for r in every_research_record))
+                  exact_project_verification_needed=sum(r['opportunity_class']=='EXACT_PROJECT_VERIFICATION_NEEDED' for r in every_research_record),
+                  qualified_investigation_candidates=len(qualified),
+                  opportunity_research_gaps=len(needs_review),
+                  shortlist_report='GTA_RADAR_QUALIFIED_OPPORTUNITY_SHORTLIST.csv')
     def esc(t):return html.escape(str(t or ''),quote=True)
     doc=['<!doctype html><html><head><meta charset="utf-8"><title>GTA Radar Leads</title>',
          '<style>body{font:15px Segoe UI,Arial;max-width:1150px;margin:25px auto;background:#f5f7fa;color:#1f2937;padding:0 16px}',
@@ -225,6 +243,12 @@ def build(root):
          str(summary['exact_project_verification_needed'])+' requiring exact project verification. '+
          'These are research classes, not confirmed unawarded jobs.</p>',
          '<p><a href="GTA_RADAR_GENUINE_OPPORTUNITY_REVIEW.csv">All researched projects by genuine opportunity review class</a></p>',
+         '<p><b>Automatic high-confidence investigation shortlist:</b> '+str(len(qualified))+
+         ' projects · <b>other saved investigations:</b> '+str(len(needs_review))+
+         '. No fixed project-count cap; these are NOT confirmed available contracts. '+
+         '<a href="GTA_RADAR_QUALIFIED_OPPORTUNITY_SHORTLIST.csv">Open shortlist CSV</a> · '+
+         '<a href="GTA_RADAR_OPPORTUNITY_RESEARCH_GAPS.csv">Research gaps</a></p>',
+         '<p><a href="GTA_RADAR_SHORTLIST.html">Browse shortlist</a></p>',
          '<p>Project counts by location and official evidence: '+
          '<a href="GTA_RADAR_VERIFIED_REGIONAL_OUTCOMES.csv">Regional outcomes</a></p>',
          '<p>Download CSV: <a href="GTA_RADAR_PROJECT_OPPORTUNITIES.csv">Promising projects</a> · ',
