@@ -21,6 +21,7 @@ from lead_qualification import grade
 from commercial_research_policy import project_evidence, directory_url, research_route, lead_sector
 import v8_ai_queue as queue
 from official_record_verifier import verify as verify_official_record, FIELDS as OFFICIAL_FIELDS
+from company_contact_policy import company_owned_page, matching_business_channel
 
 ROOT_API='https://api.deepseek.com'
 MODEL='deepseek-flash'
@@ -40,7 +41,8 @@ FIELDS=v5.FIELDS+['evidence_level','next_verification','api_attempted',
                   'input_fingerprint','investigated_local_date',
                   'contact_source_url','contact_provenance','lead_sector',
                   'project_evidence_verified','related_company','related_company_role',
-                  'related_company_contact','related_company_contact_url',*OFFICIAL_FIELDS]
+                  'related_company_contact','related_company_contact_url',
+                  'contact_source_quality','related_company_contact_quality',*OFFICIAL_FIELDS]
 PRIORITY={'PERMIT_REVIEW':0,'BUSINESS_REVIEW':1,'PLANNING_WATCH':2,
           'OTHER_WATCH':3,'SOURCE_UPDATE_WATCH':4}
 
@@ -326,16 +328,17 @@ def find_public_business_contact(row, operator, key, db, day, legacy, transport=
     for result in entries[:6]:
         if not isinstance(result,dict):continue
         url=str(result.get('url') or '')
-        if not safe_url(url) or directory_url(url):continue
+        if not safe_url(url) or directory_url(url) or not company_owned_page(name,url):continue
         body=str(result.get('content') or '')[:9000]
         if not body or name.casefold() not in body.casefold():continue
         # Prefer business role addresses; don't harvest personal mailbox IDs.
         email=re.search(r'\b(?:info|contact|office|sales|admin|enquiries|inquiries)@[a-z0-9.-]+\.[a-z]{2,}\b',body,re.I)
         phone=re.search(r'(?<!\d)(?:\+1[. -]?)?\(?[2-9]\d{2}\)?[. -]?[2-9]\d{2}[. -]?\d{4}(?!\d)',body)
         contact=(email.group(0) if email else (phone.group(0) if phone else ''))
-        if not contact:continue
+        if not contact or not matching_business_channel(name,url,body,contact):continue
         return {'contact':contact,'contact_source_url':url,
-                'contact_provenance':'PUBLIC_MATCHING_COMPANY_PAGE'},1
+                'contact_provenance':'PUBLIC_MATCHING_COMPANY_PAGE',
+                'contact_source_quality':'CONTACT_ON_BRANDED_BUSINESS_PAGE'},1
     return {},1
 
 
@@ -480,6 +483,7 @@ def run(projects_file,results_dir,legacy_data_dir=None,*,key=None,transport=None
                     else:
                         item['related_company_contact']=extra['contact']
                         item['related_company_contact_url']=extra['contact_source_url']
+                        item['related_company_contact_quality']=extra['contact_source_quality']
                     counts['company_contacts_discovered']+=1
             item['project_evidence_verified']='YES' if (evidence or official_verified) else 'NO'
             if official_verified:

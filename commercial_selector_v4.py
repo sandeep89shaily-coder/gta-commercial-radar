@@ -15,13 +15,14 @@ from contextlib import closing
 from pathlib import Path
 from urllib.parse import quote_plus, urlparse
 from commercial_research_policy import INSPECTION, PERMIT, research_route, lead_sector
+from official_record_verifier import BY_ID, exact_id, published_query
 
 ROOT = Path(__file__).resolve().parent
 OUTPUT_FIELDS = [
     'lane', 'review_priority', 'project_id', 'address', 'city', 'company_name',
     'description', 'source_id', 'source_keys', 'permit_count', 'permit_types',
     'event_date', 'date_basis', 'source_record_date', 'source_record_date_basis',
-    'current_source_status', 'source_group', 'record_source_url',
+    'current_source_status', 'source_group', 'record_source_url', 'record_source_url_basis',
     'service_hypotheses', 'review_reason', 'review_status', 'manual_research_url',
     'research_route', 'lead_sector',
 ]
@@ -157,6 +158,18 @@ def summarize(members, metadata):
     meta = next((metadata.get((str(x.get('source_id') or ''), str(x.get('source_key') or ''))) for x in members if metadata.get((str(x.get('source_id') or ''), str(x.get('source_key') or '')))), {})
     direct_urls = [safe_url(x.get('evidence_url') or x.get('source_url')) for x in members]
     direct = next((x for x in direct_urls if x), '') or safe_url(meta.get('evidence_url'))
+    direct_basis='PUBLISHED_SOURCE_EVIDENCE_FIELD' if direct else ''
+    if not direct and meta:
+        # Construct an EXACT official lookup, never a generic address-search
+        # page. The clickable lookup is NOT proof the current record remains
+        # live until verified separately against the government endpoint.
+        single=next((x for x in members if metadata.get((
+                    str(x.get('source_id') or ''),str(x.get('source_key') or '')))),None)
+        if single:
+            official_source=BY_ID.get(sid,{})
+            match=exact_id({'source_keys':single.get('source_key','')},official_source)
+            direct=published_query(official_source,match) if match else ''
+            if direct:direct_basis='EXACT_ID_OFFICIAL_LOOKUP_UNCHECKED'
     company = next((str(x.get('company_name') or '').strip() for x in members if str(x.get('company_name') or '').strip().upper() not in ('', 'UNKNOWN', 'NONE')), 'UNKNOWN')
     score = {'PERMIT_REVIEW': 70, 'BUSINESS_REVIEW': 55, 'PLANNING_WATCH': 35, 'ENVIRONMENT_WATCH':25,'SOURCE_UPDATE_WATCH': 12, 'OTHER_WATCH': 8}.get(lane, 0)
     if ACTION.search(fulltext) and lane in ('PERMIT_REVIEW', 'BUSINESS_REVIEW'):
@@ -189,7 +202,8 @@ def summarize(members, metadata):
         'source_record_date': record_date,
         'source_record_date_basis': 'COLLECTOR-PREFERRED DATE FIELD, MAY BE STATUS DATE; NOT CONFIRMED ISSUED DATE' if record_date else 'NOT AVAILABLE',
         'current_source_status': meta.get('status') or '', 'source_group': group,
-        'record_source_url': direct, 'service_hypotheses': service_hypotheses(fulltext, kinds),
+        'record_source_url': direct, 'record_source_url_basis':direct_basis,
+        'service_hypotheses': service_hypotheses(fulltext, kinds),
         'review_reason': reason, 'review_status': 'RESEARCH ONLY — OPERATOR, DATE AND DEMAND UNVERIFIED',
         'manual_research_url': 'https://www.google.com/search?q=' + quote_plus(search[:240]),
         'research_route':research_route({'source_id':sid,'lane':lane,'description':fulltext}),

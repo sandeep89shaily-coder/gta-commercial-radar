@@ -133,6 +133,7 @@ class CommercialPipelinePolicyTests(unittest.TestCase):
             rows=[dict(project_id='new',address='25 The West Mall',source_id='toronto_active_building_permits',
                        priority='PERMIT_REVIEW',operator='Example Business',buyer_fit='Hypothesis only: HVAC',
                        contact='info@example.ca',contact_source_url='https://example.ca/contact',
+                        contact_source_quality='CONTACT_ON_BRANDED_BUSINESS_PAGE',
                        status='AI_EVIDENCE_REVIEW',project_evidence_verified='YES',
                        source_urls='https://toronto.ca/permits/25thewestmall',
                        evidence_tier='OFFICIAL_PAGE_MATCHED'),

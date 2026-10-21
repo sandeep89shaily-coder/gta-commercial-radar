@@ -9,6 +9,7 @@ import html
 from pathlib import Path
 from urllib.parse import urlparse
 from commercial_research_policy import research_route, directory_url, canonical_lane
+from company_contact_policy import company_owned_page, legacy_contact_quality
 
 FIELDS=['project_id','address','city','source_id','lane','operator','developer',
         'project_stage','buyer_fit','contact','contact_source_url',
@@ -17,7 +18,9 @@ FIELDS=['project_id','address','city','source_id','lane','operator','developer',
         'next_system_action','sale_ready','official_permit_id','official_status',
         'official_status_basis','official_company','official_company_role',
         'official_record_url','official_source_date','official_verification_level',
-        'related_company','related_company_role','related_company_contact','related_company_contact_url']
+        'related_company','related_company_role','related_company_contact','related_company_contact_url',
+        'related_company_contact_quality','contact_source_quality','contact_provenance',
+        'unverified_contact','unverified_contact_source_url','record_source_url_basis']
 
 
 def read(path):
@@ -32,6 +35,39 @@ def write(path,rows):
         w.writeheader();w.writerows(rows)
 
 
+REGIONAL_FIELDS=['region','source_id','municipality','projects_reported',
+                 'live_official_verification','local_exact_source_matches',
+                 'public_business_channels_confirmed','contact_sources_to_recheck']
+
+def write_regional_outcomes(root, opportunities):
+    """Project counts by source are independent of raw collector hit counts."""
+    from collections import defaultdict
+    from official_record_verifier import BY_ID
+    observed=defaultdict(lambda:{k:0 for k in REGIONAL_FIELDS[3:]})
+    for r in opportunities:
+        source=BY_ID.get(r.get('source_id'),{})
+        sid=r.get('source_id') or 'UNKNOWN'
+        region=source.get('region') or 'Other'
+        municipality=source.get('jurisdiction') or r.get('city') or 'Unknown'
+        key=(region,sid,municipality)
+        counters=observed[key]
+        counters['projects_reported']+=1
+        level=r.get('official_verification_level') or ''
+        counters['live_official_verification']+=int(level=='OFFICIAL_ID_AND_STATUS_MATCH')
+        counters['local_exact_source_matches']+=int(level in
+            ('COLLECTOR_SOURCE_MATCH','PARTIAL_COLLECTOR_SOURCE_MATCH'))
+        counters['public_business_channels_confirmed']+=int(bool(r.get('contact')
+                                                             and r.get('contact_source_url')))
+        counters['contact_sources_to_recheck']+=int(bool(r.get('unverified_contact')))
+    rows=[dict(region=reg,source_id=sid,municipality=city,**counters)
+          for (reg,sid,city),counters in sorted(observed.items())]
+    target=Path(root)/'GTA_RADAR_VERIFIED_REGIONAL_OUTCOMES.csv'
+    with target.open('w',encoding='utf-8-sig',newline='') as handle:
+        writer=csv.DictWriter(handle,fieldnames=REGIONAL_FIELDS)
+        writer.writeheader();writer.writerows(rows)
+    return rows
+
+
 def build(root):
     root=Path(root)
     root.mkdir(parents=True,exist_ok=True)
@@ -44,24 +80,30 @@ def build(root):
     opportunities=[]
     contacts=[]
     legacy=[]
+    questionable_contacts=0
     for item in investigations:
         pid=item.get('project_id')
         source=candidates.get(pid,{})
         merged={**source,**{k:v for k,v in item.items() if v}}
-        # Old V8 source-only/false-positive page matches do not carry the
-        # strict project-evidence field. Preserve as recheck work, even when
-        # their description is absent from the rolling 48h export.
+        # Keep all prior research, but do not grandfather unsourced web hits.
         verified=item.get('project_evidence_verified')=='YES'
         if not verified:
             if item.get('status')=='AI_EVIDENCE_REVIEW':
                 legacy.append(merged)
             continue
-        if research_route(merged)=='ENRICHMENT_ONLY':
-            continue
-        if not item.get('source_urls'):
+        if research_route(merged)=='ENRICHMENT_ONLY' or not item.get('source_urls'):
             continue
         if all(directory_url(u.strip()) for u in str(item['source_urls']).split(' | ')):
             continue
+        company=(item.get('operator') or item.get('developer') or
+                 item.get('official_company') or item.get('related_company') or '')
+        contact=item.get('contact') or ''
+        contact_url=item.get('contact_source_url') or ''
+        quality=item.get('contact_source_quality') or ''
+        first_party=bool(quality=='CONTACT_ON_BRANDED_BUSINESS_PAGE'
+                         and company_owned_page(company,contact_url))
+        if contact and contact_url and not first_party:
+            questionable_contacts+=1
         record={
             'project_id':pid or '', 'address':merged.get('address',''),
             'city':merged.get('city',''),'source_id':merged.get('source_id',''),
@@ -69,14 +111,20 @@ def build(root):
             'developer':item.get('developer',''),
             'project_stage':item.get('project_stage',''),
             'buyer_fit':item.get('buyer_fit',''),
-            'contact':item.get('contact',''),
-            'contact_source_url':item.get('contact_source_url',''),
+            'contact':contact if first_party else '',
+            'contact_source_url':contact_url if first_party else '',
+            'unverified_contact':contact if not first_party else '',
+            'unverified_contact_source_url':contact_url if not first_party else '',
+            'contact_source_quality':quality if first_party else (
+                legacy_contact_quality(company,contact_url) if contact_url else ''),
+            'contact_provenance':item.get('contact_provenance',''),
             'evidence_tier':item.get('evidence_tier',''),
             'source_urls':item.get('source_urls',''),
             'record_source_url':merged.get('record_source_url',''),
+            'record_source_url_basis':merged.get('record_source_url_basis',''),
             'lead_maturity':item.get('lead_maturity',''),
             'research_status':item.get('status',''),
-            'opportunity_strength':'PUBLIC_COMPANY_CHANNEL' if item.get('contact') and item.get('contact_source_url') else (
+            'opportunity_strength':'PUBLIC_COMPANY_CHANNEL' if first_party else (
                 'IDENTIFIED_PROJECT_OPERATOR' if item.get('operator') else 'CORROBORATED_PROJECT_ONLY'),
             'next_system_action':item.get('next_system_action',''),
             'sale_ready':'NO',
@@ -85,10 +133,11 @@ def build(root):
                       'official_company','official_company_role','official_record_url',
                       'official_source_date','official_verification_level',
                       'related_company','related_company_role',
-                      'related_company_contact','related_company_contact_url'):
+                      'related_company_contact','related_company_contact_url',
+                      'related_company_contact_quality'):
             record[field]=item.get(field,'')
         opportunities.append(record)
-        if record['opportunity_strength']=='PUBLIC_COMPANY_CHANNEL':
+        if first_party:
             contacts.append(record)
 
     def rank(item):
@@ -114,6 +163,7 @@ def build(root):
         item['sale_ready']='NO'
         enrichment_rows.append(item)
 
+    regional_rows=write_regional_outcomes(root,opportunities)
     write(root/'GTA_RADAR_PROJECT_OPPORTUNITIES.csv',opportunities)
     write(root/'GTA_RADAR_PUBLIC_COMPANY_CONTACTS.csv',contacts)
     write(root/'GTA_RADAR_AUTOMATED_RESEARCH_QUEUE.csv',pending)
@@ -121,7 +171,10 @@ def build(root):
     write(root/'GTA_RADAR_LEGACY_EVIDENCE_RECHECK.csv',legacy)
     summary=dict(project_opportunities=len(opportunities),
                  public_company_contacts=len(contacts),backlog=len(pending),
-                 company_enrichment=len(enrichment_rows),legacy_rechecks=len(legacy))
+                 company_enrichment=len(enrichment_rows),legacy_rechecks=len(legacy),
+                  contact_sources_requiring_recheck=questionable_contacts,
+                  regions_with_reported_prospects=len({r['region'] for r in regional_rows}),
+                  region_report='GTA_RADAR_VERIFIED_REGIONAL_OUTCOMES.csv')
     def esc(t):return html.escape(str(t or ''),quote=True)
     doc=['<!doctype html><html><head><meta charset="utf-8"><title>GTA Radar Leads</title>',
          '<style>body{font:15px Segoe UI,Arial;max-width:1150px;margin:25px auto;background:#f5f7fa;color:#1f2937;padding:0 16px}',
@@ -134,7 +187,10 @@ def build(root):
          ' · <b>Public business contact channels:</b> '+str(len(contacts))+
          ' · <b>Queued for automatic research:</b> '+str(len(pending))+
          ' · <b>Company enrichment records:</b> '+str(len(enrichment_rows))+
-         ' · <b>Legacy evidence requiring project-specific recheck:</b> '+str(len(legacy))+'</p>',
+         ' · <b>Legacy evidence requiring project-specific recheck:</b> '+str(len(legacy))+
+         ' · <b>Unverified historical contact references:</b> '+str(questionable_contacts)+'</p>',
+         '<p>Project counts by location and official evidence: '+
+         '<a href="GTA_RADAR_VERIFIED_REGIONAL_OUTCOMES.csv">Regional outcomes</a></p>',
          '<p>Download CSV: <a href="GTA_RADAR_PROJECT_OPPORTUNITIES.csv">Promising projects</a> · ',
          '<a href="GTA_RADAR_PUBLIC_COMPANY_CONTACTS.csv">Public business contacts</a> · ',
          '<a href="GTA_RADAR_AUTOMATED_RESEARCH_QUEUE.csv">Automatic research queue</a> · ',
@@ -150,7 +206,7 @@ def build(root):
             '</p><p><b>Business:</b> '+esc(item['operator'] or item['developer'] or 'Not identified')+
             ' · <b>Related '+esc(item['related_company_role'] or 'company')+':</b> '+
             esc(item['related_company'] or 'Not identified')+
-            ' · <b>Public channel:</b> '+esc(item['contact'] or 'Not identified')+
+            ' · <b>Public channel:</b> '+esc(item['contact'] or 'Not confirmed')+
             '</p><p><b>Potential services:</b> '+esc(item['buyer_fit'] or 'Not established')+
             '</p><small>'+esc(item['next_system_action'])+'</small><p>')
         for u in str(item['source_urls']).split(' | '):

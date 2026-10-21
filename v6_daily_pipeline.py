@@ -366,6 +366,10 @@ def render_dashboard(results, state):
                     esc(', '.join(state.get('regional_regions_represented') or []) or 'None')+
                     '. These are NOT newly issued permits. '+
                     '<a href="GTA_RADAR_REGIONAL_COVERAGE.csv">Regional collection gaps and coverage</a>.</p>')
+        if state.get('regional_passed_selector') is not None:
+            page.append('<p><b>Regional source records passing commercial filter:</b> '+
+                        esc(state['regional_passed_selector'])+
+                        '. <a href="GTA_RADAR_REGIONAL_SELECTION_OUTCOMES.csv">Per-region selection outcomes</a>.</p>')
     if state.get('regional_bridge_error'):
         page.append('<p><b>Regional supplement unavailable:</b> '+
                     esc(state['regional_bridge_error'])+'. Other collectors continue.</p>')
@@ -494,6 +498,9 @@ def pipeline(workspace, database=None, *, run_collectors=True, run_research=True
                 # and never damage the primary 48-hour collector output.
                 state['regional_bridge_error']=type(exc).__name__+': '+str(exc)[:180]
         selector(selection_file, out, db)
+        if use_default_selector and not state.get('regional_bridge_error'):
+            from regional_candidate_bridge import selection_outcomes
+            state.update(selection_outcomes(out))
         projects = out / 'CANDIDATES_V4_ALL_REVIEW_ONLY.csv'
         if not projects.exists():
             raise RuntimeError('V4 did not produce a candidate CSV.')
