@@ -13,6 +13,7 @@ import json
 import re
 from pathlib import Path
 from commercial_research_policy import research_route, canonical_lane
+from official_record_verifier import BY_ID
 
 META = ('_queued_on', '_fingerprint')
 FINISHED = {'AI_EVIDENCE_REVIEW', 'AI_SOURCE_RECORD_REVIEW'}
@@ -111,6 +112,37 @@ def build(current_rows, queued_rows, history, today):
     return pending
 
 
+REGION_PRIORITY=('Peel','York','Halton','Durham','Hamilton','Waterloo','Niagara','Toronto','Other')
+
+def source_region(row):
+    """Only authoritative feed metadata decides region; never scrape it from web."""
+    source=BY_ID.get(str(row.get('source_id') or ''),{})
+    return str(source.get('region') or 'Other')
+
+def fair_regional_order(ready):
+    """Interleave qualified projects by official region; never drop or reprice one.
+
+    Within each region the original research-priority and age ordering remains.
+    One per region per round prevents a large Toronto backlog monopolizing the
+    shared $1/day AI budget. It does NOT enforce fixed quotas or suppress Toronto.
+    """
+    if not ready:return []
+    bins={}
+    for r in ready:
+        bins.setdefault(source_region(r),[]).append(r)
+    if len(bins)<=1:return ready
+    regions=[r for r in REGION_PRIORITY if r in bins]
+    regions += sorted(r for r in bins if r not in regions)
+    from collections import deque
+    queues={name:deque(bins[name]) for name in regions}
+    ordered=[]
+    while any(queues.values()):
+        for name in regions:
+            if queues[name]:
+                ordered.append(queues[name].popleft())
+    return ordered
+
+
 def due(pending, history, today):
     ready = []
     for row in pending:
@@ -143,4 +175,4 @@ def due(pending, history, today):
         except ValueError:
             score = 0
         return (effective, followup, -min(365, age), -score, queued, row.get('project_id', ''))
-    return sorted(ready, key=rank)
+    return fair_regional_order(sorted(ready, key=rank))
