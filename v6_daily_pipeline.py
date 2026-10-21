@@ -316,7 +316,10 @@ def render_dashboard(results, state):
             '<h1>GTA Commercial Radar — daily intelligence</h1>',
             f'<p><b>Run state: {esc(status)}</b> · {esc(state.get("started_local", ""))}</p>',
             '<p><b>Research only:</b> an application or AI suggestion is not proof of purchasing intent. No unverified project is sale-ready.</p>',
-             '<p><b>Commercial intelligence:</b> <a href="GTA_RADAR_LEAD_INTELLIGENCE.html">Open classified opportunities and contact dashboard</a>.</p>',
+             '<p><b>INVESTIGATE NEXT:</b> <a href="GTA_RADAR_SHORTLIST.html">Open high-confidence commercial opportunities</a> · '+
+             '<a href="GTA_RADAR_QUALIFIED_OPPORTUNITY_SHORTLIST.csv">Download qualified shortlist</a> · '+
+             '<a href="GTA_RADAR_OPPORTUNITY_RESEARCH_GAPS.csv">Records awaiting verification</a>.</p>',
+             '<p><b>Commercial intelligence:</b> <a href="GTA_RADAR_LEAD_INTELLIGENCE.html">Open all classified opportunities and contact dashboard</a>.</p>',
             f'<p><b>Collector database:</b> <span class="mono">{esc(state.get("database", ""))}</span></p>',
             f'<p><b>Window:</b> most recent 48 hours by source event/change date. <b>Projects this run:</b> {esc(state.get("projects",0))}. '
             f'<b>Projects investigated:</b> {esc(state.get("investigated",0))}. '
@@ -384,6 +387,12 @@ def render_dashboard(results, state):
                     ' · <b>Public company contact channels:</b> '+esc(reports.get('public_company_contacts',0))+
                     ' · <b>Company-only enrichment records (not sales triggers):</b> '+
                     esc(reports.get('company_enrichment',0))+'</p>')
+        page.append('<p><b>Automatic qualification:</b> '+
+                    esc(reports.get('qualified_investigation_candidates',0))+
+                    ' high-confidence projects to investigate (unlimited count); '+
+                    esc(reports.get('opportunity_research_gaps',0))+
+                    ' others retained for rechecking or historical context. '
+                    'Not proof of unawarded contracts.</p>')
         page.append('<p><b>Genuine-opportunity review:</b> '+
                     esc(reports.get('early_stage_review',0))+' early-stage · '+
                     esc(reports.get('issued_stage_review',0))+' issued-permit timing checks · '+

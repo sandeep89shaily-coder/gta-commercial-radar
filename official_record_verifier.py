@@ -21,7 +21,7 @@ BY_ID={s["id"]:s for s in SOURCES}
 FIELDS=("official_verification_level","official_permit_id","official_status",
         "official_status_basis","official_source_date","official_company",
         "official_company_role","official_record_url","official_checked_at",
-        "official_verification_note","official_live_attempted")
+        "official_verification_note","official_live_attempted","official_description")
 MAP={"brampton_building_permits":("PERMITNUMBER","BUILDER","builder"),
      "mississauga_issued_building_permits":("BP_NO",None,None),
      "mississauga_site_plan_applications":("APP_FILE_NO","APPLICANT","applicant"),

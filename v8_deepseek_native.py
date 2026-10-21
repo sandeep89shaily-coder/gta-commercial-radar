@@ -46,7 +46,7 @@ FIELDS=v5.FIELDS+['evidence_level','next_verification','api_attempted',
                   'contact_source_quality','related_company_contact_quality',
                   'owner','tenant','contractor','source_keys','description',
                   'current_source_status','source_record_date','record_source_url',
-                  'record_source_url_basis',*LIFECYCLE_FIELDS,*OFFICIAL_FIELDS]
+                  'record_source_url_basis','official_description',*LIFECYCLE_FIELDS,*OFFICIAL_FIELDS]
 PRIORITY={'PERMIT_REVIEW':0,'BUSINESS_REVIEW':1,'PLANNING_WATCH':2,
           'OTHER_WATCH':3,'SOURCE_UPDATE_WATCH':4}
 
