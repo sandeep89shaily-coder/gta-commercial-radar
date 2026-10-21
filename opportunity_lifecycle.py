@@ -78,7 +78,14 @@ def identity_of_page(row, text):
     only address-level project context, not permit-specific verification.
     """
     current=_reference_parent(row)
-    if not current:return 'ADDRESS_CONTEXT_UNCONFIRMED'
+    if not current:
+        keys=[k.strip() for k in string(row.get('source_keys')).split(' | ') if k.strip()]
+        body=' '.join(string(text).casefold().split())
+        # ArcGIS permit IDs often use non-Toronto prefixes. The exact, published
+        # key is still stronger than matching just a business or street address.
+        if len(keys)==1 and len(keys[0])>=6 and keys[0].casefold() in body:
+            return 'EXACT_CURRENT_PERMIT_ID_IN_PAGE'
+        return 'ADDRESS_CONTEXT_UNCONFIRMED'
     found={m.group(1)+' '+m.group(2) for m in _TORONTO_ID.finditer(string(text))}
     if current in found:return 'EXACT_CURRENT_PERMIT_ID_IN_PAGE'
     if found:return 'DIFFERENT_PERMIT_ID_AT_ADDRESS'
