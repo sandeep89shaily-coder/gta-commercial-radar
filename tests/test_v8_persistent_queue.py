@@ -231,7 +231,8 @@ class DurableResearchQueueTests(unittest.TestCase):
     def test_identical_evidence_backed_projects_are_not_paid_for_again(self):
         row = make_row(5)
         old = {'status':'AI_EVIDENCE_REVIEW','input_fingerprint':queue.fingerprint(row),
-               'project_evidence_verified':'YES'}
+               'project_evidence_verified':'YES',
+               'project_identity_confidence':'EXACT_ID_ON_PUBLIC_PAGE'}
         self.assertEqual(queue.build([row],[],{'project-5':old},FIXED),[])
         newer = dict(row, description='New issuance recorded for commercial works')
         self.assertEqual(len(queue.build([newer],[],{'project-5':old},FIXED)),1)
