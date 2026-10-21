@@ -285,4 +285,37 @@ def build(root):
                    'The saved queue continues its automated work.</p>')
     doc.append('</body></html>')
     (root/'GTA_RADAR_LEAD_INTELLIGENCE.html').write_text(''.join(doc),encoding='utf-8')
+    parts=['<!doctype html><html><head><meta charset="utf-8"><title>GTA Radar shortlist</title>',
+           '<style>body{font:15px Segoe UI,Arial;max-width:1100px;margin:28px auto;padding:0 20px;color:#1f2937;background:#f5f7fa}',
+           'article{background:white;border:1px solid #e2e8f0;border-radius:8px;padding:17px;margin:15px 0}',
+           'a{color:#1358a6}small{color:#526173}</style></head><body>',
+           '<h1>GTA Radar — Investigate next</h1>',
+           '<p><strong>'+str(len(qualified))+' projects passed automatic evidence checks.</strong> '+
+           'These are NOT verified open supplier contracts. No fixed top-N cutoff is imposed. '+
+           'Commercial scope comes from original municipal records, not AI sales language.</p>',
+           '<p><a href="GTA_RADAR_GENUINE_OPPORTUNITY_REVIEW.csv">All investigations</a> · '+
+           '<a href="GTA_RADAR_OPPORTUNITY_RESEARCH_GAPS.csv">Other projects and evidence gaps</a></p>']
+    for row in qualified:
+        parts.append('<article><h3>'+esc(row.get('address') or row.get('project_id'))+
+                     ' · '+esc(row.get('qualification_score'))+'/100</h3>')
+        parts.append('<p><b>Exact ID:</b> '+esc(row.get('official_permit_id') or row.get('project_id'))+
+                     ' · <b>Status:</b> '+esc(row.get('lifecycle_stage'))+
+                     ' · <b>Evidence:</b> '+esc(row.get('qualification_confidence'))+'</p>')
+        parts.append('<p><b>Official/collector scope:</b> '+esc(row.get('qualification_scope'))+'</p>')
+        parts.append('<p><b>Potential provider categories:</b> '+
+                     esc(row.get('qualification_buyer_categories'))+'</p>')
+        parts.append('<p><b>Company involved:</b> '+
+                     esc(row.get('official_company') or row.get('operator') or row.get('developer') or 'Not established')+
+                     ' (role subject to verification)</p>')
+        parts.append('<p><b>Unresolved:</b> '+esc(row.get('qualification_evidence_gaps'))+'</p>')
+        parts.append('<small>'+esc(row.get('qualification_next_action'))+'</small><p>')
+        url=row.get('official_record_url') or row.get('record_source_url')
+        if url and urlparse(url).scheme=='https' and urlparse(url).hostname:
+            parts.append('<a href="'+esc(url)+'" rel="noopener noreferrer">View exact original record</a>')
+        parts.append('</p></article>')
+    if not qualified:
+        parts.append('<p>No saved record yet meets the conservative qualification threshold. '+
+                     'All project history and verification gaps are retained.</p>')
+    parts.append('</body></html>')
+    (root/'GTA_RADAR_SHORTLIST.html').write_text(''.join(parts),encoding='utf-8')
     return summary
