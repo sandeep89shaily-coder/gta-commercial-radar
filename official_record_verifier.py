@@ -26,7 +26,12 @@ MAP={"brampton_building_permits":("PERMITNUMBER","BUILDER","builder"),
      "mississauga_issued_building_permits":("BP_NO",None,None),
      "mississauga_site_plan_applications":("APP_FILE_NO","APPLICANT","applicant"),
      "mississauga_rezoning_applications":("APP_FILE_NO","APPLICANT","applicant"),
-     "york_region_active_development_applications":("APPL_GISID","APPL_NAME","application_name")}
+     "york_region_active_development_applications":("APPL_GISID","APPL_NAME","application_name"),
+     "toronto_development_applications":("APPLICATION_NUMBER",None,None),
+     "richmond_hill_active_development_applications":("OBJECTID","OWNER","owner"),
+     "hamilton_building_demolition_permits":("PERMITNUMBER",None,None),
+     "waterloo_city_building_permits":(("PERMIT_ID","PERMIT_NUM"),None,None),
+     "st_catharines_building_permits":(("FOLDERYEAR","FOLDERSEQUENCE"),"PROPERTYNAME","property_name")}
 SKIP_COMPANY={"unknown","none","n/a","not available","na"}
 
 
@@ -37,7 +42,11 @@ def clean(value):
 def exact_id(row,source):
     """A grouped Toronto trade key is not an ArcGIS building-permit key."""
     keys=[k.strip() for k in clean(row.get("source_keys")).split(" | ") if k.strip()]
-    if len(keys)!=1 or not PERMIT_ID.fullmatch(keys[0]):
+    if len(keys)!=1:return ""
+    key_field=MAP.get(source.get("id"),("",None,None))[0]
+    segments=keys[0].split("|") if isinstance(key_field,tuple) else [keys[0]]
+    if (not key_field or (isinstance(key_field,tuple) and len(segments)!=len(key_field))
+            or not all(PERMIT_ID.fullmatch(x) for x in segments)):
         return ""
     return keys[0]
 
@@ -70,8 +79,14 @@ def published_query(s, ident):
     query=clean(s.get("query_url"))
     if not query.startswith("https://") or not PERMIT_ID.fullmatch(ident):
         return ""
-    key=MAP[sid][0]
-    where=key+" = '"+ident.replace("'","''")+"'"
+    key_fields=MAP[sid][0]
+    names=key_fields if isinstance(key_fields,tuple) else (key_fields,)
+    values=ident.split("|") if isinstance(key_fields,tuple) else [ident]
+    if len(names)!=len(values) or not all(PERMIT_ID.fullmatch(v) for v in values):
+        return ""
+    # Pure numeric values are numeric in some ArcGIS layers (ObjectID, year).
+    sql=lambda v:v if re.fullmatch(r"\\d{1,10}",v) else "'"+v.replace("'","''")+"'"
+    where=" AND ".join(name+" = "+sql(value) for name,value in zip(names,values))
     return query+"?"+urlencode({"where":where,"outFields":"*","returnGeometry":"false","f":"json"})
 
 
@@ -149,7 +164,7 @@ def verify(row,data_dir,transport=None,live=True):
                       official_status=clean(old.get("status")),
                       official_status_basis="local collector snapshot; may be stale",
                       official_source_date=clean(old.get("_db_source_date") or old.get("source_date")),
-                      official_record_url=clean(s.get("official_page")),
+                      official_record_url=published_query(s,ident) or clean(s.get("official_page")),
                       official_verification_note="Exact source_id + source record_key in local database")
         role=MAP.get(sid,("",None,"source_entity"))[2]
         company,company_role=_source_company(old,role)
@@ -163,10 +178,12 @@ def verify(row,data_dir,transport=None,live=True):
         features=packet.get("features",[])
         if packet.get("error") or not isinstance(features,list):
             raise ValueError("Official GIS service returned an error")
-        key=MAP[sid][0]
+        fields=MAP[sid][0]
+        fieldnames=fields if isinstance(fields,tuple) else (fields,)
         matched=[f.get("attributes") for f in features
                  if isinstance(f,dict) and isinstance(f.get("attributes"),dict)
-                 and clean(f["attributes"].get(key)).casefold()==ident.casefold()]
+                 and "|".join(clean(f["attributes"].get(k)) for k in fieldnames).casefold()
+                 ==ident.casefold()]
         if len(matched)!=1:
             result["official_verification_note"]="Live source returned no unique exact-key match"
             return result
