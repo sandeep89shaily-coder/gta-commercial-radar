@@ -35,6 +35,39 @@ def write(path,rows):
         w.writeheader();w.writerows(rows)
 
 
+REGIONAL_FIELDS=['region','source_id','municipality','projects_reported',
+                 'live_official_verification','local_exact_source_matches',
+                 'public_business_channels_confirmed','contact_sources_to_recheck']
+
+def write_regional_outcomes(root, opportunities):
+    """Project counts by source are independent of raw collector hit counts."""
+    from collections import defaultdict
+    from official_record_verifier import BY_ID
+    observed=defaultdict(lambda:{k:0 for k in REGIONAL_FIELDS[3:]})
+    for r in opportunities:
+        source=BY_ID.get(r.get('source_id'),{})
+        sid=r.get('source_id') or 'UNKNOWN'
+        region=source.get('region') or 'Other'
+        municipality=source.get('jurisdiction') or r.get('city') or 'Unknown'
+        key=(region,sid,municipality)
+        counters=observed[key]
+        counters['projects_reported']+=1
+        level=r.get('official_verification_level') or ''
+        counters['live_official_verification']+=int(level=='OFFICIAL_ID_AND_STATUS_MATCH')
+        counters['local_exact_source_matches']+=int(level in
+            ('COLLECTOR_SOURCE_MATCH','PARTIAL_COLLECTOR_SOURCE_MATCH'))
+        counters['public_business_channels_confirmed']+=int(bool(r.get('contact')
+                                                             and r.get('contact_source_url')))
+        counters['contact_sources_to_recheck']+=int(bool(r.get('unverified_contact')))
+    rows=[dict(region=reg,source_id=sid,municipality=city,**counters)
+          for (reg,sid,city),counters in sorted(observed.items())]
+    target=Path(root)/'GTA_RADAR_VERIFIED_REGIONAL_OUTCOMES.csv'
+    with target.open('w',encoding='utf-8-sig',newline='') as handle:
+        writer=csv.DictWriter(handle,fieldnames=REGIONAL_FIELDS)
+        writer.writeheader();writer.writerows(rows)
+    return rows
+
+
 def build(root):
     root=Path(root)
     root.mkdir(parents=True,exist_ok=True)
@@ -130,6 +163,7 @@ def build(root):
         item['sale_ready']='NO'
         enrichment_rows.append(item)
 
+    regional_rows=write_regional_outcomes(root,opportunities)
     write(root/'GTA_RADAR_PROJECT_OPPORTUNITIES.csv',opportunities)
     write(root/'GTA_RADAR_PUBLIC_COMPANY_CONTACTS.csv',contacts)
     write(root/'GTA_RADAR_AUTOMATED_RESEARCH_QUEUE.csv',pending)
@@ -138,7 +172,9 @@ def build(root):
     summary=dict(project_opportunities=len(opportunities),
                  public_company_contacts=len(contacts),backlog=len(pending),
                  company_enrichment=len(enrichment_rows),legacy_rechecks=len(legacy),
-                  contact_sources_requiring_recheck=questionable_contacts)
+                  contact_sources_requiring_recheck=questionable_contacts,
+                  regions_with_reported_prospects=len({r['region'] for r in regional_rows}),
+                  region_report='GTA_RADAR_VERIFIED_REGIONAL_OUTCOMES.csv')
     def esc(t):return html.escape(str(t or ''),quote=True)
     doc=['<!doctype html><html><head><meta charset="utf-8"><title>GTA Radar Leads</title>',
          '<style>body{font:15px Segoe UI,Arial;max-width:1150px;margin:25px auto;background:#f5f7fa;color:#1f2937;padding:0 16px}',
@@ -153,6 +189,8 @@ def build(root):
          ' · <b>Company enrichment records:</b> '+str(len(enrichment_rows))+
          ' · <b>Legacy evidence requiring project-specific recheck:</b> '+str(len(legacy))+
          ' · <b>Unverified historical contact references:</b> '+str(questionable_contacts)+'</p>',
+         '<p>Project counts by location and official evidence: '+
+         '<a href="GTA_RADAR_VERIFIED_REGIONAL_OUTCOMES.csv">Regional outcomes</a></p>',
          '<p>Download CSV: <a href="GTA_RADAR_PROJECT_OPPORTUNITIES.csv">Promising projects</a> · ',
          '<a href="GTA_RADAR_PUBLIC_COMPANY_CONTACTS.csv">Public business contacts</a> · ',
          '<a href="GTA_RADAR_AUTOMATED_RESEARCH_QUEUE.csv">Automatic research queue</a> · ',
