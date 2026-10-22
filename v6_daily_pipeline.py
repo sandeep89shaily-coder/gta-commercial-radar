@@ -295,6 +295,10 @@ def render_dashboard(results, state):
     if history.exists():
         with history.open('r', newline='', encoding='utf-8-sig') as inp:
             investigations = list(csv.DictReader(inp))
+    if state.get('ai_mode')=='OFF':
+        # This run generated NO AI investigations; never misrepresent an older
+        # paid research export as newly investigated this morning.
+        investigations=[]
     current = state.get('investigation_date', '')
     new = investigations
     # Deferred and source-only records stay in the automated research CSV queue,
@@ -316,6 +320,8 @@ def render_dashboard(results, state):
             '<h1>GTA Commercial Radar — daily intelligence</h1>',
             f'<p><b>Run state: {esc(status)}</b> · {esc(state.get("started_local", ""))}</p>',
             '<p><b>Research only:</b> an application or AI suggestion is not proof of purchasing intent. No unverified project is sale-ready.</p>',
+             '<p><b>FREE DAILY WATCH:</b> <a href="GTA_RADAR_DAILY_NEW_DEVELOPMENTS.html">Newly observed and changed municipal projects</a> · '+
+             '<a href="GTA_RADAR_DAILY_PUBLIC_RECORDS.csv">Full public-record collection</a>. DeepSeek is off when scheduled in free mode.</p>',
              '<p><b>INVESTIGATE NEXT:</b> <a href="GTA_RADAR_SHORTLIST.html">Open high-confidence commercial opportunities</a> · '+
              '<a href="GTA_RADAR_QUALIFIED_OPPORTUNITY_SHORTLIST.csv">Download qualified shortlist</a> · '+
              '<a href="GTA_RADAR_OPPORTUNITY_RESEARCH_GAPS.csv">Records awaiting verification</a>.</p>',
@@ -400,6 +406,15 @@ def render_dashboard(results, state):
                     esc(reports.get('exact_project_verification_needed',0))+' exact-ID verification required. '+
                     '<a href="GTA_RADAR_GENUINE_OPPORTUNITY_REVIEW.csv">Open full lifecycle review</a>. '+
                     'No listed project is automatically an open supplier contract.</p>')
+    if state.get('free_daily_watch'):
+        free=state['free_daily_watch']
+        page.append('<p><b>FREE municipal development watch:</b> '+
+                    esc(free.get('first_observed',0))+' newly observed records · '+
+                    esc(free.get('record_changed',0))+' records changed · '+
+                    esc(free.get('initial_baseline',0))+' initial baseline records · '+
+                    esc(free.get('archive_context',0))+' archived regional source records indexed. '+
+                    '<b>DeepSeek calls: 0. Estimated DeepSeek cost: $0.</b> '+
+                    '<a href="GTA_RADAR_DAILY_NEW_DEVELOPMENTS.html">Open this run\'s source-event report</a>.</p>')
     page.append('<h2>Evidence-backed commercial intelligence</h2>')
     page.append('<p>Project evidence is assessed automatically. A project does not imply '
                 'that a supplier purchase is underway.</p>')
@@ -435,16 +450,23 @@ def render_dashboard(results, state):
     return file
 
 
-def schedule_daily(script_path, workspace, at='08:30'):
+def schedule_daily(script_path, workspace, at='08:30', *, no_ai=False):
     if os.name != 'nt':
         return 'NOT_WINDOWS'
     # Do not replace previous schedule until the new task is successfully created.
     runner = Path(script_path).resolve()
-    command = f'cmd.exe /c ""{runner}" --unattended"'
+    command = f'cmd.exe /c ""{runner}" --unattended{" --no-ai" if no_ai else ""}"'
     proc = subprocess.run(['schtasks.exe','/Create','/F','/SC','DAILY','/ST',at,
                            '/TN',TASK_NAME,'/TR',command], capture_output=True, text=True, timeout=30)
     if proc.returncode:
         return 'FAILED: ' + str(proc.stderr or proc.stdout)[:240]
+    if no_ai:
+        # The user disabled the prior V6 task. Overwriting a disabled task can
+        # leave it disabled, so explicitly enable the free-only schedule.
+        enabled=subprocess.run(['schtasks.exe','/Change','/TN',TASK_NAME,'/ENABLE'],
+                               capture_output=True,text=True,timeout=30)
+        if enabled.returncode:
+            return 'FAILED_TO_ENABLE_FREE_TASK: '+str(enabled.stderr or enabled.stdout)[:240]
     # Avoid two daily collectors or divergent budget ledgers running together.
     old = subprocess.run(['schtasks.exe','/Delete','/F','/TN',PREVIOUS_TASK],
                          capture_output=True, text=True, timeout=20)
@@ -559,7 +581,11 @@ def pipeline(workspace, database=None, *, run_collectors=True, run_research=True
             from commercial_lead_reports import build as build_commercial_reports
             state['lead_reports']=build_commercial_reports(out)
         else:
-            state['note'] = 'AI investigation disabled for this test; no charge.'
+            state['ai_mode']='OFF'
+            state['active_stage']='FREE_DAILY_RECORD_WATCH'
+            from free_daily_report import build as build_free_daily
+            state['free_daily_watch']=build_free_daily(projects,out,today=day)
+            state['note']='Free municipal watch completed; no DeepSeek requests or AI charges.'
         return state
     except Exception as exc:
         state['status'] = 'FAILED'
@@ -606,6 +632,8 @@ def main(argv=None):
     parser.add_argument('--max-projects', type=int, default=MAX_INVESTIGATIONS)
     parser.add_argument('--unattended', action='store_true')
     parser.add_argument('--no-ai', action='store_true')
+    parser.add_argument('--install-free-schedule',action='store_true',
+                        help='Only schedule the 08:30 daily free-data run; do not run collectors or DeepSeek')
     parser.add_argument('--offline-test', action='store_true', help='Only for local diagnostics, never marketed as fresh collection')
     parser.add_argument('--no-schedule', action='store_true')
     args=parser.parse_args(argv)
@@ -613,6 +641,14 @@ def main(argv=None):
         workspace = find_workspace(args.workspace)
         db = args.database or choose_database(workspace)
         say('Using your established database: ' + str(db))
+        if args.install_free_schedule:
+            installed=ROOT/'RUN_GTA_RADAR_V6.bat'
+            if not installed.is_file():
+                say('Free schedule NOT installed: stable runner missing.');return 1
+            status=schedule_daily(installed,workspace,no_ai=True)
+            say('Daily 08:30 free collection task: '+status)
+            say('This setup made no DeepSeek requests and did not run collectors.')
+            return 0 if status.startswith('SUCCESS') else 1
         say('Running live collection first. Existing history will be preserved as collectors update it.')
         state=pipeline(workspace, db, run_collectors=not args.offline_test,
                        run_research=not args.no_ai, results_dir=args.results_dir,
@@ -630,7 +666,7 @@ def main(argv=None):
         if not args.unattended and not args.no_schedule and state['status'] in ('SUCCESS','PARTIAL'):
             # The scheduled program should be the stable, installed runner, never a Downloads ZIP.
             installed=Path(__file__).resolve().parent/'RUN_GTA_RADAR_V6.bat'
-            if installed.is_file(): say('Daily task: '+schedule_daily(installed,workspace))
+            if installed.is_file(): say('Daily task: '+schedule_daily(installed,workspace,no_ai=args.no_ai))
             else:say('Daily task not installed: stable launcher missing.')
         return 0 if state['status']=='SUCCESS' else 1
     except Exception as exc:
