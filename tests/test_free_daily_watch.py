@@ -117,9 +117,10 @@ class FreeDailyWatchTests(unittest.TestCase):
 
     def test_schedule_explicitly_includes_no_ai_and_enables_disabled_task(self):
         completed=SimpleNamespace(returncode=0,stderr='',stdout='')
+        runner=Path('C:/ProgramData/Radar/RUN_GTA_RADAR_V6.bat')
+        workspace=Path('C:/Users/sande/Desktop/new data')
         with patch.object(v6.os,'name','nt'),patch.object(v6.subprocess,'run',return_value=completed) as shell:
-            result=v6.schedule_daily(Path('C:/ProgramData/Radar/RUN_GTA_RADAR_V6.bat'),
-                                     Path('C:/Users/sande/Desktop/new data'),no_ai=True)
+            result=v6.schedule_daily(runner,workspace,no_ai=True)
         self.assertTrue(result.startswith('SUCCESS'))
         calls=[call.args[0] for call in shell.call_args_list]
         created=next(x for x in calls if '/Create' in x)
@@ -129,8 +130,10 @@ class FreeDailyWatchTests(unittest.TestCase):
     def test_failed_task_enable_is_reported_not_silent_success(self):
         ok=SimpleNamespace(returncode=0,stderr='',stdout='')
         fail=SimpleNamespace(returncode=1,stderr='Task is disabled',stdout='')
+        runner=Path('RUN_GTA_RADAR_V6.bat')
+        workspace=Path('.')
         with patch.object(v6.os,'name','nt'),patch.object(v6.subprocess,'run',side_effect=[ok,fail]) as shell:
-            result=v6.schedule_daily(Path('RUN_GTA_RADAR_V6.bat'),Path('.'),no_ai=True)
+            result=v6.schedule_daily(runner,workspace,no_ai=True)
         self.assertIn('FAILED_TO_ENABLE_FREE_TASK',result)
 
 if __name__=='__main__':
