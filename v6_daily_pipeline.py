@@ -320,8 +320,8 @@ def render_dashboard(results, state):
             '<h1>GTA Commercial Radar — daily intelligence</h1>',
             f'<p><b>Run state: {esc(status)}</b> · {esc(state.get("started_local", ""))}</p>',
             '<p><b>Research only:</b> an application or AI suggestion is not proof of purchasing intent. No unverified project is sale-ready.</p>',
-             '<p><b>FREE DAILY WATCH:</b> <a href="GTA_RADAR_DAILY_NEW_DEVELOPMENTS.html">Newly observed and changed municipal projects</a> · '+
-             '<a href="GTA_RADAR_DAILY_PUBLIC_RECORDS.csv">Full public-record collection</a>. DeepSeek is off when scheduled in free mode.</p>',
+             '<p><b>DAILY PUBLIC RECORD WATCH:</b> <a href="GTA_RADAR_DAILY_NEW_DEVELOPMENTS.html">Newly observed and changed municipal projects</a> · '+
+             '<a href="GTA_RADAR_DAILY_PUBLIC_RECORDS.csv">Full public-record collection</a>. Selective DeepSeek uses a separate $0.25 daily ceiling.</p>',
              '<p><b>INVESTIGATE NEXT:</b> <a href="GTA_RADAR_SHORTLIST.html">Open high-confidence commercial opportunities</a> · '+
              '<a href="GTA_RADAR_QUALIFIED_OPPORTUNITY_SHORTLIST.csv">Download qualified shortlist</a> · '+
              '<a href="GTA_RADAR_OPPORTUNITY_RESEARCH_GAPS.csv">Records awaiting verification</a>.</p>',
@@ -413,8 +413,18 @@ def render_dashboard(results, state):
                     esc(free.get('record_changed',0))+' records changed · '+
                     esc(free.get('initial_baseline',0))+' initial baseline records · '+
                     esc(free.get('archive_context',0))+' archived regional source records indexed. '+
-                    '<b>DeepSeek calls: 0. Estimated DeepSeek cost: $0.</b> '+
+                    '<b>Free collection stage costs $0 DeepSeek.</b> '+
                     '<a href="GTA_RADAR_DAILY_NEW_DEVELOPMENTS.html">Open this run\'s source-event report</a>.</p>')
+    if state.get('selective_ai'):
+        ai=state['selective_ai']
+        page.append('<p><b>Selective DeepSeek (US$0.25/day maximum):</b> '+
+                    esc(ai.get('new_eligible',0))+' newly eligible · '+
+                    esc(ai.get('pending_before',0))+' eligible pending · '+
+                    esc(ai.get('paid_research_attempts',0))+' model calls attempted · '+
+                    esc(ai.get('actual_daily_ledger_estimate_usd',0))+
+                    ' USD total estimated ledger use today · '+
+                    esc(ai.get('status','UNKNOWN'))+
+                    '. Unchanged historic queue projects were not authorized for AI.</p>')
     page.append('<h2>Evidence-backed commercial intelligence</h2>')
     page.append('<p>Project evidence is assessed automatically. A project does not imply '
                 'that a supplier purchase is underway.</p>')
@@ -592,8 +602,13 @@ def pipeline(workspace, database=None, *, run_collectors=True, run_research=True
             if selective_ai:
                 state['active_stage']='SELECTIVE_DEEPSEEK_USD_0_25'
                 from selective_daily_ai import run as selective_run
-                state['selective_ai']=selective_run(
-                    projects,out/CSV_NAME,out,data,today=day)
+                if state['status']=='PARTIAL':
+                    state['selective_ai']={'status':'COLLECTOR_PARTIAL_SKIP_PAID_AI',
+                                           'daily_ceiling_usd':0.25,
+                                           'paid_research_attempts':0}
+                else:
+                    state['selective_ai']=selective_run(
+                        projects,out/CSV_NAME,out,data,today=day)
                 state['investigated']=state['selective_ai'].get('investigated',0)
                 state['reserved_usd']=state['selective_ai'].get(
                     'actual_daily_ledger_estimate_usd',0)
