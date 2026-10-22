@@ -119,7 +119,7 @@ class FreeDailyWatchTests(unittest.TestCase):
         completed=SimpleNamespace(returncode=0,stderr='',stdout='')
         runner=Path('C:/ProgramData/Radar/RUN_GTA_RADAR_V6.bat')
         workspace=Path('C:/Users/sande/Desktop/new data')
-        with patch.object(v6.os,'name','nt'),patch.object(v6.subprocess,'run',return_value=completed) as shell:
+        with patch.object(v6,'os',SimpleNamespace(name='nt')),patch.object(v6.subprocess,'run',return_value=completed) as shell:
             result=v6.schedule_daily(runner,workspace,no_ai=True)
         self.assertTrue(result.startswith('SUCCESS'))
         calls=[call.args[0] for call in shell.call_args_list]
@@ -132,7 +132,7 @@ class FreeDailyWatchTests(unittest.TestCase):
         fail=SimpleNamespace(returncode=1,stderr='Task is disabled',stdout='')
         runner=Path('RUN_GTA_RADAR_V6.bat')
         workspace=Path('.')
-        with patch.object(v6.os,'name','nt'),patch.object(v6.subprocess,'run',side_effect=[ok,fail]) as shell:
+        with patch.object(v6,'os',SimpleNamespace(name='nt')),patch.object(v6.subprocess,'run',side_effect=[ok,fail]) as shell:
             result=v6.schedule_daily(runner,workspace,no_ai=True)
         self.assertIn('FAILED_TO_ENABLE_FREE_TASK',result)
 
