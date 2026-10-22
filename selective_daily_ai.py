@@ -40,7 +40,9 @@ def permitted(row):
         return False
     if stage in STAGES_BLOCKED or NO_WORK.search(desc):
         return False
-    if not desc or not COMMERCIAL.search(desc) or not ACTION.search(desc):
+    early_planning=(lane=="PLANNING_WATCH" and bool(
+        re.search(r"\b(site[\s-]?plan|propos\w*|planning application|new industrial)\b",desc,re.I)))
+    if not desc or not COMMERCIAL.search(desc) or not (ACTION.search(desc) or early_planning):
         return False
     if (SMALL_RESIDENTIAL.search(desc) or RESIDENTIAL_LED.search(desc)) and not INDEPENDENT_COMMERCIAL.search(desc):
         return False
