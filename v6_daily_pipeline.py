@@ -450,17 +450,19 @@ def render_dashboard(results, state):
     return file
 
 
-def schedule_daily(script_path, workspace, at='08:30', *, no_ai=False):
+def schedule_daily(script_path, workspace, at='08:30', *, no_ai=False, selective_ai=False):
     if os.name != 'nt':
         return 'NOT_WINDOWS'
     # Do not replace previous schedule until the new task is successfully created.
     runner = Path(script_path).resolve()
-    command = f'cmd.exe /c ""{runner}" --unattended{" --no-ai" if no_ai else ""}"'
+    if no_ai and selective_ai:raise ValueError('Conflicting task modes')
+    option=' --selective-ai' if selective_ai else (' --no-ai' if no_ai else '')
+    command = f'cmd.exe /c ""{runner}" --unattended{option}"'
     proc = subprocess.run(['schtasks.exe','/Create','/F','/SC','DAILY','/ST',at,
                            '/TN',TASK_NAME,'/TR',command], capture_output=True, text=True, timeout=30)
     if proc.returncode:
         return 'FAILED: ' + str(proc.stderr or proc.stdout)[:240]
-    if no_ai:
+    if no_ai or selective_ai:
         # The user disabled the prior V6 task. Overwriting a disabled task can
         # leave it disabled, so explicitly enable the free-only schedule.
         enabled=subprocess.run(['schtasks.exe','/Change','/TN',TASK_NAME,'/ENABLE'],
@@ -473,8 +475,9 @@ def schedule_daily(script_path, workspace, at='08:30', *, no_ai=False):
     return 'SUCCESS' if old.returncode == 0 else 'SUCCESS_NEW_TASK; REVIEW_OLD_V5_TASK'
 
 
-def pipeline(workspace, database=None, *, run_collectors=True, run_research=True, max_projects=MAX_INVESTIGATIONS,
-             collector=run_step, selector=None, investigator=investigate, results_dir=None, today=None):
+def pipeline(workspace, database=None, *, run_collectors=True, run_research=True, selective_ai=False,
+             max_projects=MAX_INVESTIGATIONS,collector=run_step,selector=None,
+             investigator=investigate,results_dir=None,today=None):
     ws = Path(workspace).resolve()
     db = Path(database or choose_database(ws)).resolve()
     data = db.parent
@@ -581,11 +584,24 @@ def pipeline(workspace, database=None, *, run_collectors=True, run_research=True
             from commercial_lead_reports import build as build_commercial_reports
             state['lead_reports']=build_commercial_reports(out)
         else:
-            state['ai_mode']='OFF'
+            state['ai_mode']='SELECTIVE_USD_0_25' if selective_ai else 'OFF'
             state['active_stage']='FREE_DAILY_RECORD_WATCH'
-            from free_daily_report import build as build_free_daily
+            from free_daily_report import build as build_free_daily, CSV_NAME
             state['free_daily_watch']=build_free_daily(projects,out,today=day)
-            state['note']='Free municipal watch completed; no DeepSeek requests or AI charges.'
+            state['note']='Free municipal watch completed without DeepSeek calls.'
+            if selective_ai:
+                state['active_stage']='SELECTIVE_DEEPSEEK_USD_0_25'
+                from selective_daily_ai import run as selective_run
+                state['selective_ai']=selective_run(
+                    projects,out/CSV_NAME,out,data,today=day)
+                state['investigated']=state['selective_ai'].get('investigated',0)
+                state['reserved_usd']=state['selective_ai'].get(
+                    'actual_daily_ledger_estimate_usd',0)
+                state['queue_stop_reason']=state['selective_ai'].get('status','UNKNOWN')
+                state['active_stage']='COMMERCIAL_REPORTING'
+                from commercial_lead_reports import build as build_commercial_reports
+                state['lead_reports']=build_commercial_reports(out)
+                state['note']='Selective AI limited to eligible new/changed projects; daily ceiling US$0.25.'
         return state
     except Exception as exc:
         state['status'] = 'FAILED'
@@ -632,6 +648,10 @@ def main(argv=None):
     parser.add_argument('--max-projects', type=int, default=MAX_INVESTIGATIONS)
     parser.add_argument('--unattended', action='store_true')
     parser.add_argument('--no-ai', action='store_true')
+    parser.add_argument('--selective-ai',action='store_true',
+                        help='New and changed commercial project AI, max USD 0.25/day')
+    parser.add_argument('--install-selective-schedule',action='store_true',
+                        help='Set 08:30 selective USD 0.25 task without running AI')
     parser.add_argument('--install-free-schedule',action='store_true',
                         help='Only schedule the 08:30 daily free-data run; do not run collectors or DeepSeek')
     parser.add_argument('--offline-test', action='store_true', help='Only for local diagnostics, never marketed as fresh collection')
@@ -641,6 +661,18 @@ def main(argv=None):
         workspace = find_workspace(args.workspace)
         db = args.database or choose_database(workspace)
         say('Using your established database: ' + str(db))
+        if args.install_free_schedule and args.install_selective_schedule:
+            say('Only one schedule mode can be selected.');return 1
+        if args.no_ai and args.selective_ai:
+            say('Cannot combine --no-ai with --selective-ai.');return 1
+        if args.install_selective_schedule:
+            installed=ROOT/'RUN_GTA_RADAR_V6.bat'
+            if not installed.is_file():
+                say('Selective schedule NOT installed: stable runner missing.');return 1
+            status=schedule_daily(installed,workspace,selective_ai=True)
+            say('Daily 08:30 selective (US$0.25) task: '+status)
+            say('Setup made NO DeepSeek requests and did not run collectors.')
+            return 0 if status.startswith('SUCCESS') else 1
         if args.install_free_schedule:
             installed=ROOT/'RUN_GTA_RADAR_V6.bat'
             if not installed.is_file():
@@ -651,7 +683,8 @@ def main(argv=None):
             return 0 if status.startswith('SUCCESS') else 1
         say('Running live collection first. Existing history will be preserved as collectors update it.')
         state=pipeline(workspace, db, run_collectors=not args.offline_test,
-                       run_research=not args.no_ai, results_dir=args.results_dir,
+                       run_research=not (args.no_ai or args.selective_ai),
+                       selective_ai=args.selective_ai,results_dir=args.results_dir,
                        max_projects=min(5000, max(0,args.max_projects)))
         dest=Path(args.results_dir or (workspace/'GTA_RADAR_RESULTS')) / 'GTA_RADAR_V6_DASHBOARD.html'
         say('Run status: '+state['status']+'; projects: '+str(state.get('projects',0))+
@@ -666,7 +699,7 @@ def main(argv=None):
         if not args.unattended and not args.no_schedule and state['status'] in ('SUCCESS','PARTIAL'):
             # The scheduled program should be the stable, installed runner, never a Downloads ZIP.
             installed=Path(__file__).resolve().parent/'RUN_GTA_RADAR_V6.bat'
-            if installed.is_file(): say('Daily task: '+schedule_daily(installed,workspace,no_ai=args.no_ai))
+            if installed.is_file(): say('Daily task: '+schedule_daily(installed,workspace,no_ai=args.no_ai,selective_ai=args.selective_ai))
             else:say('Daily task not installed: stable launcher missing.')
         return 0 if state['status']=='SUCCESS' else 1
     except Exception as exc:
