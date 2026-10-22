@@ -82,12 +82,13 @@ def effective_spend(db,day):
             float(uncertain_holds),float(nominal_reservations))
 
 
-def ledger_claim(db,day,name,reserve,legacy=0):
+def ledger_claim(db,day,name,reserve,legacy=0,*,daily_limit=None):
     db.execute('BEGIN IMMEDIATE')
     try:
         prior=db.execute('SELECT 1 FROM spends WHERE day=? AND candidate=?',(day,name)).fetchone()
         used=effective_spend(db,day)[0]
-        if prior or used+legacy+reserve>DAILY_LIMIT+1e-9:
+        ceiling=min(DAILY_LIMIT,DAILY_LIMIT if daily_limit is None else daily_limit)
+        if prior or used+legacy+reserve>ceiling+1e-9:
             db.rollback();return False
         db.execute('INSERT INTO spends(day,candidate,reserved,actual,status) VALUES(?,?,?,?,?)',
                    (day,name,reserve,None,'RESERVED'))
@@ -148,7 +149,7 @@ def matches(row, content, url=''):
     return bool(content and project_evidence(row,content,url))
 
 
-def fetch_native(row, key, db, day, legacy, transport=None):
+def fetch_native(row, key, db, day, legacy, transport=None, *, daily_limit=None):
     """Prefer original public records, then search results relevant to the project.
 
     Search snippets only choose which URLs to Fetch. They never establish a fact.
@@ -174,7 +175,7 @@ def fetch_native(row, key, db, day, legacy, transport=None):
             return
         seen.add(url)
         charge='F8:'+ident+':'+hashlib.sha256(url.encode()).hexdigest()[:14]
-        if not ledger_claim(db,day,charge,FETCH_COST,legacy):
+        if not ledger_claim(db,day,charge,FETCH_COST,legacy,daily_limit=daily_limit):
             calls['errors'].append('FETCH_BUDGET_OR_PREVIOUS');return
         try:
             page=request('/v1/tools/fetch',{'url':url},key,transport)
@@ -197,7 +198,7 @@ def fetch_native(row, key, db, day, legacy, transport=None):
     for i,q in enumerate(queries(row)):
         if len(evidence)>=3:break
         charge='S8:'+ident+':'+str(i)
-        if not ledger_claim(db,day,charge,SEARCH_COST,legacy):
+        if not ledger_claim(db,day,charge,SEARCH_COST,legacy,daily_limit=daily_limit):
             calls['errors'].append('SEARCH_BUDGET_OR_PREVIOUS');break
         try:
             data=request('/v1/tools/search',{'query':q,'count':12,'need_content':True},key,transport)
@@ -326,7 +327,7 @@ def analyze(row,evidence,key,transport=None):
     return out,actual
 
 
-def find_public_business_contact(row, operator, key, db, day, legacy, transport=None):
+def find_public_business_contact(row, operator, key, db, day, legacy, transport=None, *, daily_limit=None):
     """Search once for a publicly listed business channel, not a guessed
     decision-maker or personal contact. Never use directories as verification.
     Only run after project evidence tied a named operator to the record.
@@ -335,7 +336,7 @@ def find_public_business_contact(row, operator, key, db, day, legacy, transport=
     if not name or name.lower() in ('unknown','none'):
         return {},0
     charge='C8:'+hashlib.sha256((str(row['project_id'])+':'+name).encode()).hexdigest()[:24]
-    if not ledger_claim(db,day,charge,SEARCH_COST,legacy):
+    if not ledger_claim(db,day,charge,SEARCH_COST,legacy,daily_limit=daily_limit):
         return {},0
     try:
         data=request('/v1/tools/search',{'query':'"'+name[:100]+'" Ontario official website contact phone email',
@@ -371,7 +372,8 @@ def read_csv(path):
 
 def run(projects_file,results_dir,legacy_data_dir=None,*,key=None,transport=None,
         max_projects=0,today=None,max_runtime_seconds=1800,
-        official_transport=None,max_official_checks=60):
+        official_transport=None,max_official_checks=60,
+        budget_cap_usd=None,eligible_project_ids=None):
     """Investigate ALL queued candidates over consecutive runs, under $1/day.
 
     The old V8 discarded everything past the first 25 and lost records after the
@@ -400,6 +402,11 @@ def run(projects_file,results_dir,legacy_data_dir=None,*,key=None,transport=None
     enrolled=queue.build(fresh, saved, previous, now)
     queue.save(queue_path,enrolled)  # Checkpoint BEFORE any external API call.
     due=queue.due(enrolled,previous,now)
+    # Selective mode excludes all unrelated historical backlog from paid work.
+    # All existing projects remain in the persisted queue.
+    if eligible_project_ids is not None:
+        allowed=set(eligible_project_ids)
+        due=[row for row in due if row.get('project_id') in allowed]
     counts=dict(native_searches=0,native_fetches=0,ai_calls_attempted=0,
                 ai_calls_succeeded=0,with_public_pages=0,ai_budget_deferred=0,
                 errors=0,source_only_ai_calls=0,duplicate_model_skipped=0,
@@ -409,6 +416,8 @@ def run(projects_file,results_dir,legacy_data_dir=None,*,key=None,transport=None
     # Reserve enough headroom for a complete discovery+Flash attempt before
     # beginning another project. Never strand 25 entries as 'budget deferred'.
     job_ceiling=MODEL_RESERVE+MAX_SEARCHES*SEARCH_COST+MAX_FETCHES*FETCH_COST
+    ceiling=min(DAILY_LIMIT,DAILY_LIMIT if budget_cap_usd is None else budget_cap_usd)
+    if ceiling<0:raise ValueError('Negative AI daily budget')
     try:
         for row in due:
             if max_projects>0 and len(current)>=max_projects:
@@ -427,7 +436,7 @@ def run(projects_file,results_dir,legacy_data_dir=None,*,key=None,transport=None
                 counts['duplicate_model_skipped']+=1
                 continue
             spent=effective_spend(db,day)[0]
-            if spent+legacy+job_ceiling>DAILY_LIMIT+1e-9:
+            if spent+legacy+job_ceiling>ceiling+1e-9:
                 reason='DAILY_USD_LIMIT';break
             item={field:'' for field in FIELDS}
             item.update(project_id=cid,address=row.get('address',''),
@@ -456,7 +465,8 @@ def run(projects_file,results_dir,legacy_data_dir=None,*,key=None,transport=None
                  'official_company','official_company_role','official_verification_level')})
             if official.get('official_description'):
                 research_row['description']=official['official_description']
-            evidence,stat=fetch_native(research_row,key,db,day,legacy,transport)
+            evidence,stat=fetch_native(research_row,key,db,day,legacy,transport,
+                                        daily_limit=ceiling)
             item.update(web_pages=len(evidence),searches=stat['search'],
                         native_searches=stat['search'],native_fetches=stat['fetch'],
                         source_urls=' | '.join(e['url'] for e in evidence),
@@ -471,7 +481,7 @@ def run(projects_file,results_dir,legacy_data_dir=None,*,key=None,transport=None
                             caveats='No project description or corroborating content.')
             else:
                 name=model_name
-                if not ledger_claim(db,day,name,MODEL_RESERVE,legacy):
+                if not ledger_claim(db,day,name,MODEL_RESERVE,legacy,daily_limit=ceiling):
                     # Distinguish a concurrent/same-day duplicate from a real
                     # budget shortage. Never let one duplicate stop all work.
                     if db.execute('SELECT 1 FROM spends WHERE day=? AND candidate=?',
@@ -502,7 +512,8 @@ def run(projects_file,results_dir,legacy_data_dir=None,*,key=None,transport=None
             if (item.get('status') in ('AI_EVIDENCE_REVIEW','AI_SOURCE_RECORD_REVIEW')
                     and contact_target and (evidence or official_verified)
                     and not item.get('contact')):
-                extra,ns=find_public_business_contact(research_row,contact_target,key,db,day,legacy,transport)
+                extra,ns=find_public_business_contact(research_row,contact_target,key,db,day,legacy,transport,
+                                                       daily_limit=ceiling)
                 counts['company_contact_searches']+=ns
                 counts['native_searches']+=ns
                 if extra:
