@@ -113,7 +113,7 @@ class FreeDailyWatchTests(unittest.TestCase):
             self.assertEqual(old_ai.read_text(encoding='utf-8'),
                              'project_id,status\nold,AI_EVIDENCE_REVIEW\n')
             self.assertTrue((results/free.HTML_NAME).is_file())
-            self.assertIn('DeepSeek calls: 0',(results/'GTA_RADAR_V6_DASHBOARD.html').read_text(encoding='utf-8'))
+            self.assertIn('Free collection stage costs $0 DeepSeek',(results/'GTA_RADAR_V6_DASHBOARD.html').read_text(encoding='utf-8'))
 
     def test_schedule_explicitly_includes_no_ai_and_enables_disabled_task(self):
         completed=SimpleNamespace(returncode=0,stderr='',stdout='')
