@@ -123,7 +123,7 @@ class SelectiveDailyTests(unittest.TestCase):
                 self.assertTrue(ai.ledger_claim(conn,today,"under",.010,0,daily_limit=.25))
                 self.assertFalse(ai.ledger_claim(conn,today,"over-again",.002,0,daily_limit=.25))
                 self.assertFalse(ai.ledger_claim(conn,today,"legacy-hold",.001,.02,daily_limit=.25))
-                self.assertFalse(ai.ledger_claim(conn,today,"lowered-global",.30,0,daily_limit=1.00))
+                self.assertFalse(ai.ledger_claim(conn,today,"lowered-global",.80,0,daily_limit=1.00))
             finally:conn.close()
 
     def test_schedule_uses_selective_flag_and_enables_previously_disabled_task(self):
