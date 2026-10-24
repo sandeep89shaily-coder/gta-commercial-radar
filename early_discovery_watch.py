@@ -32,6 +32,7 @@ STATUS=("source_id","status","fetched","new","updated","baseline","coverage",
         "discovered_pages","fetched_pages","warning","error")
 CHANGES=("observed_at","source_id","record_id","change_type","title","site",
          "source_date","source_url","commercial_fit")
+BURLINGTON_BLOCKED=("source_url","problem","impact")
 TITLE_SCOPE=re.compile(r"\b(?:industrial|commercial|employment|warehouse|"
     r"manufactur\w*|data cent(?:er|re)|retail|hotel|office|medical|"
     r"cold storage|energy|logistic\w*|distribution|waste processing)\b",re.I)
@@ -133,13 +134,13 @@ def burlington_records(session,max_pages=120):
             records.append(item)
         except (ValueError,RuntimeError,requests.RequestException) as err:
             failures.append((url,type(err).__name__))
-    if failures:
-        # A refused project page could hide an early lead; do not commit
-        # misleading 'complete' source snapshots.
-        raise RuntimeError(f"{len(failures)} official Burlington pages inaccessible; first={failures[0][0][-100:]}")
     if not records:
-        raise RuntimeError("No official Burlington project records")
-    return records,{"discovered":len(discovered),"fetched":len(records),"wards":len(ward_urls)}
+        raise RuntimeError("No accessible Burlington project detail records")
+    # A 403 is a real publisher restriction, not an empty municipality.
+    # Keep partial retrieved items for a review CSV, but DO NOT commit a
+    # partial snapshot that could later create misleading NEW alerts.
+    return records,{"discovered":len(discovered),"fetched":len(records),
+                   "wards":len(ward_urls),"blocked_details":failures}
 
 
 def meeting_id(url):
@@ -254,6 +255,27 @@ def run(data_dir="data",out_dir="GTA_RADAR_RESULTS",source=None,session=None,now
                 if source_id=="burlington_ward_discovery":
                     records,stats=burlington_records(session)
                     coverage="OFFICIAL_LINKED_WARD_PROJECT_PAGES"
+                    blocked=stats.get("blocked_details",[])
+                    _write_csv(out_dir/"EARLY_BURLINGTON_BLOCKED_DETAILS.csv",
+                         BURLINGTON_BLOCKED,
+                         [{"source_url":u,"problem":e,
+                           "impact":"REVIEW_ONLY_NOT_RETRIEVED_OR_NEW"}
+                          for u,e in blocked])
+                    if blocked:
+                        # Complete-source snapshot is deliberately NOT updated.
+                        # The records remain visible only in a separate
+                        # review file, never emitted as fresh change events.
+                        _write_csv(out_dir/"EARLY_BURLINGTON_PARTIAL_REVIEW.csv",
+                          FIELDS,[dict(x,first_seen_at="",last_seen_at="",
+                             current_snapshot_status="PARTIAL_SOURCE_UNCOMMITTED",
+                             not_sale_ready_reason="SOME_OFFICIAL_PAGES_403") for x in records])
+                        status.append(dict(source_id=source_id,status="PARTIAL_UNCOMMITTED",
+                             fetched=len(records),new=0,updated=0,baseline="NO",
+                             discovered_pages=stats["discovered"],
+                             fetched_pages=stats["fetched"],coverage="INCOMPLETE_DETAIL_ACCESS",
+                             warning=f"{len(blocked)}_PAGES_INACCESSIBLE;NO_FALSE_NEW_EVENTS",
+                             error=""))
+                        continue
                 else:
                     records,stats=brampton_records(session)
                     coverage="PUBLISHED_LINKED_AGENDAS_ONLY"
