@@ -143,6 +143,14 @@ For **every prospective project**, separately store:
 
 **Deferred researched sources are NOT forgotten:** individual planning portal adapters for Ajax, Oakville, Markham, Vaughan, Richmond Hill, Hamilton, Niagara and Waterloo; municipal/provincial tenders and award feeds, prequalified GC bid invitations, Access Environment, environmental assessments, AGCO opening clues, utility capital planning beyond IESO, property leasing/acquisitions and company tenant moves. Their official endpoint schemas and incremental edge require evidence before building specific live collectors.
 
+### Ajax official planning index — new review-only pilot, October 24, 2026
+
+- `early_ajax_watch.py` reads the official Ajax public planning property/application index (https://ajaxmaps.ajax.ca/bootrest/planningapps/property.html), capturing indexed civic addresses, planning file IDs and publicly displayed application status.
+- This is **code implemented / offline test PASSED / live Ajax website NOT YET VALIDATED**. It does **not** infer project use, buyer identity, submission/publication dates or open procurement from the index.
+- History stored separately in `data/early_ajax_review.sqlite`; first-run entries are baselines rather than "NEW" opportunities, and incomplete/blocked indexes fail closed.
+- `RUN_EARLY_CUES_PREVIEW.bat` now invokes Ajax along with the earlier collectors, evidence matcher and combined health report. CI run `40116559904` passed Windows/Linux on the Ajax implementation snapshot.
+- Other researched municipal sources remain in the register, not discarded merely because Ajax now has a first adapter.
+
 ## Priority windows without losing lower-priority sources
 
 **Now:** source-age advantage comparison for Burlington preapplication/Brampton agendas, IESO connection queue, and existing ERO enhancement; alongside verification of the strongest 10–15 recent industrial opportunities.
