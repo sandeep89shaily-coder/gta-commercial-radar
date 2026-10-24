@@ -38,8 +38,8 @@ COMMERCIAL=re.compile(
     r"retail|office|institutional|school|factory|employment lands|"
     r"employment use|servicing works|processing plant|loading docks?|"
     r"airport employment|plant expansion|waste management)\b",re.I)
-HOME=re.compile(r"\b(?:residential|townhouse|dwelling|apartment|"
-                r"condominium|housing)\b",re.I)
+HOME=re.compile(r"\b(?:residential|townhouses?|dwellings?|apartments?|"
+                r"condominiums?|housing)\b",re.I)
 DATED=re.compile(r"^(?:January|February|March|April|May|June|July|August|"
                  r"September|October|November|December)\s+\d{1,2},\s+20\d{2}$",re.I)
 DATE_TEXT=re.compile(r"\b(?:January|February|March|April|May|June|July|August|"
