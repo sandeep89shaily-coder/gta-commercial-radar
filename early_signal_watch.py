@@ -66,9 +66,9 @@ SOURCES = [
          status_fields=("SIMPLE_STATUS",)),
     dict(id="york_region_development", city="York Region (Vaughan included)", stage="PLANNING",
          url=YORK, id_fields=("APPL_GISID",),
-         date_fields=("DATE_RECVD",),
+         date_fields=("DATE_RECVD", "Submission_Date__c"),
          desc_fields=("APPL_DESC", "APPL_TYPE", "APPL_SUBTYPE"),
-         entity_fields=("APPL_NAME",), address_fields=("ADDRESS",),
+         entity_fields=("APPL_NAME",), address_fields=("ADDRESS", "LOCATION"),
          status_fields=("APPL_STATUS", "APPL_STAGE")),
     dict(id="toronto_development", city="Toronto", stage="PLANNING",
          url=TORONTO, id_fields=("APPLICATION_NUMBER",),
@@ -92,6 +92,7 @@ COLUMNS = (
     "observed_at", "source_id", "city", "stage", "change_type", "record_scope",
     "application_id", "feature_id", "source_application_date", "description",
     "location", "published_company_unverified_role", "status", "commercial_signal",
+    "municipal_reference", "date_completeness", "company_role",
     "source_url", "qualification",
 )
 STATUS_COLUMNS = ("source_id", "city", "status", "fetched", "new", "updated", "baseline", "error")
@@ -218,6 +219,14 @@ def summarize(source, row, oid, id_counts, observed_at):
         if str(row.get(field.upper()) or "").strip()
     ))[:1200]
     date, date_field = get_source_date(row, source["date_fields"])
+    municipality = first(row, ("MUN_NAME",)) if source["id"] == "york_region_development" else ""
+    city = municipality if municipality else source["city"]
+    municipal_reference = first(row, ("REG_FILE_NUM", "EXT_REF_NUM")) if municipality else ""
+    municipal_reference_field = next((name for name in ("REG_FILE_NUM", "EXT_REF_NUM")
+                                      if first(row, (name,))), "") if municipality else ""
+    if not municipal_reference or municipal_reference.strip().upper() in {"0", "N/A", "NONE", "UNKNOWN"}:
+        municipal_reference = ""
+        municipal_reference_field = ""
     company_field = next((f for f in source["entity_fields"] if first(row, (f,))), "")
     role = ("PUBLISHED_APPLICANT_NOT_BUYER" if company_field in ("APPLICANT", "APPLICANT_COMPANY")
             else "PUBLISHED_AGENT_NOT_BUYER" if company_field == "AGENT_COMPANY"
@@ -225,7 +234,11 @@ def summarize(source, row, oid, id_counts, observed_at):
     return dict(
         quality_version=QUALITY_VERSION, source_date_basis=date_field,
         company_role=role,
-        source_id=source["id"], city=source["city"], stage=source["stage"],
+        municipal_reference=municipal_reference,
+        municipal_reference_field=municipal_reference_field,
+        date_completeness=("PUBLISHED_APPLICATION_DATE_AVAILABLE" if date else
+                           "PUBLISHED_APPLICATION_DATE_MISSING_OR_INVALID"),
+        source_id=source["id"], city=city, stage=source["stage"],
         record_key=key, record_scope=scope,
         application_id=app_id, feature_id=feature_id,
         source_application_date=date,
@@ -365,6 +378,10 @@ def run(data_dir, output_dir=None, ids=None, session=None, now=None):
         export_csv(output_dir / "EARLY_SIGNALS_CHANGES_REVIEW_ONLY.csv", COLUMNS, changed)
         export_csv(output_dir / "EARLY_SIGNALS_SOURCES_STATUS.csv", STATUS_COLUMNS, statuses)
         quality = export_project_reports(db, output_dir)
+        from early_signal_buyer_research import write_queue
+        buyer_queue = write_queue(output_dir/"EARLY_SIGNALS_PROJECTS_REVIEW_ONLY.csv", output_dir)
+        print("Buyer research queue:", buyer_queue["investigation_candidates"],
+              "| No buyer or open contract auto-verified")
         print("Quality review candidates:", quality["review_candidates"],
               "| Source date is NOT publication date")
         print("Review-only changes:", len(changed),
