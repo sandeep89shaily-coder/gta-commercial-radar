@@ -17,7 +17,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import requests
-from radar import parse_dateish
+from early_signal_quality import (QUALITY_VERSION, classify as quality_classify,
+                                  source_date as get_source_date, export_project_reports)
 
 ROOT = Path(__file__).resolve().parent
 BRAMPTON = ("https://services3.arcgis.com/rl7ACuZkiFsmDA2g/ArcGIS/rest/"
@@ -208,16 +209,22 @@ def summarize(source, row, oid, id_counts, observed_at):
         for field in source["desc_fields"]
         if str(row.get(field.upper()) or "").strip()
     ))[:1200]
-    date = first(row, source["date_fields"])
+    date, date_field = get_source_date(row, source["date_fields"])
+    company_field = next((f for f in source["entity_fields"] if first(row, (f,))), "")
+    role = ("PUBLISHED_APPLICANT_NOT_BUYER" if company_field in ("APPLICANT", "APPLICANT_COMPANY")
+            else "PUBLISHED_AGENT_NOT_BUYER" if company_field == "AGENT_COMPANY"
+            else "PUBLISHED_APPLICATION_NAME_NOT_BUYER" if company_field else "COMPANY_UNKNOWN")
     return dict(
+        quality_version=QUALITY_VERSION, source_date_basis=date_field,
+        company_role=role,
         source_id=source["id"], city=source["city"], stage=source["stage"],
         record_key=key, record_scope=scope,
         application_id=app_id, feature_id=feature_id,
-        source_application_date=parse_dateish(date) or "",
+        source_application_date=date,
         description=description, location=first(row, source["address_fields"])[:250],
         published_company_unverified_role=first(row, source["entity_fields"])[:180],
         status=first(row, source["status_fields"])[:180],
-        commercial_signal=classify(description), source_url=source["url"],
+        commercial_signal=quality_classify(description, row), source_url=source["url"],
         qualification="PUBLIC_PLANNING_RECORD_REVIEW_ONLY",
         observed_at=observed_at,
     )
@@ -260,8 +267,8 @@ def digest(item):
 def save_records(db, source, records, observed_at):
     """One atomic source update; initial snapshot never generates fresh alerts."""
     sid = source["id"]
-    previous = {row[0]: row[1] for row in db.execute(
-        "SELECT record_key, digest FROM observations WHERE source_id=?", (sid,)
+    previous = {row[0]: (row[1], row[2]) for row in db.execute(
+        "SELECT record_key, digest, content FROM observations WHERE source_id=?", (sid,)
     )}
     baseline = not previous
     new_count = updated = 0
@@ -270,16 +277,25 @@ def save_records(db, source, records, observed_at):
             key = item["record_key"]
             data = json.dumps(item, ensure_ascii=False, sort_keys=True)
             hash_value = digest(item)
-            prior = previous.get(key)
-            if prior is None:
+            old = previous.get(key)
+            old_hash = old[0] if old else None
+            # V1 had malformed dates. The first V2 refetch upgrades quality
+            # without manufacturing source-change alerts or losing first_seen.
+            legacy_migration = False
+            if old is not None:
+                try:
+                    legacy_migration = json.loads(old[1]).get("quality_version") != QUALITY_VERSION
+                except (ValueError, TypeError, AttributeError):
+                    legacy_migration = True
+            if old is None:
                 new_count += 1
-            elif prior != hash_value:
+            elif old_hash != hash_value and not legacy_migration:
                 updated += 1
             db.execute("""INSERT INTO observations VALUES(?,?,?,?,?,?)
                 ON CONFLICT(source_id,record_key) DO UPDATE SET
                 last_seen=excluded.last_seen,digest=excluded.digest,content=excluded.content
                 """, (sid, key, observed_at, observed_at, hash_value, data))
-            if not baseline and (prior is None or prior != hash_value):
+            if not baseline and (old is None or (old_hash != hash_value and not legacy_migration)):
                 db.execute("INSERT INTO events(observed_at,source_id,record_key,change_type,content) VALUES(?,?,?,?,?)",
                            (observed_at,sid,key,"NEW" if prior is None else "UPDATED",data))
         db.execute("INSERT INTO source_runs(observed_at,source_id,status,fetched,new_count,updated_count,baseline,error) VALUES(?,?,?,?,?,?,?,?)",
@@ -340,6 +356,9 @@ def run(data_dir, output_dir=None, ids=None, session=None, now=None):
         # Keep unknown-use events in an explicit review file; never label sale-ready.
         export_csv(output_dir / "EARLY_SIGNALS_CHANGES_REVIEW_ONLY.csv", COLUMNS, changed)
         export_csv(output_dir / "EARLY_SIGNALS_SOURCES_STATUS.csv", STATUS_COLUMNS, statuses)
+        quality = export_project_reports(db, output_dir)
+        print("Quality review candidates:", quality["review_candidates"],
+              "| Source date is NOT publication date")
         print("Review-only changes:", len(changed),
               "| No baseline records treated as new leads | No DeepSeek used")
         return 1 if any(s["status"]=="FAILED" for s in statuses) else 0
