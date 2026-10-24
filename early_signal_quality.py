@@ -157,7 +157,8 @@ def address_key(row):
     street = re.match(
         r"^((?:[A-Z0-9]+\s+){0,5}?"
         r"(?:ST|STREET|RD|ROAD|AVE|AVENUE|DR|DRIVE|BLVD|BOULEVARD|"
-        r"CT|COURT|CRES|CRESCENT|LANE|WAY|PKWY|PARKWAY))\b", road
+        r"CT|COURT|CRES|CRESCENT|LANE|WAY|PKWY|PARKWAY)"
+        r"(?:\s+(?:N|S|E|W|NORTH|SOUTH|EAST|WEST))?)\b", road
     )
     if not street:
         return ""
@@ -166,6 +167,8 @@ def address_key(row):
                     "BOULEVARD":"BLVD", "COURT":"CT", "CRESCENT":"CRES",
                     "PARKWAY":"PKWY"}
     tokens = [replacements.get(x,x) for x in normalized.split()]
+    directions = {"NORTH":"N", "SOUTH":"S", "EAST":"E", "WEST":"W"}
+    tokens = [directions.get(x,x) for x in tokens]
     return city + "|" + number + " " + " ".join(tokens)
 
 
