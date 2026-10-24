@@ -106,6 +106,14 @@ For **every prospective project**, separately store:
 - What operational burden, duplicates, update failure rate, and DeepSeek cost does it impose?
 - Do not turn pilot on in unattended V8 or let it spend tokens before it passes these tests.
 
+## Build increment — October 24, 2026 (pilot branch PR #74; NOT V8)
+
+- **Implemented offline-testable watcher:** `early_cue_watch.py` tracks published IESO connection application entries by CAA ID. Marks province-wide location and buyer/procurement status **unverified**. Visible-table pagination/full extraction **not yet live validated**.
+- **Implemented limited Burlington source-page watcher:** three identified official development pages, including pre-application references. This does **not** discover all future Burlington proposals yet; an official complete index is the next dependency.
+- **Manual Windows launch:** `RUN_EARLY_CUES_PREVIEW.bat`. Outputs new isolated `early_cues_review.sqlite`, source status, research queue, and real post-baseline changes. **No DeepSeek use; no V8 integration.**
+- **Brampton eSCRIBE agendas:** official detailed application-item page verified, but automatic current-meeting discovery is still **RESEARCHED_UNBUILT**. ERO proposal enhancements, Toronto AIC and all other catalogued sources are unchanged.
+- **Evidence still needed:** successful live execution against publisher pages, pagination/discovery validation, source terms, comparison with the original seven feeds, and any demonstrated unawarded real buyer and 10-lead/two-pilot progress. No historical baseline suddenly becomes new lead.
+
 ## Priority windows without losing lower-priority sources
 
 **Now:** source-age advantage comparison for Burlington preapplication/Brampton agendas, IESO connection queue, and existing ERO enhancement; alongside verification of the strongest 10–15 recent industrial opportunities.
