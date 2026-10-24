@@ -123,6 +123,26 @@ For **every prospective project**, separately store:
 - **Not solved by code yet:** Brampton eSCRIBE calendar/agenda discovery can return 403 to non-browser clients; do not bypass restrictions or label it automated. Burlington citywide preapplication discovery, exact first-posting-date comparison, verified operator/buyer and tender availability, early source rights and two paying pilots remain unmet.
 - Review the pilot limits and test checklist in `EARLY_PUBLIC_NOTICES_PILOT.md`. This entry updates status without removing any earlier researched categories.
 
+## Further October 24 build on isolated draft branch (still not live validated)
+
+**Phase 2A — Burlington and Brampton pre-application/committee discovery:**
+- `early_discovery_watch.py` follows the official Burlington planning navigation to ward project lists and individual project pages, with bounded fetches and fail-closed behavior if municipal HTML becomes inaccessible.
+- Brampton Planning & Development Committee eSCRIBE published meeting calendar is now linked from the official public site; extracts agenda application numbers, purpose, party descriptions and meeting dates from publicly accessible pages. Agenda publication dates are still unverified. 403/JS failures will be reported rather than worked around.
+- **Source status:** adapters implemented / offline tests passed, **live publisher coverage NOT verified**.
+
+**Phase 2B — new business-investment and direct buying-signal lanes:**
+- `early_investment_tenders.py`: official Ontario all-news RSS news releases, screened for proposed manufacturing/facility investment, and the federal-only CanadaBuys open tender CSV. Open government tenders are source-snapshot open notices with deadlines to verify—not private unawarded GTA contracts.
+- `toronto_aic_email_import.py`: voluntary, offline importer of official Toronto AIC e-update email files, WITHOUT accessing email or subscribing the user. Header dates are not official posting dates; requires original city application verification.
+- **Source status:** implemented / offline tests added, **live RSS/CSV access and any subscriber input NOT verified**.
+
+**Phase 2C — cross-source proof rather than record proliferation:**
+- `early_evidence_match.py` loads only isolated pilot SQLite history, proposes **same-city and exact-numbered street** evidence pairs for human review, and distinguishes publisher posting date from receipt date vs Radar's first-seen date. Matches do not establish one project, contractor availability, or true permit lead-time advantage.
+- `early_pilot_summary.py` writes `EARLY_PILOT_RUN_SUMMARY.txt` and `EARLY_TOP_RESEARCH_PREVIEW.csv` as RESEARCH-ONLY outputs.
+- One manual `RUN_EARLY_CUES_PREVIEW.bat` runs the new collectors and analysis without recollecting 32k original GIS rows or altering V8 / the US$0.25/day DeepSeek budget.
+- **Current source status remains NOT LIVE TESTED.** User is away from their PC; do not turn adapters into scheduled production feeds merely because CI passes.
+
+**Deferred researched sources are NOT forgotten:** individual planning portal adapters for Ajax, Oakville, Markham, Vaughan, Richmond Hill, Hamilton, Niagara and Waterloo; municipal/provincial tenders and award feeds, prequalified GC bid invitations, Access Environment, environmental assessments, AGCO opening clues, utility capital planning beyond IESO, property leasing/acquisitions and company tenant moves. Their official endpoint schemas and incremental edge require evidence before building specific live collectors.
+
 ## Priority windows without losing lower-priority sources
 
 **Now:** source-age advantage comparison for Burlington preapplication/Brampton agendas, IESO connection queue, and existing ERO enhancement; alongside verification of the strongest 10–15 recent industrial opportunities.
