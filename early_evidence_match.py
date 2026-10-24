@@ -81,8 +81,7 @@ def iso(value):
 
 def unpack(item,source,seen):
     sid=str(item.get("source_id") or source)
-    city=norm_city(item.get("city") or item.get("municipality") or
-       item.get("geographic_confidence") if False else item.get("city") or item.get("municipality"))
+    city=norm_city(item.get("city") or item.get("municipality"))
     # Tagged municipality from the three official borough-specific source lists.
     if not city:
         if sid.startswith("burlington_"):city="BURLINGTON"
