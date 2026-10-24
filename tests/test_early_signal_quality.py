@@ -50,6 +50,23 @@ class QualityTests(unittest.TestCase):
         self.assertIn("GIS_FEATURE", app_key(a))
         self.assertIn("APP|", app_key(b))
 
+    def test_cross_stage_links_require_same_address_not_just_company(self):
+        from early_signal_quality import possible_stage_links
+        a = {"source_id":"brampton_preconsultation", "stage":"PRE_CONSULTATION",
+             "city":"Brampton", "location":"350 MAIN STREET NORTH",
+             "source_application_date":"2026-01-10",
+             "project_group_key":"PRE:123", "application_id":"PRE-123"}
+        b = {"source_id":"brampton_site_plans", "stage":"SITE_PLAN",
+             "city":"Brampton", "location":"350 Main St N Brampton ON",
+             "source_application_date":"2026-10-10",
+             "project_group_key":"SPA:456", "application_id":"SPA-456"}
+        linked = possible_stage_links([a, b], dt.date(2026,10,24))
+        self.assertEqual(len(linked), 1)
+        self.assertEqual(linked[0]["link_confidence"],
+                         "POSSIBLE_SHARED_ADDRESS_AND_TIMELINE")
+        self.assertEqual(possible_stage_links(
+            [a, {**b,"location":"400 Main St N"}], dt.date(2026,10,24)), [])
+
     def test_group_multi_features_without_erasing_first_seen(self):
         with tempfile.TemporaryDirectory() as directory:
             db = sqlite3.connect(":memory:")
