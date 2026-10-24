@@ -18,6 +18,7 @@ HEALTH_FILES=(
     "EARLY_AIC_EMAIL_STATUS.csv",
     "EARLY_AJAX_SOURCE_STATUS.csv",
     "EARLY_OAKVILLE_SOURCE_STATUS.csv",
+    "EARLY_HAMILTON_SOURCE_STATUS.csv",
 )
 SOURCE_HINTS={
     "brampton_preconsultation":16,
