@@ -27,6 +27,8 @@ SOURCE_HINTS={
     "milton_notices":13,
     "pickering_proposals":13,
     "oakville_development":12,
+    "hamilton_planning_notices":15,
+    "hamilton_applications_gis":12,
     "ero_proposal_watch":11,
     "ontario_investment_news":11,
     "ieso_connections":10,
