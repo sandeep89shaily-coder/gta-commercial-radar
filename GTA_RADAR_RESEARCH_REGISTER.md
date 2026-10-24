@@ -1,0 +1,126 @@
+# GTA Radar — Research Register and Source Backlog
+_Recorded 2026-10-24. This is the durable inventory of **all previously researched directions**, including lower-priority ideas. It is not a list of implemented APIs and does not guarantee scrape rights, feed stability, or present procurement availability._
+
+## Purpose
+Keep every researched public cue visible while prioritizing the few sources most likely to increase *measurable* time-to-discovery or qualified buyer identification.
+
+**North Star:** discover commercial and industrial developments in GTA/Southern Ontario *before relevant vendors are selected*; independently verify a real buyer/operator and public business contact route; sell **10 evidence-backed actionable opportunities** to validate with **2 paying pilot customers**. No subscription search portal. Not just more GIS records.
+
+**Scope discipline:** protect existing V8; US$0.25/day DeepSeek cap; use free official data/deterministic filters; do not add duplicate feeds, false source dates, scraped private numbers, invented procurement status, or unnecessary code upgrades.
+
+**Status vocabulary:** `PILOT_ACTIVE_MANUAL` (exists and user tested); `EXISTING_NOT_YET_IMPROVED` (some collector already exists but enhancement needed); `RESEARCHED_UNBUILT` (public resource studied; new monitoring NOT built); `HYPOTHESIS_VALIDATE` (potential cue; endpoint/reuse/publication timing not confirmed); `LATER_STAGE_VALIDATION` (useful for verification, not earliest discovery).
+
+## Current seven-source early planning baseline (do not mistake it for finished lead-generation)
+
+| Municipal dataset | Location | Status | Distinctive value and caveat |
+|---|---|---|---|
+| Pre-consultation GIS | Brampton | PILOT_ACTIVE_MANUAL | Often precedes filing; publication date and active procurement still require verification |
+| Rezoning / OPA | Brampton | PILOT_ACTIVE_MANUAL | Earlier entitlement interest; multiple phases |
+| Site plans | Brampton | PILOT_ACTIVE_MANUAL | Trade-relevant scope; some source `DATE_RECEIVED` absent |
+| Site plans | Mississauga | PILOT_ACTIVE_MANUAL | Planned industrial additions |
+| Rezonings | Mississauga | PILOT_ACTIVE_MANUAL | Proposed land-use changes |
+| Region development GIS | York Region including Vaughan | PILOT_ACTIVE_MANUAL | Some `APPL_GISID` are features, not distinct municipal projects |
+| Development GIS | Toronto | PILOT_ACTIVE_MANUAL | Repeated map features grouped by application ID, not proof of unique projects |
+
+**Measured October 24 baseline:** 32,269 official source rows; 94.2% valid application/source dates; 795 commercial review candidates; 165 research-first; just 53 had application dates within 90 days. These numbers are the uploaded CSV snapshot, not newly verified opportunities. A prior Brampton site-plan audit had 1,542 undated features; Toronto and York need identity caution. Candidate seller/buyer verification and whether trades are engaged remain unknown. V8 production has **not** been updated to use this pilot.
+
+## Researched early-cue source catalogue — do not drop any item
+
+### A. Planning **before** normal application or permit (highest early-stage potential)
+
+| Cue | Geography / public lead | Status | Why investigate / what must be proven |
+|---|---|---|---|
+| Pre-application community meetings | Burlington https://www.burlington.ca/en/planning-and-development/burlington-planning-process.aspx | RESEARCHED_UNBUILT | Proposal surfaced before complete application; collect initial public agenda/post date, developer name, plans |
+| Planning & Development Committee and council agenda packages | Brampton public meeting agendas (official portal endpoint to reconfirm) | RESEARCHED_UNBUILT | Project-specific presentations, attachments, proponent names; compare to Brampton GIS date and duplication |
+| Council/planning agendas & committee reports | Toronto, Mississauga, Burlington and other GTA councils | RESEARCHED_UNBUILT | Public decision documents, planning studies, early site directions; relevant PDFs not all machine-readable |
+| Toronto AIC updates, daily application map updates and ward subscriptions | Toronto https://www.toronto.ca/city-government/planning-development/application-information-centre/ | RESEARCHED_UNBUILT | Test whether alerts/document releases appear **before** existing Toronto GIS collector; don't duplicate |
+| Development application notices / subscriptions | Milton https://www.milton.ca/business-development/planning-and-development/development-applications/development-application-notices/ | RESEARCHED_UNBUILT | Potential public notice/post date and project/applicant PDF |
+| Current development proposals / subscriber updates | Pickering https://www.pickering.ca/business-building-development/planning-and-development/current-development-proposals/ | RESEARCHED_UNBUILT | Project posting date and supporting documents; don't equate date posted with opportunity open |
+| Planning application dashboard | Ajax https://ajax.ca/build-invest/for-developers-builders/planning-development-applications/ | RESEARCHED_UNBUILT | Proposed floor areas, milestones and documents |
+| Ward/site-plan and active application pages | Oakville https://www.oakville.ca/business-development/planning-development/active-development-applications/ward-1-development-and-site-plan-applications/ | RESEARCHED_UNBUILT | Applicant and early site plans; requires stable change tracking |
+| MappiT | Markham https://www.markham.ca/economic-development-business/planning-development-services/mappit | RESEARCHED_UNBUILT | Municipality-specific planning identities; verify whether earlier than York Region layer |
+| PLANit | Vaughan https://www.vaughan.ca/news/explore-enhanced-planit-mapping-tool | RESEARCHED_UNBUILT | Municipality-specific developments; compare against York Region, avoid double counting |
+| Development status map | Richmond Hill https://www.richmondhill.ca/en/learn-more/Planning-Development.aspx | RESEARCHED_UNBUILT | Supplement York Region with local stage and site documents |
+| Planning / active developments | Hamilton https://www.hamilton.ca/build-invest-grow/planning-development/planning-applications/where-development-happening-hamilton | RESEARCHED_UNBUILT | Southern Ontario expansion after GTA source advantage proven |
+| Municipal planning expansion | Halton, Durham, Niagara, Waterloo, other Peel/York municipalities | HYPOTHESIS_VALIDATE | Examine per-municipality original first-publication evidence; expand only when unique value exceeds overlap |
+| Zoning/community consultations and minor-variance pages | GTA municipalities | HYPOTHESIS_VALIDATE | May precede permits but predominantly residential or small changes; aggressive relevance filters required |
+| Developer presentations and technical attachments | Public council agendas / planning application portals | RESEARCHED_UNBUILT | Identify refrigeration, generation, plant, data centres, loading docks, building areas, tenants, experts; extraction work may be noisy |
+
+### B. Industrial investment and infrastructure intentions (possibly earlier than site plans)
+
+| Cue | Public starting point | Status | Why investigate / what must be proven |
+|---|---|---|---|
+| Large load and generation connection applications, status changes | IESO https://www.ieso.ca/en/Sector-Participants/Connection-Process/Application-Status | RESEARCHED_UNBUILT | Potential early data-centre, electrical, plant and utility projects; identify locality, named company, queue entry date, already-selected vendors |
+| Environmental Registry proposal-stage industrial ECA/EASR | ERO https://ero.ontario.ca/search | EXISTING_NOT_YET_IMPROVED | Radar already has ERO; enhance first-proposal detection and match operators to GIS, avoid duplicate collector |
+| Environmental approval decisions / active filings | Ontario Access Environment https://www.ontario.ca/page/list-environmental-approvals-and-registrations | RESEARCHED_UNBUILT | Industrial equipment, water/air/waste permits; many approvals later than planning |
+| Environmental Assessment **Notice of Study Commencement**, consultations | Ontario https://www.ontario.ca/page/environmental-assessments and regional/municipal EA notices | RESEARCHED_UNBUILT | Public infrastructure years before construction; distinguish study/proposal from funded tender |
+| Public utility capital plans, capacity and infrastructure consultations | Hydro/utility public postings in GTA (provider pages to verify) | HYPOTHESIS_VALIDATE | Possible expansion and load signal; not every planning consultation reveals a customer site |
+| Municipal wastewater, water, transit, public works studies | Peel, Toronto, Durham, Halton, Hamilton | RESEARCHED_UNBUILT | Early design/engineering signals and subsequent work-package milestones |
+| Economic development investment/relocation announcements | Municipal investment offices, federal/provincial economic development announcements | RESEARCHED_UNBUILT | Company announces plants, major facilities, data centres or relocation prior to permit; news may arrive after vendor decisions |
+| Company press releases / industrial tenant expansion plans | Company newsroom and public investor releases | RESEARCHED_UNBUILT | Named organization, spending and capacity; track verified source/public date |
+| Industrial/commercial property sales and land acquisitions | Public land/disposition notices and developer releases | HYPOTHESIS_VALIDATE | Possible precursor to development, but many transactions have no construction plans; avoid personal-property data |
+| Commercial leasing / pre-leasing / tenant relocation announcements | Public developer/broker/tenant announcements | HYPOTHESIS_VALIDATE | Identify fit-out needs and end tenant; avoid paid/restricted MLS sources and implied buyer claims |
+| AGCO public liquor licence applications / data inventory | https://www.agco.ca/en/general/data-inventory | RESEARCHED_UNBUILT | Potential hospitality/restaurant fit-out before opening; test date and false-positive volume |
+| Business licensing / occupancy / business registry updates | Municipality-specific public business licences | HYPOTHESIS_VALIDATE | Tenant openings and fit-outs, likely closer to opening than earliest planning |
+| Industrial incentives, grants, investment commitments | Provincial/federal economic development announcements | HYPOTHESIS_VALIDATE | Named capital deployments; verify whether factory/office/new build vs headcount only |
+
+### C. Buyer / tender / work-package availability (often later, but actionable)
+
+| Cue | Public starting point | Status | Why investigate / what must be proven |
+|---|---|---|---|
+| Federal public tenders/new tender files | CanadaBuys https://canadabuys.canada.ca/en | LATER_STAGE_VALIDATION | Clearly procuring entity and response deadlines; useful buyer signal, but not early private industrial procurement |
+| Municipal / provincial purchasing RFIs, RFQs, RFPs, pre-qualifications | GTA public procurement pages/portals | LATER_STAGE_VALIDATION | Explicit work scope and deadlines; only if public feed and reuse allowed |
+| Tender awards and public contract disclosures | Public-sector buyer award/meeting reports | LATER_STAGE_VALIDATION | Confirm a supplier has already been chosen; avoid offering closed work as an open opportunity |
+| General-contractor expressions of interest / trade bid notices | Public developer/general contractor procurement notices | HYPOTHESIS_VALIDATE | May disclose upcoming subcontract awards and trade scopes; don't infer open bids without notice |
+| Public planning project developer/owner/agent names | GIS + attached official report | PILOT_ACTIVE_MANUAL | Crucial role disambiguation. Agent/architect `!=` purchasing authority |
+| Public business contact route and procurement status | Official business websites, notices, tender contact, company publications | HYPOTHESIS_VALIDATE | Essential for sale-ready lead; verify organization affiliation, lawful public channels and whether vendor selection remains open |
+
+### D. Validation / comparison feeds already in Radar
+
+- Existing building permit feeds in Toronto, Brampton, Mississauga and other locations: **use as LATE comparison**, not default early lead.
+- Existing Toronto application feed, York planning, Brampton pre-consultations and staged Mississauga layers: compare every new source against these before adding duplication.
+- Existing GTA Radar business discovery, operator/contact attempts and change-based selector: quality and traceable role evidence are the priority; don't process 578k old records just for scale.
+- Buyer benchmark products researched in earlier comparisons: Building Radar, GroundIntel, Builtie, BuildMapper, ConstructConnect, Data Axle and Streetwire. Their lessons to test, not claims of equivalent datasets: decision-maker mapping, verified procurement stage, earliest evidence and supplier-specific relevance.
+
+## Why timing isn't proof of an available lead
+
+For **every prospective project**, separately store:
+1. `official_document_url` or exact GIS feature
+2. `project_or_application_identity` (with grouping confidence)
+3. `application_date` (source-supplied, nullable)
+4. `official_publication_date` (if published and attributable, otherwise unknown)
+5. `radar_first_seen_at` (immutable first observation)
+6. `developer_owner_tenant_operator_agent_roles` (each with evidence)
+7. `commercial_scope_and_supplier_fit` (evidence, not guessed contract value)
+8. `procurement_status` (OPEN / AWARDED / UNKNOWN only when supported)
+9. `public_business_contact_route` (not an unverified private number)
+10. `cross_source_history`, `reviewer_decision`, `AI_cost`, and `confidence`.
+
+## Source intake gates before adding any feed to daily collection
+
+- Can we lawfully collect it without paid access? What machine-readable endpoint / PDF and update interval exist?
+- Do original documents expose a **first public posting date**, not just a submission date?
+- Does it reveal a non-residential investment **earlier** than 7 existing planning sources and existing permits?
+- How many **new**, unique, substantial, verified potential opportunities per 14-day window?
+- Can we identify a real organization and public business contact path without claiming contractors are unselected?
+- What operational burden, duplicates, update failure rate, and DeepSeek cost does it impose?
+- Do not turn pilot on in unattended V8 or let it spend tokens before it passes these tests.
+
+## Priority windows without losing lower-priority sources
+
+**Now:** source-age advantage comparison for Burlington preapplication/Brampton agendas, IESO connection queue, and existing ERO enhancement; alongside verification of the strongest 10–15 recent industrial opportunities.
+
+**Then:** Toronto AIC and Milton/Pickering/Ajax original posting dates; check whether they beat already collected GIS sources.
+
+**Later / conditional:** Oakville, Markham, Vaughan, Richmond Hill, Hamilton, additional Southern Ontario, AGCO, leasing/land, investment announcements, environmental assessments, tenders and procurement availability.
+
+**Every biweekly review:** scan *all* catalogue rows for newly actionable/overdue items; spotlight 3 best actions but also mention deferred areas and their reason. Don't silently erase or replace older research when adding new findings. Mark each item `not tested / tested-no edge / pilot / production` and record the evidence when status changes.
+
+## Success measures
+- `verified_actionable_opportunities`: target **10**, require work scope, current project stage, responsible buyer, public channel, and unawarded-work evidence or clearly bounded uncertainty.
+- `paying_pilot_customers`: target **2**.
+- `documented_early_advantage_days` on same identified projects and sources.
+- `qualified_new_projects_per_week` and `provider_feedback`.
+- `AI_spend_usd_per_day`: at or below **$0.25**.
+
+**Do not confuse sourced possibility, implementation, and verified lead. The research register is complete as a catalogue, not a guarantee that every public page has a tested feed.**
