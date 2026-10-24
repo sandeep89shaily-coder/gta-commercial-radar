@@ -59,3 +59,45 @@ The collector fails closed on missing IDs, empty snapshots, duplicate features a
 ## What this stage does not claim
 
 This first stage establishes source collection and change-history plumbing, **not** ten verified commercial opportunities or automated sales leads. No live remote fetch or all-suite tests were executed when the code was authored; GitHub CI and the first Windows preview are the acceptance checks. Keep V8 unchanged until those checks pass.
+
+
+## Quality correction (2026-10-24)
+
+The first seven-feed baseline was successful, but the original date parser produced
+invalid years (for example 9644) and dropped application dates on nearly all records.
+The quality correction addresses the verified deficiencies:
+
+- Parse official ArcGIS epoch-millisecond timestamps as dates even when returned
+  as numeric strings; reject impossible dates and preserve original source-date field.
+- Recognize energy-from-waste, loading docks, industrial cold-storage, manufacturing
+  expansions and structured Mississauga non-residential GFA, while retaining
+  mixed-use projects for review.
+- Consolidate repeated **features** with the same published municipal application
+  ID into review-level groups; do not assume every feature is a new development.
+- Treat York Region APPL_GISID as a GIS feature ID, not a verified applicant/project ID.
+- Preserve original SQLite `first_seen` on upgrade and **suppress false UPDATE
+  alerts from changing only the interpretation/parser**. A real source change
+  during the one-time quality migration may therefore not be alerted until
+  the next observation, and should be assessed against municipal history.
+- Emit `EARLY_SIGNALS_QUALITY_AUDIT.csv`, `EARLY_SIGNALS_PROJECTS_REVIEW_ONLY.csv`,
+  and `EARLY_SIGNALS_POSSIBLE_STAGE_LINKS_REVIEW.csv`.
+- Cross-stage links are conservative **same numbered street + two application
+  dates no more than 730 days apart**, distinct source/stage and separate
+  record IDs. These are suggestions for manual review, NEVER proven
+  project identity or supplier selection.
+- Exclude clearly inactive/withdrawn/closed projects from the recent-candidate
+  review (but retain them in source history).
+- Separate applicant/agent/published application-name roles from purchasing
+  decision-maker claims.
+
+The `EARLY_SIGNALS_PROJECTS_REVIEW_ONLY.csv` file is an application-date
+screen of historical source records; it is **not** a new-today feed and cannot
+establish public publication dates or contract availability. First-seen timestamps
+still refer only to Radar observation dates.
+
+**Important:** the uploaded original SQLite did not contain the raw GIS date
+attributes, so repairing existing dates requires **one full free-data refetch
+from the official GIS sources**. Never fill dates based only on digits in
+application numbers. The corrected pilot is still deliberately isolated from
+V8's scheduler and DeepSeek queue until source reliability and actual commercial
+value are verified.
