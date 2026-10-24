@@ -1,0 +1,145 @@
+{
+  "review_date": "2026-10-24",
+  "basis": "Municipal Hamilton GIS first-run snapshot and independent municipal/company pages; company roles kept distinct",
+  "count": 7,
+  "verified_unawarded_work_packages": 0,
+  "records": [
+    {
+      "file_number": "FCSP-26-009",
+      "location": "1431 Wilson Street, Ancaster",
+      "file_year": 2026,
+      "municipal_description": "Construct 7,688.84 square metre industrial building with warehouse and administrative space.",
+      "related_organization": "UNVERIFIED_DEVELOPER_OR_BUYER",
+      "org_relation": "NONE_VERIFIED",
+      "organization_source": "",
+      "public_contact_route": "",
+      "independent_source": "https://www.carolcorazzola.com/property/409-40729210-1431-wilson-street-w-ancaster-ON-L0R1R0",
+      "independent_finding": "2025 real estate listing for industrial land at 1431 Wilson Street West; developer/ownership may change after listing, do not treat listing agent as purchasing contact",
+      "stage": "FORMAL_CONSULTATION_GIS_2026_NO_CURRENT_STATUS",
+      "procurement": "UNKNOWN",
+      "supplier_fit": [
+        "industrial HVAC",
+        "electrical",
+        "loading dock systems"
+      ],
+      "next": "Request official 2026 file drawings and applicant/owner data; establish whether land sold and whether developer is appointed",
+      "priority": "RESEARCH_FIRST"
+    },
+    {
+      "file_number": "FC-2026-00161",
+      "location": "1119 Barton Street, Hamilton",
+      "file_year": 2026,
+      "municipal_description": "Proposed 1,196-square-metre industrial cured meat production facility addition.",
+      "related_organization": "Venetian Meat & Salami Company Limited",
+      "org_relation": "COMPANY_OPERATES_AT_SITE_PER_ONTARIO_ERO_AND_OWN_WEBSITE_NOT_CONFIRMED_CURRENT_PLANNING_APPLICANT",
+      "organization_source": "https://ero.ontario.ca/notice/019-2851",
+      "public_contact_route": "info@venetianmeats.com",
+      "public_contact_source": "https://venetianmeats.com/contact/",
+      "stage": "FORMAL_CONSULTATION_GIS_2026_NO_CURRENT_STATUS",
+      "procurement": "UNKNOWN",
+      "supplier_fit": [
+        "industrial refrigeration",
+        "food processing equipment",
+        "HVAC",
+        "sanitation"
+      ],
+      "next": "Confirm identity and current stage with city's FC-2026-00161 file, then seek real facilities/project procurement contact; assess refrigeration package unawarded status",
+      "priority": "RESEARCH_FIRST"
+    },
+    {
+      "file_number": "FC-2026-00239",
+      "location": "1133 Industrial Drive, Hamilton",
+      "file_year": 2026,
+      "municipal_description": "Proposed industrial site redevelopment with several buildings, outdoor storage, loading areas and ship docking.",
+      "related_organization": "Hamilton Container Terminal / HCT Group",
+      "org_relation": "PUBLISHED_CURRENT_TERMINAL_OPERATOR_AT_ADDRESS_NOT_PROVEN_PLANNING_APPLICANT",
+      "organization_source": "https://hcterminal.com/contact/",
+      "public_contact_route": "support@hcterminal.com",
+      "public_contact_source": "https://hcterminal.com/contact/",
+      "site_property_source": "https://www.hopaports.ca/1133-industrial-drive/",
+      "stage": "FORMAL_CONSULTATION_GIS_2026_NO_CURRENT_STATUS",
+      "procurement": "UNKNOWN",
+      "supplier_fit": [
+        "warehouse expansion",
+        "loading docks",
+        "heavy yard equipment",
+        "security and lighting"
+      ],
+      "next": "Confirm application applicant/owner; differentiate HOPA property management from HCT terminal operator and whether work has started",
+      "priority": "RESEARCH_FIRST"
+    },
+    {
+      "file_number": "FC-2026-00410",
+      "location": "100 Parkside Drive, Hamilton",
+      "file_year": 2026,
+      "municipal_description": "Proposed vacant land development for mini-storage on front portion and hotel at rear.",
+      "related_organization": "UNKNOWN",
+      "org_relation": "NONE_VERIFIED",
+      "stage": "FORMAL_CONSULTATION_GIS_2026_NO_CURRENT_STATUS",
+      "procurement": "UNKNOWN",
+      "supplier_fit": [
+        "hotel MEP",
+        "self-storage security",
+        "HVAC"
+      ],
+      "next": "Obtain original applicant and landowner from official file, then identify hotel operator and construction procurement status",
+      "priority": "RESEARCH_NEXT"
+    },
+    {
+      "file_number": "FCSP-26-003",
+      "location": "33-35 Hess Street South, Hamilton",
+      "file_year": 2026,
+      "municipal_description": "Proposed eight-storey mixed hotel and restaurant building.",
+      "related_organization": "UNKNOWN",
+      "org_relation": "NONE_VERIFIED",
+      "stage": "SITE_PLAN_FORMAL_CONSULTATION_YEAR_2026_NO_CURRENT_STATUS",
+      "procurement": "UNKNOWN",
+      "supplier_fit": [
+        "hotel HVAC",
+        "fire systems",
+        "kitchen ventilation",
+        "security"
+      ],
+      "next": "Check planning file and developer identity; distinguish prospective building from awarded hotel fit-out",
+      "priority": "RESEARCH_NEXT"
+    },
+    {
+      "file_number": "FCSP-26-007",
+      "location": "Orkney Road, Hamilton",
+      "file_year": 2026,
+      "municipal_description": "Proposed two-storey approximately 1,114.83-square-metre warehouse with agricultural processing and office.",
+      "related_organization": "UNKNOWN",
+      "org_relation": "ADDRESS_WITHOUT_CIVIC_NUMBER_AND_OWNER_UNVERIFIED",
+      "stage": "FORMAL_CONSULTATION_GIS_2026_NO_CURRENT_STATUS",
+      "procurement": "UNKNOWN",
+      "supplier_fit": [
+        "food or agricultural processing",
+        "warehouse ventilation",
+        "electrical"
+      ],
+      "next": "Resolve specific civic parcel/applicant and project identity before buyer research",
+      "priority": "RESEARCH_NEXT"
+    },
+    {
+      "file_number": "FCSP-25-066",
+      "location": "420 Garner Road West, Ancaster",
+      "file_year": 2025,
+      "municipal_description": "Natural-gas transmission station work including generator, telemetry and supporting buildings.",
+      "related_organization": "Union Gas Company of Canada Limited / Enbridge Gas Inc.",
+      "org_relation": "OFFICIAL_OWNER_FROM_CITY_COMMITTEE_AGENDA_STANTEC_IS_PLANNING_APPLICANT_AGENT",
+      "organization_source": "https://pub-hamilton.escribemeetings.com/Meeting?Agenda=Agenda&Id=789c509f-d2a9-4690-bd00-e13f7de04fbe&lang=English",
+      "public_contact_route": "https://www.enbridge.com/SupplierForm",
+      "public_contact_source": "https://www.enbridge.com/work-with-enbridge/doing-business-with-enbridge/prospective-suppliers",
+      "stage": "UNDER_CONSTRUCTION_PER_WARD_COUNCILLOR_WEBPAGE",
+      "stage_evidence_url": "https://www.craigcassar.ca/development",
+      "procurement": "UNKNOWN_PROJECT_MAY_HAVE_SELECTED_CONTRACTORS",
+      "supplier_fit": [
+        "utility electrical",
+        "controls",
+        "security"
+      ],
+      "next": "Classify as LATE_STAGE_CHECK, not an unawarded lead; supplier registration is general, NOT an open project contract",
+      "priority": "DEPRIORITIZE_LATE_STAGE"
+    }
+  ]
+}
