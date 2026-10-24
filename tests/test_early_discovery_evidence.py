@@ -130,6 +130,15 @@ class EvidenceTests(unittest.TestCase):
         self.assertEqual(gate[0]["lead_status"],"NOT_SALE_READY_RESEARCH_ONLY")
         self.assertEqual(gate[0]["vendor_status"],"UNKNOWN")
 
+    def test_ajax_municipality_not_guessed_from_arbitrary_locations(self):
+        observed=m.unpack(dict(source_id="ajax_planning_properties",
+            record_id="ajax-1",site="211 Bayly Street East",
+            commercial_fit="USE_UNKNOWN"),"ajax_planning_properties",
+            "2026-10-24T11:00:00+00:00")
+        self.assertEqual(observed["city"],"AJAX")
+        self.assertEqual(observed["address_key"],"211 BAYLY ST E")
+        self.assertEqual(observed["procurement_status"],"UNKNOWN")
+
     def test_no_cross_city_or_ambiguous_site_link(self):
         a=m.unpack(dict(source_id="pickering_proposals",site="55 King Road",
                 record_id="a",commercial_fit="POSSIBLE_COMMERCIAL"),"p","2026-10-21")
