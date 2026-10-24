@@ -50,6 +50,44 @@ class QualityTests(unittest.TestCase):
         self.assertIn("GIS_FEATURE", app_key(a))
         self.assertIn("APP|", app_key(b))
 
+    def test_york_published_reference_groups_are_review_only(self):
+        one = {"source_id":"york_region_development", "application_id":"53",
+               "feature_id":"1001", "municipal_reference":"19T-V-123",
+               "municipal_reference_field":"REG_FILE_NUM", "city":"Vaughan"}
+        two = {**one, "feature_id":"1002", "application_id":"54"}
+        other_city = {**one, "city":"Markham", "feature_id":"1003"}
+        self.assertEqual(app_key(one), app_key(two))
+        self.assertNotEqual(app_key(one), app_key(other_city))
+        self.assertIn("PUBLISHED_REF", app_key(one))
+        self.assertIn("GIS_FEATURE", app_key({**one,"municipal_reference":""}))
+        self.assertIn("GIS_FEATURE", app_key({**one,"municipal_reference":"123"}))
+
+    def test_missing_published_date_is_reported_not_invented(self):
+        import csv
+        with tempfile.TemporaryDirectory() as d:
+            db = sqlite3.connect(":memory:")
+            db.execute("CREATE TABLE observations (source_id TEXT,first_seen TEXT,content TEXT)")
+            record = dict(source_id="brampton_site_plans", city="Brampton",
+                          stage="SITE_PLAN", application_id="SPA-2026-0072",
+                          feature_id="42", source_application_date="",
+                          source_date_basis="MISSING_OR_INVALID_SOURCE_DATE",
+                          date_completeness="PUBLISHED_APPLICATION_DATE_MISSING_OR_INVALID",
+                          status="Under review",
+                          description="Warehouse extension with loading dock",
+                          commercial_signal="POSSIBLE_COMMERCIAL",
+                          source_url="https://city.example/", location="50 Test Road")
+            db.execute("INSERT INTO observations VALUES (?,?,?)",
+                ("brampton_site_plans","2026-10-24T10:00:00+00:00",json.dumps(record)))
+            results=export_project_reports(db,Path(d),today=dt.date(2026,10,24))
+            self.assertEqual(results["review_candidates"],0)
+            self.assertEqual(results["undated_commercial_records"],1)
+            self.assertEqual(results["source_stats"][0]["missing_source_date_reported"],1)
+            with (Path(d)/"EARLY_SIGNALS_MISSING_DATES_REVIEW.csv").open(
+                    encoding="utf-8-sig", newline="") as file:
+                missing=list(csv.DictReader(file))
+            self.assertEqual(missing[0]["source_application_date"],"")
+            self.assertEqual(missing[0]["application_id"],"SPA-2026-0072")
+
     def test_cross_stage_links_require_same_address_not_just_company(self):
         from early_signal_quality import possible_stage_links
         a = {"source_id":"brampton_preconsultation", "stage":"PRE_CONSULTATION",
