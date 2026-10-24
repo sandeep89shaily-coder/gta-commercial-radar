@@ -147,26 +147,34 @@ def fetch_layer(session, source, maximum=25000):
         raise RuntimeError(f"{sid}: empty, oversized, or duplicate GIS ID inventory")
     rows = []
 
-    def fetch_batch(batch, label):
+    def fetch_batch(batch):
         params = {"f": "json", "objectIds": ",".join(map(str, batch)),
                   "outFields": "*", "returnGeometry": "false"}
-        packet = get_json(session, query, params, phase=sid+" "+label)
-        features = packet.get("features")
-        if not isinstance(features, list) or packet.get("exceededTransferLimit"):
-            raise RuntimeError(f"{sid} {label}: incomplete GIS feature batch")
-        return features
-
-    for offset in range(0, len(ids), 250):
-        batch = ids[offset:offset+250]
         try:
-            features = fetch_batch(batch, f"batch {offset} ({len(batch)} IDs)")
+            try:
+                packet = get_json(session, query, params, phase=sid+" feature GET")
+            except RuntimeError as get_error:
+                try:
+                    packet = get_json(session, query, params, method="POST",
+                                      phase=sid+" feature POST")
+                except (RuntimeError, AttributeError) as post_error:
+                    raise RuntimeError(
+                        f"{sid}: GET failed ({get_error}); POST failed ({post_error})"
+                    ) from post_error
+            features = packet.get("features")
+            if not isinstance(features, list) or packet.get("exceededTransferLimit"):
+                raise RuntimeError(f"{sid}: incomplete GIS feature batch")
+            return features
         except RuntimeError:
-            # If a municipality rejects a long GET/large response, retry at 20 IDs.
-            # Retried results are still checked against the entire official ID list.
-            features = []
-            for mini in range(0, len(batch), 20):
-                sub_batch = batch[mini:mini+20]
-                features.extend(fetch_batch(sub_batch, f"small batch {offset+mini}"))
+            if len(batch) <= 1:
+                raise
+            # Proven Brampton retry method: split until both proxy and service
+            # accept the query; one failed ID rejects the complete snapshot.
+            mid = len(batch)//2
+            return fetch_batch(batch[:mid]) + fetch_batch(batch[mid:])
+
+    for offset in range(0, len(ids), 100):
+        features = fetch_batch(ids[offset:offset+100])
         for feature in features:
             values = feature.get("attributes")
             if not isinstance(values, dict):
