@@ -6,6 +6,17 @@
 
 Identify GTA/Southern Ontario industrial and commercial projects **early enough to be useful to relevant suppliers**, determine who purchases which work, verify source dates and contractor selection before sale. Milestones: **10 independently verified actionable opportunities and 2 paid pilot customers**. The source collection itself is not the product. $0.25/day DeepSeek ceiling; these manual collectors spend **$0**.
 
+## Four failed desktop collectors — targeted repair, Oct 24 2026
+
+After the user's actual Windows test, **IESO and Ajax have been fixed and live-verified**, while Brampton is **PARTIAL_CALENDAR_ONLY** and Burlington remains restricted by publisher HTTP 403. Read `EARLY_COLLECTOR_REPAIR_REPORT_20261024.md` for exact API endpoints, field semantics, limitations and live validation.
+
+Instead of rerunning all 17 collectors, double-click **`RETEST_FOUR_EARLY_SOURCES.bat`** in this pilot copy. It tests only those four sources, preserves their independent historical databases, and produces explicit source-status CSVs. It never runs V8, DeepSeek or outbound outreach.
+
+- IESO: public official JSON `/-/media/files/IESO/files/applicationstatusdata.json`, 2,085 queue entries in the live baseline, date of original public posting unknown.
+- Ajax: municipal official ArcGIS `Apps_Dev/MapServer` layers 0 and 1, 10 preconsultation and 88 active planning GIS features in live baseline; submission date is **not** posting date.
+- Brampton: eSCRIBE returns an HTML JavaScript shell for many agendas; meeting calendar is detectable but **no project-specific OZS/SPA records** can be claimed from that shell.
+- Burlington: inaccessible 403 is a publisher restriction. Individual blocked project URLs are explicitly audited, and incomplete ward snapshots are **never committed** as full new results.
+
 ## One computer test later
 
 In a **fresh folder containing the pilot branch** and the existing Python requirements, double click:
