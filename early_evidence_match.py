@@ -83,6 +83,17 @@ def iso(value):
     except ValueError:return ""
 
 
+def official_file_key(item):
+    """Only explicit published municipal file IDs, NEVER GIS feature/object IDs."""
+    candidates=(item.get("file_number"),item.get("application_id"),
+                item.get("municipal_reference"))
+    for raw in candidates:
+        value=re.sub(r"\s+","",str(raw or "").upper())
+        if re.fullmatch(r"[A-Z]{2,8}[-/]?(?:20\d{2}|\d{2})[-/]\d{2,5}",value):
+            return value.replace("/","-")
+    return ""
+
+
 def unpack(item,source,seen):
     sid=str(item.get("source_id") or source)
     city=norm_city(item.get("city") or item.get("municipality"))
@@ -106,6 +117,7 @@ def unpack(item,source,seen):
     return dict(source_id=sid,item_id=str(item.get("record_id") or
            item.get("record_key") or item.get("application_id") or item.get("feature_id") or ""),
            city=city,site=location,address_key=address,title=name,
+           published_application_file_key=official_file_key(item),
            company=str(item.get("published_company_unverified_role") or
                 item.get("company") or ""),company_role=str(item.get("company_role") or
                 "UNVERIFIED_PUBLISHED_ENTITY"),stage=str(item.get("stage") or ""),
@@ -170,21 +182,30 @@ def join_signals(records):
             ordered=sorted((a,b),key=lambda r:r["radar_first_seen"] or "9999")
             early,late=ordered[0],ordered[1]
             pa,pb=early["source_public_posted"],late["source_public_posted"]
-            days=""
-            if pa and pb:
-                days=(dt.date.fromisoformat(pb)-dt.date.fromisoformat(pa)).days
+            # Same-address projects can be unrelated (multiple tenants,
+            # old ERO application withdrawn, current construction, etc).
+            # Never produce a numeric early-disclosure "advantage" here.
+            # That is only permitted via separately reviewed same-project
+            # evidence and original dated official disclosures.
+            fa=early.get("published_application_file_key","")
+            fb=late.get("published_application_file_key","")
+            if fa and fb and fa==fb:
+                relation="POSSIBLE_SAME_OFFICIAL_FILE_ID_REVIEW"
+            elif fa and fb and fa!=fb:
+                relation="SAME_ADDRESS_DIFFERENT_FILE_IDS_NOT_SAME_PROJECT"
+            else:
+                relation="POSSIBLE_SAME_ADDRESS_NOT_VERIFIED_SAME_PROJECT"
             pairs.append(dict(city=city,normalized_site=address,
                  first_source=early["source_id"],first_record_id=early["item_id"],
                  first_official_link=early["record_url"],
                  other_source=late["source_id"],other_record_id=late["item_id"],
                  other_official_link=late["record_url"],
-                 match_status="POSSIBLE_SAME_ADDRESS_NOT_VERIFIED_SAME_PROJECT",
+                 match_status=relation,
                  first_seen_earliest=early["radar_first_seen"],
                  first_seen_other=late["radar_first_seen"],
                  first_posted_earliest=pa,first_posted_other=pb,
-                 earlier_public_date_advantage_days=days,
-                 earliness_caveat=("POSTED_DATE_COMPARISON_NOT_PERMIT_ADVANTAGE"
-                         if days!="" else "PUBLIC_POSTING_DATES_NOT_BOTH_AVAILABLE"),
+                 earlier_public_date_advantage_days="",
+                 earliness_caveat="PROJECT_IDENTITY_AND_COMPARABLE_PUBLIC_DATES_NEED_REVIEW",
                  buyer_proven="NO",procurement_proven="NO"))
     return sorted(pairs,key=lambda x:(x["city"],x["normalized_site"]))
 
