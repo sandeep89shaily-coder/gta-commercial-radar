@@ -1,0 +1,26 @@
+name: GTA Radar internal evidence sample (one-shot)
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "dev/early-dossier-build-*"
+permissions:
+  contents: read
+jobs:
+  internal-sample:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Build read-only internal source-backed dossier
+        run: python early_product_evidence_preview.py --output-dir internal_sample
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gta-radar-INTERNAL-not-sale-ready-dossiers
+          path: |
+            internal_sample/GTA_RADAR_INTERNAL_EVIDENCE_DOSSIERS.html
+            internal_sample/GTA_RADAR_INTERNAL_QUALIFICATION_SCORECARD.json
+          retention-days: 7
