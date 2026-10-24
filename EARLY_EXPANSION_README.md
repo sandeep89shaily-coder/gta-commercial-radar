@@ -12,7 +12,7 @@ In a **fresh folder containing the pilot branch** and the existing Python requir
 
 `RUN_EARLY_CUES_PREVIEW.bat`
 
-Or run the seven Python commands separately in the documented sequence:
+Or run the Python commands separately in this sequence:
 
 ```sh
 python early_cue_watch.py --data-dir data --output-dir GTA_RADAR_RESULTS
@@ -21,7 +21,10 @@ python early_discovery_watch.py --data-dir data --output-dir GTA_RADAR_RESULTS
 python early_investment_tenders.py --data-dir data --output-dir GTA_RADAR_RESULTS
 python toronto_aic_email_import.py --eml-folder data/toronto_aic_eml --data-dir data --output-dir GTA_RADAR_RESULTS
 python early_ajax_watch.py --data-dir data --output-dir GTA_RADAR_RESULTS
-python early_evidence_match.py --data-dir data --output-dir GTA_RADAR_RESULTS
+python early_oakville_watch.py --data-dir data --output-dir GTA_RADAR_RESULTS
+python early_evidence_match.py
+python early_buyer_evidence.py --output-dir GTA_RADAR_RESULTS
+python early_leadtime_evidence.py --output-dir GTA_RADAR_RESULTS --data-dir data --output-dir GTA_RADAR_RESULTS
 python early_pilot_summary.py --output-dir GTA_RADAR_RESULTS
 ```
 
@@ -44,8 +47,36 @@ Requires `requests`, `beautifulsoup4`, `pandas` already present in `requirements
 | CanadaBuys OPEN federal tenders CSV | `early_investment_tenders.py` | Open snapshot, buying federal organization, work scope, region, posted/closing date | **Federal only**, not all municipal tenders, and often not a GTA/private industrial project |
 | Toronto AIC subscribed email importer | `toronto_aic_email_import.py` | Optional local .eml city links and review stage | Requires YOUR voluntary official ward subscription and exported emails; sender header can be forged; no inbox access |
 | Ajax official public planning application index | `early_ajax_watch.py` | Public indexed addresses, file numbers and current planning statuses | Not an owner, buyer, permit or verified commercial land use; official application/receipt dates not exposed in list |
+| Oakville seven-ward development/site-plan index | `early_oakville_watch.py` | Public application titles, stages, project links and bounded supporting project details | Index has no verified publication date; planning contact is NOT the buyer; detail PDFs dates are not notice posting dates |
 
-**Backbone scripts:** `early_evidence_match.py` reads available source databases WITHOUT changing them, conservatively proposes same-city/exact-civic-address pairs, never auto-merges project identities and only calculates public posting-date comparison if both original public posting dates exist. `early_pilot_summary.py` produces the source-health recap and top-50 **research-only**, not sale-ready list.
+**Backbone scripts:** `early_evidence_match.py` reads available source databases WITHOUT changing them, conservatively proposes same-city/exact-civic-address pairs, never auto-merges project identities and only calculates public posting-date comparison if both original public posting dates exist. `early_buyer_evidence.py` preserves human evidence worksheets and produces formal verification gates without automatically certifying leads; `early_leadtime_evidence.py` requires human-confirmed project identity and original source posting dates before comparing earlier/later stages. `early_pilot_summary.py` produces the source-health recap and top-50 **research-only**, not sale-ready list.
+
+## One-shot public live check — October 24, 2026
+
+GitHub Actions `Early public source live health (one-shot)`, run **40117942636**, checked only each publisher's minimum *index* schema, not full extraction or unattended rights:
+
+| Source | Official index reachability | Limits |
+|---|---|---|
+| Oakville | PASS — all 7 ward indexes found | Full application/detail monitoring not yet live-tested |
+| Milton | PASS — 10 first-page notices parsed | No later pagination |
+| Pickering | PASS — 27 visible active proposal rows | Not every municipal filing |
+| Brampton council calendar | PASS — 1 matching planning meeting link | Does not prove complete meeting archive or agenda text extraction |
+| IESO | FAIL — expected HTML project table absent | Site may render table via JavaScript; currently no live data in watcher |
+| Burlington ward index | FAIL — HTTP 403 from GitHub runner | Do not bypass protection or assume original seed pages are accessible |
+| Ajax | FAIL — public index has different markup/JS response | Collector must not report missing applications as zero |
+
+**A 'PASS' means publisher index accessible/schema readable only.** These numbers are not new leads or verified contractors. Neither RSS nor CanadaBuys were in this seven-source probe. The `early_live_source_probe.py` script and a gated, one-shot GitHub workflow can rerun the same read-only check; it never touches V8.
+
+## New evidence outputs
+
+- `EARLY_OAKVILLE_SOURCE_STATUS.csv`, `EARLY_OAKVILLE_RESEARCH_QUEUE.csv`, `EARLY_OAKVILLE_DETAILS_REVIEW.csv`
+- `EARLY_BUYER_EVIDENCE_WORKSHEET.csv` — **editable human research** preserved across later snapshots; record exact buyer organization, business contact route, current stage, real work package, procurement status, evidence URLs, reviewer and date.
+- `EARLY_BUYER_EVIDENCE_GATE_AUDIT.csv` — checks field completeness, but can NEVER authenticate web claims; anything complete remains `ASSEMBLED_FOR_HUMAN_REVIEW_NOT_VERIFIED_LEAD`.
+- `EARLY_LEADTIME_EVIDENCE_WORKSHEET.csv` — reviewer confirms SAME project and enters **actual first public posting dates**, with sources; merely matching an address is not enough.
+- `EARLY_LEADTIME_REVIEW_MEASUREMENTS.csv` — human-attested, evidence-linked date differences, not inferred advantage.
+- `EARLY_BUSINESS_MILESTONES.csv` — metrics state no automatic verified sales-ready leads; paying customers cannot be inferred from code.
+
+These worksheets make the **10 verified projects / 2 paying pilots** business objective measurable through human source evidence, rather than inflated GIS candidate counts.
 
 ## Protection and evidence rules
 
@@ -64,7 +95,7 @@ Requires `requests`, `beautifulsoup4`, `pandas` already present in `requirements
 1. **LIVE checks / pagination / rights**: confirm each current publisher format and endpoints, including Burlington complete ward links and Brampton eSCRIBE access. Never bypass WAFs.
 2. **Sourced first-posting comparison**: establish the earliest *real public* exposure across source types for the SAME physical project and compare against later GIS/permit milestones; exact-address matches require manual identity checks.
 3. **Buyer research and vendor availability**: verify owner/developer/operator, named work package, vendor already selected or not, public business contact and relevant service provider; unknown remains unknown.
-4. **Additional source-specific feeds researched but not yet validated/built:** Toronto AIC automated bulk feed (City provides e-updates, not confirmed public bulk API), Ajax/Oakville/Markham/Vaughan/Richmond Hill/Hamilton and expanded Southern Ontario; AGCO full fit-out stage, utility connections beyond IESO, investments/land/leasing, Ontario Environmental Assessments, municipal tender/awards and GC prequalification signals. See **main branch** `GTA_RADAR_RESEARCH_REGISTER.md` for the complete catalogue.
+4. **Additional source-specific feeds researched but not yet validated/built:** Toronto AIC automated bulk feed (City provides e-updates, not confirmed public bulk API), Markham/Vaughan/Richmond Hill/Hamilton and expanded Southern Ontario; AGCO full fit-out stage, utility connections beyond IESO, investments/land/leasing, Ontario Environmental Assessments, municipal tender/awards and GC prequalification signals. See **main branch** `GTA_RADAR_RESEARCH_REGISTER.md` for the complete catalogue.
 5. **Business validation**: 10 verified opportunities and two paying pilot customers; no software test can establish buyer interest.
 
 ## CI / deployment
