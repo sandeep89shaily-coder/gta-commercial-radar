@@ -1,0 +1,23 @@
+name: Export pilot download ZIP
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "dev/pilot-download-zip-*"
+permissions:
+  contents: read
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - name: Package repository source for local Windows test
+        run: |
+          zip -q -r GTA_RADAR_EARLY_PILOT_WINDOWS.zip . -x ".git/*" "**/__pycache__/*" "**/*.pyc" "data/*.sqlite" "data/*.db"
+          unzip -t GTA_RADAR_EARLY_PILOT_WINDOWS.zip | tail -1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gta-radar-pilot-download
+          path: GTA_RADAR_EARLY_PILOT_WINDOWS.zip
+          retention-days: 7
