@@ -22,9 +22,10 @@ python early_investment_tenders.py --data-dir data --output-dir GTA_RADAR_RESULT
 python toronto_aic_email_import.py --eml-folder data/toronto_aic_eml --data-dir data --output-dir GTA_RADAR_RESULTS
 python early_ajax_watch.py --data-dir data --output-dir GTA_RADAR_RESULTS
 python early_oakville_watch.py --data-dir data --output-dir GTA_RADAR_RESULTS
+python early_hamilton_watch.py --data-dir data --output-dir GTA_RADAR_RESULTS
 python early_evidence_match.py
 python early_buyer_evidence.py --output-dir GTA_RADAR_RESULTS
-python early_leadtime_evidence.py --output-dir GTA_RADAR_RESULTS --data-dir data --output-dir GTA_RADAR_RESULTS
+python early_leadtime_evidence.py --output-dir GTA_RADAR_RESULTS
 python early_pilot_summary.py --output-dir GTA_RADAR_RESULTS
 ```
 
@@ -47,6 +48,7 @@ Requires `requests`, `beautifulsoup4`, `pandas` already present in `requirements
 | CanadaBuys OPEN federal tenders CSV | `early_investment_tenders.py` | Open snapshot, buying federal organization, work scope, region, posted/closing date | **Federal only**, not all municipal tenders, and often not a GTA/private industrial project |
 | Toronto AIC subscribed email importer | `toronto_aic_email_import.py` | Optional local .eml city links and review stage | Requires YOUR voluntary official ward subscription and exported emails; sender header can be forged; no inbox access |
 | Ajax official public planning application index | `early_ajax_watch.py` | Public indexed addresses, file numbers and current planning statuses | Not an owner, buyer, permit or verified commercial land use; official application/receipt dates not exposed in list |
+| Hamilton public planning GIS and dated planning notices | `early_hamilton_watch.py` | 5,237 official GIS features plus bounded original notice pages with explicit publication dates | GIS has filing year only and no buyer/status; 5 dated notice details verified out of first eight articles; no first-run NEW events |
 | Oakville seven-ward development/site-plan index | `early_oakville_watch.py` | Public application titles, stages, project links and bounded supporting project details | Index has no verified publication date; planning contact is NOT the buyer; detail PDFs dates are not notice posting dates |
 
 **Backbone scripts:** `early_evidence_match.py` reads available source databases WITHOUT changing them, conservatively proposes same-city/exact-civic-address pairs, never auto-merges project identities and only calculates public posting-date comparison if both original public posting dates exist. `early_buyer_evidence.py` preserves human evidence worksheets and produces formal verification gates without automatically certifying leads; `early_leadtime_evidence.py` requires human-confirmed project identity and original source posting dates before comparing earlier/later stages. `early_pilot_summary.py` produces the source-health recap and top-50 **research-only**, not sale-ready list.
@@ -77,6 +79,12 @@ GitHub Actions `Early public source live health (one-shot)`, run **40117942636**
 - `EARLY_BUSINESS_MILESTONES.csv` — metrics state no automatic verified sales-ready leads; paying customers cannot be inferred from code.
 
 These worksheets make the **10 verified projects / 2 paying pilots** business objective measurable through human source evidence, rather than inflated GIS candidate counts.
+
+## Hamilton live check — October 24, 2026
+
+A separate GitHub one-shot test **successfully retrieved the complete 5,237-feature Hamilton ArcGIS Development Applications layer** and **five individual dated planning notices** from eight initial published article pages. It was an initial baseline and correctly emitted ZERO new alerts. The GIS publishes FILE_YEAR, not a precise received date or public posting date. Formal Consultation is an early planning type. Hamilton official notices provide applicant descriptions, file references and actual published dates. This does not establish whether supplier contracts are unawarded.
+
+Source schema, two genuine industrial/commercial examples, required City open data attribution and limitations: **`HAMILTON_EARLY_PILOT.md`**. City open-data reuse is allowed for commercial purposes subject to its licence; linked third-party news/photos require separate rights checks.
 
 ## Protection and evidence rules
 
