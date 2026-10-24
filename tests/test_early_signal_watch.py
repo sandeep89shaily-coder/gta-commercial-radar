@@ -106,7 +106,7 @@ class EarlySignalTests(unittest.TestCase):
                 row = db.execute("SELECT first_seen,content FROM observations").fetchone()
                 self.assertEqual(row[0], stamp)
                 upgraded = json.loads(row[1])
-                self.assertEqual(upgraded["quality_version"], 2)
+                self.assertEqual(upgraded["quality_version"], 3)
                 self.assertTrue(upgraded["source_application_date"].startswith("2026-"))
                 self.assertEqual(db.execute("SELECT COUNT(*) FROM events").fetchone()[0], 0)
             finally:
@@ -119,6 +119,19 @@ class EarlySignalTests(unittest.TestCase):
         rows = early.prepare_rows(source, [one, two], "OBJECTID", "2026-10-24")
         self.assertEqual({r["record_key"] for r in rows}, {"OID:101", "OID:102"})
         self.assertTrue(all(r["record_scope"] == "FEATURE_ONLY" for r in rows))
+
+    def test_york_source_reference_and_municipality_preserved(self):
+        source = next(s for s in early.SOURCES if s["id"] == "york_region_development")
+        row = {"OBJECTID": 11, "APPL_GISID": "53", "MUN_NAME": "Vaughan",
+               "REG_FILE_NUM": "19T-V-123", "ADDRESS": "100 Test Road",
+               "APPL_DESC": "Industrial warehouse", "DATE_RECVD": None,
+               "Submission_Date__c": 1792000000000}
+        record = early.prepare_rows(source, [row], "OBJECTID", "2026-10-24")[0]
+        self.assertEqual(record["city"], "Vaughan")
+        self.assertEqual(record["municipal_reference"], "19T-V-123")
+        self.assertEqual(record["source_date_basis"], "SUBMISSION_DATE__C")
+        self.assertEqual(record["company_role"], "COMPANY_UNKNOWN")
+        self.assertEqual(record["quality_version"], 3)
 
     def test_failed_fetch_keeps_previous_snapshot(self):
         with tempfile.TemporaryDirectory() as root:
