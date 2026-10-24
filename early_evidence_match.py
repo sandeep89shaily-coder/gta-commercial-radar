@@ -17,7 +17,8 @@ from pathlib import Path
 DBS = ("early_signals_review.sqlite","early_cues_review.sqlite",
        "early_public_notices_review.sqlite","early_discovery_review.sqlite",
        "early_investment_procurement_review.sqlite","early_aic_email_review.sqlite",
-       "early_ajax_review.sqlite","early_oakville_review.sqlite")
+       "early_ajax_review.sqlite","early_oakville_review.sqlite",
+       "early_hamilton_review.sqlite")
 CITIES=("BRAMPTON","MISSISSAUGA","TORONTO","BURLINGTON","MILTON","PICKERING",
         "VAUGHAN","MARKHAM","RICHMOND HILL","OAKVILLE","AJAX","OSHAWA",
         "WHITBY","HAMILTON")
