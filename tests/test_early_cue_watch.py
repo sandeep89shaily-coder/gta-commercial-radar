@@ -30,9 +30,23 @@ office and commercial floor area, 3476 residential units.</p>
 <h2>Public Meetings</h2><div>Pre-Application Community Meeting</div>
 <div>April 22</div></body></html>"""
 
+IESO_JSON_DATA=[
+    dict(CaaId=i,CaaIdAndDate=f"2026-EX{i}",
+         Name=f"Test project {i}",Applicant="Public Hydro Applicant",
+         Location="Southwest",Type="Connection assessment",
+         Size="20 MW",ProposedInServiceDate="2027-Q4<br>",
+         SiaStatus="Active",Queue="",Committed="")
+    for i in range(100,160)
+]
+IESO_JSON_DATA[1]["CaaIdAndDate"]="2026-914"
+IESO_JSON_DATA[1]["Applicant"]="BURLINGTON HYDRO INC."
+
 class FakeResponse:
-    def __init__(self, html): self.text=html
+    def __init__(self, value):
+        self.text=value if isinstance(value,str) else ""
+        self.value=value
     def raise_for_status(self):pass
+    def json(self):return self.value
 
 class Session:
     def __init__(self, mapping):
@@ -74,7 +88,7 @@ class CueTests(unittest.TestCase):
     def test_baseline_repeats_and_actual_changes(self):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d)
-            s=Session({cue.IESO_URL:IESO_HTML})
+            s=Session({cue.IESO_JSON:IESO_JSON_DATA})
             argv=dict(data_dir=root/"data",output_dir=root/"output",
                       sources=["ieso_connections"])
             self.assertEqual(cue.run(**argv,session=s,
@@ -82,8 +96,9 @@ class CueTests(unittest.TestCase):
             self.assertEqual(cue.run(**argv,session=s,
                  observed="2026-10-25T09:00:00+00:00"),0)
             # Preserve first seen and emit UPDATE only for true data edits.
-            modified=IESO_HTML.replace("20 MW","30 MW")
-            self.assertEqual(cue.run(**argv,session=Session({cue.IESO_URL:modified}),
+            modified=[dict(x) for x in IESO_JSON_DATA]
+            modified[1]["Size"]="30 MW"
+            self.assertEqual(cue.run(**argv,session=Session({cue.IESO_JSON:modified}),
                  observed="2026-10-26T09:00:00+00:00"),0)
             with (root/"output"/"EARLY_CUES_CHANGES_REVIEW_ONLY.csv").open(
                         encoding="utf-8-sig",newline="") as stream:
@@ -100,11 +115,11 @@ class CueTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             opts=dict(data_dir=Path(d)/"data",output_dir=Path(d)/"output",
                       sources=["ieso_connections"])
-            cue.run(**opts,session=Session({cue.IESO_URL:IESO_HTML}),
+            cue.run(**opts,session=Session({cue.IESO_JSON:IESO_JSON_DATA}),
                     observed="2026-10-24T09:00:00+00:00")
-            added=IESO_HTML.replace("</tbody>", """<tr><td>2026-933</td><td></td><td>EXAMPLE INC.</td>
-<td>Large Industrial Plant</td><td>Southwest</td><td>New load facility</td>
-<td>90 MW</td><td>2030-Q1</td><td>Active</td><td></td></tr></tbody>""")
+            added=[dict(x) for x in IESO_JSON_DATA]
+            added.append(dict(IESO_JSON_DATA[0],CaaId=933,
+                CaaIdAndDate="2026-933",Name="Large Industrial Plant"))
             cue.run(**opts,session=Session({cue.IESO_URL:added}),
                     observed="2026-10-25T09:00:00+00:00")
             with (Path(d)/"output"/"EARLY_CUES_CHANGES_REVIEW_ONLY.csv").open(
