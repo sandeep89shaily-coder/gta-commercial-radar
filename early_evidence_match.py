@@ -89,6 +89,7 @@ def unpack(item,source,seen):
         if sid.startswith("burlington_"):city="BURLINGTON"
         if sid.startswith("milton_"):city="MILTON"
         if sid.startswith("pickering_"):city="PICKERING"
+        if sid.startswith("ajax_"):city="AJAX"
         if sid.startswith("brampton_"):city="BRAMPTON"
         if sid.startswith("mississauga_"):city="MISSISSAUGA"
         if sid.startswith("toronto_"):city="TORONTO"
