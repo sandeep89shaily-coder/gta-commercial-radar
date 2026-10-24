@@ -231,7 +231,12 @@ def summarize(source, row, oid, id_counts, observed_at):
     role = ("PUBLISHED_APPLICANT_NOT_BUYER" if company_field in ("APPLICANT", "APPLICANT_COMPANY")
             else "PUBLISHED_AGENT_NOT_BUYER" if company_field == "AGENT_COMPANY"
             else "PUBLISHED_APPLICATION_NAME_NOT_BUYER" if company_field else "COMPANY_UNKNOWN")
+    exact_source_record_url = (
+        source["url"] + "/query?f=json&objectIds=" + feature_id +
+        "&outFields=%2A&returnGeometry=false" if feature_id.isdigit() else ""
+    )
     return dict(
+        exact_source_record_url=exact_source_record_url,
         quality_version=QUALITY_VERSION, source_date_basis=date_field,
         company_role=role,
         municipal_reference=municipal_reference,
