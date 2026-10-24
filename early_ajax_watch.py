@@ -1,4 +1,7 @@
-"""Read-only Ajax publicly listed planning files, no paid APIs or login.
+"""Read-only Ajax official planning GIS preconsultation & active records, no paid APIs/login.
+
+The old HTML index was removed/changed. Collector now uses municipal
+ArcGIS MapServer/0 preconsultation and /1 active, skipping /3 duplicate view.
 
 This is NOT an early investment claim: portal application index may include
 minor variances/residential cases. Status "Open" = planning file, not tender.
@@ -15,6 +18,7 @@ from urllib.parse import urlparse
 import requests
 from bs4 import BeautifulSoup
 from early_cue_watch import db_setup,save_source,_write_csv
+from early_ajax_arcgis import collect as collect_official_gis
 
 URL="https://ajaxmaps.ajax.ca/bootrest/planningapps/property.html"
 SOURCE="ajax_planning_properties"
@@ -29,7 +33,7 @@ FILE=re.compile(r"\b((?:OPA\d{2}-A\d+|SPA\d{1,4}/\d{2}|SP\d{1,4}/\d{2}|"
 STATUS=("source_id","status","parsed","source_property_count","source_application_count",
     "new","updated","baseline","warning","error")
 COLUMNS=("source_id","record_id","title","site","company","company_role",
-         "stage","source_date","source_url","commercial_fit","procurement_status",
+         "stage","source_application_date","source_date","source_url","commercial_fit","procurement_status",
          "verification","first_seen_at","last_seen_at","current_snapshot_status")
 
 
@@ -94,12 +98,13 @@ def run(data_dir="data",out_dir="GTA_RADAR_RESULTS",session=None,stamp=None):
     db_setup(db)
     try:
         try:
-            records,counts=parse_ajax(fetch(session))
+            records,counts_by_layer=collect_official_gis(session)
+            counts=(counts_by_layer[0],counts_by_layer[1])
             saved=save_source(db,SOURCE,records,stamp)
             stat=dict(source_id=SOURCE,status="SUCCESS",
                 parsed=len(records),source_property_count=counts[0],
                 source_application_count=counts[1],
-                warning="LAND_USE_AND_BUYER_UNVERIFIED;NO_PUBLISHED_NOTICE_DATE",
+                warning="PUBLIC_GIS_COMPLETE_IDS;PRECONSULT_AND_ACTIVE;SUBMISSION_DATE_NOT_PUBLIC_POSTING;BUYER_UNVERIFIED",
                 error="",**saved)
             exit_code=0
         except (requests.RequestException,ValueError,RuntimeError,sqlite3.Error) as exc:
@@ -119,7 +124,7 @@ def run(data_dir="data",out_dir="GTA_RADAR_RESULTS",session=None,stamp=None):
               current_snapshot_status=("SOURCE_FAILED" if exit_code else
                  "OBSERVED_LATEST" if last==stamp else "NOT_LATEST_LISTING")))
         _write_csv(o/"EARLY_AJAX_PLANNING_REVIEW.csv",COLUMNS,review)
-        print(SOURCE,stat["status"],"records",stat["parsed"],
+        print(SOURCE,stat["status"],"public ArcGIS features",stat["parsed"],
              "post-baseline changes",stat["new"]+stat["updated"],
              "| unknown commercial use; no AI")
         return exit_code
