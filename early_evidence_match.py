@@ -56,7 +56,7 @@ def norm_city(raw):
 def norm_address(value):
     """Conservative numbered street matching, never fuzzy across buildings."""
     raw=re.sub(r"\s+"," ",re.sub(r"[,.#]"," ",str(value or "").upper())).strip()
-    match=re.search(r"(?<![A-Z0-9])(\d{1,6}[A-Z]?)\s+"
+    match=re.search(r"(?<![A-Z0-9])([1-9]\d{0,5}[A-Z]?)\s+"
                     r"((?:[A-Z0-9'-]+\s+){1,6}?"
                     r"(?:STREET|ST|ROAD|RD|AVENUE|AVE|DRIVE|DR|"
                     r"BOULEVARD|BLVD|COURT|CT|CRESCENT|CRES|PARKWAY|PKWY|"
