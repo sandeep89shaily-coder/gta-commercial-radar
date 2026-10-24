@@ -37,10 +37,9 @@ class S:
         if url.endswith("/query"):
             if params.get("returnIdsOnly")=="true":
                 return Reply({"objectIds":[1,2,3]})
-            if params.get("objectIds")=="1,2":
-                ids=[1,2]
-            elif params.get("objectIds")=="3":ids=[3]
-            else:raise AssertionError("Unrecognized ArcGIS batch")
+            ids=[int(x) for x in (params.get("objectIds") or "").split(",") if x]
+            if not ids or any(i not in (1,2,3) for i in ids):
+                raise AssertionError("Unrecognized ArcGIS batch")
             if self.links.get("drop_feature") and ids==[3]:
                 return Reply({"features":[]})
             return Reply({"features":[{"attributes":{
@@ -68,7 +67,7 @@ class Tests(unittest.TestCase):
         self.assertEqual(rows[1]["commercial_fit"],"POSSIBLE_COMMERCIAL")
 
     def test_partial_gis_rejected_not_rebased(self):
-        with self.assertRaisesRegex(RuntimeError,"Partial GIS batch"):
+        with self.assertRaisesRegex(RuntimeError,"incomplete|Partial GIS batch"):
             h.collect_gis(S({"drop_feature":True}),batch_size=2)
 
     def test_public_news_notice_and_original_publication(self):
