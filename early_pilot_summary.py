@@ -73,29 +73,49 @@ def statuses(result_dir):
     return findings
 
 
-def priority(row,today):
-    sid=row.get("source_id","")
-    when=row.get("official_public_posting_date","")
-    title=row.get("title","")
-    score=SOURCE_HINTS.get(sid,4)
-    if row.get("site"):score+=9
-    if row.get("city"):score+=4
-    if row.get("record_url"):score+=5
-    if row.get("matched_sources"):score+=3
-    if row.get("published_entity"):score+=4
-    if SCOPES.search(title):score+=23
-    if RESIDENTIAL.search(title):score-=10
-    posted=""
+def _date(value):
     try:
-        day=dt.date.fromisoformat(when)
-        age=(today-day).days
-        if 0<=age<=30:score+=25;posted="OFFICIAL_POST_LAST_30_DAYS"
-        elif 31<=age<=90:score+=16;posted="OFFICIAL_POST_LAST_90_DAYS"
-        elif 91<=age<=365:score+=5;posted="OFFICIAL_POST_LAST_YEAR"
-        else:posted="OLDER_PUBLIC_DATE"
-    except (TypeError,ValueError):
-        posted="NO_VERIFIED_PUBLICATION_DATE"
-    return max(score,0),posted
+        return dt.date.fromisoformat(str(value or "").strip())
+    except (ValueError,TypeError):
+        return None
+
+
+def priority(row,today):
+    """Freshness is mandatory for shortlist. Receipt != public posting.
+
+    First radar observation during bulk baseline is NOT a new project.
+    Undated and old records remain in historical research, not top 50.
+    """
+    sid=row.get("source_id","")
+    title=row.get("title","")
+    posted_day=_date(row.get("official_public_posting_date"))
+    application_day=_date(row.get("application_date"))
+    public_age=(today-posted_day).days if posted_day else None
+    received_age=(today-application_day).days if application_day else None
+    if public_age is not None and 0<=public_age<=180:
+        freshness=95 if public_age<=30 else 80 if public_age<=90 else 58
+        reason="OFFICIAL_PUBLIC_POST_WITHIN_180_DAYS"
+    elif received_age is not None and 0<=received_age<=180:
+        freshness=60 if received_age<=30 else 50 if received_age<=90 else 38
+        reason="RECENT_APPLICATION_RECEIPT_NOT_PUBLICATION_DATE"
+    else:
+        return 0,"HISTORICAL_OR_NO_VERIFIED_RECENT_PROJECT_DATE"
+    # Location not established (many Ontario-wide ERO and federal tenders):
+    # do not crowd locally verifiable GTA projects into a top-50 product.
+    city=str(row.get("city") or "").upper().strip()
+    if not city:
+        return 0,"LOCATION_NOT_VERIFIED_REVIEW_SEPARATELY"
+    # Do not treat government procurement outside GTA as new private building.
+    if sid=="federal_open_tenders":
+        return 0,"FEDERAL_TENDER_SEPARATE_REVIEW_LANE"
+    score=SOURCE_HINTS.get(sid,4)+freshness
+    if row.get("site"):score+=9
+    if row.get("record_url"):score+=5
+    if row.get("published_entity"):score+=3
+    if SCOPES.search(title):score+=14
+    if RESIDENTIAL.search(title):score-=25
+    if row.get("commercial_signal")=="MIXED_USE_REVIEW":score-=8
+    return max(score,0),reason
 
 
 def preview_candidates(records,limit=50,today=None):
