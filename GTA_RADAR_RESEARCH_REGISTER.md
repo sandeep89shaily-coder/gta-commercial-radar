@@ -114,6 +114,15 @@ For **every prospective project**, separately store:
 - **Brampton eSCRIBE agendas:** official detailed application-item page verified, but automatic current-meeting discovery is still **RESEARCHED_UNBUILT**. ERO proposal enhancements, Toronto AIC and all other catalogued sources are unchanged.
 - **Evidence still needed:** successful live execution against publisher pages, pagination/discovery validation, source terms, comparison with the original seven feeds, and any demonstrated unawarded real buyer and 10-lead/two-pilot progress. No historical baseline suddenly becomes new lead.
 
+## Additional build increment — 2026-10-24: Milton / Pickering / ERO proposal pilot
+
+- **Milton:** Official `/news/development-notices/` listing exposes dated public notices with `/news/posts/` project pages. New **manual pilot adapter** `early_public_notices.py` watches the visible first page, captures source-published dates and optionally reads up to 12 newest details. **Not yet live collection verified; later listing pages unimplemented.**
+- **Pickering:** Official active development proposal list exposes applicant, address, exact **Date Posted**, project links and supporting descriptions. Same pilot records each published application URL and new changes while respecting roles. **Not yet live collection verified; not a full site plan/permit index.**
+- **ERO:** New isolated `ero_proposal_watch` reuses the existing `radar._parse_ero_search_cards` logic to screen bounded recent search pages for industrial/environmental notices *explicitly at Proposal stage*, preserving proposal dates. **Not a change to V8's enabled ERO source, not a guarantee of GTA location or full feed coverage.**
+- **Manual combined runner:** `RUN_EARLY_CUES_PREVIEW.bat` now launches the existing IESO/Burlington watcher plus the new Milton/Pickering/ERO watcher. It does **not** rerun the seven GIS baselines. New independent `early_public_notices_review.sqlite` database; no DeepSeek.
+- **Not solved by code yet:** Brampton eSCRIBE calendar/agenda discovery can return 403 to non-browser clients; do not bypass restrictions or label it automated. Burlington citywide preapplication discovery, exact first-posting-date comparison, verified operator/buyer and tender availability, early source rights and two paying pilots remain unmet.
+- Review the pilot limits and test checklist in `EARLY_PUBLIC_NOTICES_PILOT.md`. This entry updates status without removing any earlier researched categories.
+
 ## Priority windows without losing lower-priority sources
 
 **Now:** source-age advantage comparison for Burlington preapplication/Brampton agendas, IESO connection queue, and existing ERO enhancement; alongside verification of the strongest 10–15 recent industrial opportunities.
