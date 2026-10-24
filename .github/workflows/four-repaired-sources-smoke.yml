@@ -24,6 +24,7 @@ jobs:
         run: |
           python early_discovery_watch.py --source brampton_planning_agendas --data-dir live_smoke_db --output-dir live_smoke_reports
       - name: Inspect Burlington ward pages safely (publisher may return partial 403)
+        continue-on-error: true
         run: |
           python early_discovery_watch.py --source burlington_ward_discovery --data-dir live_smoke_db --output-dir live_smoke_reports
       - name: Print all actual public source health results
