@@ -11,7 +11,7 @@ PROJECT=dict(source_id="brampton_preconsultation",item_id="PRE-2026-0028",
  title="Industrial development",record_url="https://www.brampton.ca/official/abc",
  radar_first_seen="2026-10-24T10:00:00+00:00",
  official_public_posting_date="2026-10-23",
- published_entity="Architect Not Buyer",official_public_posting_date="",
+ published_entity="Architect Not Buyer",
  commercial_signal="POSSIBLE_COMMERCIAL",lead_status="NOT_SALE_READY_RESEARCH_ONLY")
 
 class Tests(unittest.TestCase):
