@@ -1,0 +1,45 @@
+name: Four repaired early collectors live check
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "dev/four-repaired-collectors-*"
+permissions:
+  contents: read
+jobs:
+  actual-publisher-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install -r requirements.txt
+      - name: Fetch official IESO public JSON queue and Ajax GIS
+        run: |
+          python early_cue_watch.py --source ieso_connections --data-dir live_smoke_db --output-dir live_smoke_reports
+          python early_ajax_watch.py --data-dir live_smoke_db --output-dir live_smoke_reports
+      - name: Inspect Brampton public planning committee calendar (agenda JS may be partial)
+        run: |
+          python early_discovery_watch.py --source brampton_planning_agendas --data-dir live_smoke_db --output-dir live_smoke_reports
+      - name: Inspect Burlington ward pages safely (publisher may return partial 403)
+        run: |
+          python early_discovery_watch.py --source burlington_ward_discovery --data-dir live_smoke_db --output-dir live_smoke_reports
+      - name: Print all actual public source health results
+        if: always()
+        run: |
+          python - <<'PY'
+          import csv,pathlib
+          for p in pathlib.Path("live_smoke_reports").glob("*STATUS.csv"):
+              print("REPORT",p.name)
+              with p.open(encoding="utf-8-sig",newline="") as f:
+                  for row in csv.DictReader(f):print({k:v for k,v in row.items() if k in ("source_id","state","status","fetched","parsed","warning","error","coverage")})
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: four-repaired-collectors-source-status
+          path: live_smoke_reports/*.csv
+          if-no-files-found: warn
+          retention-days: 7
