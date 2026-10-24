@@ -139,6 +139,44 @@ class EvidenceTests(unittest.TestCase):
         self.assertEqual(observed["address_key"],"211 BAYLY ST E")
         self.assertEqual(observed["procurement_status"],"UNKNOWN")
 
+    def test_same_site_with_different_applications_never_yields_lead_days(self):
+        # 1133 Industrial Drive has unrelated ERO waste and industrial GIS
+        # records, plus a demolition permit. Two published dates at one
+        # address still cannot demonstrate lead time for the SAME project.
+        a=m.unpack(dict(source_id="hamilton_planning_notices",
+              record_id="not1",site="1133 Industrial Drive",
+              file_number="FC-2026-00239",source_date="2026-06-12",
+              date_basis="OFFICIAL_NOTICE_PUBLISHED_DATE",
+              commercial_fit="POSSIBLE_COMMERCIAL"),"hamilton_planning_notices",
+              "2026-10-24T12:00:00+00:00")
+        b=m.unpack(dict(source_id="hamilton_applications_gis",
+              record_id="2",site="1133 Industrial Dr",
+              file_number="DPA-2026-00343",source_date="2026-09-01",
+              date_basis="OFFICIAL_NOTICE_PUBLISHED_DATE",
+              commercial_fit="POSSIBLE_COMMERCIAL"),"hamilton_applications_gis",
+              "2026-10-24T12:05:00+00:00")
+        pairs=m.join_signals([a,b])
+        self.assertEqual(len(pairs),1)
+        self.assertEqual(pairs[0]["match_status"],
+              "SAME_ADDRESS_DIFFERENT_FILE_IDS_NOT_SAME_PROJECT")
+        self.assertEqual(pairs[0]["earlier_public_date_advantage_days"],"")
+        self.assertIn("NEED_REVIEW",pairs[0]["earliness_caveat"])
+
+    def test_same_official_file_number_is_review_link_not_verified_buyer(self):
+        a=m.unpack(dict(source_id="hamilton_planning_notices",
+              record_id="url1",site="844 Glancaster Rd",
+              file_number="DPA-2026-00043",commercial_fit="POSSIBLE_COMMERCIAL"),
+              "hamilton_planning_notices","2026-10-24T12:00:00+00:00")
+        b=m.unpack(dict(source_id="hamilton_applications_gis",
+              record_id="feature1",site="844 Glancaster Road",
+              file_number="DPA-2026-00043",commercial_fit="POSSIBLE_COMMERCIAL"),
+              "hamilton_applications_gis","2026-10-24T12:05:00+00:00")
+        pair=m.join_signals([a,b])[0]
+        self.assertEqual(pair["match_status"],"POSSIBLE_SAME_OFFICIAL_FILE_ID_REVIEW")
+        self.assertEqual(pair["buyer_proven"],"NO")
+        self.assertEqual(pair["procurement_proven"],"NO")
+        self.assertEqual(pair["earlier_public_date_advantage_days"],"")
+
     def test_no_cross_city_or_ambiguous_site_link(self):
         a=m.unpack(dict(source_id="pickering_proposals",site="55 King Road",
                 record_id="a",commercial_fit="POSSIBLE_COMMERCIAL"),"p","2026-10-21")
