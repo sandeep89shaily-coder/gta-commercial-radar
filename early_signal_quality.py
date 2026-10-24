@@ -137,6 +137,83 @@ def _is_recent(date, today, years=3):
         return False
 
 
+
+LINK_COLUMNS = ("city", "address_key", "earlier_source", "earlier_application",
+                "earlier_date", "later_source", "later_application",
+                "later_date", "link_confidence", "review_note")
+
+
+def address_key(row):
+    """Conservative numbered-street matching; NOT proof of a shared project."""
+    city = str(row.get("city") or "").upper()
+    if city.startswith("YORK REGION"):
+        return ""
+    value = re.sub(r"[,.;#]", " ", str(row.get("location") or "").upper())
+    value = re.sub(r"\s+", " ", value).strip()
+    match = re.match(r"^([1-9]\d{0,5}[A-Z]?)\s+(.+)", value)
+    if not match:
+        return ""
+    number, road = match.groups()
+    street = re.match(
+        r"^((?:[A-Z0-9]+\s+){0,5}?"
+        r"(?:ST|STREET|RD|ROAD|AVE|AVENUE|DR|DRIVE|BLVD|BOULEVARD|"
+        r"CT|COURT|CRES|CRESCENT|LANE|WAY|PKWY|PARKWAY))\b", road
+    )
+    if not street:
+        return ""
+    normalized = street.group(1)
+    replacements = {"STREET":"ST", "ROAD":"RD", "AVENUE":"AVE", "DRIVE":"DR",
+                    "BOULEVARD":"BLVD", "COURT":"CT", "CRESCENT":"CRES",
+                    "PARKWAY":"PKWY"}
+    tokens = [replacements.get(x,x) for x in normalized.split()]
+    return city + "|" + number + " " + " ".join(tokens)
+
+
+def possible_stage_links(project_rows, today):
+    buckets = defaultdict(list)
+    for row in project_rows:
+        key = address_key(row)
+        if key and _is_recent(row.get("source_application_date",""), today):
+            buckets[key].append(row)
+    links = []
+    seen = set()
+    for key, rows in buckets.items():
+        if len(rows) > 14:
+            continue  # busy multi-tenant sites can create spurious matches
+        for i, a in enumerate(rows):
+            for b in rows[i+1:]:
+                if a["source_id"] == b["source_id"] or a["stage"] == b["stage"]:
+                    continue
+                if a["project_group_key"] == b["project_group_key"]:
+                    continue
+                try:
+                    gap = abs((dt.date.fromisoformat(a["source_application_date"]) -
+                               dt.date.fromisoformat(b["source_application_date"])).days)
+                except ValueError:
+                    continue
+                if gap > 730:
+                    continue
+                # Exact source address, distinct stages, nearby application
+                # dates. Related project identity remains UNVERIFIED.
+                prior, later = sorted((a,b), key=lambda x:x["source_application_date"])
+                pair = (prior["project_group_key"], later["project_group_key"])
+                if pair in seen:
+                    continue
+                seen.add(pair)
+                links.append(dict(
+                    city=prior["city"], address_key=key,
+                    earlier_source=prior["source_id"],
+                    earlier_application=prior["application_id"],
+                    earlier_date=prior["source_application_date"],
+                    later_source=later["source_id"],
+                    later_application=later["application_id"],
+                    later_date=later["source_application_date"],
+                    link_confidence="POSSIBLE_SHARED_ADDRESS_AND_TIMELINE",
+                    review_note="Separate applications; verify same development manually. "
+                                "Do not merge projects or assert purchasing intent."
+                ))
+    return sorted(links, key=lambda x:x["later_date"], reverse=True)
+
 def _write(path, fields, rows):
     path = Path(path)
     temp = path.with_suffix(path.suffix + ".tmp")
@@ -172,6 +249,7 @@ def export_project_reports(db, output_dir, *, today=None):
         classifications[sid][item.get("commercial_signal") or "USE_UNKNOWN"] += 1
         groups[app_key(item)].append(item)
     output = []
+    all_project_rows = []
     source_stats = defaultdict(lambda: Counter())
     for key, items in groups.items():
         base = max(items, key=lambda x: (
@@ -218,9 +296,15 @@ def export_project_reports(db, output_dir, *, today=None):
             description=base.get("description", ""), source_url=base.get("source_url", ""),
             review_state="HISTORICAL_SOURCE_APPLICATION_DATE_NOT_PUBLICATION_DATE"
         )
+        all_project_rows.append(row)
         if signal not in {"POSSIBLE_COMMERCIAL", "MIXED_USE_REVIEW"}:
             continue
         if not _is_recent(when, today):
+            continue
+        if re.search(r"\b(?:withdrawn|cancelled|canceled|refused|rejected|abandoned|inactive)\b",
+                     row["status"], re.IGNORECASE):
+            continue
+        if row["status"].strip().lower() == "closed":
             continue
         stats["recent"] += 1
         output.append(row)
@@ -242,4 +326,7 @@ def export_project_reports(db, output_dir, *, today=None):
     output_dir.mkdir(parents=True, exist_ok=True)
     _write(output_dir/"EARLY_SIGNALS_PROJECTS_REVIEW_ONLY.csv", COLUMNS, output)
     _write(output_dir/"EARLY_SIGNALS_QUALITY_AUDIT.csv", AUDIT_COLUMNS, stats_rows)
-    return {"review_candidates":len(output), "source_stats":stats_rows}
+    links = possible_stage_links(all_project_rows, today)
+    _write(output_dir/"EARLY_SIGNALS_POSSIBLE_STAGE_LINKS_REVIEW.csv", LINK_COLUMNS, links)
+    return {"review_candidates":len(output), "possible_stage_links":len(links),
+            "source_stats":stats_rows}
