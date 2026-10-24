@@ -15,7 +15,7 @@ FIELDS = (
     "first_observed_at", "days_since_application", "description", "location",
     "commercial_signal", "published_entity", "published_entity_role",
     "specific_scope_terms", "potential_service_categories",
-    "source_url", "source_record_status", "project_identity",
+    "source_url", "exact_source_record_url", "source_record_status", "project_identity",
     "date_integrity", "purchasing_decision_maker",
     "vendor_selection_status", "procurement_status", "verified_business_contact",
     "evidence_tier", "next_investigation", "not_sale_ready_reason"
@@ -114,7 +114,9 @@ def queue(rows, *, today=None):
             commercial_signal=item.get("commercial_signal",""),
             published_entity=published_company, published_entity_role=role,
             specific_scope_terms=terms, potential_service_categories=service,
-            source_url=item.get("source_url",""), source_record_status=status,
+            source_url=item.get("source_url",""),
+            exact_source_record_url=item.get("exact_source_record_url",""),
+            source_record_status=status,
             project_identity=identity, date_integrity=source_date_basis,
             purchasing_decision_maker="UNVERIFIED",
             vendor_selection_status="UNKNOWN",
@@ -124,8 +126,9 @@ def queue(rows, *, today=None):
             next_investigation=" | ".join(next_steps),
             not_sale_ready_reason=";".join(REVIEW),
         ))
-    selected.sort(key=lambda x: (-x["rank"], x["source_application_date"],
-                                  x["source_id"], x["project_group_key"]),reverse=False)
+    selected.sort(key=lambda x: (-x["rank"], -( _date(x["source_application_date"]).toordinal()
+                                  if _date(x["source_application_date"]) else 0),
+                                  x["source_id"], x["project_group_key"]))
     return selected
 
 
