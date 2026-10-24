@@ -201,6 +201,16 @@ The short-term priority remains measuring whether existing new early sources exp
 
 **Tests:** Full Windows + Ubuntu GitHub Actions unit suites passed on the 2026-10-24 isolated code snapshot. Markham live index run passed. No V8, scheduler, outreach or DeepSeek budget changes. Do not merge before permission/rate-limit/live-quality gates.
 
+## Actual Windows pilot ZIP audited October 24 — fixes after user's desktop test
+
+**Pilot run successful overall, but 4 source adapters failed:** all original 7 GIS feeds succeeded (32,269 features); Hamilton full 5,237 GIS + 14 dated notices succeeded; Oakville 7 wards/146 applications/6 details succeeded; Markham 63 biweekly PDF links succeeded; Pickering 27, Milton 10, ERO proposals 20, Ontario government RSS 15 and CanadaBuys current open 891 succeeded. **IESO HTML table absent**, **Burlington citywide discovery failed due to one inaccessible 4103 Palladium Way detail page** (three independent known Burlington pages succeeded), **Brampton planning agenda content mismatch**, **Ajax application index heading absent**. Toronto AIC email importer NO_EMAIL_INPUT was optional, not a defect.
+
+**Material data-quality correction:** old `EARLY_TOP_RESEARCH_PREVIEW.csv` selected 50 Brampton preconsultation items, some from 2019, over more recent publicly dated records because no project-age check. Fix committed to `early_pilot_summary.py`: require first published notice in past 180 days, or recent application *receipt date*, correctly labeled NOT public publication; exclude unlocated Ontario-wide and federal tenders from local private-work ranking. Applying to the actual uploaded desktop results yields **179 freshness-eligible research records**; diversified top 50 = Brampton 18, Toronto 18, Hamilton 7, Mississauga 4, Milton 2, Pickering 1. `early_buyer_evidence.py` now creates a fresh top-100 manageable human worklist, retaining previously annotated cases, rather than 9,428 baseline historical rows with no human review.
+
+**Still not verified:** real private purchasing contacts, work packages or vendor selection, actual positive same-project public leadtime, 10 commercial sale-ready opportunities, 2 paying buyers. The initial 2,381 same-address matches are not verified identical projects. Brampton 1,542 site-plan records and York 319 features with missing/invalid date remain separate quality backlog.
+
+**Repo evidence:** isolated draft PR #74 `DESKTOP_PILOT_TEST_REVIEW_20261024.md`; regression `tests/test_early_freshness_ranking.py` passed on Windows and Linux, GitHub run `40131733699` (newest package run `40131881431` passed both). Production V8, scheduled run, current DeepSeek daily budget and outreach untouched.
+
 ## Priority windows without losing lower-priority sources
 
 **Now:** source-age advantage comparison for Burlington preapplication/Brampton agendas, IESO connection queue, and existing ERO enhancement; alongside verification of the strongest 10–15 recent industrial opportunities.
