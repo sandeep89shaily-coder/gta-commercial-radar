@@ -156,14 +156,18 @@ def parse_calendar(html,origin=BRAMPTON_CALENDAR):
     soup=BeautifulSoup(html,"html.parser")
     result={}
     for a in soup.find_all("a",href=True):
+        # A calendar often has many committees in the same BODY. Never walk
+        # up to body and mistakenly treat all meeting links as planning.
         context=a
-        for depth in range(5):
-            if not context:break
+        matched=False
+        for depth in range(4):
+            if context is None or context.name in ("html","body"):break
             block=_text(context)
-            if ("Planning and Development Committee" in block and len(block)<1200):
+            if "Planning and Development Committee" in block and len(block)<900:
+                matched=True
                 break
             context=context.parent
-        if not context:continue
+        if not matched:continue
         try:url=_link(origin,a["href"])
         except ValueError:continue
         key=meeting_id(url)
