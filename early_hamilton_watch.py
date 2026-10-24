@@ -65,6 +65,37 @@ def fetch_json(session,url,params):
         raise RuntimeError("Hamilton ArcGIS rejected query: "+str(obj.get("error") if isinstance(obj,dict) else "")[:160])
     return obj
 
+def fetch_feature_batch(session, ids):
+    """POST IDs to avoid exceeding URL length limits on ArcGIS GET requests.
+
+    If a publisher blocks POST, a bounded 30-ID GET fallback is used. A
+    partial batch always raises and no source snapshot is committed.
+    """
+    payload={"objectIds":",".join(map(str,ids)),
+             "outFields":"OBJECTID,FILE_NUM,FILE_TYPE,ADDRESS,FILE_YEAR,DESCRIP",
+             "returnGeometry":"false","f":"json"}
+    if hasattr(session,"post"):
+        try:
+            response=session.post(GIS+"/query",data=payload,timeout=(10,50),
+                   headers={"User-Agent":"GTA-Radar-HamiltonResearch/0.1"})
+            response.raise_for_status()
+            value=response.json()
+            if (isinstance(value,dict) and "error" not in value
+                and isinstance(value.get("features"),list)):
+                return value["features"]
+        except (requests.RequestException,ValueError):
+            pass
+    results=[]
+    for k in range(0,len(ids),30):
+        chunk=ids[k:k+30]
+        data=fetch_json(session,GIS+"/query",dict(payload,objectIds=",".join(map(str,chunk))))
+        batch=data.get("features")
+        if not isinstance(batch,list) or len(batch)!=len(chunk):
+            raise RuntimeError("Hamilton GIS GET fallback incomplete")
+        results.extend(batch)
+    return results
+
+
 def parse_layer_features(features):
     result=[]
     ids=set()
@@ -114,13 +145,7 @@ def collect_gis(session,batch_size=400,max_ids=20000):
     features=[]
     for start in range(0,len(ids),batch_size):
         group=ids[start:start+batch_size]
-        result=fetch_json(session,GIS+"/query",
-           {"objectIds":",".join(map(str,group)),"outFields":
-            "OBJECTID,FILE_NUM,FILE_TYPE,ADDRESS,FILE_YEAR,DESCRIP",
-            "returnGeometry":"false","f":"json"})
-        batch=result.get("features")
-        if not isinstance(batch,list):
-            raise RuntimeError("ArcGIS batch response missing features")
+        batch=fetch_feature_batch(session,group)
         if len(batch)!=len(group):
             raise RuntimeError("Partial GIS batch; abort without writing")
         features.extend(batch)
@@ -215,9 +240,19 @@ def collect_notices(session,max_details=20):
     links=discover_notice_links(listing)
     if len(links)>60:raise RuntimeError("Unexpectedly many Hamilton notice links")
     records=[]
+    unkeyed=0
     for url in list(links)[:max_details]:
-        records.append(parse_notice_detail(fetch_html(session,url),url))
-    if not records:raise RuntimeError("No complete notice details parsed")
+        html=fetch_html(session,url)
+        try:
+            records.append(parse_notice_detail(html,url))
+        except RuntimeError as error:
+            # Municipal-wide zoning notices may have no individual planning
+            # file. Skipping those is justified; arbitrary parser breakage is
+            # never converted into an empty source.
+            if "No municipal application number on notice" not in str(error):
+                raise
+            unkeyed+=1
+    if not records:raise RuntimeError("No application-numbered notice details parsed")
     return records,len(links)
 
 def run(data_dir="data",output_dir="GTA_RADAR_RESULTS",sources=None,session=None,
