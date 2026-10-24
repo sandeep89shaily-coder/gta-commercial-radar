@@ -10,6 +10,7 @@ PROJECT=dict(source_id="brampton_preconsultation",item_id="PRE-2026-0028",
  city="BRAMPTON",site="11462 Coleraine Drive",
  title="Industrial development",record_url="https://www.brampton.ca/official/abc",
  radar_first_seen="2026-10-24T10:00:00+00:00",
+ official_public_posting_date="2026-10-23",
  published_entity="Architect Not Buyer",official_public_posting_date="",
  commercial_signal="POSSIBLE_COMMERCIAL",lead_status="NOT_SALE_READY_RESEARCH_ONLY")
 
@@ -70,6 +71,17 @@ class Tests(unittest.TestCase):
             milestone=e.read(base/"EARLY_BUSINESS_MILESTONES.csv")
             metric={r["metric"]:r["value"] for r in milestone}
             self.assertEqual(metric["verified_sale_ready_opportunities"],"0")
+
+    def test_unreviewed_historical_records_do_not_swamp_worklist(self):
+        from datetime import date
+        from early_pilot_summary import preview_candidates
+        old={**PROJECT,"item_id":"old-1","application_date":"2019-05-11",
+             "official_public_posting_date":""}
+        filtered=preview_candidates([PROJECT,old],limit=100,today=date(2026,10,24))
+        self.assertEqual(len(filtered),1)
+        self.assertEqual(filtered[0]["item_id"],PROJECT["item_id"])
+        result=e.merge([e.make_item(old)],[PROJECT])
+        self.assertEqual(len(result),1)
 
     def test_lost_source_retains_original_manual_record(self):
         source=e.make_item(PROJECT)
