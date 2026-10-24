@@ -71,7 +71,7 @@ SOURCES = [
          status_fields=("APPL_STATUS", "APPL_STAGE")),
     dict(id="toronto_development", city="Toronto", stage="PLANNING",
          url=TORONTO, id_fields=("APPLICATION_NUMBER",),
-         date_fields=("SUBMIT_DATE",),
+         date_fields=("INDATE", "SUBMIT_DATE"),
          desc_fields=("FOLDERDESCRIPTION", "APPLICATION_TYPE", "FOLDERTYPE_DESC"),
          entity_fields=(), address_fields=("FULL_ADDRESS",),
          status_fields=("STATUS_DESC", "LATEST_MILESTONE")),
@@ -100,9 +100,10 @@ def get_json(session, url, params):
     response = session.get(url, params=params, timeout=(10, 50))
     response.raise_for_status()
     result = response.json()
-    if not isinstance(result, dict) or "error" in result:
-        raise RuntimeError("Official GIS service returned invalid/error JSON: " +
-                           str(result.get("error", ""))[:200])
+    if not isinstance(result, dict):
+        raise RuntimeError("Official GIS service returned non-object JSON")
+    if "error" in result:
+        raise RuntimeError("Official GIS error: " + str(result["error"])[:200])
     return result
 
 
@@ -267,6 +268,7 @@ def export_csv(path, columns, rows):
 
 def run(data_dir, output_dir=None, ids=None, session=None, now=None):
     data_dir = Path(data_dir)
+    data_dir.mkdir(parents=True, exist_ok=True)
     output_dir = Path(output_dir or data_dir / "GTA_RADAR_RESULTS")
     output_dir.mkdir(parents=True, exist_ok=True)
     db = sqlite3.connect(data_dir / "early_signals_review.sqlite")
