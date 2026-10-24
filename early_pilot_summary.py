@@ -25,6 +25,7 @@ SOURCE_HINTS={
     "brampton_planning_agendas":15,
     "milton_notices":13,
     "pickering_proposals":13,
+    "oakville_development":12,
     "ero_proposal_watch":11,
     "ontario_investment_news":11,
     "ieso_connections":10,
