@@ -226,16 +226,71 @@ def parse_meeting_agenda(html,url):
     return entries
 
 
+def _brampton_calendar_dates(html):
+    """Published meeting scheduled date only, never agenda publication date."""
+    soup=BeautifulSoup(html,"html.parser")
+    found={}
+    for heading in soup.select("h3.meeting-title-heading"):
+        if "planning and development committee" not in _text(heading).lower():
+            continue
+        label=(heading.find(attrs={"aria-label":True}) or heading).get("aria-label","")
+        date=""
+        m=re.search(r"\b(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),?\s+"
+                    r"([A-Za-z]+)\s+(\d{1,2}),?\s+(20\d{2})",label,re.I)
+        if m:
+            try:date=datetime.strptime(" ".join(m.groups()),"%B %d %Y").date().isoformat()
+            except ValueError:pass
+        container=heading
+        for depth in range(7):
+            container=container.parent
+            if container is None or container.name in ("html","body"):break
+            matches={meeting_id(_link(BRAMPTON_CALENDAR,a["href"]))
+                     for a in container.find_all("a",href=True)
+                     if "/Meeting" in a["href"]}
+            matches.discard("")
+            if len(matches)==1:
+                found[next(iter(matches))]=date
+                break
+    return found
+
+
 def brampton_records(session,max_meetings=16):
-    meetings=parse_calendar(fetch(session,BRAMPTON_CALENDAR))
-    if len(meetings)>max_meetings:
-        raise RuntimeError("Published calendar has more meetings than review cap; pagination/window needed")
+    calendar=fetch(session,BRAMPTON_CALENDAR)
+    meetings=parse_calendar(calendar)
+    dates=_brampton_calendar_dates(calendar)
+    # This calendar can include past/future meetings; the most recent visible
+    # 16 are a review WINDOW, never completeness of Council records.
+    selected=list(meetings.items())[:max_meetings]
     all_records=[]
-    for key,url in sorted(meetings.items()):
-        all_records.extend(parse_meeting_agenda(fetch(session,url),url))
+    agenda_ok=0
+    calendar_only=0
+    for key,url in selected:
+        try:
+            agenda=parse_meeting_agenda(fetch(session,url),url)
+            all_records.extend(agenda)
+            agenda_ok+=1
+        except (RuntimeError,requests.RequestException,ValueError):
+            # eSCRIBE Meeting.aspx currently renders a JavaScript shell
+            # without agenda item descriptions to ordinary GET. Do NOT
+            # fabricate applications. Save only the public meeting signal.
+            calendar_only+=1
+            all_records.append(dict(
+                source_id="brampton_planning_agendas",
+                record_id=key+"|CALENDAR_ONLY",
+                title="Brampton Planning and Development Committee public meeting",
+                site="",company="",company_role="NOT_AN_APPLICATION_OR_BUYER",
+                stage="PDC_CALENDAR_AGENDA_NOT_READABLE",
+                signal_type="OFFICIAL_MEETING_SCHEDULE_ONLY",
+                source_date="",date_basis="MEETING_DATE_NOT_PUBLIC_POST_DATE",
+                source_url=url,description="",
+                commercial_fit="USE_UNKNOWN",procurement_status="UNKNOWN",
+                verification="CALENDAR_LINK_ONLY_NO_APPLICATION_EXTRACTED",
+                attributes={"meeting_date":dates.get(key,""),
+                            "meeting_id":key,"agenda_data_verified":False}))
     unique={(r["source_id"],r["record_id"]):r for r in all_records}
-    if not unique:raise RuntimeError("No validated agenda application records")
-    return list(unique.values()),{"discovered":len(meetings),"fetched":len(meetings)}
+    if not unique:raise RuntimeError("No published Brampton PDC calendar entries")
+    return list(unique.values()),{"discovered":len(meetings),"fetched":len(selected),
+               "agenda_parsed":agenda_ok,"calendar_only":calendar_only}
 
 
 def run(data_dir="data",out_dir="GTA_RADAR_RESULTS",source=None,session=None,now=None):
@@ -278,12 +333,16 @@ def run(data_dir="data",out_dir="GTA_RADAR_RESULTS",source=None,session=None,now
                         continue
                 else:
                     records,stats=brampton_records(session)
-                    coverage="PUBLISHED_LINKED_AGENDAS_ONLY"
+                    coverage="PDC_AGENDA_APPLICATION_ITEMS" if not stats["calendar_only"] else "PDC_CALENDAR_AND_PARTIAL_AGENDAS"
                 saved=save_source(db,source_id,records,now)
-                status.append(dict(source_id=source_id,status="SUCCESS",
+                state=("PARTIAL_CALENDAR_ONLY" if source_id=="brampton_planning_agendas"
+                   and stats.get("calendar_only",0)>0 else "SUCCESS")
+                status.append(dict(source_id=source_id,status=state,
                      fetched=len(records),discovered_pages=stats["discovered"],
                      fetched_pages=stats["fetched"],coverage=coverage,
-                     warning="NO_OPEN_PROCUREMENT_VERIFIED;PUBLICATION_DATE_UNKNOWN",
+                     warning=("AGENDA_ITEMS_UNAVAILABLE;CALENDAR_ONLY_NO_PROJECT_LEADS"
+                              if state=="PARTIAL_CALENDAR_ONLY" else
+                              "NO_OPEN_PROCUREMENT_VERIFIED;PUBLICATION_DATE_UNKNOWN"),
                      error="",**saved))
             except (RuntimeError,ValueError,requests.RequestException,sqlite3.Error) as err:
                 db.rollback()
