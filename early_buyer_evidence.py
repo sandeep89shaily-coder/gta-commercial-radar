@@ -139,6 +139,18 @@ def review(row,today=None):
     # Even these checks cannot authenticate source documents or who purchases.
     return "ASSEMBLED_FOR_HUMAN_REVIEW_NOT_VERIFIED_LEAD","formal_fields_complete_validate_links_roles_and_open_work"
 
+def has_manual_research(row):
+    """Never discard human annotations, but don't preserve 9,000 untouched
+    historical baseline rows when creating a practical worklist."""
+    fields=("reviewer","reviewed_on","buyer_organization","identity_evidence_url",
+      "buyer_role_evidence_url","specific_work_package","work_package_evidence_url",
+      "public_business_contact","public_contact_evidence_url",
+      "stage_current_evidence_url","supplier_category","feedback")
+    return any(str(row.get(k,"")).strip() for k in fields) or (
+        row.get("outreach_status") not in ("","NOT_CONTACTED",None)) or (
+        str(row.get("project_identity_confirmed","")).upper()=="YES")
+
+
 def merge(prior,current):
     """Do not overwrite human evidence on a later run. Indexed project title,
     municipality and URL are refreshed only when the reviewer has no notes."""
@@ -161,7 +173,7 @@ def merge(prior,current):
     # Retain human work for projects no longer in the source. Its original
     # presence is historical, not proof the site is still active.
     for key,old in previous.items():
-        if key not in already:
+        if key not in already and has_manual_research(old):
             retained={field:old.get(field,"") for field in WORKSHEET_FIELDS}
             retained["confidence_notes"]=(retained["confidence_notes"]+
               " | NO_LONGER_IN_CURRENT_RESEARCH_QUEUE;CHECK_PROJECT_CURRENT_STATUS").strip(" |")
@@ -178,7 +190,11 @@ def run(input_csv="GTA_RADAR_RESULTS/EARLY_EVIDENCE_ACTIONABILITY_GATES.csv",
     if not Path(input_csv).is_file():
         print("No evidence input yet. Run existing early cue pilot and cross-match first.")
         return 1
-    merged=merge(read(path),incoming)
+    # Use the same freshness/location gate as the shortlist. Otherwise a
+    # baseline of >9000 historical files overwhelms human verification.
+    from early_pilot_summary import preview_candidates
+    focus=preview_candidates(incoming,limit=100,today=today)
+    merged=merge(read(path),focus)
     report=[]
     for row in merged:
         quality,reason=review(row,today=today)
