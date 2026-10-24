@@ -40,7 +40,7 @@ COLUMNS = (
     "record_identity_confidence", "feature_count", "distinct_location_count",
     "source_application_date", "source_date_basis", "first_observed_at",
     "published_company", "company_role", "status", "commercial_signal",
-    "location", "description", "source_url", "review_state",
+    "location", "description", "source_url", "exact_source_record_url", "review_state",
     "municipal_reference", "date_completeness"
 )
 AUDIT_COLUMNS = (
@@ -313,6 +313,7 @@ def export_project_reports(db, output_dir, *, today=None):
             status=" | ".join(sorted(set(str(x.get("status") or "") for x in items)))[:180],
             commercial_signal=signal, location=base.get("location", ""),
             description=base.get("description", ""), source_url=base.get("source_url", ""),
+            exact_source_record_url=base.get("exact_source_record_url", ""),
             municipal_reference=base.get("municipal_reference", ""),
             date_completeness=base.get("date_completeness", "LEGACY_DATE_UNVERIFIED"),
             review_state="HISTORICAL_SOURCE_APPLICATION_DATE_NOT_PUBLICATION_DATE"
