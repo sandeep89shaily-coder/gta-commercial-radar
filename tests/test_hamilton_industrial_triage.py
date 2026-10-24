@@ -58,6 +58,24 @@ class Tests(unittest.TestCase):
         old={**G,"source_application_year":"2022"}
         self.assertEqual(t.evaluate([old],[]),[])
 
+    def test_late_construction_evidence_suppresses_false_early_lead(self):
+        g={**G,"record_id":"HAMILTON-GIS-99","file_number":"FCSP-25-066",
+             "site":"420 Garner Road West", "source_application_year":"2025",
+             "description":"Construct a new generator and telemetry building"}
+        follow=dict(file_number="FCSP-25-066",related_organization="Enbridge Gas Inc.",
+             org_relation="OFFICIAL_OWNER_WITH_AGENT_STANTEC",
+             organization_source="https://pub-hamilton.escribemeetings.com/Meeting?Id=x",
+             stage="UNDER_CONSTRUCTION_PER_WARD_COUNCILLOR_WEBPAGE",
+             stage_evidence_url="https://www.craigcassar.ca/development",
+             public_contact_route="https://www.enbridge.com/SupplierForm",
+             next="Do not sell as unawarded: under construction")
+        rows=t.evaluate([g],[],[follow])
+        self.assertEqual(len(rows),1)
+        self.assertEqual(rows[0]["priority"],"REVIEW_LATE_STAGE")
+        self.assertLessEqual(rows[0]["research_score"],5)
+        self.assertEqual(rows[0]["related_company_at_site"],"Enbridge Gas Inc.")
+        self.assertEqual(rows[0]["vendor_selection_status"],"UNKNOWN")
+
     def test_readonly_database_and_output(self):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d)
