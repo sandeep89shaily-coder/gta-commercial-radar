@@ -94,6 +94,48 @@ class EarlySignalTests(unittest.TestCase):
             finally:
                 db.close()
 
+    def test_oversized_get_request_retries_small_batches(self):
+        class RejectLargeRequests(FakeSession):
+            def get(self, url, params=None, timeout=None):
+                if params and params.get("objectIds"):
+                    ids = params["objectIds"].split(",")
+                    if len(ids) > 20:
+                        raise early.requests.HTTPError("404 batch request rejected")
+                return super().get(url, params=params, timeout=timeout)
+
+        with tempfile.TemporaryDirectory() as root:
+            rows = [
+                {**sample(), "OBJECTID": i, "APPLICATION_NUMBER": f"SPA-{i}"}
+                for i in range(101, 172)
+            ]
+            result = early.run(root, None, ["toronto_development"],
+                               RejectLargeRequests(rows), "2026-10-24T10:00:00+00:00")
+            self.assertEqual(result, 0)
+            db = sqlite3.connect(Path(root) / "early_signals_review.sqlite")
+            try:
+                self.assertEqual(db.execute("SELECT COUNT(*) FROM observations").fetchone()[0],
+                                 len(rows))
+                self.assertEqual(db.execute("SELECT COUNT(*) FROM events").fetchone()[0], 0)
+            finally:
+                db.close()
+
+    def test_nonjson_response_reports_request_stage(self):
+        class NotJson:
+            headers = {"content-type": "text/html"}
+            status_code = 200
+            def raise_for_status(self):
+                pass
+            def json(self):
+                raise ValueError("HTML, not JSON")
+
+        class BadMetadata(FakeSession):
+            def get(self, url, params=None, timeout=None):
+                return NotJson()
+
+        with self.assertRaisesRegex(RuntimeError, "toronto_development metadata"):
+            early.fetch_layer(BadMetadata([sample()]),
+                              next(s for s in early.SOURCES if s["id"] == "toronto_development"))
+
     def test_empty_and_duplicate_id_batches_refused(self):
         source = early.SOURCES[0]
         with self.assertRaises(RuntimeError):
