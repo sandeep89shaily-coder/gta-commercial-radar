@@ -125,7 +125,7 @@ class EarlySignalTests(unittest.TestCase):
         row = {"OBJECTID": 11, "APPL_GISID": "53", "MUN_NAME": "Vaughan",
                "REG_FILE_NUM": "19T-V-123", "ADDRESS": "100 Test Road",
                "APPL_DESC": "Industrial warehouse", "DATE_RECVD": None,
-               "Submission_Date__c": 1792000000000}
+               "SUBMISSION_DATE__C": 1792000000000}
         record = early.prepare_rows(source, [row], "OBJECTID", "2026-10-24")[0]
         self.assertEqual(record["city"], "Vaughan")
         self.assertEqual(record["municipal_reference"], "19T-V-123")
