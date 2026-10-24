@@ -28,7 +28,8 @@ STREETS={"STREET":"ST","ROAD":"RD","AVENUE":"AVE","DRIVE":"DR",
          "EAST":"E","WEST":"W"}
 SUFFIXES={"ST","RD","AVE","DR","BLVD","CT","CRES","PKWY","LN",
           "WAY","CIR","CIRCLE","PL","PLACE","TRAIL","TER","TERRACE"}
-DATE_BASIS_POSTED={"PICKERING_OFFICIAL_DATE_POSTED","MILTON_NEWS_LIST_DATE","ERO_PROPOSAL_POSTED"}
+DATE_BASIS_POSTED={"PICKERING_OFFICIAL_DATE_POSTED","MILTON_NEWS_LIST_DATE","ERO_PROPOSAL_POSTED",
+                   "OFFICIAL_NOTICE_PUBLISHED_DATE"}
 META=("source_id","item_id","city","site","address_key","title","company",
       "company_role","stage","source_application_date","source_public_posted",
       "radar_first_seen","record_url","commercial_signal","status",
