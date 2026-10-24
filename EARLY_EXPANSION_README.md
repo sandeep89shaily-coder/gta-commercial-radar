@@ -20,6 +20,7 @@ python early_public_notices.py --data-dir data --output-dir GTA_RADAR_RESULTS
 python early_discovery_watch.py --data-dir data --output-dir GTA_RADAR_RESULTS
 python early_investment_tenders.py --data-dir data --output-dir GTA_RADAR_RESULTS
 python toronto_aic_email_import.py --eml-folder data/toronto_aic_eml --data-dir data --output-dir GTA_RADAR_RESULTS
+python early_ajax_watch.py --data-dir data --output-dir GTA_RADAR_RESULTS
 python early_evidence_match.py --data-dir data --output-dir GTA_RADAR_RESULTS
 python early_pilot_summary.py --output-dir GTA_RADAR_RESULTS
 ```
@@ -42,6 +43,7 @@ Requires `requests`, `beautifulsoup4`, `pandas` already present in `requirements
 | Ontario Newsroom all-news RSS | `early_investment_tenders.py` | Company investment/plant announcements with original publication date | Recent rolling RSS only, may be blocked; many investment releases are non-project or post-contract |
 | CanadaBuys OPEN federal tenders CSV | `early_investment_tenders.py` | Open snapshot, buying federal organization, work scope, region, posted/closing date | **Federal only**, not all municipal tenders, and often not a GTA/private industrial project |
 | Toronto AIC subscribed email importer | `toronto_aic_email_import.py` | Optional local .eml city links and review stage | Requires YOUR voluntary official ward subscription and exported emails; sender header can be forged; no inbox access |
+| Ajax official public planning application index | `early_ajax_watch.py` | Public indexed addresses, file numbers and current planning statuses | Not an owner, buyer, permit or verified commercial land use; official application/receipt dates not exposed in list |
 
 **Backbone scripts:** `early_evidence_match.py` reads available source databases WITHOUT changing them, conservatively proposes same-city/exact-civic-address pairs, never auto-merges project identities and only calculates public posting-date comparison if both original public posting dates exist. `early_pilot_summary.py` produces the source-health recap and top-50 **research-only**, not sale-ready list.
 
