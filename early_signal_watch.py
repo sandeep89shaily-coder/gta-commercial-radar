@@ -96,52 +96,84 @@ COLUMNS = (
 STATUS_COLUMNS = ("source_id", "city", "status", "fetched", "new", "updated", "baseline", "error")
 
 
-def get_json(session, url, params):
-    response = session.get(url, params=params, timeout=(10, 50))
-    response.raise_for_status()
-    result = response.json()
+def get_json(session, url, params, *, method="GET", phase="GIS query"):
+    """Include the request stage in errors; never silently accept HTML as JSON."""
+    try:
+        if method == "POST":
+            response = session.post(url, data=params, timeout=(10, 50))
+        else:
+            response = session.get(url, params=params, timeout=(10, 50))
+        response.raise_for_status()
+    except requests.RequestException as exc:
+        code = getattr(locals().get("response"), "status_code", "unknown")
+        raise RuntimeError(f"{phase}: HTTP/network error (status {code}): {type(exc).__name__}") from exc
+    try:
+        result = response.json()
+    except ValueError as exc:
+        content_type = str(getattr(response, "headers", {}).get("content-type", "unknown"))
+        raise RuntimeError(f"{phase}: non-JSON response (HTTP {getattr(response, 'status_code', 'unknown')}, type {content_type})") from exc
     if not isinstance(result, dict):
-        raise RuntimeError("Official GIS service returned non-object JSON")
+        raise RuntimeError(f"{phase}: GIS service returned non-object JSON")
     if "error" in result:
-        raise RuntimeError("Official GIS error: " + str(result["error"])[:200])
+        raise RuntimeError(f"{phase}: official GIS error: " + str(result["error"])[:120])
     return result
 
 
 def fetch_layer(session, source, maximum=25000):
-    """Fetch a complete GIS snapshot by exact object IDs; refuse incomplete pages."""
-    meta = get_json(session, source["url"], {"f": "json"})
+    """Fetch complete feature-ID snapshots; use small batches if a large request fails."""
+    sid = source["id"]
+    meta = get_json(session, source["url"], {"f": "json"}, phase=sid+" metadata")
     fields = {str(f.get("name", "")).upper() for f in meta.get("fields", [])}
     oid = str(meta.get("objectIdField") or "")
     if not oid or oid.upper() not in fields:
-        raise RuntimeError("GIS layer lacks a documented object-ID field")
+        raise RuntimeError(f"{sid}: GIS layer lacks a documented object-ID field")
     query = source["url"] + "/query"
-    result = get_json(session, query, {
-        "f": "json", "where": "1=1", "returnIdsOnly": "true"
-    })
+    params = {"f": "json", "where": "1=1", "returnIdsOnly": "true"}
+    try:
+        result = get_json(session, query, params, phase=sid+" ID inventory GET")
+    except RuntimeError as first_error:
+        # Some municipal GIS gateways deliver HTML/blocked responses for large GETs.
+        try:
+            result = get_json(session, query, params, method="POST",
+                              phase=sid+" ID inventory POST")
+        except (RuntimeError, AttributeError) as second_error:
+            raise RuntimeError(f"{sid}: ID inventory failed by GET ({first_error}) "
+                               f"and POST ({second_error})") from second_error
     ids = result.get("objectIds")
     if not isinstance(ids, list):
-        raise RuntimeError("GIS ID inventory unavailable")
+        raise RuntimeError(f"{sid}: GIS ID inventory unavailable")
     if not ids or len(ids) > maximum or len(set(ids)) != len(ids):
-        raise RuntimeError("Empty, oversized, or duplicate GIS ID inventory")
+        raise RuntimeError(f"{sid}: empty, oversized, or duplicate GIS ID inventory")
     rows = []
-    for offset in range(0, len(ids), 250):
-        batch = ids[offset:offset+250]
-        packet = get_json(session, query, {
-            "f": "json", "objectIds": ",".join(map(str, batch)),
-            "outFields": "*", "returnGeometry": "false"
-        })
+
+    def fetch_batch(batch, label):
+        params = {"f": "json", "objectIds": ",".join(map(str, batch)),
+                  "outFields": "*", "returnGeometry": "false"}
+        packet = get_json(session, query, params, phase=sid+" "+label)
         features = packet.get("features")
         if not isinstance(features, list) or packet.get("exceededTransferLimit"):
-            raise RuntimeError("Incomplete GIS feature batch")
+            raise RuntimeError(f"{sid} {label}: incomplete GIS feature batch")
+        return features
+
+    for offset in range(0, len(ids), 250):
+        batch = ids[offset:offset+250]
+        try:
+            features = fetch_batch(batch, f"batch {offset} ({len(batch)} IDs)")
+        except RuntimeError:
+            # If a municipality rejects a long GET/large response, retry at 20 IDs.
+            # Retried results are still checked against the entire official ID list.
+            features = []
+            for mini in range(0, len(batch), 20):
+                sub_batch = batch[mini:mini+20]
+                features.extend(fetch_batch(sub_batch, f"small batch {offset+mini}"))
         for feature in features:
             values = feature.get("attributes")
             if not isinstance(values, dict):
-                raise RuntimeError("Invalid GIS attributes")
-            row = {str(k).upper(): v for k, v in values.items()}
-            rows.append(row)
+                raise RuntimeError(f"{sid}: invalid GIS attributes at batch {offset}")
+            rows.append({str(k).upper(): v for k, v in values.items()})
     returned = [row.get(oid.upper()) for row in rows]
     if len(returned) != len(ids) or set(returned) != set(ids):
-        raise RuntimeError("GIS snapshot incomplete or changed mid-fetch")
+        raise RuntimeError(f"{sid}: GIS snapshot incomplete or changed mid-fetch")
     return rows, oid.upper()
 
 
