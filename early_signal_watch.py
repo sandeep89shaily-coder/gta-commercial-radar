@@ -297,7 +297,7 @@ def save_records(db, source, records, observed_at):
                 """, (sid, key, observed_at, observed_at, hash_value, data))
             if not baseline and (old is None or (old_hash != hash_value and not legacy_migration)):
                 db.execute("INSERT INTO events(observed_at,source_id,record_key,change_type,content) VALUES(?,?,?,?,?)",
-                           (observed_at,sid,key,"NEW" if prior is None else "UPDATED",data))
+                           (observed_at,sid,key,"NEW" if old is None else "UPDATED",data))
         db.execute("INSERT INTO source_runs(observed_at,source_id,status,fetched,new_count,updated_count,baseline,error) VALUES(?,?,?,?,?,?,?,?)",
                    (observed_at,sid,"SUCCESS",len(records),new_count,updated,int(baseline),""))
     return dict(source_id=sid,city=source["city"],status="SUCCESS",fetched=len(records),
