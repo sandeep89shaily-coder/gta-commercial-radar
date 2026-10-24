@@ -151,6 +151,23 @@ For **every prospective project**, separately store:
 - `RUN_EARLY_CUES_PREVIEW.bat` now invokes Ajax along with the earlier collectors, evidence matcher and combined health report. CI run `40116559904` passed Windows/Linux on the Ajax implementation snapshot.
 - Other researched municipal sources remain in the register, not discarded merely because Ajax now has a first adapter.
 
+## October 24 later expansion: Oakville, real live checks and business evidence gates
+
+**New implementation, draft PR #74 only:**
+- `early_oakville_watch.py`: discovers seven official Oakville development/site-plan ward lists and records application-level history, with bounded separate project descriptions and labeled supporting-document months. Official project pages often show company, street, scope, and multiple submissions. **Document month is NOT an attributable first-public-posted date.** Planning office email is not the purchasing contact.
+- `early_buyer_evidence.py`: preserves annotated buyer/operator and open-procurement evidence in reviewer worksheets; requires original citations and current proof before formal case completeness. **The code never claims an auto-verified sales-ready lead.**
+- `early_leadtime_evidence.py`: requires human confirmation of SAME project plus public notice evidence before measuring source lead-time, instead of calculating a spurious date advantage from application receipt dates.
+- `early_live_source_probe.py`: bounded public source read-only smoke checks from GitHub Actions, no DeepSeek, login, private contact acquisition or V8 changes.
+
+**Observed source-health on October 24 (GitHub one-shot run `40117942636`):**
+- Oakville seven official ward links PASSED; Milton initial news listings parsed 10; Pickering current-applications table parsed 27; Brampton published calendar parsed 1 planning-meeting link. These are not proven live projects/lead counts, and each source still requires full collection and rights review.
+- IESO status HTML project table NOT present in GitHub response; source may be browser-rendered. Burlington planning ward index returned HTTP 403 on GitHub; no bypass. Ajax applications index response did not expose expected markup. **Those adapters must remain pilot-only and must not be called operational until their access is resolved legally.**
+- Ontario investment RSS and CanadaBuys CSV were not included in the same one-shot seven-source probe; existing code tests only synthetic fixtures.
+
+**Still researched, not built as verified usable collectors:** Markham MappiT and Vaughan PLANit GIS dashboard, Richmond Hill planning/status GIS, Hamilton interactive planning map, later Niagara/Waterloo geographies, land sales/commercial leasing, AGCO-specific fit-out inference, Ontario environmental assessment commencements, municipal public procurement/awards and supplier/vendor contact validation. AGCO and ERO already have collectors in the legacy V8 source config; do not duplicate merely to increase collection totals.
+
+The short-term priority remains measuring whether existing new early sources expose an actual official public notice **before** later site plan/permit milestones, plus independently verifying the first 10 paying-customer-worthy leads. Do not add more unstable map scrapers until sources pass publisher access, documentation rights and demonstrated incremental information gates.
+
 ## Priority windows without losing lower-priority sources
 
 **Now:** source-age advantage comparison for Burlington preapplication/Brampton agendas, IESO connection queue, and existing ERO enhancement; alongside verification of the strongest 10–15 recent industrial opportunities.
