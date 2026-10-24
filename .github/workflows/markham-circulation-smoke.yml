@@ -1,0 +1,28 @@
+name: Markham circulated planning report one-shot
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "dev/markham-circulation-live-*"
+permissions:
+  contents: read
+jobs:
+  markham:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install existing Radar deps
+        run: python -m pip install -r requirements.txt
+      - name: Official Markham index schema and baseline
+        run: python early_markham_circulation.py --data-dir markham_smoke_db --output-dir markham_reports
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: markham-source-index-smoke
+          path: markham_reports/*.csv
+          if-no-files-found: warn
+          retention-days: 3
