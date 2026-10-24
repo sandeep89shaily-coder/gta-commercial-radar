@@ -211,6 +211,17 @@ The short-term priority remains measuring whether existing new early sources exp
 
 **Repo evidence:** isolated draft PR #74 `DESKTOP_PILOT_TEST_REVIEW_20261024.md`; regression `tests/test_early_freshness_ranking.py` passed on Windows and Linux, GitHub run `40131733699` (newest package run `40131881431` passed both). Production V8, scheduled run, current DeepSeek daily budget and outreach untouched.
 
+## Four original failed collectors — actual publisher repairs and limitations (2026-10-24)
+
+The user's real Windows ZIP exposed failures in **IESO, Ajax, Brampton PDC and Burlington citywide**. On isolated draft PR #74:
+
+- **IESO: FIXED and live SUCCESS**. The official publisher's application-status page uses a JavaScript W2UI grid backed by publicly readable official `applicationstatusdata.json` (2,085 source entries at test). `early_cue_watch.py` now consumes that JSON directly. The CAA ID's year is NOT a first public posting date, and applicant is not a purchasing decision maker.
+- **Ajax: FIXED and live SUCCESS**. Old `bootrest/planningapps/property.html` layout no longer exposes records. New `early_ajax_arcgis.py` uses official public `Planning/Apps_Dev/MapServer` layers **0 pre-consultation, 1 active** (live 10 + 88 = 98 public GIS features), complete ObjectID batching, applicant, type, nonres floor area and submitted date (not first public posted). Layer 3 is duplicate active visualization and is omitted to avoid double count.
+- **Brampton Planning & Development Committee: PARTIAL**. Publisher's eSCRIBE meeting calendar works (live one committee meeting in tested window), but `Meeting.aspx` returns JavaScript shell with no original agenda details via ordinary GET. The collector now saves calendar-only **noncommercial non-buyer** rows, labeled `PARTIAL_CALENDAR_ONLY`; NO actual OZS/SPA file items claimed. Actual agenda item access remains unresolved.
+- **Burlington: PUBLISHER BLOCKED / PARTIAL**. Publisher sends HTTP 403 for home index on GitHub runners and one project detail page on desktop. When some ward/project pages are readable, collector emits a partial review and denied-URL audit while refusing to commit incomplete full coverage/new alerts. Do not bypass protection or call source complete. Existing 3 known project seed pages are a separate nonexhaustive watcher.
+- **Verification:** full Windows/Linux unit regression passed on code snapshot; one-shot live Action `40133850905` verifies IESO and Ajax, Brampton PARTIAL and Burlington 403. Manual Windows rerun packaged as `RETEST_FOUR_EARLY_SOURCES.bat`, no V8, no DeepSeek or scheduler. Complete detail `EARLY_COLLECTOR_REPAIR_REPORT_20261024.md` on feature branch.
+- Still need: confirm Burlington publisher-authorized alternate feed, real Brampton individual agenda item dataset, opportunity buyer/vendor qualification, measured first-public-to-later-stage time advantage. 2 fixed feeds alone do not make saleable opportunities.
+
 ## Priority windows without losing lower-priority sources
 
 **Now:** source-age advantage comparison for Burlington preapplication/Brampton agendas, IESO connection queue, and existing ERO enhancement; alongside verification of the strongest 10–15 recent industrial opportunities.
