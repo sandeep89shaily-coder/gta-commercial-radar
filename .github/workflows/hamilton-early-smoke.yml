@@ -19,10 +19,30 @@ jobs:
         run: python -m pip install -r requirements.txt
       - name: One-time official Hamilton GIS and published notice test
         run: python early_hamilton_watch.py --data-dir hamilton_smoke_data --output-dir hamilton_smoke_reports --max-notice-details 8
+      - name: Prepare Hamilton industrial research and public-company evidence
+        if: always()
+        run: |
+          python hamilton_industrial_triage.py --database hamilton_smoke_data/early_hamilton_review.sqlite --output-dir hamilton_smoke_reports --limit 200
+          python hamilton_company_evidence_export.py --output-dir hamilton_smoke_reports
+      - name: Print top official GIS industrial review candidates
+        if: always()
+        run: |
+          python - <<'PY'
+          import csv
+          path="hamilton_smoke_reports/HAMILTON_INDUSTRIAL_TRIAGE_REVIEW.csv"
+          try:
+              with open(path,encoding="utf-8-sig",newline="") as f:
+                  r=list(csv.DictReader(f))
+              for x in r[:12]:
+                  print("GIS_REVIEW",x["research_score"],x["site"],x["gis_file_number"],
+                        x["gis_file_year"],x["potential_supplier_scopes"],x["municipal_description"][:120])
+          except FileNotFoundError:
+              print("Industrial preview unavailable due to publisher/source failure")
+          PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: hamilton-early-source-smoke
-          path: hamilton_smoke_reports/EARLY_HAMILTON_SOURCE_STATUS.csv
+          path: hamilton_smoke_reports/*.csv
           retention-days: 3
           if-no-files-found: warn
