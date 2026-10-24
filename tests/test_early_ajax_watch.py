@@ -41,19 +41,12 @@ class Tests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError,"coverage too low"):
             ajax.parse_ajax(html)
 
-    def test_snapshot_baseline_and_no_false_new(self):
-        with tempfile.TemporaryDirectory() as d:
-            opts=dict(data_dir=Path(d)/"data",out_dir=Path(d)/"out")
-            self.assertEqual(ajax.run(**opts,session=S(INDEX),stamp="2026-10-24T12:00:00"),0)
-            self.assertEqual(ajax.run(**opts,session=S(INDEX),stamp="2026-10-25T12:00:00"),0)
-            database=sqlite3.connect(Path(d)/"data"/"early_ajax_review.sqlite")
-            self.assertEqual(database.execute("SELECT count(*) FROM snapshots").fetchone()[0],3)
-            self.assertEqual(database.execute("SELECT count(*) FROM changes").fetchone()[0],0)
-            database.close()
-            self.assertEqual(ajax.run(**opts,session=S("<html>blocked</html>"),
-                                      stamp="2026-10-26T12:00:00"),1)
-            database=sqlite3.connect(Path(d)/"data"/"early_ajax_review.sqlite")
-            self.assertEqual(database.execute("SELECT count(*) FROM snapshots").fetchone()[0],3)
-            database.close()
+    def test_legacy_parser_still_handles_historical_html_fixture(self):
+        rows,totals=ajax.parse_ajax(INDEX)
+        self.assertEqual(totals,(2,3))
+        self.assertEqual(len(rows),3)
+        # Actual RUN tests for the replacement GIS service are in
+        # tests/test_early_ajax_arcgis.py.
+
 
 if __name__=="__main__":unittest.main()
