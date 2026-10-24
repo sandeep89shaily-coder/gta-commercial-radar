@@ -120,7 +120,7 @@ class CueTests(unittest.TestCase):
             added=[dict(x) for x in IESO_JSON_DATA]
             added.append(dict(IESO_JSON_DATA[0],CaaId=933,
                 CaaIdAndDate="2026-933",Name="Large Industrial Plant"))
-            cue.run(**opts,session=Session({cue.IESO_URL:added}),
+            cue.run(**opts,session=Session({cue.IESO_JSON:added}),
                     observed="2026-10-25T09:00:00+00:00")
             with (Path(d)/"output"/"EARLY_CUES_CHANGES_REVIEW_ONLY.csv").open(
                     encoding="utf-8-sig",newline="") as stream:
