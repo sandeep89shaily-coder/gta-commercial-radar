@@ -63,7 +63,7 @@ class Tests(unittest.TestCase):
         items=summary.preview_candidates([row],today=__import__("datetime").date(2026,10,24))
         self.assertEqual(len(items),1)
         self.assertEqual(items[0]["lead_status"],"NOT_SALE_READY_RESEARCH_ONLY")
-        self.assertEqual(items[0]["why_research"],"OFFICIAL_POST_LAST_30_DAYS")
+        self.assertEqual(items[0]["why_research"],"OFFICIAL_PUBLIC_POST_WITHIN_180_DAYS")
         self.assertEqual(summary.preview_candidates([{**row,"lead_status":"VERIFIED"}],
                         today=__import__("datetime").date(2026,10,24)),[])
 
