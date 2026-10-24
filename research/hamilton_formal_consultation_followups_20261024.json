@@ -65,8 +65,33 @@
         "heavy yard equipment",
         "security and lighting"
       ],
-      "next": "Confirm application applicant/owner; differentiate HOPA property management from HCT terminal operator and whether work has started",
-      "priority": "RESEARCH_FIRST"
+      "next": "Reconcile City FC-2026-00239 applicant with HOPA landlord, HCT tenant and XCAVAC's separate withdrawn waste ECA; check May 2026 Building G demolition and exact unawarded construction packages. This is NOT yet a first-stage untouched site.",
+      "priority": "RESEARCH_FIRST_WITH_STAGE_WARNING",
+      "co_located_distinct_project_evidence": [
+        {
+          "exact_scope_id": "ERO-019-8711",
+          "result": "WITHDRAWN_2026_08_13",
+          "record_date": "2024-05-21",
+          "date_type": "ERO_PROPOSAL_PUBLICATION",
+          "source": "https://ero.ontario.ca/notice/019-8711",
+          "applicant": "2388455 Ontario Inc. operating as XCAVAC Ontario",
+          "warning": "Environmental approval for distinct waste operation, not evidence the FC-2026-00239 construction proposal was withdrawn"
+        },
+        {
+          "exact_scope_id": "HAMILTON-PERMIT-26-101057",
+          "result": "DEMOLITION_PERMIT_ISSUED_MAY_2026",
+          "record_date": "2026-05",
+          "date_type": "CITY_PERMIT_ISSUE_MONTH_ONLY",
+          "source": "https://www.hamilton.ca/sites/default/files/2026-06/building-activity-may2026-statscan.pdf",
+          "warning": "Demolition of 404 sqm Building G; separate from future industrial new-build trade packages"
+        },
+        {
+          "exact_scope_id": "HOPA-COMMERCIAL-PROPERTY-1133",
+          "result": "HOPA_MARKETS_SPACE_FOR_LEASE",
+          "source": "https://www.hopaports.ca/1133-industrial-drive/",
+          "warning": "Lease marketing contact not verified 2026 application owner or project procurement officer"
+        }
+      ]
     },
     {
       "file_number": "FC-2026-00410",
@@ -141,5 +166,7 @@
       "next": "Classify as LATE_STAGE_CHECK, not an unawarded lead; supplier registration is general, NOT an open project contract",
       "priority": "DEPRIORITIZE_LATE_STAGE"
     }
-  ]
+  ],
+  "updated_at": "2026-10-24",
+  "review_note": "Negative city permit and ERO evidence added; do not transfer withdrawal between exact project scopes."
 }
