@@ -44,7 +44,7 @@ def parse_ajax(html):
     current=""
     rows={}
     start=next((i for i,l in enumerate(lines) if l.casefold()=="all applications"),0)
-    for line in lines[start+1:]:
+    for line_index,line in enumerate(lines[start+1:], start+1):
         if len(line)>280:continue
         if ((CIVIC.search(line) and STREET.search(line)) or CORNER.search(line)):
             current=line
@@ -56,7 +56,6 @@ def parse_ajax(html):
         status=m.group(2) or ""
         # Original DOM may split file number and status into adjacent lines.
         if not status:
-            line_index=lines.index(line)
             if line_index+1<len(lines) and lines[line_index+1] in (
                "Open","Approved","Closed","Refused","Withdrawn","Appealed","Pending"):
                 status=lines[line_index+1]
