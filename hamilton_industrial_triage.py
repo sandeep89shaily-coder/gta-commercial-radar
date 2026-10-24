@@ -22,7 +22,9 @@ FIELDS=("research_score","priority","site","address_key","source_gis_feature_id"
  "address_only_possible_links","distinct_gis_features_same_address",
  "potential_supplier_scopes","owner_operator_verified",
  "purchasing_contact_verified","vendor_selection_status","sale_readiness",
- "first_radar_observation","next_research_action")
+ "first_radar_observation","independent_stage_evidence","independent_stage_status",
+ "related_company_at_site","related_company_role","related_company_source",
+ "company_business_contact","next_research_action")
 TRADE_PATTERNS={
  "INDUSTRIAL_FACILITY":r"\b(?:warehouse|distribution|manufactur|industrial|factory|employment)\b",
  "COLD_CHAIN":r"\b(?:cold storage|refrigerat|freezer|food processing)\b",
@@ -65,7 +67,7 @@ def read_rows(database):
                           "WHERE source_id IN ('hamilton_applications_gis','hamilton_planning_notices')")]
     finally:db.close()
 
-def evaluate(gis,notices):
+def evaluate(gis,notices,followups=None):
     """One row per GIS source feature, with explicit same-file evidence."""
     related_by_file=defaultdict(list)
     related_by_address=defaultdict(list)
@@ -78,6 +80,8 @@ def evaluate(gis,notices):
     for g in gis:
         key=address_key(g.get("site"))
         if key:counts[key]+=1
+    evidence_by_file={file_key(r.get("file_number")):r for r in (followups or [])
+                      if file_key(r.get("file_number"))}
     results=[]
     for g in gis:
         desc=g.get("description","") or ""
@@ -110,10 +114,14 @@ def evaluate(gis,notices):
         if not key:score-=5
         notice=exact[0] if exact else {}
         supplier=";".join(scope)
+        follow=evidence_by_file.get(fkey,{})
+        later_stage=follow.get("stage","").startswith("UNDER_CONSTRUCTION")
+        if later_stage:score=min(score,5)
         results.append(dict(
             research_score=score,
-            priority="RESEARCH_FIRST" if score>=60 else
-                "RESEARCH_NEXT" if score>=35 else "LOW_PRIORITY",
+            priority=("REVIEW_LATE_STAGE" if later_stage else
+                "RESEARCH_FIRST" if score>=60 else
+                "RESEARCH_NEXT" if score>=35 else "LOW_PRIORITY"),
             site=site,address_key=key,source_gis_feature_id=gid,
             gis_file_number=filename,gis_file_type=g.get("title",""),
             gis_file_year=year,municipal_description=desc[:900],
@@ -133,7 +141,14 @@ def evaluate(gis,notices):
             vendor_selection_status="UNKNOWN",
             sale_readiness="NOT_SALE_READY",
             first_radar_observation=g.get("_first_seen_at",""),
-            next_research_action=("Confirm project identity and current planning stage; "
+            independent_stage_evidence=follow.get("stage_evidence_url",""),
+            independent_stage_status=follow.get("stage","UNVERIFIED"),
+            related_company_at_site=follow.get("related_organization",""),
+            related_company_role=follow.get("org_relation",""),
+            related_company_source=follow.get("organization_source",""),
+            company_business_contact=follow.get("public_contact_route",""),
+            next_research_action=(follow.get("next") or
+               "Confirm project identity and current planning stage; "
                "identify operator/developer and public procurement route; "
                "verify whether work package is unawarded. "
                "Do not assume GIS FILE_YEAR is publication date.")))
@@ -142,7 +157,8 @@ def evaluate(gis,notices):
     return results
 
 def run(database="data/early_hamilton_review.sqlite",
-        output_dir="GTA_RADAR_RESULTS",limit=200):
+        output_dir="GTA_RADAR_RESULTS",limit=200,
+        followup_file="research/hamilton_formal_consultation_followups_20261024.json"):
     if not 1<=limit<=1000:raise ValueError("limit 1..1000")
     rows=read_rows(database)
     gis=[];notices=[]
@@ -150,7 +166,9 @@ def run(database="data/early_hamilton_review.sqlite",
         row["_first_seen_at"]=first
         if sid=="hamilton_applications_gis":gis.append(row)
         else:notices.append(row)
-    queue=evaluate(gis,notices)
+    f=Path(followup_file) if followup_file else None
+    followups=json.loads(f.read_text(encoding="utf-8")).get("records",[]) if f and f.exists() else []
+    queue=evaluate(gis,notices,followups)
     folder=Path(output_dir);folder.mkdir(parents=True,exist_ok=True)
     _write_csv(folder/"HAMILTON_INDUSTRIAL_TRIAGE_REVIEW.csv",FIELDS,queue[:limit])
     print("Hamilton GIS",len(gis),"notice sources",len(notices),
@@ -163,5 +181,6 @@ if __name__=="__main__":
     p.add_argument("--database",default="data/early_hamilton_review.sqlite")
     p.add_argument("--output-dir",default="GTA_RADAR_RESULTS")
     p.add_argument("--limit",type=int,default=200)
+    p.add_argument("--followup-file",default="research/hamilton_formal_consultation_followups_20261024.json")
     a=p.parse_args()
-    raise SystemExit(run(a.database,a.output_dir,a.limit))
+    raise SystemExit(run(a.database,a.output_dir,a.limit,a.followup_file))
