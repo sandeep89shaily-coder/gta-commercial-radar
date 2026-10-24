@@ -12,7 +12,7 @@ import re
 from collections import Counter, defaultdict
 from pathlib import Path
 
-QUALITY_VERSION = 2
+QUALITY_VERSION = 3
 COMMERCIAL = (
     r"\bindustrial\b", r"\bwarehous\w*\b", r"\bmanufactur\w*\b",
     r"\bcommercial\b", r"\bretail\b", r"\boffice\b", r"\bhotel\b",
@@ -40,12 +40,14 @@ COLUMNS = (
     "record_identity_confidence", "feature_count", "distinct_location_count",
     "source_application_date", "source_date_basis", "first_observed_at",
     "published_company", "company_role", "status", "commercial_signal",
-    "location", "description", "source_url", "review_state"
+    "location", "description", "source_url", "review_state",
+    "municipal_reference", "date_completeness"
 )
 AUDIT_COLUMNS = (
     "source_id", "records", "valid_source_dates", "invalid_or_missing_dates",
     "possible_commercial_records", "mixed_use_records", "project_groups",
     "multi_feature_groups", "feature_identity_groups", "recent_review_projects",
+    "missing_source_date_reported", "york_published_reference_groups",
 )
 
 
@@ -118,7 +120,17 @@ def app_key(record):
     sid = str(record.get("source_id") or "")
     app = str(record.get("application_id") or "").strip().upper()
     if sid == "york_region_development":
-        # APPL_GISID is a GIS identity, NOT a verified municipal application number.
+        # Regional reference must be published, specific, and tied to a
+        # known municipality. Never use bare APPL_GISID as project identity.
+        reference = str(record.get("municipal_reference") or "").strip().upper()
+        municipality = str(record.get("city") or "").strip().upper()
+        if (reference not in {"", "0", "NONE", "N/A", "UNKNOWN"}
+            and len(reference) >= 4
+            and re.search(r"[A-Z]", reference) and re.search(r"\d", reference)
+            and municipality not in {"", "YORK REGION (VAUGHAN INCLUDED)", "YORK REGION"}
+            and str(record.get("municipal_reference_field") or "") in
+                {"REG_FILE_NUM", "EXT_REF_NUM"}):
+            return sid + "|PUBLISHED_REF|" + municipality + "|" + reference
         return sid + "|GIS_FEATURE|" + str(record.get("feature_id") or "")
     if not app or app in {"0", "NONE", "N/A", "UNKNOWN"}:
         return sid + "|FEATURE|" + str(record.get("feature_id") or "")
@@ -253,6 +265,7 @@ def export_project_reports(db, output_dir, *, today=None):
         groups[app_key(item)].append(item)
     output = []
     all_project_rows = []
+    undated = []
     source_stats = defaultdict(lambda: Counter())
     for key, items in groups.items():
         base = max(items, key=lambda x: (
@@ -265,6 +278,8 @@ def export_project_reports(db, output_dir, *, today=None):
             stats["multi"] += 1
         if "|FEATURE|" in key or "|GIS_FEATURE|" in key:
             stats["feature"] += 1
+        if "|PUBLISHED_REF|" in key:
+            stats["published_ref"] += 1
         date_candidates = [x.get("source_application_date") for x in items
                            if parse_source_date(x.get("source_application_date"), today=today)]
         dates = sorted(set(date_candidates))
@@ -282,6 +297,7 @@ def export_project_reports(db, output_dir, *, today=None):
         locations = {_clean_location(x.get("location")) for x in items if x.get("location")}
         site_count = len(locations)
         identity = ("FEATURE_NOT_CONFIRMED_PROJECT" if "|FEATURE|" in key or "|GIS_FEATURE|" in key
+                    else "MUNICIPAL_REFERENCE_GROUP_REVIEW" if "|PUBLISHED_REF|" in key
                     else "MULTIPLE_SITE_FEATURES_REVIEW" if site_count > 1
                     else "SOURCE_APPLICATION_GROUP_REVIEW")
         row = dict(
@@ -297,9 +313,15 @@ def export_project_reports(db, output_dir, *, today=None):
             status=" | ".join(sorted(set(str(x.get("status") or "") for x in items)))[:180],
             commercial_signal=signal, location=base.get("location", ""),
             description=base.get("description", ""), source_url=base.get("source_url", ""),
+            municipal_reference=base.get("municipal_reference", ""),
+            date_completeness=base.get("date_completeness", "LEGACY_DATE_UNVERIFIED"),
             review_state="HISTORICAL_SOURCE_APPLICATION_DATE_NOT_PUBLICATION_DATE"
         )
         all_project_rows.append(row)
+        if not when:
+            stats["missing_date"] += 1
+            if signal in {"POSSIBLE_COMMERCIAL", "MIXED_USE_REVIEW"}:
+                undated.append(row)
         if signal not in {"POSSIBLE_COMMERCIAL", "MIXED_USE_REVIEW"}:
             continue
         if not _is_recent(when, today):
@@ -324,12 +346,15 @@ def export_project_reports(db, output_dir, *, today=None):
             mixed_use_records=classifications[sid]["MIXED_USE_REVIEW"],
             project_groups=stats["groups"], multi_feature_groups=stats["multi"],
             feature_identity_groups=stats["feature"],
-            recent_review_projects=stats["recent"]))
+            recent_review_projects=stats["recent"],
+            missing_source_date_reported=stats["missing_date"],
+            york_published_reference_groups=stats["published_ref"]))
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     _write(output_dir/"EARLY_SIGNALS_PROJECTS_REVIEW_ONLY.csv", COLUMNS, output)
     _write(output_dir/"EARLY_SIGNALS_QUALITY_AUDIT.csv", AUDIT_COLUMNS, stats_rows)
+    _write(output_dir/"EARLY_SIGNALS_MISSING_DATES_REVIEW.csv", COLUMNS, undated)
     links = possible_stage_links(all_project_rows, today)
     _write(output_dir/"EARLY_SIGNALS_POSSIBLE_STAGE_LINKS_REVIEW.csv", LINK_COLUMNS, links)
     return {"review_candidates":len(output), "possible_stage_links":len(links),
-            "source_stats":stats_rows}
+            "undated_commercial_records":len(undated), "source_stats":stats_rows}
