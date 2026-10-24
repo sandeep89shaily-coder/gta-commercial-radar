@@ -35,7 +35,7 @@ TRADE_PATTERNS={
 }
 RESIDENTIAL=re.compile(r"\b(?:residential|dwellings?|apartments?|townhouses?|"
   r"condominiums?|housing)\b",re.I)
-APP=re.compile(r"\b(?:FC|DPA|SUB|SPA|OPA|ZAC|ZBA)-\d{2,4}-\d{2,5}\b",re.I)
+APP=re.compile(r"\b(?:FCSP|FC|DPA|SUB|SPA|OPA|ZAC|ZBA)-\d{2,4}-\d{2,5}\b",re.I)
 CIVIC=re.compile(r"(?<!\d)([1-9]\d{0,5}[A-Z]?)\s+"
     r"([A-Za-z0-9'-]+(?:\s+[A-Za-z0-9'-]+){0,5})\s+"
     r"(Road|Rd|Street|St|Drive|Dr|Avenue|Ave|Court|Ct|Crescent|Cres|"
