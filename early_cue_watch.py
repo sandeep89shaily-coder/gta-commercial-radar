@@ -32,10 +32,11 @@ STATUS_COLUMNS = ("source_id", "state", "scope", "fetched", "new", "updated",
 EVENT_COLUMNS = ("observed_at", "change_type", "source_id", "record_id", "title",
                  "site", "company", "company_role", "stage", "signal_type",
                  "source_date", "first_seen_at", "source_url", "commercial_fit",
-                 "procurement_status", "verification")
+                 "geographic_confidence", "procurement_status", "verification")
 QUEUE_COLUMNS = ("source_id", "record_id", "title", "site", "company", "company_role",
                  "stage", "signal_type", "source_date", "first_seen_at",
-                 "commercial_fit", "source_url", "procurement_status",
+                 "last_seen_at", "current_snapshot_status", "commercial_fit",
+                 "geographic_confidence", "source_url", "procurement_status",
                  "verification", "first_appearance_status", "not_sale_ready_reason")
 UA = "GTA-Radar-EarlyCueResearch/0.1 (+manual public data review)"
 ALLOWED_HOSTS = {"www.ieso.ca", "ieso.ca", "www.burlington.ca"}
@@ -124,6 +125,8 @@ def parse_ieso(html, url=IESO_URL):
             "company_role":"PUBLISHED_IESO_APPLICANT_NOT_VERIFIED_BUYER",
             "stage":stage, "signal_type":typ, "source_date":"",
             "source_url":url, "commercial_fit":"REVIEW" if RELEVANT.search(info) else "LOW",
+            "geographic_confidence":("GTA_NAME_MENTION_UNVERIFIED" if GTA.search(name)
+                                     else "ONTARIO_REGION_ONLY_NOT_GTA_VERIFIED"),
             "procurement_status":"UNKNOWN",
             "verification":"IESO_APPLICATION_NOT_CONTRACT",
             "attributes":{"size":size, "proposed_service":service}
@@ -189,6 +192,7 @@ def parse_burlington(html, url):
             "PRE_APPLICATION_MENTIONED" if preapp else "PROJECT_STATUS_PAGE"),
         "source_date":"", "source_url":url,
         "commercial_fit":"REVIEW" if RELEVANT.search(info) else "LOW",
+        "geographic_confidence":"BURLINGTON_VERIFIED_MUNICIPAL_PAGE",
         "procurement_status":"UNKNOWN",
         "verification":"PROJECT_PAGE_NOT_OPEN_PROCUREMENT",
         "attributes":{"proposal":description}
@@ -305,11 +309,15 @@ def run(data_dir="data",output_dir="GTA_RADAR_RESULTS",sources=None,session=None
         _write_csv(output_dir/"EARLY_CUES_CHANGES_REVIEW_ONLY.csv",EVENT_COLUMNS,events)
         _write_csv(output_dir/"EARLY_CUES_SOURCE_STATUS.csv",STATUS_COLUMNS,statuses)
         queue=[]
-        for sid,rid,first,content in conn.execute(
-              "SELECT source_id,record_id,first_seen_at,content FROM snapshots"):
+        valid_sources={s["source_id"] for s in statuses if s["state"]=="SUCCESS"}
+        for sid,rid,first,last,content in conn.execute(
+              "SELECT source_id,record_id,first_seen_at,last_seen_at,content FROM snapshots"):
             item=json.loads(content)
             if item.get("commercial_fit")!="REVIEW":continue
-            queue.append(dict(**item,first_seen_at=first,
+            seen_status=("UNKNOWN_FAILED_SOURCE" if sid not in valid_sources else
+                         "OBSERVED_THIS_RUN" if last==now else "NOT_ON_LATEST_VISIBLE_WINDOW")
+            queue.append(dict(**item,first_seen_at=first,last_seen_at=last,
+                   current_snapshot_status=seen_status,
                    first_appearance_status="HISTORICAL_BASELINE_OR_FIRST_OBSERVATION",
                    not_sale_ready_reason="BUYER_ROLE_UNVERIFIED;VENDOR_STATUS_UNKNOWN;"
                       "PROCUREMENT_UNKNOWN;EARLINESS_NOT_PROVEN"))
