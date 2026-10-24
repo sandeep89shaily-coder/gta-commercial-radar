@@ -73,6 +73,45 @@ class EarlySignalTests(unittest.TestCase):
             self.assertEqual(records[0]["commercial_signal"], "POSSIBLE_COMMERCIAL")
             self.assertEqual(records[0]["qualification"], "PUBLIC_PLANNING_RECORD_REVIEW_ONLY")
 
+    def test_upgrade_legacy_database_preserves_first_seen_and_no_false_update(self):
+        with tempfile.TemporaryDirectory() as root:
+            src = ["toronto_development"]
+            stamp = "2026-10-24T10:00:00+00:00"
+            self.assertEqual(early.run(root, None, src, FakeSession([sample()]), stamp), 0)
+            database = Path(root)/"early_signals_review.sqlite"
+            db = sqlite3.connect(database)
+            try:
+                row = db.execute("SELECT record_key, content FROM observations").fetchone()
+                old = json.loads(row[1])
+                old.pop("quality_version", None)
+                old.pop("source_date_basis", None)
+                old.pop("company_role", None)
+                old["source_application_date"] = ""
+                old["commercial_signal"] = "USE_UNKNOWN"
+                old["description"] = sample()["FOLDERDESCRIPTION"]
+                import hashlib
+                payload = json.dumps(old, ensure_ascii=False, sort_keys=True)
+                hashed = hashlib.sha256(json.dumps(
+                    {k:v for k,v in old.items() if k != "observed_at"},
+                    sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
+                db.execute("UPDATE observations SET digest=?,content=?",
+                           (hashed, payload))
+                db.commit()
+            finally:
+                db.close()
+            self.assertEqual(early.run(root, None, src, FakeSession([sample()]),
+                                       "2026-10-25T10:00:00+00:00"), 0)
+            db = sqlite3.connect(database)
+            try:
+                row = db.execute("SELECT first_seen,content FROM observations").fetchone()
+                self.assertEqual(row[0], stamp)
+                upgraded = json.loads(row[1])
+                self.assertEqual(upgraded["quality_version"], 2)
+                self.assertTrue(upgraded["source_application_date"].startswith("2026-"))
+                self.assertEqual(db.execute("SELECT COUNT(*) FROM events").fetchone()[0], 0)
+            finally:
+                db.close()
+
     def test_duplicate_applications_fall_back_to_feature_identity(self):
         source = next(s for s in early.SOURCES if s["id"] == "toronto_development")
         one = sample()
