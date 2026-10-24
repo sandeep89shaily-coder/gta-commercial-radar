@@ -40,8 +40,8 @@ class S:
             ids=[int(x) for x in (params.get("objectIds") or "").split(",") if x]
             if not ids or any(i not in (1,2,3) for i in ids):
                 raise AssertionError("Unrecognized ArcGIS batch")
-            if self.links.get("drop_feature") and ids==[3]:
-                return Reply({"features":[]})
+            if self.links.get("drop_feature") and 3 in ids:
+                ids=[i for i in ids if i!=3]
             return Reply({"features":[{"attributes":{
                   "OBJECTID":i,
                   "FILE_NUM":"FC-25-040" if i==1 else f"DPA-2026-{i:05d}",
