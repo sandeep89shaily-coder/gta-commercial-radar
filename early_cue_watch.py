@@ -20,6 +20,7 @@ import requests
 from bs4 import BeautifulSoup
 
 IESO_URL = "https://www.ieso.ca/Sector-Participants/Connection-Process/Application-Status"
+IESO_JSON="https://www.ieso.ca/-/media/files/IESO/files/applicationstatusdata.json"
 # These verified Burlington URLs are SEEDS, not a full municipal development index.
 BURLINGTON_PROJECT_URLS = (
     "https://www.burlington.ca/en/news/current-development-projects/3056376-canada-inc-777guelphline.aspx",
@@ -138,6 +139,66 @@ def parse_ieso(html, url=IESO_URL):
     pagination = bool(re.search(r"\b\d+\s*[-–]\s*\d+\s+of\s+[\d,]+\b", text, re.I))
     return list(result.values()), ("PAGINATED_WINDOW_NOT_FULL_QUEUE" if pagination
                                     else "TABLE_PAGE_COVERAGE_UNVERIFIED")
+
+
+def fetch_ieso_json(session):
+    """Publisher referenced JSON; HTML grid is JavaScript-created only."""
+    response=session.get(IESO_JSON,headers={"User-Agent":UA},
+                         timeout=(10,60))
+    response.raise_for_status()
+    data=response.json()
+    if not isinstance(data,list) or len(data)<50 or len(data)>25000:
+        raise RuntimeError("IESO published connection JSON absent/unexpected size")
+    return data
+
+
+def parse_ieso_json(records,url=IESO_URL):
+    """One official CAA row per record; public queue history, not open bids."""
+    if not isinstance(records,list) or len(records)<50:
+        raise RuntimeError("IESO JSON has no credible connection list")
+    result=[]
+    ids=set()
+    rejected=0
+    for row in records:
+        if not isinstance(row,dict):
+            rejected+=1
+            continue
+        ident=str(row.get("CaaIdAndDate") or "").strip().upper()
+        project=str(row.get("Name") or "").strip()
+        if not re.fullmatch(r"20\d{2}-[A-Z0-9-]{3,40}",ident) or not project:
+            rejected+=1
+            continue
+        if ident in ids:
+            # Addenda/duplicate IDs must not silently collapse into false
+            # updates or fabricated distinct physical developments.
+            raise RuntimeError("Duplicate IESO official CAA identifier")
+        ids.add(ident)
+        applicant=str(row.get("Applicant") or "").strip()
+        zone=str(row.get("Location") or "").strip()
+        kind=str(row.get("Type") or "").strip()
+        size=str(row.get("Size") or "").strip()
+        status=str(row.get("SiaStatus") or "").strip()
+        service=BeautifulSoup(str(row.get("ProposedInServiceDate") or ""),
+                               "html.parser").get_text(" ",strip=True)
+        info=" ".join((project,kind,zone,size))
+        result.append(dict(
+            source_id="ieso_connections",record_id=ident,
+            title=project[:280],site=zone,company=applicant,
+            company_role="IESO_PUBLISHED_APPLICANT_NOT_PROVEN_PURCHASER",
+            stage=status,signal_type=kind,
+            source_date="",date_basis="IESO_QUEUE_ID_YEAR_NOT_PUBLICATION_DATE",
+            source_url=url,commercial_fit=("REVIEW" if RELEVANT.search(info) else "LOW"),
+            geographic_confidence=("GTA_NAME_MENTION_UNVERIFIED" if GTA.search(project)
+                 else "IESO_TRANSMISSION_ZONE_NOT_VERIFIED_LOCAL_ADDRESS"),
+            procurement_status="UNKNOWN",verification="IESO_CAA_NOT_PROJECT_TENDER",
+            attributes={"size":size,"zone":zone,"queue":str(row.get("Queue") or ""),
+                        "proposed_service":service,
+                        "numeric_caa_id":row.get("CaaId"),
+                        "committed":str(row.get("Committed") or "")[:40]}
+        ))
+    if len(result)<50 or rejected>len(records)*0.05:
+        raise RuntimeError("IESO JSON coverage/identity below confidence threshold")
+    return result,f"PUBLISHED_JSON_{len(result)}_RECORDS;HISTORICAL_QUEUE;NO_PROJECT_POST_DATES"
 
 
 def _line_after(lines, label):
@@ -278,9 +339,8 @@ def run(data_dir="data",output_dir="GTA_RADAR_RESULTS",sources=None,session=None
             if source not in selected:continue
             try:
                 if source=="ieso_connections":
-                    html=fetch_html(session,IESO_URL)
-                    items,warning=parse_ieso(html)
-                    scope="IESO_VISIBLE_TABLE"
+                    items,warning=parse_ieso_json(fetch_ieso_json(session))
+                    scope="IESO_PUBLISHER_JSON_FULL_LIST"
                 else:
                     urls=tuple(burlington_urls or BURLINGTON_PROJECT_URLS)
                     if not urls:raise RuntimeError("No verified Burlington seed pages")
