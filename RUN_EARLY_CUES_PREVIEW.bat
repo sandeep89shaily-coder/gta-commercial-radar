@@ -12,6 +12,7 @@ if not exist "early_cue_watch.py" goto missing
 if not exist "early_public_notices.py" goto missing
 if not exist "early_discovery_watch.py" goto missing
 if not exist "early_investment_tenders.py" goto missing
+if not exist "early_ajax_watch.py" goto missing
 if not exist "toronto_aic_email_import.py" goto missing
 if not exist "early_evidence_match.py" goto missing
 if not exist "early_pilot_summary.py" goto missing
@@ -24,25 +25,28 @@ if not errorlevel 1 (
   set "PYCMD=python"
 )
 if not exist GTA_RADAR_RESULTS mkdir GTA_RADAR_RESULTS
-echo [1/7] IESO connections and known Burlington project pages
+echo [1/8] IESO connections and known Burlington project pages
 %PYCMD% early_cue_watch.py --data-dir data --output-dir GTA_RADAR_RESULTS
 set "FAIL1=%ERRORLEVEL%"
-echo [2/7] Milton, Pickering, and ERO public proposals
+echo [2/8] Milton, Pickering, and ERO public proposals
 %PYCMD% early_public_notices.py --data-dir data --output-dir GTA_RADAR_RESULTS
 set "FAIL2=%ERRORLEVEL%"
-echo [3/7] Burlington ward project discovery and Brampton council agendas
+echo [3/8] Burlington ward project discovery and Brampton council agendas
 %PYCMD% early_discovery_watch.py --data-dir data --output-dir GTA_RADAR_RESULTS
 set "FAIL3=%ERRORLEVEL%"
-echo [4/7] Ontario public investment news and federal open tenders
+echo [4/8] Ontario public investment news and federal open tenders
 %PYCMD% early_investment_tenders.py --data-dir data --output-dir GTA_RADAR_RESULTS
 set "FAIL4=%ERRORLEVEL%"
-echo [5/7] Optional Toronto AIC email notices (NO inbox access)
+echo [5/8] Ajax public planning application index
+%PYCMD% early_ajax_watch.py --data-dir data --output-dir GTA_RADAR_RESULTS
+set "FAILAJAX=%ERRORLEVEL%"
+echo [6/8] Optional Toronto AIC email notices (NO inbox access)
 %PYCMD% toronto_aic_email_import.py --eml-folder data\toronto_aic_eml --data-dir data --output-dir GTA_RADAR_RESULTS
 set "FAILAIC=%ERRORLEVEL%"
-echo [6/7] Compare all available separate early-source databases (read-only)
+echo [7/8] Compare all available separate early-source databases (read-only)
 %PYCMD% early_evidence_match.py --data-dir data --output-dir GTA_RADAR_RESULTS
 set "FAIL5=%ERRORLEVEL%"
-echo [7/7] Prepare one source health summary and research-only shortlist
+echo [8/8] Prepare one source health summary and research-only shortlist
 %PYCMD% early_pilot_summary.py --output-dir GTA_RADAR_RESULTS
 set "FAIL6=%ERRORLEVEL%"
 echo ===============================================================
@@ -55,6 +59,7 @@ if not "%FAIL1%"=="0" goto failed
 if not "%FAIL2%"=="0" goto failed
 if not "%FAIL3%"=="0" goto failed
 if not "%FAIL4%"=="0" goto failed
+if not "%FAILAJAX%"=="0" goto failed
 if not "%FAILAIC%"=="0" goto failed
 if not "%FAIL5%"=="0" goto failed
 if not "%FAIL6%"=="0" goto failed
