@@ -70,3 +70,30 @@ for num in (0,1):
    row=S.get(base+"/query",params={"objectIds":str(ids[0]),"outFields":"OBJECTID,REF_ID,ADDRESS,LOCATION,APPLICANT,DESCRIPTION,STATUS,SUBMISSION_DATE,TOTAL_NONRES_SQ,TYPE","returnGeometry":"false","f":"json"},timeout=(8,25)).json()
    print("AJAX_SAMPLE",num,json.dumps(row.get("features",[]),ensure_ascii=False)[:950],"error",str(row.get("error",""))[:150])
  except Exception as e:print("AJAX_DETAIL_ERROR",num,str(e)[:220])
+
+print("\n== IESO OFFICIAL JSON DATA ==",flush=True)
+try:
+ url="https://www.ieso.ca/-/media/files/IESO/files/applicationstatusdata.json"
+ r=S.get(url,timeout=(7,30))
+ print("IESO_JSON_HTTP",r.status_code,len(r.content),r.headers.get("Content-Type",""),r.url[:170])
+ j=r.json()
+ print("IESO_JSON_TYPE",type(j).__name__,
+       "keys",list(j.keys())[:20] if isinstance(j,dict) else
+       "length",len(j) if hasattr(j,"__len__") else "?")
+ if isinstance(j,list):print("IESO_JSON_EXAMPLE",json.dumps(j[:1],ensure_ascii=False)[:2600])
+ elif isinstance(j,dict):
+  for k,v in j.items():
+   print("IESO_JSON_GROUP",k,type(v).__name__,len(v) if hasattr(v,"__len__") else "?",
+         json.dumps(v[:1] if isinstance(v,list) else v,ensure_ascii=False)[:2000])
+except Exception as e:print("IESO_JSON_ERROR",type(e).__name__,str(e)[:280])
+print("\n== BRAMPTON PLANNING CALENDAR CARD ==",flush=True)
+try:
+ soup=BeautifulSoup(S.get(urls["brampton_calendar"],timeout=(7,20)).text,"html.parser")
+ for tag in soup.find_all(string=re.compile(r"Planning and Development Committee",re.I)):
+  if tag.parent.name=="option":continue
+  e=tag.parent
+  print("CARD_PARENT",str(e.parent)[:1500].replace("\n"," ")[:1500])
+  meeting=e.find_parent(["tr","li","article"])
+  print("CARD_ROW",str(meeting)[:1700] if meeting else "NO_ROW")
+  break
+except Exception as e:print("BRAMPTON_CARD_ERROR",str(e)[:200])
