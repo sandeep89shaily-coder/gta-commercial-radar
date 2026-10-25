@@ -1,9 +1,11 @@
-name: Build desktop early-cue preview ZIP
+name: Build early-cues-only desktop ZIP
 on:
   push:
     branches:
       - 'dev/integrate-early-feeds-v8-20261024'
     paths:
+      - unified_collector_inventory.py
+      - integrated_early_events.py
       - early_only_mode.py
       - run_desktop_early_only.py
       - RUN_EARLY_ONLY.bat
@@ -33,13 +35,13 @@ jobs:
         run: python -m unittest discover -s tests -p test_early_only_mode.py
       - name: Build tested ZIP from this exact development commit
         run: |
-          zip -q -r GTA_RADAR_V8_EARLY_DESKTOP_PREVIEW.zip . \
+          zip -q -r GTA_RADAR_EARLY_ONLY_DESKTOP.zip . \
             -x ".git/*" ".github/*" "data/*" "GTA_RADAR_RESULTS/*" \
             "**/__pycache__/*" "**/*.pyc" "*.sqlite" "*.sqlite-wal" "*.sqlite-shm"
-          unzip -t GTA_RADAR_V8_EARLY_DESKTOP_PREVIEW.zip | tail -1
-          unzip -Z1 GTA_RADAR_V8_EARLY_DESKTOP_PREVIEW.zip | grep -Fx 'RUN_V8_EARLY_PREVIEW.bat'
+          unzip -t GTA_RADAR_EARLY_ONLY_DESKTOP.zip | tail -1
+          unzip -Z1 GTA_RADAR_EARLY_ONLY_DESKTOP.zip | grep -Fx 'RUN_EARLY_ONLY.bat'
       - uses: actions/upload-artifact@v4
         with:
-          name: gta-radar-v8-early-desktop-preview
-          path: GTA_RADAR_V8_EARLY_DESKTOP_PREVIEW.zip
+          name: gta-radar-early-only-desktop
+          path: GTA_RADAR_EARLY_ONLY_DESKTOP.zip
           retention-days: 14
