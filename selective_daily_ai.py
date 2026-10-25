@@ -43,7 +43,7 @@ def permitted(row):
     early_planning=(lane in ("EARLY_SIGNAL_WATCH","PLANNING_WATCH") and bool(
         re.search(r"\b(site[\s-]?plan|pre[ -]?consultation|propos\w*|"
                   r"planning application|new industrial|connection assessment|"
-                  r"planned expansion)\b",desc,re.I)))
+                  r"planned expansion|grid[ -]?connection|rezoning)\b",desc,re.I)))
     if not desc or not COMMERCIAL.search(desc) or not (ACTION.search(desc) or early_planning):
         return False
     if (SMALL_RESIDENTIAL.search(desc) or RESIDENTIAL_LED.search(desc)) and not INDEPENDENT_COMMERCIAL.search(desc):

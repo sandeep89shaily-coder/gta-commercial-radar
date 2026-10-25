@@ -74,6 +74,14 @@ class SelectiveDailyTests(unittest.TestCase):
         self.assertFalse(selected.permitted(vague))
         self.assertFalse(selected.permitted(
             dict(cue,description="New single detached residential house")))
+        speculative=dict(cue,source_id="ieso_connections",
+                         description="Proposed industrial grid connection",
+                         early_signal_stage="CONNECTION_ASSESSMENT")
+        self.assertEqual(research_route(speculative),"AI_WATCH")
+        self.assertTrue(selected.permitted(speculative))
+        self.assertEqual(research_route(
+            dict(speculative,description="General industry commentary")),
+            "ENRICHMENT_ONLY")
 
     def test_first_baseline_always_zero_ai(self):
         with tempfile.TemporaryDirectory() as td:
