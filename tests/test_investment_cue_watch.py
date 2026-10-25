@@ -128,7 +128,7 @@ class InvestmentWatchTests(unittest.TestCase):
                 records=list(csv.DictReader(file))
             self.assertEqual(len(records),1)
             self.assertEqual(records[0]['company'],'Sample Industries Ltd')
-            self.assertEqual(records[0]['source_scope'],'HISTORICAL_RECIPIENT_BACKFILL_NOT_FRESH')
+            self.assertEqual(records[0]['source_scope'],'HISTORICAL_PUBLICATION_BACKFILL_NOT_FRESH')
 
     def test_failed_feed_does_not_erase_snapshot(self):
         with tempfile.TemporaryDirectory() as t:
