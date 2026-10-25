@@ -202,6 +202,31 @@ class V6Tests(unittest.TestCase):
         self.assertNotIn('href="javascript:',contents)
         self.assertIn('&lt;b&gt;unsafe&lt;/b&gt;',contents)
 
+    def test_dashboard_names_failed_toronto_publishers_and_partial_pilots(self):
+        self.results.mkdir()
+        logs=self.results/'V6_LOGS'
+        logs.mkdir()
+        (logs/'municipal_collector.log').write_text(
+            '[4/18] Toronto Business Licences\\n  !! FAILED: 502 Bad Gateway\\n'
+            '[5/18] Toronto DineSafe\\n  !! FAILED: 502 Server Error\\n',
+            encoding='utf-8')
+        with (self.results/'GTA_RADAR_ALL_SOURCE_STATUS.csv').open(
+                'w',encoding='utf-8-sig',newline='') as f:
+            w=csv.DictWriter(f,fieldnames=('source_id','group','execution_status'))
+            w.writeheader()
+            w.writerow(dict(source_id='burlington_ward_discovery',
+                            group='early_agendas',execution_status='PARTIAL_UNCOMMITTED'))
+            w.writerow(dict(source_id='brampton_building_permits',
+                            group='CORE_CONFIG',execution_status='CONFIGURED_ENABLED'))
+        statuses=v6.collector_attention(self.results)
+        self.assertEqual(len(statuses),3)
+        text=v6.render_dashboard(self.results,dict(
+            status='PARTIAL',investigation_date='2026-10-25',steps=[])).read_text()
+        self.assertIn('Toronto Business Licences',text)
+        self.assertIn('Toronto DineSafe',text)
+        self.assertIn('burlington_ward_discovery',text)
+        self.assertNotIn('brampton_building_permits</b>:',text)
+
     def test_same_folder_lock_prevents_overlapping_runs(self):
         self.results.mkdir()
         first=v6.once_lock(self.results)

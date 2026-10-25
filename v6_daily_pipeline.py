@@ -279,6 +279,36 @@ def investigate(data_dir, results_dir, max_projects=MAX_INVESTIGATIONS, *, enabl
                           key=None if enable_ai else '',
                           max_projects=max_projects)
 
+def collector_attention(results):
+    """Extract specific source problems from existing logs and per-source status.
+
+    These are warnings, not fabricated zero-event results. Keep unavailable
+    publishers separate from bugs in V8 integration.
+    """
+    root=Path(results)
+    found=[]
+    log=root/'V6_LOGS'/'municipal_collector.log'
+    if log.is_file():
+        source=''
+        for line in log.read_text(encoding='utf-8',errors='replace').splitlines():
+            heading=re.match(r'^\\[\\d+/\\d+\\]\\s+(.+)',line.strip())
+            if heading:
+                source=heading.group(1)
+            elif '!! FAILED:' in line:
+                reason=line.split('!! FAILED:',1)[1].strip()
+                found.append((source or 'Municipal source',reason[:230]))
+    inventory=root/'GTA_RADAR_ALL_SOURCE_STATUS.csv'
+    if inventory.is_file():
+        with inventory.open(encoding='utf-8-sig',newline='') as stream:
+            for row in csv.DictReader(stream):
+                if row.get('group')=='CORE_CONFIG':
+                    continue
+                state=str(row.get('execution_status') or '')
+                if state.startswith(('PARTIAL','FAILED','TIMEOUT','STALE','SOURCE_NOT_REPORTED','NOT_RUN')):
+                    found.append((row.get('source_id') or 'Pilot source',state))
+    return found[:30]
+
+
 def render_dashboard(results, state):
     """User-facing report must reveal when collectors failed or when no fresh events exist."""
     rdir = Path(results)
@@ -368,6 +398,15 @@ def render_dashboard(results, state):
             f'<b>Completed API-call cost estimate:</b> US${esc(state.get("charged_estimate_usd",0))}; '
             f'<b>Uncertain charges still reserved:</b> US${esc(state.get("unresolved_reservations_usd",0))}. '
             f'These are local estimates, not DeepSeek account billing.</p>']
+    warnings=collector_attention(rdir)
+    if warnings:
+        page.append('<article><h2>Specific sources requiring attention</h2>'
+                    '<p>These source failures/partial feeds are not zero projects, '
+                    'and do not mean the other collectors failed.</p><ul>'+
+                    ''.join('<li><b>'+esc(name)+'</b>: '+esc(reason)+'</li>'
+                            for name,reason in warnings)+
+                    '</ul><p>Open the unified source inventory for all pilot '
+                    'statuses and the V6_LOGS folder for details.</p></article>')
     if status != 'SUCCESS':
         incomplete_collector=any(step.get('status')!='SUCCESS' for step in state.get('steps',[]))
         heading='Collection attention needed' if incomplete_collector else 'Run attention needed'
