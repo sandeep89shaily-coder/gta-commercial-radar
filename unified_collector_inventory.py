@@ -88,7 +88,9 @@ def build(results, config, steps, *, run_started=None):
             validation_state="ACTIVE" if active else item.get("validation_state", "UNVERIFIED"),
             opportunity_role="CORE_SOURCE" if active else item.get("opportunity_role", "UNREVIEWED"),
             reactivation_decision="ENABLED" if active else item.get("reactivation_decision", "NOT_YET_DECIDED"),
-            reason="" if active else item.get("integration_reason") or item.get("reason", "Awaiting safe activation")))
+            reason="" if active else " | ".join(part for part in (
+                item.get("reason",""),item.get("integration_reason","")) if part)
+                or "Awaiting safe activation"))
 
     executed = {step.get("step"): step.get("status") for step in steps}
     total_pilot_sources = 0
