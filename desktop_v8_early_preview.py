@@ -25,10 +25,10 @@ def snapshot_once(source, destination):
     """SQLite online backup, crash-safe replacement, preserve preview history."""
     source = Path(source).resolve()
     destination = Path(destination).resolve()
-    if destination.exists():
-        return False
     if source == destination:
         raise ValueError("Preview must never write to the established source DB")
+    if destination.exists():
+        return False
     destination.parent.mkdir(parents=True, exist_ok=True)
     pending = destination.with_name(destination.name + ".copying")
     if pending.exists():
