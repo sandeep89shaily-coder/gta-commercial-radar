@@ -65,7 +65,8 @@ class V6Tests(unittest.TestCase):
         self.assertEqual(outcome['investigated'],1)
         self.assertEqual(events,['municipal_collector','business_collector',
             'early_planning_pilot','early_industrial_cues','early_agendas',
-            'early_hamilton','early_notices','fresh_48h_opportunities',
+            'early_hamilton','early_notices','early_ajax','early_oakville',
+            'early_markham','early_investment_tenders','fresh_48h_opportunities',
             'selector','investigator'])
         self.assertTrue((self.results/'GTA_RADAR_V6_DASHBOARD.html').exists())
         self.assertFalse((self.results/'V6_RUNNING.lock').exists())
@@ -116,6 +117,26 @@ class V6Tests(unittest.TestCase):
         self.assertEqual(outcome['status'],'PARTIAL')
         html=(self.results/'GTA_RADAR_V6_DASHBOARD.html').read_text()
         self.assertIn('Collection attention needed',html)
+
+    def test_optional_early_pilot_failure_does_not_block_core_research(self):
+        events=[]
+        def collector(name,args,logs,**kwargs):
+            events.append(name)
+            if name=='fresh_48h_opportunities':
+                (self.data/'opportunities_ALL_REVIEW_ONLY.csv').write_text(
+                    'source_id,source_key,description,address\\n',encoding='utf-8')
+            if name=='early_oakville':
+                return {'step':name,'status':'FAILED','detail':'offline pilot'}
+            return {'step':name,'status':'SUCCESS','detail':'done'}
+        def selector(src,dst,db):
+            (Path(dst)/'CANDIDATES_V4_ALL_REVIEW_ONLY.csv').write_text(
+                'project_id,address\\n',encoding='utf-8')
+        outcome=v6.pipeline(self.ws,self.db,collector=collector,selector=selector,
+            investigator=lambda *_a,**_kw:{'processed':0,'with_public_pages':0,
+                                           'reserved_usd':0,'deepseek_configured':False})
+        self.assertEqual(outcome['status'],'SUCCESS')
+        self.assertIn('early_oakville',events)
+        self.assertIn({'step':'early_oakville','status':'FAILED'},outcome['early_pilot_results'])
 
     def test_week_cooldown_skips_recently_investigated(self):
         import types

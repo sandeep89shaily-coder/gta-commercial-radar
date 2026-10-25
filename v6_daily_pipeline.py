@@ -515,17 +515,29 @@ def pipeline(workspace, database=None, *, run_collectors=True, run_research=True
                 ('early_agendas',['early_discovery_watch.py','--data-dir',data,'--output-dir',out],900),
                 ('early_hamilton',['early_hamilton_watch.py','--data-dir',data,'--output-dir',out],900),
                 ('early_notices',['early_public_notices.py','--data-dir',data,'--output-dir',out],900),
+                # Discovery-only pilot outputs: not forwarded to paid research.
+                ('early_ajax',['early_ajax_watch.py','--data-dir',data,'--output-dir',out],900),
+                ('early_oakville',['early_oakville_watch.py','--data-dir',data,'--output-dir',out],900),
+                ('early_markham',['early_markham_circulation.py','--data-dir',data,'--output-dir',out],900),
+                ('early_investment_tenders',['early_investment_tenders.py','--data-dir',data,'--output-dir',out],900),
             ])
             for name, command, timeout in steps:
                 outcome = collector(name, command, out / 'V6_LOGS', timeout=timeout)
                 state['steps'].append(outcome)
                 atomic_json(manifest, state)
-            succeeded = sum(step['status'] == 'SUCCESS' for step in state['steps'])
-            if not succeeded:
+            # Optional early pilots are independently reported; do not convert a
+            # healthy core refresh into PARTIAL and suppress its selective AI.
+            core_steps = [step for step in state['steps']
+                          if step['step'] in ('municipal_collector','business_collector')]
+            core_succeeded = sum(step['status'] == 'SUCCESS' for step in core_steps)
+            state['early_pilot_results'] = [
+                {'step':step['step'],'status':step['status']}
+                for step in state['steps'] if step['step'].startswith('early_')]
+            if not core_succeeded:
                 state['status'] = 'FAILED'
-                state['note'] = 'No collectors succeeded; prior export NOT reused and AI NOT run.'
+                state['note'] = 'No core collectors succeeded; prior export NOT reused and AI NOT run.'
                 return state
-            state['status'] = 'PARTIAL' if succeeded < len(steps) else 'SUCCESS'
+            state['status'] = 'PARTIAL' if core_succeeded < len(core_steps) else 'SUCCESS'
         else:
             # Tests and explicitly requested offline diagnostics; never fake a live refresh.
             state['status'] = 'OFFLINE_REVIEW_ONLY'
