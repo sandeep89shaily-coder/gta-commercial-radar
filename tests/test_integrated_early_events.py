@@ -7,6 +7,24 @@ def save(p,rows):
     with p.open("w",newline="",encoding="utf-8") as f:
         w=csv.DictWriter(f,fieldnames=list(rows[0]));w.writeheader();w.writerows(rows)
 class Tests(unittest.TestCase):
+    def test_oakville_new_change_can_reach_one_selection_input(self):
+        with tempfile.TemporaryDirectory() as t:
+            d=Path(t)
+            save(d/"EARLY_OAKVILLE_SOURCE_STATUS.csv",[
+                {"source_id":"oakville_development","status":"SUCCESS"}])
+            save(d/"EARLY_OAKVILLE_CHANGES_REVIEW_ONLY.csv",[
+                {"source_id":"oakville_development","record_id":"P1",
+                 "change_type":"NEW","title":"Industrial site plan",
+                 "source_url":"https://www.oakville.ca/planning/p1",
+                 "commercial_fit":"POSSIBLE_COMMERCIAL","observed_at":"2026-10-24T08:00:00Z"},
+                {"source_id":"oakville_development","record_id":"P2",
+                 "change_type":"NEW","title":"Residential houses",
+                 "source_url":"https://www.oakville.ca/planning/p2",
+                 "commercial_fit":"RESIDENTIAL_LIKELY","observed_at":"2026-10-24T08:00:00Z"}])
+            rows,_=harvest(d,successful_steps={"early_oakville"})
+            self.assertEqual([r["source_key"] for r in rows],["P1"])
+            self.assertEqual(harvest(d,successful_steps=set())[0],[])
+
     def test_only_live_successful_nonbaseline_changes(self):
         with tempfile.TemporaryDirectory() as t:
             d=Path(t)

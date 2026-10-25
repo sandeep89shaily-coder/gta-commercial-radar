@@ -326,6 +326,12 @@ def render_dashboard(results, state):
              '<a href="GTA_RADAR_QUALIFIED_OPPORTUNITY_SHORTLIST.csv">Download qualified shortlist</a> · '+
              '<a href="GTA_RADAR_OPPORTUNITY_RESEARCH_GAPS.csv">Records awaiting verification</a>.</p>',
              '<p><b>Commercial intelligence:</b> <a href="GTA_RADAR_LEAD_INTELLIGENCE.html">Open all classified opportunities and contact dashboard</a>.</p>',
+            '<h2>One collection system — source health</h2>',
+            '<p>All early collectors run under the same daily pipeline. An unsuccessful or review-only source is not a verified buying signal.</p>',
+            '<ul>'+''.join('<li>'+esc(s.get('step'))+': <b>'+esc(s.get('status'))+'</b></li>'
+                  for s in state.get('early_pilot_results',[]))+'</ul>',
+            f'<p><b>Early post-baseline changes passed to the common opportunity engine:</b> {esc(state.get("early_pilot_changes_accepted",0))}. '
+            f'<b>Disabled main sources (not activated):</b> {esc(state.get("disabled_source_count",14))}.</p>',
             f'<p><b>Collector database:</b> <span class="mono">{esc(state.get("database", ""))}</span></p>',
             f'<p><b>Window:</b> most recent 48 hours by source event/change date. <b>Projects this run:</b> {esc(state.get("projects",0))}. '
             f'<b>Projects investigated:</b> {esc(state.get("investigated",0))}. '
@@ -495,9 +501,16 @@ def pipeline(workspace, database=None, *, run_collectors=True, run_research=True
     out.mkdir(parents=True, exist_ok=True)
     lock = once_lock(out)
     day = today or dt.date.today()
+    # Disabled sources remain accounted for in the unified report, not silently enabled.
+    try:
+        with (ROOT / 'config' / 'sources.json').open(encoding='utf-8') as source_file:
+            disabled_count=sum(not item.get('enabled',False) for item in json.load(source_file))
+    except (OSError,ValueError):
+        disabled_count='UNVERIFIED'
     state = {'version': VERSION, 'started_local': dt.datetime.now().astimezone().isoformat(timespec='seconds'),
              'database': str(db), 'status': 'RUNNING', 'investigation_date': day.isoformat(),
-             'steps': [], 'projects': 0, 'investigated': 0, 'reserved_usd': 0}
+             'steps': [], 'projects': 0, 'investigated': 0, 'reserved_usd': 0,
+             'disabled_source_count': disabled_count}
     manifest = out / 'GTA_RADAR_V6_RUN.json'
     try:
         atomic_json(manifest, state)
