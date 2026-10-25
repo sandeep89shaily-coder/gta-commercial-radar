@@ -109,7 +109,8 @@ def build(results, config, steps, *, run_started=None):
                 raise ValueError("Missing V8 overlap mapping: " + mapped)
             source_state = statuses.get(source_id, {}).get(status_column, "").strip()
             execution = (source_state or "SOURCE_NOT_REPORTED") if current else (
-                "STALE_STATUS_FILE" if run_status == "SUCCESS" and report.is_file()
+                "SOURCE_STATUS_MISSING" if run_status == "SUCCESS" and not report.is_file()
+                    else "STALE_STATUS_FILE" if run_status == "SUCCESS" and report.is_file()
                     else (run_status or "NOT_RUN_THIS_RUN"))
             integration = ("OVERLAPS_V8" if mapped else
                            "REVIEW_ONLY" if runner in REVIEW_ONLY else "EARLY_CHANGE_BRIDGE")

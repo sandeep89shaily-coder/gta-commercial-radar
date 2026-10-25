@@ -50,6 +50,15 @@ class Coverage(unittest.TestCase):
         self.assertEqual(len(found), 21)
         self.assertEqual(len(set(found)), 21)
         self.assertEqual(len(set(found) - set(OVERLAP_V8)), 17)
+    def test_successful_runner_without_per_source_status_is_not_proven_success(self):
+        with tempfile.TemporaryDirectory() as t:
+            target,_=build(Path(t),ROOT/"config"/"sources.json",
+                           [{"step":"early_industrial_cues","status":"SUCCESS"}])
+            rows=list(csv.DictReader(target.open(encoding="utf-8-sig")))
+            ie=next(row for row in rows if row["source_id"]=="ieso_connections")
+            self.assertEqual(ie["execution_status"],"SOURCE_STATUS_MISSING")
+            self.assertEqual(ie["validation_state"],"UNVERIFIED_THIS_RUN")
+
     def test_missing_run_not_misreported_as_success(self):
         with tempfile.TemporaryDirectory() as t:
             out = Path(t)
