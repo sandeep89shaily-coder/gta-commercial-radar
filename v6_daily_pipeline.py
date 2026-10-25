@@ -601,7 +601,8 @@ def pipeline(workspace, database=None, *, run_collectors=True, run_research=True
                 }
                 selection_file, integration=merge(
                     selection_file,out,out/'GTA_RADAR_INTEGRATED_EARLY_EVENTS.csv',
-                    successful_steps=successful_pilots)
+                    successful_steps=successful_pilots,
+                    run_started=state['started_local'])
                 state.update(integration)
             except (OSError,ValueError,csv.Error) as exc:
                 state['early_integration_error']=str(exc)[:180]

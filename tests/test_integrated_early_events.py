@@ -25,6 +25,27 @@ class Tests(unittest.TestCase):
             self.assertEqual([r["source_key"] for r in rows],["P1"])
             self.assertEqual(harvest(d,successful_steps=set())[0],[])
 
+    def test_stale_successful_output_not_replayed_into_next_run(self):
+        with tempfile.TemporaryDirectory() as d:
+            folder=Path(d)
+            save(folder/"EARLY_AJAX_SOURCE_STATUS.csv",[{"source_id":"ajax_planning_properties","status":"SUCCESS"}])
+            save(folder/"EARLY_AJAX_CHANGES_REVIEW_ONLY.csv",[{
+                "source_id":"ajax_planning_properties","record_id":"A1",
+                "change_type":"NEW","title":"Industrial facility",
+                "commercial_fit":"COMMERCIAL","source_url":"https://ajax.ca/a1",
+                "observed_at":"2026-10-24T09:00:00Z"}])
+            self.assertEqual(harvest(folder,successful_steps={"early_ajax"},
+                                     run_started="2026-10-24T10:00:00Z")[0],[])
+            self.assertEqual(len(harvest(folder,successful_steps={"early_ajax"},
+                                     run_started="2026-10-24T08:00:00Z")[0]),1)
+            save(folder/"EARLY_AJAX_CHANGES_REVIEW_ONLY.csv",[{
+                "source_id":"ajax_planning_properties","record_id":"A2",
+                "change_type":"NEW","title":"Residential planning",
+                "commercial_fit":"USE_UNKNOWN","source_url":"https://ajax.ca/a2",
+                "observed_at":"2026-10-24T11:00:00Z"}])
+            self.assertEqual(harvest(folder,successful_steps={"early_ajax"},
+                                     run_started="2026-10-24T10:00:00Z")[0],[])
+
     def test_only_live_successful_nonbaseline_changes(self):
         with tempfile.TemporaryDirectory() as t:
             d=Path(t)
