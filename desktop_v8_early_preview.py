@@ -7,6 +7,7 @@ The original workspace/data and results remain untouched.
 from __future__ import annotations
 
 import json
+from contextlib import closing
 import os
 import sqlite3
 import subprocess
@@ -34,11 +35,14 @@ def snapshot_once(source, destination):
     if pending.exists():
         raise RuntimeError(f"Interrupted prior snapshot: {pending} (not overwriting)")
     try:
-        with sqlite3.connect(source.as_uri() + "?mode=ro", uri=True, timeout=15) as original:
-            with sqlite3.connect(pending, timeout=15) as isolated:
+        # sqlite3.Connection as a context manager only commits; it does NOT
+        # close file handles. Windows cannot rename an open SQLite database.
+        with closing(sqlite3.connect(source.as_uri() + "?mode=ro", uri=True, timeout=15)) as original:
+            with closing(sqlite3.connect(pending, timeout=15)) as isolated:
                 original.backup(isolated, pages=2048, sleep=0.1)
                 if isolated.execute("PRAGMA quick_check").fetchone()[0] != "ok":
                     raise RuntimeError("Isolated SQLite backup failed validation")
+                isolated.commit()
         pending.replace(destination)
         return True
     except BaseException:
