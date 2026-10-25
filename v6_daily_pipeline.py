@@ -508,6 +508,14 @@ def pipeline(workspace, database=None, *, run_collectors=True, run_research=True
                 ('municipal_collector', ['main.py','poll','--data-dir',data,'--hours','48'], 1800),
                 ('business_collector', ['business_discovery.py','run','--data-dir',data], 1200),
             ]
+            # Keep independent source histories and only ingest verified changes.
+            steps.extend([
+                ('early_planning_pilot',['early_signal_watch.py','--data-dir',data,'--output-dir',out],1800),
+                ('early_industrial_cues',['early_cue_watch.py','--data-dir',data,'--output-dir',out],900),
+                ('early_agendas',['early_discovery_watch.py','--data-dir',data,'--output-dir',out],900),
+                ('early_hamilton',['early_hamilton_watch.py','--data-dir',data,'--output-dir',out],900),
+                ('early_notices',['early_public_notices.py','--data-dir',data,'--output-dir',out],900),
+            ])
             for name, command, timeout in steps:
                 outcome = collector(name, command, out / 'V6_LOGS', timeout=timeout)
                 state['steps'].append(outcome)
@@ -548,6 +556,13 @@ def pipeline(workspace, database=None, *, run_collectors=True, run_research=True
                 # Never misrepresent uncollected regions as successfully covered,
                 # and never damage the primary 48-hour collector output.
                 state['regional_bridge_error']=type(exc).__name__+': '+str(exc)[:180]
+        if use_default_selector and run_collectors:
+            try:
+                from integrated_early_events import merge
+                selection_file, integration=merge(selection_file,out,out/'GTA_RADAR_INTEGRATED_EARLY_EVENTS.csv')
+                state.update(integration)
+            except (OSError,ValueError,csv.Error) as exc:
+                state['early_integration_error']=str(exc)[:180]
         selector(selection_file, out, db)
         if use_default_selector and not state.get('regional_bridge_error'):
             from regional_candidate_bridge import selection_outcomes
