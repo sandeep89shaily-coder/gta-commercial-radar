@@ -57,7 +57,9 @@ def run(output="source-audit/DISABLED_PLANNING_BASELINE.csv"):
                         delta=con.execute("SELECT count(*) FROM changes WHERE source_id=?",
                                           (row["source_id"],)).fetchone()[0]
                         row["repeat_changes"]=delta
-                        if repeat.returncode!=0 or delta!=0:
+                        # Exit 2 means all snapshot sources correctly skipped
+                        # because their scheduled refresh is not due yet.
+                        if repeat.returncode not in (0,2) or delta!=0:
                             row["status"]="REPEAT_FAILED"
         except (subprocess.TimeoutExpired,OSError,sqlite3.DatabaseError,RuntimeError) as exc:
             print("Isolated baseline test could not finish:",type(exc).__name__,str(exc)[:260])
