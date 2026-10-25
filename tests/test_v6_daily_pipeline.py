@@ -207,8 +207,8 @@ class V6Tests(unittest.TestCase):
         logs=self.results/'V6_LOGS'
         logs.mkdir()
         (logs/'municipal_collector.log').write_text(
-            '[4/18] Toronto Business Licences\\n  !! FAILED: 502 Bad Gateway\\n'
-            '[5/18] Toronto DineSafe\\n  !! FAILED: 502 Server Error\\n',
+            '[4/18] Toronto Business Licences\n  !! FAILED: 502 Bad Gateway\n'
+            '[5/18] Toronto DineSafe\n  !! FAILED: 502 Server Error\n',
             encoding='utf-8')
         with (self.results/'GTA_RADAR_ALL_SOURCE_STATUS.csv').open(
                 'w',encoding='utf-8-sig',newline='') as f:
