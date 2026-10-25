@@ -1,0 +1,28 @@
+name: Download three-source repair ZIP
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "dev/three-source-repair-download-*"
+permissions:
+  contents: read
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - name: Package only the repaired modules and diagnostic runner
+        run: |
+          zip -q GTA_RADAR_3_SOURCE_REPAIR_V2.zip \
+            early_cue_watch.py early_discovery_watch.py \
+            early_ajax_watch.py early_ajax_arcgis.py \
+            diagnose_three_sources.py RETEST_3_FAILED_SOURCES_V2.bat \
+            REPAIR_3_SOURCES_README.txt
+          unzip -t GTA_RADAR_3_SOURCE_REPAIR_V2.zip | tail -1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gta-radar-three-source-repair-v2
+          path: GTA_RADAR_3_SOURCE_REPAIR_V2.zip
+          if-no-files-found: error
+          retention-days: 7
