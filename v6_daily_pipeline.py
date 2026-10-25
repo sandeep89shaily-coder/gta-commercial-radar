@@ -559,7 +559,15 @@ def pipeline(workspace, database=None, *, run_collectors=True, run_research=True
         if use_default_selector and run_collectors:
             try:
                 from integrated_early_events import merge
-                selection_file, integration=merge(selection_file,out,out/'GTA_RADAR_INTEGRATED_EARLY_EVENTS.csv')
+                # Fail closed: previous status/CSV files may remain after a crash.
+                # Only use pilot outputs from collector steps successful THIS run.
+                successful_pilots={
+                    step['step'] for step in state['steps']
+                    if step.get('status')=='SUCCESS'
+                }
+                selection_file, integration=merge(
+                    selection_file,out,out/'GTA_RADAR_INTEGRATED_EARLY_EVENTS.csv',
+                    successful_steps=successful_pilots)
                 state.update(integration)
             except (OSError,ValueError,csv.Error) as exc:
                 state['early_integration_error']=str(exc)[:180]

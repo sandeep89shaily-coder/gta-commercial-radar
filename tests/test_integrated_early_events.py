@@ -16,6 +16,13 @@ class Tests(unittest.TestCase):
                 {"source_id":"other","record_id":"Y","change_type":"NEW","title":"Factory","source_url":"https://example.org"},
                 {"source_id":"ieso_connections","record_id":"Z","change_type":"BASELINE","title":"Factory","source_url":"https://example.org"}])
             rows,_=harvest(d);self.assertEqual(len(rows),1)
+            # Old files with SUCCESS labels must not be replayed if the
+            # associated collector failed or never ran in this invocation.
+            skipped,_=harvest(d,successful_steps=set())
+            self.assertEqual(skipped,[])
+            current,_=harvest(d,successful_steps={"early_industrial_cues"})
+            self.assertEqual(len(current),1)
+
             self.assertEqual(rows[0]["event_date_basis"],"RADAR_OBSERVATION_NOT_PUBLICATION_DATE")
             save(d/"base.csv",[{"source_id":"a","source_key":"b"}])
             dest,state=merge(d/"base.csv",d,d/"merged.csv")

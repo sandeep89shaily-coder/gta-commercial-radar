@@ -63,7 +63,10 @@ class V6Tests(unittest.TestCase):
         outcome=v6.pipeline(self.ws,self.db,collector=collector,selector=selector,investigator=investigator)
         self.assertEqual(outcome['status'],'SUCCESS')
         self.assertEqual(outcome['investigated'],1)
-        self.assertEqual(events,['municipal_collector','business_collector','fresh_48h_opportunities','selector','investigator'])
+        self.assertEqual(events,['municipal_collector','business_collector',
+            'early_planning_pilot','early_industrial_cues','early_agendas',
+            'early_hamilton','early_notices','fresh_48h_opportunities',
+            'selector','investigator'])
         self.assertTrue((self.results/'GTA_RADAR_V6_DASHBOARD.html').exists())
         self.assertFalse((self.results/'V6_RUNNING.lock').exists())
 
