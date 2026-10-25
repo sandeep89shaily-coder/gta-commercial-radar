@@ -4,6 +4,7 @@ import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 import early_ajax_watch as ajax
 
 INDEX="""<html><body><h1>Planning Applications</h1><main>
@@ -31,6 +32,27 @@ class Tests(unittest.TestCase):
         self.assertEqual(rows[0]["commercial_fit"],"USE_UNKNOWN")
         self.assertEqual(rows[0]["source_date"],"")
         self.assertEqual(rows[0]["procurement_status"],"UNKNOWN")
+
+    def test_ajax_change_export_excludes_baseline_and_emits_true_new(self):
+        sample={"source_id":ajax.SOURCE,"record_id":"P1","title":"Industrial plan",
+                "site":"200 Test Rd","company":"","company_role":"",
+                "stage":"PRECONSULTATION","source_application_date":"",
+                "source_date":"","source_url":"https://ajax.ca/planning",
+                "commercial_fit":"USE_UNKNOWN","procurement_status":"UNKNOWN",
+                "verification":"SOURCE_ONLY"}
+        with tempfile.TemporaryDirectory() as t:
+            d=Path(t)
+            with patch.object(ajax,"collect_official_gis",side_effect=[
+                ([sample],(1,1)),([sample,dict(sample,record_id="P2")],(2,2))]):
+                self.assertEqual(ajax.run(d,d,stamp="2026-10-24T08:00:00Z"),0)
+                path=d/"EARLY_AJAX_CHANGES_REVIEW_ONLY.csv"
+                with path.open(encoding="utf-8-sig",newline="") as f:
+                    self.assertEqual(list(csv.DictReader(f)),[])
+                self.assertEqual(ajax.run(d,d,stamp="2026-10-25T08:00:00Z"),0)
+                with path.open(encoding="utf-8-sig",newline="") as f:
+                    rows=list(csv.DictReader(f))
+                self.assertEqual([(row["record_id"],row["change_type"]) for row in rows],
+                                 [("P2","NEW")])
 
     def test_missing_header_fails(self):
         with self.assertRaises(RuntimeError):
