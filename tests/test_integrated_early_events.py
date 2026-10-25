@@ -62,6 +62,24 @@ class Tests(unittest.TestCase):
             self.assertTrue(any(s["source_file"]=="EARLY_INVESTMENT_TENDERS_STATUS.csv"
                                 for s in audit))
 
+    def test_markham_report_index_not_misrepresented_as_project(self):
+        with tempfile.TemporaryDirectory() as t:
+            d=Path(t)
+            save(d/"EARLY_MARKHAM_REPORT_SOURCE_STATUS.csv",[
+                {"source_id":"markham_circulated_application_reports",
+                 "status":"SUCCESS_REPORT_INDEX"}])
+            save(d/"EARLY_MARKHAM_NEW_REPORTS_REVIEW_ONLY.csv",[
+                {"source_id":"markham_circulated_application_reports",
+                 "record_id":"PDF-1","change_type":"NEW",
+                 "title":"Circulated planning applications",
+                 "source_url":"https://www.markham.ca/report.pdf",
+                 "observed_at":"2026-10-24T11:00:00Z"}])
+            rows,audit=harvest(d,successful_steps={"early_markham"},
+                               run_started="2026-10-24T10:00:00Z")
+            self.assertEqual(rows,[])
+            self.assertTrue(any(s["source_file"]=="EARLY_MARKHAM_REPORT_SOURCE_STATUS.csv"
+                                for s in audit))
+
     def test_only_live_successful_nonbaseline_changes(self):
         with tempfile.TemporaryDirectory() as t:
             d=Path(t)
