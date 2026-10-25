@@ -209,6 +209,10 @@ def build(root):
     needs_review.sort(key=lambda r:(r['qualification_group'],*sort_key(r)))
     write(root/'GTA_RADAR_QUALIFIED_OPPORTUNITY_SHORTLIST.csv',qualified)
     write(root/'GTA_RADAR_OPPORTUNITY_RESEARCH_GAPS.csv',needs_review)
+    # Produce ten transparent research dossiers from existing investigations.
+    # Never claim missing buyer / contract evidence has been verified.
+    from ten_research_dossiers import build as build_ten_dossiers
+    dossier_result = build_ten_dossiers(root)
     summary=dict(project_opportunities=len(opportunities),
                  public_company_contacts=len(contacts),backlog=len(pending),
                  company_enrichment=len(enrichment_rows),legacy_rechecks=len(legacy),
@@ -223,6 +227,7 @@ def build(root):
                   qualified_investigation_candidates=len(qualified),
                   opportunity_research_gaps=len(needs_review),
                   shortlist_report='GTA_RADAR_QUALIFIED_OPPORTUNITY_SHORTLIST.csv')
+    summary.update(dossier_result)
     def esc(t):return html.escape(str(t or ''),quote=True)
     doc=['<!doctype html><html><head><meta charset="utf-8"><title>GTA Radar Leads</title>',
          '<style>body{font:15px Segoe UI,Arial;max-width:1150px;margin:25px auto;background:#f5f7fa;color:#1f2937;padding:0 16px}',
