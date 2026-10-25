@@ -1,0 +1,77 @@
+{
+  "checked_utc": "2026-10-25",
+  "operational_doctor_run": "https://github.com/sandeep89shaily-coder/gta-commercial-radar/actions/runs/40160392713",
+  "planning_baseline_run": "https://github.com/sandeep89shaily-coder/gta-commercial-radar/actions/runs/40160631296",
+  "sources": [
+    {
+      "source_id": "toronto_cleared_building_permits",
+      "validation_state": "HISTORICAL_ONLY",
+      "reason": "CKAN resource resolves; cleared permits are historical backfill, not an early-stage lead feed."
+    },
+    {
+      "source_id": "york_region_active_development_applications",
+      "validation_state": "BASELINE_PASS",
+      "reason": "6,773 records loaded in isolated full baseline; no historical change alerts. Need cross-feed deduplication before activation."
+    },
+    {
+      "source_id": "mississauga_site_plan_applications",
+      "validation_state": "IDENTITY_REVIEW",
+      "reason": "1,144 GIS features produced 1,143 application keys in isolated baseline; review the duplicate application ID before activation."
+    },
+    {
+      "source_id": "mississauga_rezoning_applications",
+      "validation_state": "BASELINE_PASS",
+      "reason": "293 records loaded in isolated full baseline; zero historical change alerts. Activation still requires cross-feed review."
+    },
+    {
+      "source_id": "richmond_hill_active_development_applications",
+      "validation_state": "BASELINE_PASS",
+      "reason": "408 records loaded in isolated full baseline; zero historical change alerts. Review overlap with York Region."
+    },
+    {
+      "source_id": "hamilton_development_applications",
+      "validation_state": "DATE_REVIEW",
+      "reason": "5,237 records available but no configured source dates; a naive recent-window query returns all 5,237 as recent."
+    },
+    {
+      "source_id": "waterloo_city_building_permits",
+      "validation_state": "BASELINE_PENDING",
+      "reason": "33,525 records available; configured recent-window query works (33); full baseline not yet verified."
+    },
+    {
+      "source_id": "st_catharines_building_permits",
+      "validation_state": "BASELINE_PENDING",
+      "reason": "22,213 records available; recent-window query works (123); full baseline not yet verified."
+    },
+    {
+      "source_id": "durham_planit_consents",
+      "validation_state": "QUERY_FIX_NEEDED",
+      "reason": "665 records available; incremental date query fails; sampled Completed_Date is empty."
+    },
+    {
+      "source_id": "durham_planit_opa",
+      "validation_state": "QUERY_FIX_NEEDED",
+      "reason": "25 records available; incremental date query fails; sampled Completed_Date is empty."
+    },
+    {
+      "source_id": "durham_business_sites",
+      "validation_state": "ENRICHMENT_ONLY",
+      "reason": "6,874 businesses available; use for company/context enrichment rather than a new project signal; dates absent in sample."
+    },
+    {
+      "source_id": "durham_capital_projects",
+      "validation_state": "BASELINE_PENDING",
+      "reason": "13 project boundaries available; configured query works; public capital projects require buyer/procurement differentiation."
+    },
+    {
+      "source_id": "hamilton_building_demolition_permits",
+      "validation_state": "BASELINE_PENDING",
+      "reason": "51,846 permit records available; configured query works; full baseline not yet verified."
+    },
+    {
+      "source_id": "kitchener_active_planning_applications",
+      "validation_state": "DATE_REVIEW",
+      "reason": "214 active planning applications available; INDATE and PUBLIC_STATUS_UPDATE are populated in sample but not yet configured for collection."
+    }
+  ]
+}

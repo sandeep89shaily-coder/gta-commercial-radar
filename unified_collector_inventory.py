@@ -11,18 +11,26 @@ REVIEW_ONLY={
     "early_markham":"Markham reports are index-only, not confirmed projects",
     "early_investment_tenders":"Public tenders/investment news require location and buyer qualification",
 }
-FIELDS=("source_id","group","execution_status","integration_status","reason")
+FIELDS=("source_id","group","execution_status","integration_status","validation_state","reason")
 
 def build(results, config, steps):
     output=Path(results)/"GTA_RADAR_ALL_SOURCE_STATUS.csv"
     source_defs=json.loads(Path(config).read_text(encoding="utf-8"))
+    review_path=Path(config).with_name("disabled_source_review.json")
+    review={}
+    if review_path.is_file():
+        checked=json.loads(review_path.read_text(encoding="utf-8"))
+        review={s["source_id"]:s for s in checked.get("sources",[])}
+
     rows=[]
     for source in source_defs:
         active=bool(source.get("enabled",False))
+        item=review.get(source["id"],{}) if not active else {}
         rows.append(dict(source_id=source["id"],group="CORE_CONFIG",
             execution_status="CONFIGURED_ENABLED" if active else "CONFIGURED_DISABLED",
             integration_status="CORE_ENGINE" if active else "NOT_ENABLED",
-            reason="" if active else "Awaiting safe feed-specific activation"))
+            validation_state="ACTIVE" if active else item.get("validation_state","UNVERIFIED"),
+            reason="" if active else item.get("reason","Awaiting safe feed-specific activation"))
     for step in steps:
         name=step.get("step","")
         if not name.startswith("early_"):continue
@@ -30,6 +38,7 @@ def build(results, config, steps):
         rows.append(dict(source_id=name,group="INDEPENDENT_COLLECTOR",
             execution_status=step.get("status","UNKNOWN"),
             integration_status="REVIEW_ONLY" if reason else "EARLY_CHANGE_BRIDGE",
+            validation_state="RUN_CHECKED" if step.get("status")=="SUCCESS" else "NOT_VERIFIED_THIS_RUN",
             reason=reason))
     output.parent.mkdir(parents=True,exist_ok=True)
     with output.open("w",encoding="utf-8-sig",newline="") as f:

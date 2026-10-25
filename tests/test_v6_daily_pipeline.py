@@ -149,6 +149,11 @@ class V6Tests(unittest.TestCase):
         with path.open(encoding='utf-8-sig',newline='') as file:
             rows=list(csv.DictReader(file))
         self.assertEqual(counts['disabled_count'],14)
+        york=next(r for r in rows if r['source_id']=='york_region_active_development_applications')
+        self.assertEqual(york['validation_state'],'BASELINE_PASS')
+        self.assertIn('6,773',york['reason'])
+        durham=next(r for r in rows if r['source_id']=='durham_planit_opa')
+        self.assertEqual(durham['validation_state'],'QUERY_FIX_NEEDED')
         self.assertEqual(counts['review_only_pilots'],3)
         self.assertIn('early_ajax',{r['source_id'] for r in rows})
         self.assertIn('early_markham',{r['source_id'] for r in rows})
