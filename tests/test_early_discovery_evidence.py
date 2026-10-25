@@ -1,5 +1,6 @@
 """No network/unit-only: discover only official links and refuse incomplete sources."""
 import sqlite3
+import csv
 import json
 import tempfile
 import unittest
@@ -98,6 +99,25 @@ class DiscoveryTests(unittest.TestCase):
         self.assertEqual(records[0]["meeting_date"],"2026-05-11")
         self.assertEqual(records[0]["procurement_status"],"UNKNOWN")
         self.assertEqual(records[1]["commercial_fit"],"RESIDENTIAL_LIKELY")
+
+    def test_calendar_only_does_not_write_project_history(self):
+        with tempfile.TemporaryDirectory() as t:
+            opts=dict(data_dir=Path(t)/"db",out_dir=Path(t)/"results",
+                      source=["brampton_planning_agendas"])
+            url=next(iter(d.parse_calendar(CAL).values()))
+            html="<html><body><h1>Agenda</h1><p>Loading...</p></body></html>"
+            self.assertEqual(d.run(**opts,session=Session({
+                d.BRAMPTON_CALENDAR:CAL,url:html}),
+                now="2026-10-24T11:00:00+00:00"),0)
+            db=sqlite3.connect(Path(t)/"db"/"early_discovery_review.sqlite")
+            self.assertEqual(db.execute("SELECT count(*) FROM snapshots").fetchone()[0],0)
+            self.assertEqual(db.execute("SELECT count(*) FROM changes").fetchone()[0],0)
+            db.close()
+            self.assertTrue((Path(t)/"results"/"EARLY_BRAMPTON_PARTIAL_REVIEW.csv").exists())
+            with (Path(t)/"results"/"EARLY_DISCOVERY_SOURCE_STATUS.csv").open() as f:
+                rows=list(csv.DictReader(f))
+            self.assertEqual(rows[0]["status"],"PARTIAL_CALENDAR_ONLY")
+            self.assertEqual(rows[0]["new"],"0")
 
     def test_blocked_source_keeps_prior_snapshots(self):
         with tempfile.TemporaryDirectory() as t:

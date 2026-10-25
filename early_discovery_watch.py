@@ -345,9 +345,25 @@ def run(data_dir="data",out_dir="GTA_RADAR_RESULTS",source=None,session=None,now
                 else:
                     records,stats=brampton_records(session)
                     coverage="PDC_AGENDA_APPLICATION_ITEMS" if not stats["calendar_only"] else "PDC_CALENDAR_AND_PARTIAL_AGENDAS"
+                if source_id=="brampton_planning_agendas" and stats.get("calendar_only",0)>0:
+                    # Do not commit calendar-only records as application snapshots.
+                    # A blocked JS agenda cannot prove a project or a change.
+                    _write_csv(out_dir/"EARLY_BRAMPTON_PARTIAL_REVIEW.csv",
+                        FIELDS,[dict(x,first_seen_at="",last_seen_at="",
+                            current_snapshot_status="PARTIAL_SOURCE_UNCOMMITTED",
+                            not_sale_ready_reason="AGENDA_ITEMS_UNAVAILABLE;NO_PROJECT_VERIFIED")
+                            for x in records])
+                    status.append(dict(source_id=source_id,
+                        status="PARTIAL_CALENDAR_ONLY",fetched=len(records),
+                        new=0,updated=0,baseline="NO",
+                        discovered_pages=stats["discovered"],
+                        fetched_pages=stats["fetched"],
+                        coverage="PDC_CALENDAR_PARTIAL_UNCOMMITTED",
+                        warning="AGENDA_ITEMS_UNAVAILABLE;CALENDAR_ONLY_NO_PROJECT_LEADS;NO_SNAPSHOT_UPDATE",
+                        error=""))
+                    continue
                 saved=save_source(db,source_id,records,now)
-                state=("PARTIAL_CALENDAR_ONLY" if source_id=="brampton_planning_agendas"
-                   and stats.get("calendar_only",0)>0 else "SUCCESS")
+                state="SUCCESS"
                 status.append(dict(source_id=source_id,status=state,
                      fetched=len(records),discovered_pages=stats["discovered"],
                      fetched_pages=stats["fetched"],coverage=coverage,
