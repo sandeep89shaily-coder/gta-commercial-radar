@@ -55,7 +55,7 @@ def qualify(record):
     kind=(record.get('change_type') or '').upper()
     if kind not in ('NEW','UPDATED'):return 'NOT_NEW_OR_CHANGED'
     sid=record.get('source_id') or ''
-    if sid in ('industrial_property_watch','corporate_capex_watch'):
+    if sid=='industrial_property_watch':
         # Generic market or earnings context should not consume DeepSeek.
         return 'CONTEXT_ONLY_REVIEW'
     title=record.get('title') or record.get('description') or ''
@@ -74,8 +74,18 @@ def qualify(record):
     city=record.get('city') or ''
     company=record.get('company') or record.get('published_company_unverified_role') or ''
     # Investment-funded record with explicit company, or planning with site.
-    if sid.startswith(('feddev_','investontario_')):
+    if sid.startswith(('feddev_','investontario_','corporate_capex_')):
         if not company:return 'COMPANY_NOT_IDENTIFIED_IN_INDEX'
+        # A parser improvement must never turn an old announcement into a new lead.
+        from datetime import date
+        try:
+            announced=date.fromisoformat((record.get('source_date') or '')[:10])
+            discovered=date.fromisoformat((record.get('observed_at') or '')[:10])
+        except ValueError:return 'PUBLICATION_DATE_NOT_VERIFIED'
+        if not (0 <= (discovered-announced).days <= 120):
+            return 'NOT_RECENT_PUBLIC_ANNOUNCEMENT'
+        if sid=='corporate_capex_watch' and not record.get('description'):
+            return 'CAPEX_NOT_PROJECT_SPECIFIC'
         if not GTA.search(desc+' '+title+' '+location+' '+city):
             return 'GTA_SITE_NOT_ESTABLISHED'
     elif not location and not company:
