@@ -40,6 +40,10 @@ def research_route(row):
         return 'AI_WATCH' if ENV_TRIGGER.search(desc) else 'ENRICHMENT_ONLY'
     if BUSINESS.search(sid) or lane=='BUSINESS_REVIEW':
         return 'AI_WATCH' if BUSINESS_TRIGGER.search(desc) else 'ENRICHMENT_ONLY'
+    if lane=='EARLY_SIGNAL_WATCH':
+        # An upstream signal only merits paid verification if the text
+        # describes a concrete project/action; the daily budget remains capped.
+        return 'AI_WATCH' if PROJECT.search(desc) else 'ENRICHMENT_ONLY'
     if lane=='SOURCE_UPDATE_WATCH':
         return 'ENRICHMENT_ONLY'
     if lane=='OTHER_WATCH':

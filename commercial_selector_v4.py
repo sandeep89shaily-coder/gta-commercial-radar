@@ -24,7 +24,8 @@ OUTPUT_FIELDS = [
     'event_date', 'date_basis', 'source_record_date', 'source_record_date_basis',
     'current_source_status', 'source_group', 'record_source_url', 'record_source_url_basis',
     'service_hypotheses', 'review_reason', 'review_status', 'manual_research_url',
-    'research_route', 'lead_sector',
+    'research_route', 'lead_sector', 'early_signal_stage', 'early_signal_type',
+    'first_observed_at', 'pre_permit_verification', 'procurement_status',
 ]
 EXCLUDED_FIELDS = ['source_id', 'source_key', 'address', 'description', 'reason']
 
@@ -43,9 +44,10 @@ SERVICES = [
     ('Electrical services', re.compile(r'\b(electrical|wiring|power distribution|lighting)\b', re.I)),
     ('Security/access control', re.compile(r'\b(security|access control|surveillance|alarm system)\b', re.I)),
 ]
-LANE_ORDER = {'PERMIT_REVIEW': 0, 'BUSINESS_REVIEW': 1,
-              'PLANNING_WATCH': 2, 'ENVIRONMENT_WATCH':3,
-              'SOURCE_UPDATE_WATCH': 4, 'OTHER_WATCH': 5,'ENRICHMENT_ONLY':6}
+LANE_ORDER = {'EARLY_SIGNAL_WATCH': 0, 'PERMIT_REVIEW': 1,
+              'BUSINESS_REVIEW': 2, 'PLANNING_WATCH': 3,
+              'ENVIRONMENT_WATCH': 4, 'SOURCE_UPDATE_WATCH': 5,
+              'OTHER_WATCH': 6, 'ENRICHMENT_ONLY': 7}
 
 
 def safe_url(value):
@@ -74,6 +76,9 @@ def classify(row):
         return 'EXCLUDE_RESIDENTIAL_LED', 'Residential-led construction is outside commercial-only lead scope'
     if not COMMERCIAL.search(d) and not ('licen' in sid.lower() and row.get('company_name')):
         return 'EXCLUDE_NO_COMMERCIAL', 'No specific commercial activity established'
+    if group == 'EARLY_PILOT_OBSERVED_CHANGE':
+        return 'EARLY_SIGNAL_WATCH', ('Upstream commercial signal for pre-permit investigation; '
+                                      'permit issuance, public posting date and purchasing stage unverified')
     if INSPECTION.search(sid):
         return 'ENRICHMENT_ONLY', 'Routine health inspection is company context, not a new commercial purchasing trigger'
     if PLANNING.search(sid):
@@ -171,7 +176,7 @@ def summarize(members, metadata):
             direct=published_query(official_source,match) if match else ''
             if direct:direct_basis='EXACT_ID_OFFICIAL_LOOKUP_UNCHECKED'
     company = next((str(x.get('company_name') or '').strip() for x in members if str(x.get('company_name') or '').strip().upper() not in ('', 'UNKNOWN', 'NONE')), 'UNKNOWN')
-    score = {'PERMIT_REVIEW': 70, 'BUSINESS_REVIEW': 55, 'PLANNING_WATCH': 35, 'ENVIRONMENT_WATCH':25,'SOURCE_UPDATE_WATCH': 12, 'OTHER_WATCH': 8}.get(lane, 0)
+    score = {'EARLY_SIGNAL_WATCH': 38, 'PERMIT_REVIEW': 70, 'BUSINESS_REVIEW': 55, 'PLANNING_WATCH': 35, 'ENVIRONMENT_WATCH':25,'SOURCE_UPDATE_WATCH': 12, 'OTHER_WATCH': 8}.get(lane, 0)
     if ACTION.search(fulltext) and lane in ('PERMIT_REVIEW', 'BUSINESS_REVIEW'):
         score += 10
     if company != 'UNKNOWN':
@@ -187,27 +192,39 @@ def summarize(members, metadata):
     city = chosen.get('city') or ''
     search = ' '.join(x for x in (f'"{address}"' if address else '', city, company if company != 'UNKNOWN' else '', key) if x)
     raw_basis = str(chosen.get('event_date_basis') or chosen.get('date_basis') or '')
-    date_basis = ('SOURCE RECORD UPDATE OBSERVED — NOT ISSUANCE/OPENING'
+    date_basis = ('RADAR FIRST OBSERVATION — NOT ORIGINAL POSTING DATE OR PERMIT ISSUANCE'
+                  if lane == 'EARLY_SIGNAL_WATCH' else
+                  'SOURCE RECORD UPDATE OBSERVED — NOT ISSUANCE/OPENING'
                   if group == 'MUNICIPAL_CHANGE' or lane == 'SOURCE_UPDATE_WATCH'
                   else ('PLANNING APPLICATION DATE — VERIFY' if lane == 'PLANNING_WATCH'
                         else ('SOURCE EVENT DATE — NOT VERIFIED ISSUANCE/OPENING' if group == 'MUNICIPAL'
                               else 'REPORTED SOURCE/OBSERVATION DATE — VERIFY')))
-    record_date = meta.get('source_date') or ''
+    record_date = meta.get('source_date') or chosen.get('source_record_date') or ''
     return {
         'lane': lane, 'review_priority': score, 'project_id': group_key(chosen),
         'address': address, 'city': city, 'company_name': company, 'description': chosen.get('description') or '',
         'source_id': sid, 'source_keys': ' | '.join(dict.fromkeys(str(x.get('source_key') or '') for x in members)),
-        'permit_count': len(members), 'permit_types': ', '.join(kinds),
+        'permit_count': 0 if lane == 'EARLY_SIGNAL_WATCH' else len(members), 'permit_types': ', '.join(kinds),
         'event_date': chosen.get('event_date') or '', 'date_basis': date_basis,
         'source_record_date': record_date,
-        'source_record_date_basis': 'COLLECTOR-PREFERRED DATE FIELD, MAY BE STATUS DATE; NOT CONFIRMED ISSUED DATE' if record_date else 'NOT AVAILABLE',
-        'current_source_status': meta.get('status') or '', 'source_group': group,
+        'source_record_date_basis': ('PILOT REPORTED PLANNING/ACTIVITY DATE — NOT PROVEN PUBLIC POST DATE'
+                                     if record_date and lane == 'EARLY_SIGNAL_WATCH' else
+                                     'COLLECTOR-PREFERRED DATE FIELD, MAY BE STATUS DATE; NOT CONFIRMED ISSUED DATE'
+                                     if record_date else 'NOT AVAILABLE'),
+        'current_source_status': meta.get('status') or chosen.get('current_source_status') or '', 'source_group': group,
         'record_source_url': direct, 'record_source_url_basis':direct_basis,
         'service_hypotheses': service_hypotheses(fulltext, kinds),
         'review_reason': reason, 'review_status': 'RESEARCH ONLY — OPERATOR, DATE AND DEMAND UNVERIFIED',
         'manual_research_url': 'https://www.google.com/search?q=' + quote_plus(search[:240]),
         'research_route':research_route({'source_id':sid,'lane':lane,'description':fulltext}),
         'lead_sector':lead_sector({'source_id':sid,'description':fulltext}),
+        'early_signal_stage': chosen.get('early_signal_stage') or '',
+        'early_signal_type': chosen.get('early_signal_type') or '',
+        'first_observed_at': chosen.get('first_observed_at') or '',
+        'pre_permit_verification': chosen.get('pre_permit_verification') or
+            ('NOT_VERIFIED' if lane == 'EARLY_SIGNAL_WATCH' else ''),
+        'procurement_status': chosen.get('procurement_status') or
+            ('UNKNOWN' if lane == 'EARLY_SIGNAL_WATCH' else ''),
     }
 
 

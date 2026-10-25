@@ -1,9 +1,9 @@
-"""Review-only bridge from independently run early collectors into the V8 selector."""
+"""Preserve distinct early-stage pilot signals when joining the common V8 selector."""
 import csv
 from datetime import datetime, timezone
 from pathlib import Path
 PAIRS=[("EARLY_SIGNALS_SOURCES_STATUS.csv","EARLY_SIGNALS_CHANGES_REVIEW_ONLY.csv","status"),("EARLY_CUES_SOURCE_STATUS.csv","EARLY_CUES_CHANGES_REVIEW_ONLY.csv","state"),("EARLY_DISCOVERY_SOURCE_STATUS.csv","EARLY_DISCOVERY_CHANGES_REVIEW_ONLY.csv","status"),("EARLY_HAMILTON_SOURCE_STATUS.csv","EARLY_HAMILTON_CHANGES_REVIEW_ONLY.csv","status"),("EARLY_PUBLIC_NOTICES_SOURCE_STATUS.csv","EARLY_PUBLIC_NOTICES_CHANGES_REVIEW_ONLY.csv","status"),("EARLY_OAKVILLE_SOURCE_STATUS.csv","EARLY_OAKVILLE_CHANGES_REVIEW_ONLY.csv","status"),("EARLY_AJAX_SOURCE_STATUS.csv","EARLY_AJAX_CHANGES_REVIEW_ONLY.csv","status"),("EARLY_INVESTMENT_TENDERS_STATUS.csv","EARLY_INVESTMENT_TENDERS_CHANGES.csv","status"),("EARLY_MARKHAM_REPORT_SOURCE_STATUS.csv","EARLY_MARKHAM_NEW_REPORTS_REVIEW_ONLY.csv","status")]
-FIELDS=["source_id","source_key","source_group","description","address","city","company_name","event_date","event_date_basis","evidence_url","source_record_date","current_source_status"]
+FIELDS=["source_id","source_key","source_group","description","address","city","company_name","event_date","event_date_basis","evidence_url","source_record_date","current_source_status","early_signal_stage","early_signal_type","first_observed_at","pre_permit_verification","procurement_status"]
 def read(path):
     if not Path(path).is_file(): return []
     with Path(path).open(encoding="utf-8-sig",newline="") as f:return list(csv.DictReader(f))
@@ -46,7 +46,14 @@ def harvest(folder,successful_steps=None,run_started=None):
                 event_date=(r.get("observed_at") or "")[:10],
                 event_date_basis="RADAR_OBSERVATION_NOT_PUBLICATION_DATE",
                 evidence_url=url,source_record_date=r.get("source_application_date") or r.get("source_date") or "",
-                current_source_status=r.get("status") or r.get("stage") or "UNKNOWN"))
+                current_source_status=r.get("status") or r.get("stage") or "UNKNOWN",
+                early_signal_stage=r.get("stage") or "STAGE_NOT_REPORTED",
+                early_signal_type=r.get("signal_type") or "UPSTREAM_PUBLIC_OBSERVATION",
+                first_observed_at=r.get("observed_at") or "",
+                # The goal is to discover activity before permits, but the
+                # source observation is NOT evidence no permit exists yet.
+                pre_permit_verification="NOT_VERIFIED",
+                procurement_status=r.get("procurement_status") or "UNKNOWN"))
         statuses.append({"source_file":sf,"accepted":n,"status_file_present":(folder/sf).exists()})
     return events,statuses
 def merge(original,folder,destination,successful_steps=None,run_started=None):

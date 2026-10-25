@@ -80,6 +80,27 @@ class Tests(unittest.TestCase):
             self.assertTrue(any(s["source_file"]=="EARLY_MARKHAM_REPORT_SOURCE_STATUS.csv"
                                 for s in audit))
 
+    def test_early_signal_keeps_stage_timing_and_unknown_permit_status(self):
+        with tempfile.TemporaryDirectory() as path:
+            d=Path(path)
+            save(d/"EARLY_CUES_SOURCE_STATUS.csv",[
+                {"source_id":"ieso_connections","state":"SUCCESS"}])
+            save(d/"EARLY_CUES_CHANGES_REVIEW_ONLY.csv",[{
+                "source_id":"ieso_connections","record_id":"GRID-3",
+                "change_type":"NEW","title":"New industrial factory power connection",
+                "site":"Industrial Road","source_url":"https://www.ieso.ca/grid",
+                "stage":"CONNECTION_ASSESSMENT","signal_type":"GRID_CONNECTION",
+                "procurement_status":"UNKNOWN","source_date":"2026-10-13",
+                "observed_at":"2026-10-25T10:00:00Z"}])
+            rows,_=harvest(d,successful_steps={"early_industrial_cues"},
+                           run_started="2026-10-25T09:00:00Z")
+            self.assertEqual(len(rows),1)
+            self.assertEqual(rows[0]["early_signal_stage"],"CONNECTION_ASSESSMENT")
+            self.assertEqual(rows[0]["early_signal_type"],"GRID_CONNECTION")
+            self.assertEqual(rows[0]["first_observed_at"],"2026-10-25T10:00:00Z")
+            self.assertEqual(rows[0]["pre_permit_verification"],"NOT_VERIFIED")
+            self.assertEqual(rows[0]["source_record_date"],"2026-10-13")
+
     def test_only_live_successful_nonbaseline_changes(self):
         with tempfile.TemporaryDirectory() as t:
             d=Path(t)
