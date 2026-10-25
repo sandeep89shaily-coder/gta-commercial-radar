@@ -159,7 +159,7 @@ def parse_calendar(html,origin=BRAMPTON_CALENDAR):
     a Council item is Planning simply because the calendar body mentions PDC.
     """
     soup=BeautifulSoup(html,"html.parser")
-    pdc=re.compile(r"\\bPlanning\\s*(?:&|and)\\s*Development\\s+Committee\\b",re.I)
+    pdc=re.compile(r"\bPlanning\s*(?:&|and)\s*Development\s+Committee\b",re.I)
     result={}
     for a in soup.find_all("a",href=True):
         try:url=_link(origin,a["href"])
@@ -242,7 +242,7 @@ def _brampton_calendar_dates(html):
     soup=BeautifulSoup(html,"html.parser")
     found={}
     for heading in soup.select("h3.meeting-title-heading"):
-        if not re.search(r"planning\\s*(?:&|and)\\s*development\\s+committee",_text(heading),re.I):
+        if not re.search(r"planning\s*(?:&|and)\s*development\s+committee",_text(heading),re.I):
             continue
         label=(heading.find(attrs={"aria-label":True}) or heading).get("aria-label","")
         date=""
