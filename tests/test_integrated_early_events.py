@@ -101,6 +101,40 @@ class Tests(unittest.TestCase):
             self.assertEqual(rows[0]["pre_permit_verification"],"NOT_VERIFIED")
             self.assertEqual(rows[0]["source_record_date"],"2026-10-13")
 
+    def test_one_review_contains_all_valid_current_run_cues_without_promoting_documents(self):
+        with tempfile.TemporaryDirectory() as dir:
+            d=Path(dir)
+            save(d/"EARLY_MARKHAM_REPORT_SOURCE_STATUS.csv",[
+                {"source_id":"markham_circulated_application_reports","status":"SUCCESS_REPORT_INDEX"}])
+            save(d/"EARLY_MARKHAM_NEW_REPORTS_REVIEW_ONLY.csv",[
+                {"source_id":"markham_circulated_application_reports","record_id":"DOC",
+                 "change_type":"NEW","title":"Circulated planning applications",
+                 "source_url":"https://www.markham.ca/report.pdf",
+                 "observed_at":"2026-10-25T12:00:00Z"}])
+            save(d/"EARLY_CUES_SOURCE_STATUS.csv",[
+                {"source_id":"ieso_connections","state":"SUCCESS"}])
+            save(d/"EARLY_CUES_CHANGES_REVIEW_ONLY.csv",[
+                {"source_id":"ieso_connections","record_id":"POWER",
+                 "change_type":"NEW","title":"New industrial factory expansion",
+                 "source_url":"https://www.ieso.ca/connection",
+                 "observed_at":"2026-10-25T12:00:00Z"},
+                {"source_id":"ieso_connections","record_id":"OLD",
+                 "change_type":"NEW","title":"Old industrial factory",
+                 "source_url":"https://www.ieso.ca/old",
+                 "observed_at":"2026-10-24T10:00:00Z"}])
+            original=d/"base.csv"
+            save(original,[{"source_id":"legacy","source_key":"legacy"}])
+            _,summary=merge(original,d,d/"selected.csv",
+                            successful_steps={"early_markham","early_industrial_cues"},
+                            run_started="2026-10-25T10:00:00Z")
+            self.assertEqual(summary["early_pilot_changes_accepted"],1)
+            self.assertEqual(summary["early_cues_reviewed"],2)
+            with (d/"GTA_RADAR_EARLY_CUES_REVIEW.csv").open(encoding="utf-8-sig") as f:
+                rows=list(csv.DictReader(f))
+            self.assertEqual({r["source_key"]:r["pipeline_disposition"] for r in rows},
+                {"DOC":"DOCUMENT_OR_TENDER_REVIEW_ONLY","POWER":"EARLY_SELECTOR_CANDIDATE"})
+            self.assertTrue(all(r["pre_permit_verification"]=="NOT_VERIFIED" for r in rows))
+
     def test_only_live_successful_nonbaseline_changes(self):
         with tempfile.TemporaryDirectory() as t:
             d=Path(t)

@@ -8,13 +8,83 @@ def read(path):
     if not Path(path).is_file(): return []
     with Path(path).open(encoding="utf-8-sig",newline="") as f:return list(csv.DictReader(f))
 STEP_NAMES=("early_planning_pilot","early_industrial_cues","early_agendas","early_hamilton","early_notices","early_oakville","early_ajax","early_investment_tenders","early_markham")
+REVIEW_FIELDS=["source_id","source_key","observed_at","change_type","stage",
+              "source_record_date","description","site","evidence_url",
+              "commercial_fit","pipeline_disposition","pre_permit_verification",
+              "procurement_status"]
+REVIEW_ONLY_SOURCES={"EARLY_INVESTMENT_TENDERS_STATUS.csv",
+                     "EARLY_MARKHAM_REPORT_SOURCE_STATUS.csv"}
+
+def review_changes(folder,successful_steps,run_started,accepted):
+    """One current-run review of signals from all nine runner groups.
+
+    Keep weak/document sources visible, never buy research based solely
+    on an index, news item or a government open tender.
+    """
+    folder=Path(folder)
+    baseline=as_utc(run_started)
+    promoted={(r["source_id"],r["source_key"]) for r in accepted}
+    records=[]
+    seen=set()
+    for i,(status_file,event_file,column) in enumerate(PAIRS):
+        if STEP_NAMES[i] not in successful_steps:
+            continue
+        live={row.get("source_id") for row in read(folder/status_file)
+              if row.get(column) in ("SUCCESS","SUCCESS_INDEX_ONLY","SUCCESS_REPORT_INDEX")}
+        for row in read(folder/event_file):
+            sid=row.get("source_id") or ""
+            key=row.get("record_id") or row.get("application_id") or row.get("feature_id") or ""
+            stamp=row.get("observed_at") or ""
+            changed=row.get("change_type","").upper()
+            when=as_utc(stamp)
+            if not sid or not key or sid not in live or changed not in ("NEW","UPDATED"):
+                continue
+            if baseline is not None and (when is None or when<baseline):
+                continue
+            if (sid,key) in seen:
+                continue
+            seen.add((sid,key))
+            use=(row.get("commercial_fit") or row.get("commercial_signal") or "").upper()
+            if (sid,key) in promoted:
+                disposition="EARLY_SELECTOR_CANDIDATE"
+            elif "CALENDAR_ONLY" in key:
+                disposition="CALENDAR_ONLY_REVIEW"
+            elif use in ("LOW","RESIDENTIAL_LIKELY"):
+                disposition="RESIDENTIAL_EXCLUDED"
+            elif status_file in REVIEW_ONLY_SOURCES:
+                disposition="DOCUMENT_OR_TENDER_REVIEW_ONLY"
+            elif use in ("UNKNOWN","USE_UNKNOWN","REVIEW",""):
+                disposition="COMMERCIAL_USE_UNCONFIRMED"
+            else:
+                disposition="INCOMPLETE_OR_UNQUALIFIED_CUE"
+            records.append({
+                "source_id":sid,"source_key":key,"observed_at":stamp,
+                "change_type":changed,"stage":row.get("stage") or "",
+                "source_record_date":row.get("source_application_date") or row.get("source_date") or "",
+                "description":row.get("description") or row.get("title") or "",
+                "site":row.get("site") or row.get("location") or "",
+                "evidence_url":row.get("source_url") or "",
+                "commercial_fit":use,"pipeline_disposition":disposition,
+                "pre_permit_verification":"NOT_VERIFIED",
+                "procurement_status":row.get("procurement_status") or "UNKNOWN",
+            })
+    return records
+
+def as_utc(stamp):
+    if not stamp:return None
+    try:
+        result=datetime.fromisoformat(str(stamp).replace("Z","+00:00"))
+        return result.replace(tzinfo=timezone.utc) if result.tzinfo is None else result.astimezone(timezone.utc)
+    except ValueError:return None
+
+def write_csv(path,fields,rows):
+    path=Path(path)
+    path.parent.mkdir(parents=True,exist_ok=True)
+    with path.open("w",encoding="utf-8-sig",newline="") as f:
+        writer=csv.DictWriter(f,fieldnames=fields,extrasaction="ignore")
+        writer.writeheader();writer.writerows(rows)
+
 def harvest(folder,successful_steps=None,run_started=None):
-    def as_utc(stamp):
-        if not stamp:return None
-        try:
-            result=datetime.fromisoformat(str(stamp).replace("Z","+00:00"))
-            return result.replace(tzinfo=timezone.utc) if result.tzinfo is None else result.astimezone(timezone.utc)
-        except ValueError:return None
     start=as_utc(run_started)
     folder=Path(folder);events=[];seen=set();statuses=[]
     for i,(sf,ef,col) in enumerate(PAIRS):
@@ -64,4 +134,13 @@ def merge(original,folder,destination,successful_steps=None,run_started=None):
     dest=Path(destination);dest.parent.mkdir(parents=True,exist_ok=True)
     with dest.open("w",encoding="utf-8-sig",newline="") as f:
         writer=csv.DictWriter(f,fieldnames=columns);writer.writeheader();writer.writerows(rows)
-    return dest,{"early_pilot_changes_accepted":len(extra),"early_pilot_audit":audit}
+    # The pilot review lane records every *current-run* upstream cue, including
+    # unqualified documents and unknown uses. Nothing here is sale-ready.
+    # When a standalone caller intentionally omits successful_steps, review
+    # only this invocation's harvested source groups (same harvest semantics).
+    active=successful_steps if successful_steps is not None else set(STEP_NAMES)
+    review_rows=review_changes(folder,active,run_started,events)
+    write_csv(Path(folder)/"GTA_RADAR_EARLY_CUES_REVIEW.csv",REVIEW_FIELDS,review_rows)
+    return dest,{"early_pilot_changes_accepted":len(extra),"early_pilot_audit":audit,
+                 "early_cues_reviewed":len(review_rows),
+                 "early_cues_review_only":sum(r["pipeline_disposition"]!="EARLY_SELECTOR_CANDIDATE" for r in review_rows)}

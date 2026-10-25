@@ -336,7 +336,12 @@ def render_dashboard(results, state):
             '<p>All early collectors run under the same daily pipeline. An unsuccessful or review-only source is not a verified buying signal.</p>',
             '<ul>'+''.join('<li>'+esc(s.get('step'))+': <b>'+esc(s.get('status'))+'</b></li>'
                   for s in state.get('early_pilot_results',[]))+'</ul>',
+            '<p><b>Pre-permit early cue review:</b> '
+            '<a href="GTA_RADAR_EARLY_CUES_REVIEW.csv">View all fresh pilot cues, including evidence gaps and review-only signals</a>. '
+            'Cues are not proof that a supplier package remains available.</p>',
             f'<p><b>Early post-baseline changes passed to the common opportunity engine:</b> {esc(state.get("early_pilot_changes_accepted",0))}. '
+            f'<b>Fresh pilot cues assessed:</b> {esc(state.get("early_cues_reviewed",0))}; '
+            f'<b>Held for review:</b> {esc(state.get("early_cues_review_only",0))}; '
             f'<b>Disabled main sources (not activated):</b> {esc(state.get("disabled_source_count",14))}.</p>',
             f'<p><b>Collector database:</b> <span class="mono">{esc(state.get("database", ""))}</span></p>',
             f'<p><b>Window:</b> most recent 48 hours by source event/change date. <b>Projects this run:</b> {esc(state.get("projects",0))}. '
