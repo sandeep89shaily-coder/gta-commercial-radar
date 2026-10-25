@@ -153,32 +153,43 @@ def meeting_id(url):
 
 
 def parse_calendar(html,origin=BRAMPTON_CALENDAR):
-    """Extract links associated with PDC only; calendar is not a full PDF archive."""
+    """Official PDC calendar anchors only. Ampersand and 'and' are equivalent.
+
+    One card must contain only ONE published meeting ID; this avoids claiming
+    a Council item is Planning simply because the calendar body mentions PDC.
+    """
     soup=BeautifulSoup(html,"html.parser")
+    pdc=re.compile(r"\\bPlanning\\s*(?:&|and)\\s*Development\\s+Committee\\b",re.I)
     result={}
     for a in soup.find_all("a",href=True):
-        # A calendar often has many committees in the same BODY. Never walk
-        # up to body and mistakenly treat all meeting links as planning.
-        context=a
-        matched=False
-        for depth in range(4):
-            if context is None or context.name in ("html","body"):break
-            block=_text(context)
-            if "Planning and Development Committee" in block and len(block)<900:
-                matched=True
-                break
-            context=context.parent
-        if not matched:continue
         try:url=_link(origin,a["href"])
         except ValueError:continue
-        key=meeting_id(url)
-        if not key:continue
-        if urlparse(url).hostname!="pub-brampton.escribemeetings.com":continue
-        # Honor only published meeting URLs, never guessed meeting IDs.
-        result[key]="https://pub-brampton.escribemeetings.com/Meeting.aspx?"+urlencode(
-             {"Agenda":"Agenda","Id":key,"lang":"English"})
+        mid=meeting_id(url)
+        if not mid or urlparse(url).hostname!="pub-brampton.escribemeetings.com":
+            continue
+        card=a
+        matched=False
+        for depth in range(9):
+            if card is None or card.name in ("html","body"):
+                break
+            part=_text(card)
+            # Cards are identifiable by exactly one meeting, not by broad
+            # calendar text with many unrelated committees and links.
+            if pdc.search(part) and len(part)<1800:
+                meeting_ids=set()
+                for link in card.find_all("a",href=True):
+                    try:existing=meeting_id(_link(origin,link["href"]))
+                    except ValueError:continue
+                    if existing:meeting_ids.add(existing)
+                if meeting_ids=={mid}:
+                    matched=True
+                    break
+            card=card.parent
+        if not matched:continue
+        result[mid]="https://pub-brampton.escribemeetings.com/Meeting.aspx?"+urlencode(
+            {"Agenda":"Agenda","Id":mid,"lang":"English"})
     if not result:
-        raise RuntimeError("No publicly linked Brampton planning meetings; calendar may require JS")
+        raise RuntimeError("No individual PDC meeting links on published Brampton calendar; layout/JS may differ")
     return result
 
 
@@ -231,7 +242,7 @@ def _brampton_calendar_dates(html):
     soup=BeautifulSoup(html,"html.parser")
     found={}
     for heading in soup.select("h3.meeting-title-heading"):
-        if "planning and development committee" not in _text(heading).lower():
+        if not re.search(r"planning\\s*(?:&|and)\\s*development\\s+committee",_text(heading),re.I):
             continue
         label=(heading.find(attrs={"aria-label":True}) or heading).get("aria-label","")
         date=""
