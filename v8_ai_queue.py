@@ -127,27 +127,35 @@ def source_region(row):
     return str(source.get('region') or 'Other')
 
 def fair_regional_order(ready):
-    """Interleave qualified projects by official region; never drop or reprice one.
+    """Interleave regions within each buying-stage lane.
 
-    Within each region the original research-priority and age ordering remains.
-    One per region per round prevents a large Toronto backlog monopolizing the
-    shared $1/day AI budget. It does NOT enforce fixed quotas or suppress Toronto.
+    Early buying cues must not lose to later permits merely because the
+    permit source happens to be in a region earlier in REGION_PRIORITY.
+    Within each lane, round-robin across regions to maintain GTA coverage.
     """
-    if not ready:return []
-    bins={}
-    for r in ready:
-        bins.setdefault(source_region(r),[]).append(r)
-    if len(bins)<=1:return ready
-    regions=[r for r in REGION_PRIORITY if r in bins]
-    regions += sorted(r for r in bins if r not in regions)
+    if not ready:
+        return []
+    by_lane = {}
+    for row in ready:
+        lane_rank = LANES.get(canonical_lane(row), 7)
+        by_lane.setdefault(lane_rank, []).append(row)
     from collections import deque
-    queues={name:deque(bins[name]) for name in regions}
-    ordered=[]
-    while any(queues.values()):
-        for name in regions:
-            if queues[name]:
-                ordered.append(queues[name].popleft())
-    return ordered
+    result = []
+    for lane_rank in sorted(by_lane):
+        bins = {}
+        for row in by_lane[lane_rank]:
+            bins.setdefault(source_region(row), []).append(row)
+        if len(bins) <= 1:
+            result.extend(by_lane[lane_rank])
+            continue
+        regions = [name for name in REGION_PRIORITY if name in bins]
+        regions += sorted(name for name in bins if name not in regions)
+        queues = {region: deque(bins[region]) for region in regions}
+        while any(queues.values()):
+            for region in regions:
+                if queues[region]:
+                    result.append(queues[region].popleft())
+    return result
 
 
 def due(pending, history, today):

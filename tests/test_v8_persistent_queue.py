@@ -237,6 +237,21 @@ class DurableResearchQueueTests(unittest.TestCase):
         newer = dict(row, description='New issuance recorded for commercial works')
         self.assertEqual(len(queue.build([newer],[],{'project-5':old},FIXED)),1)
 
+    def test_early_cue_precedes_permit_across_different_regions(self):
+        from unittest.mock import patch
+        early=make_row(88,'EARLY_SIGNAL_WATCH')
+        early['source_id']='early_project_in_other_region'
+        early['description']='New industrial warehouse expansion'
+        permit=make_row(89,'PERMIT_REVIEW')
+        permit['source_id']='brampton_building_permits'
+        # Preserve geographic fairness *within* the same stage without
+        # allowing region iteration to bury upstream opportunity discovery.
+        with patch.object(queue,'source_region',
+                          side_effect=lambda row: 'Other' if row['project_id']=='project-88' else 'Peel'):
+            ranked=queue.due([permit,early],{},FIXED)
+        self.assertEqual([r['project_id'] for r in ranked],
+                         ['project-88','project-89'])
+
     def test_permit_first_and_old_health_inspection_never_reaches_ai(self):
         older = make_row(1,'SOURCE_UPDATE_WATCH')
         older['source_id']='peel_health_food'
