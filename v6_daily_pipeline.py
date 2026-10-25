@@ -327,6 +327,8 @@ def render_dashboard(results, state):
              '<a href="GTA_RADAR_OPPORTUNITY_RESEARCH_GAPS.csv">Records awaiting verification</a>.</p>',
              '<p><b>Commercial intelligence:</b> <a href="GTA_RADAR_LEAD_INTELLIGENCE.html">Open all classified opportunities and contact dashboard</a>.</p>',
             '<h2>One collection system — source health</h2>',
+            '<p><b>Unified source inventory:</b> <a href="GTA_RADAR_ALL_SOURCE_STATUS.csv">View status of every core, disabled, and independent collector</a>. '
+            'Review-only feeds are visible, but do not automatically trigger paid research.</p>',
             '<p>All early collectors run under the same daily pipeline. An unsuccessful or review-only source is not a verified buying signal.</p>',
             '<ul>'+''.join('<li>'+esc(s.get('step'))+': <b>'+esc(s.get('status'))+'</b></li>'
                   for s in state.get('early_pilot_results',[]))+'</ul>',
@@ -546,6 +548,13 @@ def pipeline(workspace, database=None, *, run_collectors=True, run_research=True
             state['early_pilot_results'] = [
                 {'step':step['step'],'status':step['status']}
                 for step in state['steps'] if step['step'].startswith('early_')]
+            # A single status inventory covers every configured and independent source.
+            try:
+                from unified_collector_inventory import build
+                _,inventory=build(out,ROOT/'config'/'sources.json',state['steps'])
+                state.update(inventory)
+            except (OSError,ValueError,csv.Error) as exc:
+                state['collector_inventory_error']=str(exc)[:200]
             if not core_succeeded:
                 state['status'] = 'FAILED'
                 state['note'] = 'No core collectors succeeded; prior export NOT reused and AI NOT run.'

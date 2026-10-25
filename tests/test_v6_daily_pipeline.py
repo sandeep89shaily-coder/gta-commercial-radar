@@ -138,6 +138,22 @@ class V6Tests(unittest.TestCase):
         self.assertIn('early_oakville',events)
         self.assertIn({'step':'early_oakville','status':'FAILED'},outcome['early_pilot_results'])
 
+    def test_all_source_inventory_includes_disabled_and_review_only(self):
+        from unified_collector_inventory import build
+        results=self.results
+        status=[{'step':'early_ajax','status':'SUCCESS'},
+                {'step':'early_markham','status':'SUCCESS'},
+                {'step':'early_investment_tenders','status':'FAILED'},
+                {'step':'early_oakville','status':'SUCCESS'}]
+        path,counts=build(results,v6.ROOT/'config'/'sources.json',status)
+        with path.open(encoding='utf-8-sig',newline='') as file:
+            rows=list(csv.DictReader(file))
+        self.assertEqual(counts['disabled_count'],14)
+        self.assertEqual(counts['review_only_pilots'],3)
+        self.assertIn('early_ajax',{r['source_id'] for r in rows})
+        self.assertIn('early_markham',{r['source_id'] for r in rows})
+        self.assertIn('early_investment_tenders',{r['source_id'] for r in rows})
+
     def test_week_cooldown_skips_recently_investigated(self):
         import types
         stub=types.SimpleNamespace(CLOSED=v6.re.compile(r'closed',v6.re.I))
