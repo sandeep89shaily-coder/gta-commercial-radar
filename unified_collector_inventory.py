@@ -45,7 +45,7 @@ OVERLAP_V8 = {
 }
 REVIEW_ONLY = {"early_markham", "early_investment_tenders"}
 FIELDS = ("source_id", "group", "execution_status", "integration_status",
-          "validation_state", "reason")
+          "validation_state", "opportunity_role", "reactivation_decision", "reason")
 
 
 def _status_rows(path):
@@ -86,7 +86,9 @@ def build(results, config, steps, *, run_started=None):
             execution_status="CONFIGURED_ENABLED" if active else "CONFIGURED_DISABLED",
             integration_status="CORE_ENGINE" if active else "NOT_ENABLED",
             validation_state="ACTIVE" if active else item.get("validation_state", "UNVERIFIED"),
-            reason="" if active else item.get("reason", "Awaiting safe activation")))
+            opportunity_role="CORE_SOURCE" if active else item.get("opportunity_role", "UNREVIEWED"),
+            reactivation_decision="ENABLED" if active else item.get("reactivation_decision", "NOT_YET_DECIDED"),
+            reason="" if active else item.get("integration_reason") or item.get("reason", "Awaiting safe activation")))
 
     executed = {step.get("step"): step.get("status") for step in steps}
     total_pilot_sources = 0
@@ -116,6 +118,8 @@ def build(results, config, steps, *, run_started=None):
             rows.append(dict(source_id=source_id, group=runner,
                              execution_status=execution, integration_status=integration,
                              validation_state="REPORTED_THIS_RUN" if source_state else "UNVERIFIED_THIS_RUN",
+                             opportunity_role="EARLY_PILOT_SOURCE",
+                             reactivation_decision="INTEGRATED_RUNNER",
                              reason=reason))
     output.parent.mkdir(parents=True, exist_ok=True)
     with output.open("w", encoding="utf-8-sig", newline="") as stream:
