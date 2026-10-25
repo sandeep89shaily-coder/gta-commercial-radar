@@ -30,7 +30,7 @@ def build(results, config, steps):
             execution_status="CONFIGURED_ENABLED" if active else "CONFIGURED_DISABLED",
             integration_status="CORE_ENGINE" if active else "NOT_ENABLED",
             validation_state="ACTIVE" if active else item.get("validation_state","UNVERIFIED"),
-            reason="" if active else item.get("reason","Awaiting safe feed-specific activation"))
+            reason="" if active else item.get("reason","Awaiting safe feed-specific activation")))
     for step in steps:
         name=step.get("step","")
         if not name.startswith("early_"):continue
