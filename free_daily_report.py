@@ -23,9 +23,11 @@ FIELDS=[
     "date_basis","source_record_date","current_source_status",
     "stage_from_local_status","record_source_url","record_source_url_basis",
     "service_hypotheses","source_group","review_priority",
-    "follow_up","warning"
+    "early_signal_stage","first_observed_at","pre_permit_verification",
+    "procurement_status","follow_up","warning"
 ]
-WATCHED_LANES={"PERMIT_REVIEW","PLANNING_WATCH","BUSINESS_REVIEW","ENVIRONMENT_WATCH"}
+WATCHED_LANES={"EARLY_SIGNAL_WATCH","PERMIT_REVIEW","PLANNING_WATCH",
+               "BUSINESS_REVIEW","ENVIRONMENT_WATCH"}
 STATE_NAME="GTA_RADAR_FREE_DAILY_SEEN.json"
 CSV_NAME="GTA_RADAR_DAILY_NEW_DEVELOPMENTS.csv"
 HTML_NAME="GTA_RADAR_DAILY_NEW_DEVELOPMENTS.html"
@@ -58,6 +60,10 @@ def _record(row,observation,first,day):
         next_action="Historical/inactive; do not promote as a current service opportunity."
     elif stage=="INSPECTION_STAGE":
         next_action="Construction may be advanced; check only outstanding future packages."
+    elif lane=="EARLY_SIGNAL_WATCH":
+        next_action=("Identify the project sponsor and actual purchasing decision-maker; "
+                     "verify whether supplier selection has started, packages remain open, "
+                     "and whether any permit has already been issued.")
     elif lane in WATCHED_LANES and ACTION.search(desc):
         next_action="Verify exact official permit, project company and whether supplier work remains unawarded."
     else:
@@ -78,6 +84,10 @@ def _record(row,observation,first,day):
         "service_hypotheses":row.get("service_hypotheses",""),
         "source_group":row.get("source_group",""),
         "review_priority":row.get("review_priority",""),
+        "early_signal_stage":row.get("early_signal_stage",""),
+        "first_observed_at":row.get("first_observed_at",""),
+        "pre_permit_verification":row.get("pre_permit_verification",""),
+        "procurement_status":row.get("procurement_status",""),
         "follow_up":next_action,
         "warning":("Source observation/status is not a live government verification, "
                    "a newly issued permit, or evidence of a supplier contract.")
@@ -92,7 +102,8 @@ def _priority(row):
            "BLOCKED_OR_INACTIVE":9,"COMPLETED":9}.get(row["stage_from_local_status"],5)
     try:base=-int(row["review_priority"])
     except (ValueError,TypeError):base=0
-    return (kind,stage,base,row["project_id"])
+    early_rank=0 if row["lane"]=="EARLY_SIGNAL_WATCH" else 1
+    return (kind,early_rank,stage,base,row["project_id"])
 
 def build(candidates_path,results_dir,*,today=None):
     """Update persistent first-seen index only after parsing the latest V4 file.

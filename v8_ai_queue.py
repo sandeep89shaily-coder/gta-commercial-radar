@@ -19,11 +19,15 @@ from opportunity_lifecycle import classify_status
 META = ('_queued_on', '_fingerprint')
 FINISHED = {'AI_EVIDENCE_REVIEW', 'AI_SOURCE_RECORD_REVIEW'}
 CLOSED = re.compile(r'\b(closed|refused|withdrawn|cancelled|canceled|rejected|denied|inactive)\b', re.I)
-LANES = {'PERMIT_REVIEW':0, 'BUSINESS_REVIEW':1, 'PLANNING_WATCH':2,
-         'ENVIRONMENT_WATCH':3, 'OTHER_WATCH':4, 'SOURCE_UPDATE_WATCH':5}
+# Genuine newly observed pre-permit cues precede late permit records.
+# This is investigation order, not proof the procurement window is still open.
+LANES = {'EARLY_SIGNAL_WATCH':0, 'PLANNING_WATCH':1,
+         'BUSINESS_REVIEW':2, 'PERMIT_REVIEW':3, 'ENVIRONMENT_WATCH':4,
+         'OTHER_WATCH':5, 'SOURCE_UPDATE_WATCH':6}
 SIGNATURE_FIELDS = ('project_id', 'source_id', 'source_keys', 'address',
                     'company_name', 'description', 'current_source_status',
-                    'record_source_url', 'permit_types')
+                    'record_source_url', 'permit_types', 'early_signal_stage',
+                    'early_signal_type', 'procurement_status')
 
 
 def fingerprint(row):
@@ -172,8 +176,8 @@ def due(pending, history, today):
             age = max(0, (today - dt.date.fromisoformat(queued[:10])).days)
         except ValueError:
             age = 0
-        # Lane remains the primary sort key. Old health-inspection or source
-        # updates must NEVER outrank active commercial permits by aging.
+        # Lane is the primary key: credible early cues first, mature permits
+        # later. Old inspection and generic updates never jump lanes by age.
         base = LANES.get(canonical_lane(row), 6)
         effective = base
         prior = history.get(row.get('project_id'), {})

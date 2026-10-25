@@ -34,14 +34,16 @@ def permitted(row):
     source=str(row.get("source_id") or "").lower()
     desc=str(row.get("description") or "")
     stage=classify_status(row.get("current_source_status"))
-    if lane not in ("PERMIT_REVIEW","PLANNING_WATCH","BUSINESS_REVIEW"):
+    if lane not in ("EARLY_SIGNAL_WATCH","PERMIT_REVIEW","PLANNING_WATCH","BUSINESS_REVIEW"):
         return False
     if "inspection" in source or "health_food" in source:
         return False
     if stage in STAGES_BLOCKED or NO_WORK.search(desc):
         return False
-    early_planning=(lane=="PLANNING_WATCH" and bool(
-        re.search(r"\b(site[\s-]?plan|propos\w*|planning application|new industrial)\b",desc,re.I)))
+    early_planning=(lane in ("EARLY_SIGNAL_WATCH","PLANNING_WATCH") and bool(
+        re.search(r"\b(site[\s-]?plan|pre[ -]?consultation|propos\w*|"
+                  r"planning application|new industrial|connection assessment|"
+                  r"planned expansion)\b",desc,re.I)))
     if not desc or not COMMERCIAL.search(desc) or not (ACTION.search(desc) or early_planning):
         return False
     if (SMALL_RESIDENTIAL.search(desc) or RESIDENTIAL_LED.search(desc)) and not INDEPENDENT_COMMERCIAL.search(desc):

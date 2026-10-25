@@ -30,6 +30,10 @@ def research_route(row):
     sid=str(row.get('source_id') or '')
     lane=str(row.get('lane') or row.get('priority') or '')
     desc=str(row.get('description') or '')
+    # Check the lane first: an observed pre-permit source is not an issued
+    # permit just because the publisher/source ID contains the word "permit".
+    if lane=='EARLY_SIGNAL_WATCH':
+        return 'AI_WATCH' if PROJECT.search(desc) else 'ENRICHMENT_ONLY'
     if INSPECTION.search(sid):
         return 'ENRICHMENT_ONLY'
     if PERMIT.search(sid) or lane=='PERMIT_REVIEW':
@@ -40,10 +44,6 @@ def research_route(row):
         return 'AI_WATCH' if ENV_TRIGGER.search(desc) else 'ENRICHMENT_ONLY'
     if BUSINESS.search(sid) or lane=='BUSINESS_REVIEW':
         return 'AI_WATCH' if BUSINESS_TRIGGER.search(desc) else 'ENRICHMENT_ONLY'
-    if lane=='EARLY_SIGNAL_WATCH':
-        # An upstream signal only merits paid verification if the text
-        # describes a concrete project/action; the daily budget remains capped.
-        return 'AI_WATCH' if PROJECT.search(desc) else 'ENRICHMENT_ONLY'
     if lane=='SOURCE_UPDATE_WATCH':
         return 'ENRICHMENT_ONLY'
     if lane=='OTHER_WATCH':
@@ -55,6 +55,8 @@ def canonical_lane(row):
     if research_route(row)=='ENRICHMENT_ONLY':
         return 'ENRICHMENT_ONLY'
     sid=str(row.get('source_id') or '')
+    if str(row.get('lane') or '')=='EARLY_SIGNAL_WATCH':
+        return 'EARLY_SIGNAL_WATCH'
     if PERMIT.search(sid):
         return 'PERMIT_REVIEW'
     if PLANNING.search(sid):

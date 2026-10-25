@@ -255,9 +255,10 @@ def select_unresearched(rows,limit,previous,day):
                if row.get('project_id') not in reviewed
                and not v5.CLOSED.search(str(row.get('current_source_status') or ''))]
     original_order=v5_original_queue(remaining,len(remaining),previous,day)
-    priorities={'PERMIT_REVIEW':0,'BUSINESS_REVIEW':1,'PLANNING_WATCH':2,
-                'OTHER_WATCH':3,'SOURCE_UPDATE_WATCH':4}
-    # Preserve earlier ordering within each lane but prioritize genuine permits.
+    priorities={'EARLY_SIGNAL_WATCH':0,'PLANNING_WATCH':1,
+                'BUSINESS_REVIEW':2,'PERMIT_REVIEW':3,
+                'OTHER_WATCH':4,'SOURCE_UPDATE_WATCH':5}
+    # Prioritize early commercial buying cues, not later permit issuance.
     original_order.sort(key=lambda row:(priorities.get(row.get('lane'),5),
                                          -int(row.get('review_priority') or 0)))
     return original_order[:max(0,limit)]

@@ -52,6 +52,29 @@ class SelectiveDailyTests(unittest.TestCase):
             with self.subTest(x=x["description"]):
                 self.assertFalse(selected.permitted(x))
 
+    def test_prepermit_cue_is_selectable_and_kept_separate_from_permit(self):
+        from commercial_research_policy import canonical_lane, research_route
+        from v8_ai_queue import LANES, due
+        cue=row(project_id="brampton_preconsultation:pc-11",source_id="brampton_preconsultation",
+                source_keys="pc-11",lane="EARLY_SIGNAL_WATCH",review_priority="38",
+                description="Proposed industrial warehouse expansion in pre-consultation",
+                current_source_status="Pre-consultation",
+                source_group="EARLY_PILOT_OBSERVED_CHANGE",
+                early_signal_stage="PRE_CONSULTATION",
+                procurement_status="UNKNOWN",
+                pre_permit_verification="NOT_VERIFIED")
+        self.assertTrue(selected.permitted(cue))
+        self.assertEqual(canonical_lane(cue),"EARLY_SIGNAL_WATCH")
+        self.assertEqual(research_route(cue),"AI_WATCH")
+        self.assertLess(LANES["EARLY_SIGNAL_WATCH"],LANES["PERMIT_REVIEW"])
+        ranked=due([row(),cue],{},NOW)
+        self.assertEqual(ranked[0]["project_id"],cue["project_id"])
+        vague=row(project_id="p:vague",lane="EARLY_SIGNAL_WATCH",
+                 description="General industrial discussion")
+        self.assertFalse(selected.permitted(vague))
+        self.assertFalse(selected.permitted(
+            dict(cue,description="New single detached residential house")))
+
     def test_first_baseline_always_zero_ai(self):
         with tempfile.TemporaryDirectory() as td:
             root=Path(td);inp=root/"candidates.csv"
