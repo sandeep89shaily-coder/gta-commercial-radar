@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 
 REVIEW_ONLY={
-    "early_ajax":"Ajax source tracks planning records but lacks changes-only export",
+    "early_ajax":"Ajax now exports post-baseline changes; classification and location evidence still require qualification",
     "early_markham":"Markham reports are index-only, not confirmed projects",
     "early_investment_tenders":"Public tenders/investment news require location and buyer qualification",
 }
