@@ -10,11 +10,14 @@ class EarlyPurchaseTests(unittest.TestCase):
     def test_require_postbaseline_and_company_for_funded_investment(self):
         sample=dict(source_id='feddev_investment',record_id='official#company',change_type='NEW',
             description='Brampton factory manufacturing expansion through new CNC equipment',
-            company='Example Manufacturing',source_url='https://www.canada.ca/approved',commercial_fit='REVIEW')
+            company='Example Manufacturing',source_url='https://www.canada.ca/approved',commercial_fit='REVIEW',
+            source_date='2026-10-22',observed_at='2026-10-25T10:00:00Z')
         self.assertEqual(qualify(sample),'')
         self.assertEqual(qualify(dict(sample,company='')),'COMPANY_NOT_IDENTIFIED_IN_INDEX')
         self.assertEqual(qualify(dict(sample,commercial_fit='LOW')),'COMMERCIAL_FIT_NOT_ESTABLISHED')
         self.assertEqual(qualify(dict(sample,change_type='BASELINE')),'NOT_NEW_OR_CHANGED')
+        self.assertEqual(qualify(dict(sample,source_date='2023-10-22')),'NOT_RECENT_PUBLIC_ANNOUNCEMENT')
+        self.assertEqual(qualify(dict(sample,source_date='')),'PUBLICATION_DATE_NOT_VERIFIED')
         self.assertEqual(qualify(dict(sample,source_id='industrial_property_watch')),'CONTEXT_ONLY_REVIEW')
     def test_live_observation_only_and_separate_review_queue(self):
         with tempfile.TemporaryDirectory() as t:
@@ -22,9 +25,9 @@ class EarlyPurchaseTests(unittest.TestCase):
             (root/'EARLY_INVESTMENT_SOURCE_STATUS.csv').write_text(
                 'source_id,status\nfeddev_investment,SUCCESS\n',encoding='utf-8')
             (root/'EARLY_INVESTMENT_CHANGES_REVIEW_ONLY.csv').write_text(
-                'source_id,record_id,change_type,observed_at,company,description,source_url,commercial_fit\n'
-                'feddev_investment,a,NEW,2026-10-25T11:01:00Z,Demo Factory,Brampton factory new CNC equipment,https://www.canada.ca/a,REVIEW\n'
-                'feddev_investment,b,NEW,2026-10-24T11:01:00Z,Old Factory,Brampton new plant,https://www.canada.ca/b,REVIEW\n',encoding='utf-8')
+                'source_id,record_id,change_type,observed_at,company,description,source_url,commercial_fit,source_date\n'
+                'feddev_investment,a,NEW,2026-10-25T11:01:00Z,Demo Factory,Brampton factory new CNC equipment,https://www.canada.ca/a,REVIEW,2026-10-22\n'
+                'feddev_investment,b,NEW,2026-10-24T11:01:00Z,Old Factory,Brampton new plant,https://www.canada.ca/b,REVIEW,2026-10-22\n',encoding='utf-8')
             accepted,gaps=compile_sources(root,set(),'2026-10-25T11:00:00Z')
             self.assertEqual(len(accepted),1)
             self.assertEqual(accepted[0]['procurement_status'],'UNKNOWN')
@@ -46,8 +49,8 @@ class EarlyPurchaseTests(unittest.TestCase):
                         'corporate_capex_watch,SUCCESS,0,0,0\n'
                         'industrial_property_watch,SUCCESS,0,0,0\n',encoding='utf-8')
                     (out/'EARLY_INVESTMENT_CHANGES_REVIEW_ONLY.csv').write_text(
-                        'source_id,record_id,change_type,observed_at,company,description,source_url,commercial_fit\n'
-                        'feddev_investment,id,NEW,2099-10-25T13:00:00Z,Acme,Brampton factory equipment expansion,https://www.canada.ca/id,REVIEW\n',encoding='utf-8')
+                        'source_id,record_id,change_type,observed_at,company,description,source_url,commercial_fit,source_date\n'
+                        'feddev_investment,id,NEW,2099-10-25T13:00:00Z,Acme,Brampton factory equipment expansion,https://www.canada.ca/id,REVIEW,2099-10-23\n',encoding='utf-8')
                 return {'step':name,'status':'SUCCESS','exit_code':0}
             a=radar.run(data,out,collector=collect,paid=False)
             self.assertEqual(len(seen),10)
