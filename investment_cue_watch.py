@@ -59,7 +59,7 @@ GEO=re.compile(r"\b(?:Brampton|Mississauga|Toronto|Vaughan|Markham|Richmond Hill
 FIELDS=("source_id","record_id","title","site","company","company_role", "stage",
         "source_date","date_basis","source_url","signal_type","description",
         "commercial_fit","geographic_confidence","procurement_status","verification",
-        "purchase_hypothesis","source_scope")
+        "purchase_hypothesis","source_scope","project_cost","funding_contribution")
 STATUS=("source_id","status","fetched","new","updated","baseline","coverage","error")
 CHANGES=("observed_at","source_id","record_id","change_type",*FIELDS[2:])
 
@@ -93,9 +93,9 @@ def _record(sid,url,title,desc="",company="",published="",scope=""):
     if not _allowed(url) or not title:raise ValueError("Invalid project source URL or title")
     fit=("POSSIBLE_COMMERCIAL" if INVESTMENT.search(text) else "USE_UNKNOWN")
     # A generic market story, even one naming a city, cannot prove tenant spend.
-    if sid=="industrial_property_watch":fit="REVIEW" if PROPERTY.search(text) else "LOW"
-    if sid=="corporate_capex_watch":fit="REVIEW" if INVESTMENT.search(text) else "LOW"
-    if sid=="feddev_investment":fit="REVIEW" if INVESTMENT.search(text) else "LOW"
+    if sid=="industrial_property_watch":fit="LOW"  # Market summaries are not tenant purchasing events.
+    if sid=="corporate_capex_watch":fit="LOW"  # Requires named, dated, local capex in full article.
+    if sid=="feddev_investment":fit="REVIEW" if company and INVESTMENT.search(text) else "LOW"
     if sid=="investontario_investment":fit="REVIEW" if INVESTMENT.search(text) else "LOW"
     published=published[:10] if DATE.fullmatch(published[:10]) else ""
     return dict(source_id=sid,record_id=url,title=title,site="",company=company,
@@ -109,7 +109,8 @@ def _record(sid,url,title,desc="",company="",published="",scope=""):
        geographic_confidence="SOUTHERN_ONTARIO_TEXT_MENTION_NOT_SITE_VERIFIED" if GEO.search(text)
                             else "LOCATION_UNVERIFIED_OR_OUTSIDE_GTA",
        procurement_status="UNKNOWN",verification="PUBLISHED_DOCUMENT_NOT_UNAWARDED_PURCHASE",
-       purchase_hypothesis="RESEARCH_ONLY_NOT_CONFIRMED_PURCHASE",source_scope=scope)
+       purchase_hypothesis="RESEARCH_ONLY_NOT_CONFIRMED_PURCHASE",source_scope=scope,
+       project_cost="",funding_contribution="")
 
 
 def parse_feddev_atom(raw):
@@ -181,38 +182,88 @@ def parse_investontario(html):
             for url,title in links.items()]
 
 
-def enriched_investontario(session,html,max_details=16):
-    """Page-specific descriptions prevent title-only purchases from entering AI."""
+MONTH_DATE=re.compile(r"\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2}),?\s+(20\d{2})\b",re.I)
+SPECIFIC_SPEND=re.compile(r"\b(?:invest(?:ing|ment)?\s+\$|\$[\d,.]+\s*(?:million|billion)|\bnew\s+(?:factory|production line|manufacturing facility)|\binstall(?:ing|ation)?\s+(?:new\s+)?(?:machinery|equipment)|\b(?:equipment|facility)\s+upgrades?)\b",re.I)
+
+def _published_date(soup):
+    """Only official publication metadata or a date in the opening article text."""
+    for attr,key in (("property","article:published_time"),("name","date"),
+                     ("name","datePublished"),("name","dcterms.date")):
+        tag=soup.find("meta",attrs={attr:key})
+        if tag:
+            value=(tag.get("content") or "")[:10]
+            if DATE.fullmatch(value):return value.replace('/','-')
+    for tag in soup.find_all('time',limit=4):
+        value=(tag.get('datetime') or '')[:10]
+        if DATE.fullmatch(value):return value.replace('/','-')
+    main=soup.find('main') or soup.find('article') or soup
+    opening=_clean(main.get_text(' ',strip=True))[:2800]
+    m=MONTH_DATE.search(opening)
+    if m:
+        try:return datetime.strptime(' '.join(m.groups()),'%B %d %Y').date().isoformat()
+        except ValueError:pass
+    return ''
+
+
+def _index_date(link):
+    """Use date in a single press-release card, never a whole page date."""
+    node=link
+    for _ in range(5):
+        node=node.parent
+        if node is None or node.name in ('body','html'):break
+        others={urljoin(FEEDS['investontario_investment']['url'],a['href'])
+                for a in node.select('a[href]') if '/press-release/' in a['href']}
+        if len(others)>1:break
+        if len(_clean(node.get_text(' ',strip=True)))>850:break
+        date=_published_date(node)
+        if date:return date
+    return ''
+
+
+def enriched_investontario(session,html,max_details=32):
+    """Extract index dates first, then verify recent individual article details."""
     items=parse_investontario(html)
+    soup=BeautifulSoup(html,'html.parser')
+    links={}
+    for anchor in soup.select('a[href]'):
+        url=urljoin(FEEDS['investontario_investment']['url'],anchor.get('href','')).split('#',1)[0]
+        if url not in links and any(item['source_url']==url for item in items):
+            links[url]=anchor
+    for row in items:
+        if row['source_url'] in links:
+            date=_index_date(links[row['source_url']])
+            if date:row['source_date']=date;row['date_basis']='OFFICIAL_INDEX_CARD_DATE'
     for row in items[:max_details]:
         try:
             body=_fetch(session,row['source_url'])
-            soup=BeautifulSoup(body,'html.parser')
-            heading=soup.find('h1')
+            detail=BeautifulSoup(body,'html.parser')
+            heading=detail.find('h1')
             if heading:
                 actual=_clean(heading.get_text(' ',strip=True))
                 if len(actual)>12:row['title']=actual[:280]
-            main=soup.find('main') or soup
-            # Official paragraphs only; never mix investor footer navigation.
+            main=detail.find('main') or detail
             snippets=[]
-            for p in main.find_all('p')[:15]:
-                t=_clean(p.get_text(' ',strip=True))
-                if INVESTMENT.search(t):snippets.append(t)
+            for para in main.find_all('p')[:20]:
+                value=_clean(para.get_text(' ',strip=True))
+                if INVESTMENT.search(value):snippets.append(value)
                 if len(snippets)>=3:break
             if snippets:row['description']=' '.join(snippets)[:1100]
-            published=main.find('time')
-            if published and published.has_attr('datetime'):
-                raw=published['datetime'][:10]
-                if DATE.fullmatch(raw):row['source_date']=raw;row['date_basis']='SOURCE_PUBLISHED_TIME'
+            date=_published_date(detail)
+            if date:row['source_date']=date;row['date_basis']='OFFICIAL_ARTICLE_PUBLICATION_DATE'
             candidate=title_entity(row['title'])
             if candidate:row['company']=candidate
-            row['company_role']='PUBLIC_HEADLINE_ENTITY_NOT_VERIFIED_PURCHASER' if candidate else row['company_role']
+            if row['company']:
+                row['company_role']='PUBLIC_ANNOUNCEMENT_ENTITY_NOT_VERIFIED_PURCHASER'
             text=row['title']+' '+row['description']
-            row['commercial_fit']='REVIEW' if INVESTMENT.search(text) else 'LOW'
-            row['geographic_confidence']='SOUTHERN_ONTARIO_TEXT_MENTION_NOT_SITE_VERIFIED' if GEO.search(text) else 'LOCATION_UNVERIFIED_OR_OUTSIDE_GTA'
+            row['geographic_confidence']=('SOUTHERN_ONTARIO_TEXT_MENTION_NOT_SITE_VERIFIED'
+                  if GEO.search(text) else 'LOCATION_UNVERIFIED_OR_OUTSIDE_GTA')
+            row['commercial_fit']='REVIEW' if (row['company'] and row['source_date']
+                    and GEO.search(text) and SPECIFIC_SPEND.search(text)) else 'LOW'
         except (requests.RequestException,ValueError,RuntimeError):
-            # An index headline remains reviewable without inferring details.
-            pass
+            # Keep index data and verified dates, but do not claim a project.
+            row['commercial_fit']='LOW'
+    for row in items[max_details:]:
+        row['commercial_fit']='LOW'  # Index-only announcements are not yet actionable.
     return items
 
 
@@ -223,6 +274,23 @@ def parse_corporate(html):
     return [_record("corporate_capex_watch",url,title,company="Maple Leaf Foods",
                     scope=FEEDS["corporate_capex_watch"]["coverage"]) for url,title in links.items()]
 
+
+def enriched_corporate(session,html,max_details=12):
+    items=parse_corporate(html)
+    for row in items[:max_details]:
+        try:
+            detail=BeautifulSoup(_fetch(session,row['source_url']),'html.parser')
+            main=detail.find('main') or detail
+            paras=[_clean(p.get_text(' ',strip=True)) for p in main.find_all('p')[:15]]
+            row['description']=' '.join(p for p in paras if INVESTMENT.search(p))[:1100]
+            row['source_date']=_published_date(detail)
+            row['date_basis']='OFFICIAL_ARTICLE_PUBLICATION_DATE' if row['source_date'] else 'NOT_VERIFIED'
+            text=row['title']+' '+row['description']
+            if row['source_date'] and GEO.search(text) and SPECIFIC_SPEND.search(text):
+                row['commercial_fit']='REVIEW'
+                row['geographic_confidence']='SOUTHERN_ONTARIO_TEXT_MENTION_NOT_SITE_VERIFIED'
+        except (requests.RequestException,ValueError,RuntimeError):pass
+    return items
 
 def parse_property(html):
     """Altus weekly published transaction context, NOT an inferred tenant."""
@@ -250,51 +318,64 @@ def parse_property(html):
 
 
 def parse_feddev_backgrounder(html,url,release_date=""):
-    """One verified recipient per table row, keeping purchase status unknown."""
+    """Recipient, project and financials from the official FedDev table only."""
     soup=BeautifulSoup(html,"html.parser")
     items=[]
-    for table in soup.find_all("table"):
-        heads=[_clean(x.get_text(" ",strip=True)).lower() for x in table.find_all("th")[:8]]
-        if not any("recipient" in h or "business name" in h for h in heads):
-            continue
-        for tr in table.find_all("tr"):
-            cells=tr.find_all("td")
+    for table in soup.find_all('table'):
+        headings=[_clean(t.get_text(' ',strip=True)).lower() for t in table.find_all('th')]
+        if not any('recipient' in h or 'business name' in h for h in headings):continue
+        if not any('project' in h for h in headings):continue
+        for tr in table.find_all('tr'):
+            cells=tr.find_all('td',recursive=False)
             if len(cells)<2:continue
-            company=_clean(cells[0].get_text(" ",strip=True))[:150]
-            project=_clean(cells[1].get_text(" ",strip=True))[:1100]
-            if not 3<=len(company)<=140 or not INVESTMENT.search(project):continue
-            row=_record("feddev_investment",url,"FedDev project: "+company,project,
+            company=_clean(cells[0].get_text(' ',strip=True))[:150]
+            project=_clean(cells[1].get_text(' ',strip=True))[:1100]
+            if not (3<=len(company)<=140 and len(project)>=20):continue
+            row=_record('feddev_investment',url,'FedDev project: '+company,project,
                         company=company,published=release_date,
-                        scope="PUBLISHED_RECIPIENT_TABLE_NOT_PROCUREMENT")
-            row["record_id"]=url+"#recipient-"+re.sub(r"[^a-z0-9]+","-",company.lower()).strip('-')[:120]
-            row["date_basis"]="RELATED_RELEASE_DATE_NOT_PURCHASE_COMMITMENT_DATE"
+                        scope='OFFICIAL_RECIPIENT_ROW_NOT_PROCUREMENT')
+            row['record_id']=url+'#recipient-'+re.sub(r'[^a-z0-9]+','-',company.lower()).strip('-')[:120]
+            row['date_basis']='RELATED_RELEASE_DATE_NOT_PURCHASE_COMMITMENT_DATE'
+            row['project_cost']=_clean(cells[2].get_text(' ',strip=True)) if len(cells)>2 else ''
+            row['funding_contribution']=_clean(cells[3].get_text(' ',strip=True)) if len(cells)>3 else ''
+            row['commercial_fit']='REVIEW' if INVESTMENT.search(project) else 'LOW'
+            row['geographic_confidence']=('SOUTHERN_ONTARIO_TEXT_MENTION_NOT_SITE_VERIFIED'
+                if GEO.search(project) else 'LOCATION_UNVERIFIED_OR_OUTSIDE_GTA')
             items.append(row)
-    return list({r["record_id"]:r for r in items}.values())
+    return list({r['record_id']:r for r in items}.values())
 
 
-def enriched_feddev(session,feed):
-    """Bounded public announcement->backgrounder follow-through; no auth/scraping portals."""
-    records=parse_feddev_atom(feed)
-    expanded=[]
-    for release in records[:14]:
-        if not re.search(r"businesses|companies|recipients|funding|support",release['title'],re.I):
+def enriched_feddev(session,feed,max_releases=28):
+    """Follow official backgrounders; never invent recipient companies."""
+    releases=parse_feddev_atom(feed)
+    expanded={}
+    visited=set()
+    for release in releases[:max_releases]:
+        if not re.search(r'business|compan|recipient|funding|support|investment',release['title'],re.I):
             continue
         try:
             html=_fetch(session,release['source_url'])
-            soup=BeautifulSoup(html,"html.parser")
-            links=[]
-            for a in soup.find_all('a',href=True):
-                if 'backgrounder' not in _clean(a.get_text(' ',strip=True)).lower():continue
-                url=urljoin(release['source_url'],a['href']).split('#',1)[0]
-                if url.startswith('https://www.canada.ca/en/economic-development-southern-ontario/news/'):
-                    links.append(url)
-            for url in dict.fromkeys(links[:2]):
-                expanded.extend(parse_feddev_backgrounder(_fetch(session,url),url,release['source_date']))
-        except (requests.RequestException,ValueError,RuntimeError):
-            # Keep the release, flag the index as a partial recipient scope.
-            # Never pretend the release enumerates all supported companies.
-            continue
-    return records+expanded
+            for item in parse_feddev_backgrounder(html,release['source_url'],release['source_date']):
+                expanded[item['record_id']]=item
+            soup=BeautifulSoup(html,'html.parser')
+            urls=[]
+            for link in soup.find_all('a',href=True):
+                label=_clean(link.get_text(' ',strip=True)).lower()
+                url=urljoin(release['source_url'],link['href']).split('#',1)[0]
+                if not (_allowed(url) and url.startswith('https://www.canada.ca/en/economic-development-southern-ontario/news/')):
+                    continue
+                if ('backgrounder' in label or 'backgrounder' in url.lower()
+                   or ('recipient' in label and 'project' in label)):
+                    urls.append(url)
+            for url in dict.fromkeys(urls[:4]):
+                if url in visited:continue
+                visited.add(url)
+                try:
+                    for item in parse_feddev_backgrounder(_fetch(session,url),url,release['source_date']):
+                        expanded[item['record_id']]=item
+                except (requests.RequestException,ValueError,RuntimeError):continue
+        except (requests.RequestException,ValueError,RuntimeError):continue
+    return releases+list(expanded.values())
 
 
 PARSERS={"feddev_investment":parse_feddev_atom,
@@ -320,6 +401,7 @@ def run(data_dir="data",output_dir="GTA_RADAR_RESULTS",sources=None,session=None
                 raw=_fetch(session,FEEDS[sid]['url'],xml=(sid=="feddev_investment"))
                 records=(enriched_feddev(session,raw) if sid=="feddev_investment" else
                          enriched_investontario(session,raw) if sid=="investontario_investment" else
+                         enriched_corporate(session,raw) if sid=="corporate_capex_watch" else
                          PARSERS[sid](raw))
                 result=save_source(db,sid,records,stamp)
                 statuses.append(dict(source_id=sid,status="SUCCESS",fetched=len(records),
@@ -348,6 +430,14 @@ def run(data_dir="data",output_dir="GTA_RADAR_RESULTS",sources=None,session=None
         _write_csv(out/'EARLY_INVESTMENT_CHANGES_REVIEW_ONLY.csv',CHANGES,events)
         _write_csv(out/'EARLY_INVESTMENT_RESEARCH_QUEUE.csv',
                    (*FIELDS,'first_seen_at','last_seen_at','current_snapshot_status'),research)
+        context=[]
+        for sid,rid,first,last,raw in db.execute(
+            'SELECT source_id,record_id,first_seen_at,last_seen_at,content FROM snapshots'):
+            row=json.loads(raw)
+            if row['commercial_fit'] not in ('REVIEW','POSSIBLE_COMMERCIAL'):
+                context.append(dict(row,first_seen_at=first,last_seen_at=last))
+        _write_csv(out/'EARLY_INVESTMENT_CONTEXT_ONLY.csv',
+                   (*FIELDS,'first_seen_at','last_seen_at'),context)
         for row in statuses:
             print(row['source_id'],row['status'],'records',row['fetched'],
                   'postbaseline',row['new']+row['updated'],flush=True)
