@@ -291,7 +291,7 @@ def collector_attention(results):
     if log.is_file():
         source=''
         for line in log.read_text(encoding='utf-8',errors='replace').splitlines():
-            heading=re.match(r'^\\[\\d+/\\d+\\]\\s+(.+)',line.strip())
+            heading=re.match(r'^\[\d+/\d+\]\s+(.+)',line.strip())
             if heading:
                 source=heading.group(1)
             elif '!! FAILED:' in line:
