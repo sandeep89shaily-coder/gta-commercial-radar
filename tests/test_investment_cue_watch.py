@@ -100,6 +100,36 @@ class InvestmentWatchTests(unittest.TestCase):
     def test_generic_market_report_not_buyer_lead(self):
         self.assertEqual(parse_property(PROP)[0]['commercial_fit'],'LOW')
 
+    def test_old_recipient_added_after_parser_upgrade_is_not_fresh_cue(self):
+        release='https://www.canada.ca/en/economic-development-southern-ontario/news/2026/10/announcement.html'
+        back='https://www.canada.ca/en/economic-development-southern-ontario/news/2026/10/details.html'
+        atom=f'''<feed xmlns="http://www.w3.org/2005/Atom"><entry>
+        <title>Support for businesses and manufacturing</title>
+        <link rel="alternate" href="{release}"/><published>2026-10-02T00:00:00Z</published>
+        </entry></feed>'''
+        table='''<html><body><table><tr><th>Recipient Name</th><th>Project</th></tr>
+        <tr><td>Sample Industries Ltd</td>
+        <td>To expand factory operations and automate production equipment in Brampton.</td>
+        </tr></table></body></html>'''
+        with tempfile.TemporaryDirectory() as t:
+            data=Path(t)/'data';out=Path(t)/'results'
+            first=Session({FEEDS['feddev_investment']['url']:atom,
+                           release:'<html><body>No linked backgrounder here.</body></html>'})
+            self.assertEqual(run(data,out,sources=['feddev_investment'],session=first,
+                                 observed='2026-10-25T10:00:00Z'),0)
+            second=Session({FEEDS['feddev_investment']['url']:atom,
+                           release:f'<html><body><a href="{back}">backgrounder</a></body></html>',
+                           back:table})
+            self.assertEqual(run(data,out,sources=['feddev_investment'],session=second,
+                                 observed='2026-10-26T10:00:00Z'),0)
+            with (out/'EARLY_INVESTMENT_CHANGES_REVIEW_ONLY.csv').open(encoding='utf-8-sig') as file:
+                self.assertEqual(len(list(csv.DictReader(file))),0)
+            with (out/'EARLY_INVESTMENT_RESEARCH_QUEUE.csv').open(encoding='utf-8-sig') as file:
+                records=list(csv.DictReader(file))
+            self.assertEqual(len(records),1)
+            self.assertEqual(records[0]['company'],'Sample Industries Ltd')
+            self.assertEqual(records[0]['source_scope'],'HISTORICAL_RECIPIENT_BACKFILL_NOT_FRESH')
+
     def test_failed_feed_does_not_erase_snapshot(self):
         with tempfile.TemporaryDirectory() as t:
             data=Path(t)/'data';out=Path(t)/'results'

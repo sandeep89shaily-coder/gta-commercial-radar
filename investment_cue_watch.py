@@ -403,6 +403,15 @@ def run(data_dir="data",output_dir="GTA_RADAR_RESULTS",sources=None,session=None
                          enriched_investontario(session,raw) if sid=="investontario_investment" else
                          enriched_corporate(session,raw) if sid=="corporate_capex_watch" else
                          PARSERS[sid](raw))
+                # Newly extracted recipients from releases older than an
+                # established baseline are historical discoveries, not fresh news.
+                earliest=db.execute('SELECT MIN(first_seen_at) FROM snapshots WHERE source_id=?',
+                                    (sid,)).fetchone()[0]
+                if sid=='feddev_investment' and earliest:
+                    for record in records:
+                        if ('#recipient-' in record['record_id'] and record['source_date']
+                           and record['source_date']<earliest[:10]):
+                            record['source_scope']='HISTORICAL_RECIPIENT_BACKFILL_NOT_FRESH'
                 result=save_source(db,sid,records,stamp)
                 statuses.append(dict(source_id=sid,status="SUCCESS",fetched=len(records),
                     coverage=FEEDS[sid]["coverage"],error="",**result))
@@ -417,6 +426,8 @@ def run(data_dir="data",output_dir="GTA_RADAR_RESULTS",sources=None,session=None
             (stamp,)):
             if sid not in good:continue
             record=json.loads(raw)
+            if record.get('source_scope')=='HISTORICAL_RECIPIENT_BACKFILL_NOT_FRESH':
+                continue
             events.append(dict(record,observed_at=date,change_type=kind))
         research=[]
         for sid,rid,first,last,raw in db.execute(
