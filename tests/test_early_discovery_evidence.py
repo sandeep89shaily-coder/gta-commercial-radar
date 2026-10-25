@@ -71,6 +71,17 @@ class DiscoveryTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError,"ward"):
             d.discover_burlington_ward_urls("<html><p>not linked</p></html>")
 
+    def test_actual_brampton_calendar_ampersand_and_deep_card(self):
+        fixture="""<html><body>
+        <div class="calendar-entry"><h3 class="meeting-title-heading">Planning &amp; Development Committee</h3>
+          <div><div><div><div><a href="Meeting.aspx?Agenda=Agenda&amp;Id=25022e86-016b-490b-b051-1bae3971fa77&amp;lang=English">Agenda HTML</a></div></div></div></div>
+        </div>
+        <div class="calendar-entry"><h3>City Council</h3>
+          <a href="Meeting.aspx?Agenda=Agenda&amp;Id=b1b11e86-016b-490b-b051-1bae3971fa77&amp;lang=English">Agenda</a>
+        </div></body></html>"""
+        result=d.parse_calendar(fixture)
+        self.assertEqual(list(result),["25022e86-016b-490b-b051-1bae3971fa77"])
+
     def test_brampton_calendar_selects_only_planning_meetings(self):
         meetings=d.parse_calendar(CAL)
         self.assertEqual(len(meetings),1)
