@@ -124,13 +124,13 @@ class V6Tests(unittest.TestCase):
             events.append(name)
             if name=='fresh_48h_opportunities':
                 (self.data/'opportunities_ALL_REVIEW_ONLY.csv').write_text(
-                    'source_id,source_key,description,address\\n',encoding='utf-8')
+                    'source_id,source_key,description,address\n',encoding='utf-8')
             if name=='early_oakville':
                 return {'step':name,'status':'FAILED','detail':'offline pilot'}
             return {'step':name,'status':'SUCCESS','detail':'done'}
         def selector(src,dst,db):
             (Path(dst)/'CANDIDATES_V4_ALL_REVIEW_ONLY.csv').write_text(
-                'project_id,address\\n',encoding='utf-8')
+                'project_id,address\n',encoding='utf-8')
         outcome=v6.pipeline(self.ws,self.db,collector=collector,selector=selector,
             investigator=lambda *_a,**_kw:{'processed':0,'with_public_pages':0,
                                            'reserved_usd':0,'deepseek_configured':False})
