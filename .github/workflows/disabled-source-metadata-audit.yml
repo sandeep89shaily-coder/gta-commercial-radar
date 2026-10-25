@@ -1,0 +1,33 @@
+name: Disabled source metadata audit
+
+on:
+  push:
+    branches:
+      - 'dev/integrate-early-feeds-v8-20261024'
+    paths:
+      - 'disabled_source_schema_audit.py'
+      - 'tests/test_disabled_source_schema_audit.py'
+      - '.github/workflows/disabled-source-metadata-audit.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-metadata:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install network dependency
+        run: python -m pip install requests
+      - name: Read-only metadata check
+        run: python disabled_source_schema_audit.py --output source-audit/DISABLED_SOURCE_SCHEMA_AUDIT.csv
+      - name: Save report
+        uses: actions/upload-artifact@v4
+        with:
+          name: disabled-source-metadata-report
+          path: source-audit/DISABLED_SOURCE_SCHEMA_AUDIT.csv
