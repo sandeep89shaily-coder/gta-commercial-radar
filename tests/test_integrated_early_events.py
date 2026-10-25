@@ -46,6 +46,22 @@ class Tests(unittest.TestCase):
             self.assertEqual(harvest(folder,successful_steps={"early_ajax"},
                                      run_started="2026-10-24T10:00:00Z")[0],[])
 
+    def test_tenders_never_promoted_as_private_commercial_project(self):
+        with tempfile.TemporaryDirectory() as t:
+            d=Path(t)
+            save(d/"EARLY_INVESTMENT_TENDERS_STATUS.csv",[
+                {"source_id":"federal_open_tenders","status":"SUCCESS"}])
+            save(d/"EARLY_INVESTMENT_TENDERS_CHANGES.csv",[
+                {"source_id":"federal_open_tenders","record_id":"T1",
+                 "change_type":"NEW","title":"Federal government contract",
+                 "source_url":"https://canadabuys.canada.ca/open-tender",
+                 "observed_at":"2026-10-24T11:00:00Z"}])
+            rows,audit=harvest(d,successful_steps={"early_investment_tenders"},
+                               run_started="2026-10-24T10:00:00Z")
+            self.assertEqual(rows,[])
+            self.assertTrue(any(s["source_file"]=="EARLY_INVESTMENT_TENDERS_STATUS.csv"
+                                for s in audit))
+
     def test_only_live_successful_nonbaseline_changes(self):
         with tempfile.TemporaryDirectory() as t:
             d=Path(t)

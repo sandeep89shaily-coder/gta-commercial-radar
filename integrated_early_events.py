@@ -2,12 +2,12 @@
 import csv
 from datetime import datetime, timezone
 from pathlib import Path
-PAIRS=[("EARLY_SIGNALS_SOURCES_STATUS.csv","EARLY_SIGNALS_CHANGES_REVIEW_ONLY.csv","status"),("EARLY_CUES_SOURCE_STATUS.csv","EARLY_CUES_CHANGES_REVIEW_ONLY.csv","state"),("EARLY_DISCOVERY_SOURCE_STATUS.csv","EARLY_DISCOVERY_CHANGES_REVIEW_ONLY.csv","status"),("EARLY_HAMILTON_SOURCE_STATUS.csv","EARLY_HAMILTON_CHANGES_REVIEW_ONLY.csv","status"),("EARLY_PUBLIC_NOTICES_SOURCE_STATUS.csv","EARLY_PUBLIC_NOTICES_CHANGES_REVIEW_ONLY.csv","status"),("EARLY_OAKVILLE_SOURCE_STATUS.csv","EARLY_OAKVILLE_CHANGES_REVIEW_ONLY.csv","status"),("EARLY_AJAX_SOURCE_STATUS.csv","EARLY_AJAX_CHANGES_REVIEW_ONLY.csv","status")]
+PAIRS=[("EARLY_SIGNALS_SOURCES_STATUS.csv","EARLY_SIGNALS_CHANGES_REVIEW_ONLY.csv","status"),("EARLY_CUES_SOURCE_STATUS.csv","EARLY_CUES_CHANGES_REVIEW_ONLY.csv","state"),("EARLY_DISCOVERY_SOURCE_STATUS.csv","EARLY_DISCOVERY_CHANGES_REVIEW_ONLY.csv","status"),("EARLY_HAMILTON_SOURCE_STATUS.csv","EARLY_HAMILTON_CHANGES_REVIEW_ONLY.csv","status"),("EARLY_PUBLIC_NOTICES_SOURCE_STATUS.csv","EARLY_PUBLIC_NOTICES_CHANGES_REVIEW_ONLY.csv","status"),("EARLY_OAKVILLE_SOURCE_STATUS.csv","EARLY_OAKVILLE_CHANGES_REVIEW_ONLY.csv","status"),("EARLY_AJAX_SOURCE_STATUS.csv","EARLY_AJAX_CHANGES_REVIEW_ONLY.csv","status"),("EARLY_INVESTMENT_TENDERS_STATUS.csv","EARLY_INVESTMENT_TENDERS_CHANGES.csv","status")]
 FIELDS=["source_id","source_key","source_group","description","address","city","company_name","event_date","event_date_basis","evidence_url","source_record_date","current_source_status"]
 def read(path):
     if not Path(path).is_file(): return []
     with Path(path).open(encoding="utf-8-sig",newline="") as f:return list(csv.DictReader(f))
-STEP_NAMES=("early_planning_pilot","early_industrial_cues","early_agendas","early_hamilton","early_notices","early_oakville","early_ajax")
+STEP_NAMES=("early_planning_pilot","early_industrial_cues","early_agendas","early_hamilton","early_notices","early_oakville","early_ajax","early_investment_tenders")
 def harvest(folder,successful_steps=None,run_started=None):
     def as_utc(stamp):
         if not stamp:return None
@@ -31,6 +31,9 @@ def harvest(folder,successful_steps=None,run_started=None):
                 seen_at=as_utc(r.get("observed_at"))
                 if seen_at is None or seen_at < start:continue
             if "CALENDAR_ONLY" in key or r.get("commercial_fit") in ("LOW","RESIDENTIAL_LIKELY","UNKNOWN","REVIEW") or r.get("commercial_signal")=="RESIDENTIAL_LIKELY":continue
+            # Tenders/news are kept in a separate reviewed lane; they cannot
+            # become leads solely because a procurement notice was observed.
+            if sf=="EARLY_INVESTMENT_TENDERS_STATUS.csv":continue
             if sf=="EARLY_AJAX_SOURCE_STATUS.csv" and r.get("commercial_fit") not in ("POSSIBLE_COMMERCIAL","COMMERCIAL","INDUSTRIAL","MIXED_USE_REVIEW"):continue
             if sf=="EARLY_OAKVILLE_SOURCE_STATUS.csv" and r.get("commercial_fit") not in ("POSSIBLE_COMMERCIAL","MIXED_USE_REVIEW"):continue
             desc=r.get("description") or r.get("title") or ""
