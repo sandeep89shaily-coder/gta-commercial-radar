@@ -155,9 +155,15 @@ class V6Tests(unittest.TestCase):
         durham=next(r for r in rows if r['source_id']=='durham_planit_opa')
         self.assertEqual(durham['validation_state'],'QUERY_FIX_NEEDED')
         self.assertEqual(counts['review_only_pilots'],3)
-        self.assertIn('early_ajax',{r['source_id'] for r in rows})
-        self.assertIn('early_markham',{r['source_id'] for r in rows})
-        self.assertIn('early_investment_tenders',{r['source_id'] for r in rows})
+        self.assertEqual(counts['pilot_runner_count'],9)
+        self.assertEqual(counts['pilot_source_definitions'],21)
+        self.assertEqual(counts['pilot_source_overlaps_v8'],4)
+        self.assertEqual(counts['pilot_unique_outside_v8'],17)
+        self.assertIn('ajax_planning_properties',{r['source_id'] for r in rows})
+        self.assertIn('markham_circulated_application_reports',{r['source_id'] for r in rows})
+        self.assertIn('federal_open_tenders',{r['source_id'] for r in rows})
+        overlaps=[r for r in rows if r['integration_status']=='OVERLAPS_V8']
+        self.assertEqual(len(overlaps),4)
 
     def test_week_cooldown_skips_recently_investigated(self):
         import types

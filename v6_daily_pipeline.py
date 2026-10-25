@@ -327,6 +327,9 @@ def render_dashboard(results, state):
              '<a href="GTA_RADAR_OPPORTUNITY_RESEARCH_GAPS.csv">Records awaiting verification</a>.</p>',
              '<p><b>Commercial intelligence:</b> <a href="GTA_RADAR_LEAD_INTELLIGENCE.html">Open all classified opportunities and contact dashboard</a>.</p>',
             '<h2>One collection system — source health</h2>',
+            f'<p><b>Pilot coverage:</b> {esc(state.get("pilot_unique_outside_v8","UNKNOWN"))} distinct feeds outside V8; '
+            f'{esc(state.get("pilot_source_overlaps_v8","UNKNOWN"))} overlap existing V8 sources, managed by '
+            f'{esc(state.get("pilot_runner_count","UNKNOWN"))} collector runner groups.</p>',
             '<p><b>Unified source inventory:</b> <a href="GTA_RADAR_ALL_SOURCE_STATUS.csv">View status of every core, disabled, and independent collector</a>. '
             'Review-only feeds are visible, but do not automatically trigger paid research.</p>',
             '<p>All early collectors run under the same daily pipeline. An unsuccessful or review-only source is not a verified buying signal.</p>',
@@ -551,7 +554,8 @@ def pipeline(workspace, database=None, *, run_collectors=True, run_research=True
             # A single status inventory covers every configured and independent source.
             try:
                 from unified_collector_inventory import build
-                _,inventory=build(out,ROOT/'config'/'sources.json',state['steps'])
+                _,inventory=build(out,ROOT/'config'/'sources.json',state['steps'],
+                                  run_started=state['started_local'])
                 state.update(inventory)
             except (OSError,ValueError,csv.Error) as exc:
                 state['collector_inventory_error']=str(exc)[:200]
