@@ -16,8 +16,8 @@ class SafeDesktopPreview(unittest.TestCase):
                 db.execute("INSERT INTO records_current VALUES(17)")
                 db.commit()
             ws,database,results=prepare(workspace=root,original_db=source)
-            self.assertEqual(ws,root)
-            self.assertEqual(database,root/PREVIEW_DIR/"data"/"radar.sqlite")
+            self.assertEqual(ws,root.resolve())
+            self.assertEqual(database,(root/PREVIEW_DIR/"data"/"radar.sqlite").resolve())
             with closing(sqlite3.connect(database)) as db:
                 self.assertEqual(db.execute("SELECT count(*) FROM records_current").fetchone()[0],1)
             with closing(sqlite3.connect(source)) as db:
