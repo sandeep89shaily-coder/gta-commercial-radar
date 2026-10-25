@@ -2,7 +2,8 @@ import csv
 import tempfile
 import unittest
 from pathlib import Path
-from investment_cue_watch import (parse_feddev_atom,parse_investontario,parse_corporate,parse_property,run,FEEDS)
+from investment_cue_watch import (parse_feddev_atom,parse_investontario,parse_corporate,parse_property,run,FEEDS,parse_feddev_backgrounder,
+    enriched_feddev,enriched_investontario)
 
 class Response:
     def __init__(self,data):
@@ -45,6 +46,60 @@ class InvestmentWatchTests(unittest.TestCase):
             self.assertEqual(len(changes),1)
             self.assertEqual(changes[0]['change_type'],'NEW')
             self.assertEqual(changes[0]['source_id'],'investontario_investment')
+    def test_official_feddev_recipient_table_is_individual_projects(self):
+        url='https://www.canada.ca/en/economic-development-southern-ontario/news/2026/10/recipient-details.html'
+        page='''<html><body><table><tr><th>Recipient Name</th><th>Project</th>
+        <th>Total Project Cost</th><th>FedDev Ontario Funding Contribution</th></tr>
+        <tr><td>Daybar Industries Limited</td>
+        <td>To expand industrial manufacturing capacity in Brampton and modernize factory equipment.</td>
+        <td>$12,475,650</td><td>$700,000</td></tr>
+        <tr><td>Maxxit Systems Inc.</td>
+        <td>To acquire and install steel printing equipment in Mississauga.</td>
+        <td>$3,351,976</td><td>$900,000</td></tr></table></body></html>'''
+        rows=parse_feddev_backgrounder(page,url,'2026-10-02')
+        self.assertEqual(len(rows),2)
+        self.assertEqual(rows[0]['company'],'Daybar Industries Limited')
+        self.assertEqual(rows[0]['project_cost'],'$12,475,650')
+        self.assertEqual(rows[1]['funding_contribution'],'$900,000')
+        self.assertEqual(rows[0]['source_date'],'2026-10-02')
+        self.assertEqual(rows[0]['procurement_status'],'UNKNOWN')
+
+    def test_follow_feddev_release_backgrounder_link(self):
+        release='https://www.canada.ca/en/economic-development-southern-ontario/news/2026/10/example.html'
+        back='https://www.canada.ca/en/economic-development-southern-ontario/news/2026/10/details.html'
+        atom=f'''<feed xmlns="http://www.w3.org/2005/Atom"><entry>
+        <title>Government supports businesses expanding factories</title>
+        <link rel="alternate" href="{release}"/><published>2026-10-02T00:00:00Z</published>
+        </entry></feed>'''
+        article=f'<html><body><a href="{back}">backgrounder</a></body></html>'
+        table='''<html><body><table><tr><th>Recipient Name</th><th>Project</th></tr>
+        <tr><td>Example Brampton Fabrication</td>
+        <td>Upgrade production equipment in Brampton and expand factory.</td></tr>
+        </table></body></html>'''
+        rows=enriched_feddev(Session({release:article,back:table}),atom.encode())
+        self.assertEqual(len(rows),2)
+        self.assertEqual(rows[0]['commercial_fit'],'LOW')
+        self.assertEqual(rows[1]['company'],'Example Brampton Fabrication')
+        self.assertEqual(rows[1]['source_url'],back)
+
+    def test_investontario_datelined_article_and_specific_spend(self):
+        url='https://www.investontario.ca/press-release/invest-ontario-welcomes-sekisui-expansion-burlington'
+        idx=f'''<html><body><div class="card"><span>August 19, 2026</span>
+        <h3><a href="{url}">Invest Ontario welcomes SEKISUI Canada Modular Solutions’ expansion in Burlington</a></h3>
+        </div></body></html>'''
+        article='''<html><body><main><h1>Invest Ontario welcomes SEKISUI Canada Modular Solutions’ expansion in Burlington</h1>
+        <p>BURLINGTON, Ontario, August 19, 2026 – The company is investing $15 million in a
+        new manufacturing facility in Burlington, Ontario.</p></main></body></html>'''
+        rows=enriched_investontario(Session({url:article}),idx)
+        self.assertEqual(len(rows),1)
+        self.assertEqual(rows[0]['source_date'],'2026-08-19')
+        self.assertEqual(rows[0]['company'],'SEKISUI Canada Modular Solutions')
+        self.assertEqual(rows[0]['commercial_fit'],'REVIEW')
+        self.assertEqual(rows[0]['procurement_status'],'UNKNOWN')
+
+    def test_generic_market_report_not_buyer_lead(self):
+        self.assertEqual(parse_property(PROP)[0]['commercial_fit'],'LOW')
+
     def test_failed_feed_does_not_erase_snapshot(self):
         with tempfile.TemporaryDirectory() as t:
             data=Path(t)/'data';out=Path(t)/'results'
