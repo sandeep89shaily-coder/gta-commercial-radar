@@ -230,8 +230,10 @@ def read_documents(db, home, now):
                  (pid,identity,city,address,app,quote,doc_type,now,public_date,
                   "MANIFEST_DATE_UNVERIFIED_AS_PUBLIC_POSTING",url,1,
                   existing[0] if existing else 1,"REVIEW_REQUIRED","DOCUMENT_ONLY_NEEDS_IDENTITY_REVIEW",now))
+                page_markers=re.findall(r"\\[page (\\d+)\\]",text[:snippet.start()])
+                locator=("PDF page "+page_markers[-1]) if page_markers else "document text"
                 add_fact(db,pid,"document_scope_excerpt",quote,doc=doc_id,url=url,
-                         locator="extracted text; page marker in document",verification="DOCUMENT_TEXT_EXTRACTION_NOT_FACT_CHECKED",
+                         locator=locator,verification="DOCUMENT_TEXT_EXTRACTION_NOT_FACT_CHECKED",
                          observed=now,date_basis="MANIFEST_DATE_UNVERIFIED")
     return count
 
@@ -309,7 +311,7 @@ def finalize(db, now):
         # A research candidate is NOT a verified customer or open contract.
         db.execute("""UPDATE project_nodes SET source_count=?,review_state=?,
                   review_reason=?,updated_at=? WHERE project_id=?""",
-                  (n,state,";".join(missing),now,pid))
+                  (n+doc,state,";".join(missing),now,pid))
         if address_id:
             by_address[address_id].append(pid)
     for addr, members in by_address.items():
