@@ -49,3 +49,9 @@ does not claim 100% source success just because records exist.
 - No environment variable or API key is copied, printed, or saved.
 - Research remains off by default; the prior local US$0.25/day DeepSeek software
   cap is not a provider-wide spending limit.
+
+**Coverage note:** This first importer recognizes SQLite `snapshots` and
+`changes` tables used by the early pilots. Databases with other schemas,
+including the old V8 core database, are **counted as unsupported** rather than
+misreported as successfully imported. Their original files are untouched;
+a dedicated V8 adapter will be needed before claiming complete history.

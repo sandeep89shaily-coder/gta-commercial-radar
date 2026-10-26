@@ -149,9 +149,15 @@ def _payload(raw):
 def _import_database(master, file, seen_at, counts):
     source = _read_only(file)
     try:
-        if _has_fields(source, "snapshots",
-                       ("source_id", "record_id", "first_seen_at",
-                        "last_seen_at", "content")):
+        has_snapshots = _has_fields(
+            source, "snapshots",
+            ("source_id", "record_id", "first_seen_at", "last_seen_at", "content"))
+        has_changes = _has_fields(
+            source, "changes",
+            ("source_id", "record_id", "observed_at", "change_type", "content"))
+        if not (has_snapshots or has_changes):
+            return False
+        if has_snapshots:
             rows = source.execute(
                 "SELECT source_id,record_id,first_seen_at,last_seen_at,content FROM snapshots")
             for sid, rid, first, last, body in rows:
@@ -180,8 +186,7 @@ def _import_database(master, file, seen_at, counts):
                         "last_seen_at=?,source_date=?,payload_json=?,payload_hash=?,"
                         "last_imported_at=?,provenance=? WHERE source_id=? AND record_id=?",
                         (first, last, date, packed, digest, seen_at, str(file), sid, rid))
-        if _has_fields(source, "changes",
-                       ("source_id", "record_id", "observed_at", "change_type", "content")):
+        if has_changes:
             for sid, rid, observed, kind, body in source.execute(
                     "SELECT source_id,record_id,observed_at,change_type,content FROM changes"):
                 if not sid or not rid or not observed:
@@ -194,6 +199,7 @@ def _import_database(master, file, seen_at, counts):
                     (key, str(sid), str(rid), str(kind), str(observed),
                      str(file), packed))
                 counts["added_events"] += inserted.rowcount
+        return True
     finally:
         source.close()
 
@@ -240,7 +246,8 @@ def import_history(home, roots):
     started = utcnow()
     counts = {"new_records": 0, "added_versions": 0,
               "added_events": 0, "source_status_rows": 0,
-              "source_databases_read": 0, "read_errors": []}
+              "source_databases_read": 0, "unsupported_databases": 0,
+              "read_errors": []}
     with sqlite3.connect(master_file) as db:
         db.execute(
             "INSERT INTO import_runs(import_id,started_at,roots_json) VALUES(?,?,?)",
@@ -252,13 +259,19 @@ def import_history(home, roots):
             for filename in source_databases(folder, master_file):
                 # Savepoint ensures a corrupt source does not partially import.
                 db.execute("SAVEPOINT source_import")
+                before = {name: counts[name] for name in
+                          ("new_records", "added_versions", "added_events")}
                 try:
-                    _import_database(db, filename, started, counts)
-                    counts["source_databases_read"] += 1
+                    supported = _import_database(db, filename, started, counts)
+                    if supported:
+                        counts["source_databases_read"] += 1
+                    else:
+                        counts["unsupported_databases"] += 1
                     db.execute("RELEASE source_import")
                 except (sqlite3.Error, ValueError, UnicodeError, TypeError) as exc:
                     db.execute("ROLLBACK TO source_import")
                     db.execute("RELEASE source_import")
+                    counts.update(before)  # Rolled-back work is not counted.
                     counts["read_errors"].append(filename.name + ": "
                                                  + type(exc).__name__)
             try:

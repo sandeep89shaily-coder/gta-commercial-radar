@@ -77,6 +77,34 @@ class WorkspaceTests(unittest.TestCase):
             self.assertTrue(result["read_errors"])
             self.assertEqual(rw.status(new)["records"], 1)
 
+    def test_malformed_second_snapshot_rolls_back_entire_source_and_counters(self):
+        with tempfile.TemporaryDirectory() as temp:
+            old = Path(temp) / "old"
+            new = Path(temp) / "permanent"
+            legacy = create_legacy(old)
+            with sqlite3.connect(legacy) as db:
+                db.execute("INSERT INTO snapshots VALUES(?,?,?,?,?)",
+                           ("brampton_site_plans", "bad", "2026-10-01",
+                            "2026-10-02", "{not JSON"))
+            result = rw.import_history(new, [old])
+            self.assertEqual(result["new_records"], 0)
+            self.assertEqual(result["added_versions"], 0)
+            self.assertTrue(result["read_errors"])
+            self.assertEqual(rw.status(new)["records"], 0)
+
+    def test_unrecognized_database_not_counted_as_imported_source(self):
+        with tempfile.TemporaryDirectory() as temp:
+            old = Path(temp) / "old"
+            new = Path(temp) / "permanent"
+            directory = old / "Workspace" / "Data"
+            directory.mkdir(parents=True)
+            with sqlite3.connect(directory / "v8_main.sqlite") as db:
+                db.execute("CREATE TABLE v8_records(id INTEGER PRIMARY KEY)")
+            result = rw.import_history(new, [old])
+            self.assertEqual(result["source_databases_read"], 0)
+            self.assertEqual(result["unsupported_databases"], 1)
+            self.assertFalse(result["read_errors"])
+
     def test_importing_workspace_itself_never_recurses_into_master(self):
         with tempfile.TemporaryDirectory() as temp:
             home = Path(temp)
