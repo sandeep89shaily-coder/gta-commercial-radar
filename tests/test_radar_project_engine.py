@@ -1,5 +1,6 @@
 """Offline tests for document extraction, project identity, review gates and scheduling."""
 import csv
+from contextlib import closing
 import json
 import sqlite3
 import tempfile
@@ -24,13 +25,14 @@ class ProjectIntelligenceTests(unittest.TestCase):
                stage="PRE_CONSULTATION"):
         item=dict(city=city,application_id=app,location=address,
                   description=desc,source_url=url,stage=stage)
-        with sqlite3.connect(self.master) as db:
+        with closing(sqlite3.connect(self.master)) as db:
             db.execute("""INSERT INTO records
                 (source_id,record_id,first_seen_at,last_seen_at,source_date,
                  payload_json,payload_hash,last_imported_at,provenance)
                  VALUES(?,?,?,?,?,?,?,?,?)""",
                  (sid,rid,"2026-10-20T10:00:00+00:00","2026-10-25T10:00:00+00:00",
                   "2024-01-03",json.dumps(item),"hash","2026-10-26","test"))
+            db.commit()
 
     def csvread(self, name):
         with (self.home/"Results"/name).open(encoding="utf-8-sig",newline="") as f:
