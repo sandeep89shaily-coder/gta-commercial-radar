@@ -13,6 +13,7 @@ import json
 import re
 import sqlite3
 from collections import defaultdict
+from contextlib import closing
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlparse
@@ -168,6 +169,8 @@ def read_documents(db, home, now):
             if not name or filename.name != name or filename.suffix.lower() not in (".pdf",".txt",".html",".htm"):
                 continue
             path=directory/filename.name
+            if path.is_symlink() or path.resolve().parent != directory.resolve():
+                continue
             doc_id="DOC-"+digest(name+"|"+url)[:20]
             status="READY"; reason=""; text=""
             raw=b""; sha=""
@@ -192,7 +195,7 @@ def read_documents(db, home, now):
                     status="REVIEW";reason="NO_READABLE_TEXT_OR_SCANNED_PDF"
                 if not url:
                     status="REVIEW";reason="SOURCE_URL_MISSING_OR_NOT_HTTPS"
-            except (OSError,ValueError,UnicodeError,Exception) as exc:
+            except Exception as exc:
                 # Store the failure, never turn it into a successful project.
                 status="ERROR";reason=type(exc).__name__+": "+str(exc)[:120]
             db.execute("""INSERT INTO project_documents
@@ -333,7 +336,7 @@ def build(home):
     home=Path(home).expanduser().resolve()
     master=workspace.setup(home)
     now=datetime.now(timezone.utc).isoformat(timespec="seconds")
-    with sqlite3.connect(master,timeout=30) as db:
+    with closing(sqlite3.connect(master,timeout=30)) as db:
         db.execute("PRAGMA busy_timeout=30000")
         setup(db)
         # Keep raw records and versions. Only refresh our derived engine tables.
