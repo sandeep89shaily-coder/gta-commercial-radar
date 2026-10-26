@@ -69,6 +69,24 @@ class V8MigrationTests(unittest.TestCase):
             self.assertEqual(second["source_runs_imported"],0)
             self.assertEqual(source.read_bytes(),prior)
 
+    def test_v8_disabled_source_catalog_preserved(self):
+        with tempfile.TemporaryDirectory() as td:
+            source=Path(td)/"v8"/"data"/"radar.sqlite"
+            make_v8(source)
+            with closing(sqlite3.connect(source)) as db:
+                db.execute("CREATE TABLE sources(source_id TEXT,name TEXT,"
+                           "jurisdiction TEXT,family TEXT,enabled INTEGER,official_page TEXT)")
+                db.execute("INSERT INTO sources VALUES(?,?,?,?,?,?)",
+                           ("closed_source","Closed source","Toronto","permit",0,
+                            "https://example.org/"))
+                db.commit()
+            home=Path(td)/"master"
+            rw.import_history(home,[source.parent.parent])
+            with closing(sqlite3.connect(home/"Data"/rw.DB_NAME)) as db:
+                row=db.execute("SELECT enabled,name FROM source_catalog "
+                               "WHERE source_id='closed_source'").fetchone()
+                self.assertEqual(row,(0,"Closed source"))
+
     def test_adopt_v8_one_time_only(self):
         with tempfile.TemporaryDirectory() as td:
             old=Path(td)/"old"/"radar.sqlite";home=Path(td)/"home"

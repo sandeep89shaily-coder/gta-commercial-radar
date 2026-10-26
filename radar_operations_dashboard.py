@@ -52,6 +52,9 @@ def build(home):
         latest={}
         for row in v8:
             latest.setdefault(row["source_id"],row)
+        catalog=[dict(row) for row in db.execute(
+            "SELECT source_id,name,jurisdiction,family,enabled FROM source_catalog "
+            "ORDER BY source_id")]
         imported=db.execute("SELECT import_id,completed_at FROM import_runs "
                             "ORDER BY rowid DESC LIMIT 1").fetchone()
         early=[]
@@ -65,6 +68,14 @@ def build(home):
             "<tr>"+"".join("<td>"+str(c)+"</td>" for c in row)+"</tr>" for row in rows
         )+"</tbody></table></div>"
     health=[]
+    for item in catalog:
+        s=latest.pop(item["source_id"],None)
+        status=("DISABLED" if not item["enabled"] else
+                ("SUCCESS" if s and s["success"]==1 else
+                 ("FAILED" if s else "NEVER_RUN")))
+        health.append((esc(item["name"] or item["source_id"]),"V8",status,
+                       esc(s["finished_at"] if s else ""),esc(s["record_count"] if s else ""),
+                       esc(s["error"] if s else "")))
     for s in latest.values():
         health.append((esc(s["source_id"]),"V8","SUCCESS" if s["success"]==1 else "FAILED",
                        esc(s["finished_at"]),esc(s["record_count"]),esc(s["error"])))

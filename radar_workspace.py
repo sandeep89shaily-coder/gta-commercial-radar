@@ -83,6 +83,11 @@ def setup(home):
               added_events INTEGER NOT NULL DEFAULT 0,
               read_errors_json TEXT NOT NULL DEFAULT '[]'
             );
+            CREATE TABLE IF NOT EXISTS source_catalog(
+              source_id TEXT PRIMARY KEY, name TEXT, jurisdiction TEXT,
+              family TEXT, enabled INTEGER, official_page TEXT,
+              provenance TEXT, last_indexed_at TEXT
+            );
             CREATE TABLE IF NOT EXISTS source_runs(
               provenance TEXT NOT NULL, run_id INTEGER NOT NULL,
               source_id TEXT, started_at TEXT, finished_at TEXT, success INTEGER,

@@ -85,6 +85,14 @@ def import_v8(master, source, file, seen_at, counts, has_fields, payload):
             "INSERT OR IGNORE INTO historical_events VALUES(?,?,?,?,?,?,?)",
             (key,str(sid),str(rid),str(kind),str(observed),str(file),packed))
         counts["added_events"] += inserted.rowcount
+    if has_fields(source,"sources",("source_id","name","jurisdiction","family",
+                                      "enabled","official_page")):
+        for source_row in source.execute(
+                "SELECT source_id,name,jurisdiction,family,enabled,official_page FROM sources"):
+            if source_row[0]:
+                master.execute(
+                    "INSERT OR REPLACE INTO source_catalog VALUES(?,?,?,?,?,?,?,?)",
+                    (*source_row,str(file),seen_at))
     if has_fields(source,"runs",("run_id","source_id","started_at","finished_at",
                                   "success","baseline","record_count","new_count",
                                   "updated_count","removed_count","error","metadata_json")):
