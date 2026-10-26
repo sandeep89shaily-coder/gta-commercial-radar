@@ -93,7 +93,7 @@ def import_v8(master, source, file, seen_at, counts, has_fields, payload):
                 "record_count,new_count,updated_count,removed_count,"
                 "latest_source_date,error,metadata_json FROM runs ORDER BY run_id"):
             master.execute(
-                "INSERT OR IGNORE INTO source_runs VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                "INSERT OR IGNORE INTO source_runs VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (str(file),*row))
             counts["source_runs_imported"] += master.execute("SELECT changes()").fetchone()[0]
     return True
