@@ -108,6 +108,7 @@ def setup(db):
        source_url TEXT, locator TEXT, verification TEXT NOT NULL,
        observed_at TEXT, date_basis TEXT
     );
+    CREATE INDEX IF NOT EXISTS ix_project_facts_project ON project_facts(project_id,document_id);
     CREATE TABLE IF NOT EXISTS project_documents(
        document_id TEXT PRIMARY KEY, filename TEXT NOT NULL,
        source_url TEXT, document_type TEXT, public_date TEXT, city TEXT,
