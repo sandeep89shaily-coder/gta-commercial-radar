@@ -48,7 +48,7 @@ class ProjectIntelligenceTests(unittest.TestCase):
         self.assertEqual(rows[0]["source_count"],"2")
         self.assertEqual(rows[0]["buyer_status"],"UNVERIFIED")
         self.assertEqual(rows[0]["supplier_selection_status"],"UNKNOWN")
-        with sqlite3.connect(self.master) as db:
+        with closing(sqlite3.connect(self.master)) as db:
             self.assertEqual(db.execute("SELECT COUNT(*) FROM project_record_edges").fetchone()[0],2)
             self.assertEqual(db.execute("SELECT COUNT(*) FROM project_facts WHERE field_name='application_id'").fetchone()[0],2)
 
@@ -100,7 +100,7 @@ class ProjectIntelligenceTests(unittest.TestCase):
         report=engine.build(self.home)
         self.assertEqual(report["documents_checked"],1)
         self.assertEqual(report["research_candidates"],1)
-        with sqlite3.connect(self.master) as db:
+        with closing(sqlite3.connect(self.master)) as db:
             actual=db.execute("SELECT extraction_status FROM project_documents").fetchone()[0]
             self.assertEqual(actual,"READY")
             fact=db.execute("SELECT verification,source_url,field_value FROM project_facts "
