@@ -19,6 +19,7 @@ from pathlib import Path
 import radar_workspace as ws
 import radar_v8_migration as v8
 import radar_operations_dashboard as dashboard
+import radar_project_engine as intelligence
 
 ROOT=Path(__file__).resolve().parent
 TASK="GTA_Radar_Consolidated"
@@ -97,8 +98,15 @@ def run(home, core=None, early=None):
         state["master_v8_source_runs"]=imported["source_runs_imported"]
         state["import_errors"]=len(imported["read_errors"])
         state["unsupported_databases"]=imported["unsupported_databases"]
+        try:
+            state["project_intelligence"]=intelligence.build(home)
+            state["project_status"]="SUCCESS"
+        except Exception as exc:
+            state["project_status"]="FAILED"
+            state["project_error"]=type(exc).__name__+": "+str(exc)[:240]
         state["status"]="SUCCESS" if (
-            code==0 and state["early_status"]=="SUCCESS" and not imported["read_errors"]
+            code==0 and state["early_status"]=="SUCCESS"
+            and not imported["read_errors"] and state["project_status"]=="SUCCESS"
         ) else "PARTIAL"
     except Exception as exc:
         state["status"]="FAILED"
