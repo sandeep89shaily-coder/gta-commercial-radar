@@ -107,10 +107,32 @@ def build(home):
                         esc(c.get("event_date") or ""),"RESEARCH ONLY"))
                     if len(candidates)>=35:break
         except (OSError,csv.Error,UnicodeError):pass
+    project_rows=[]
+    indexed=results/"GTA_RADAR_PROJECT_RESEARCH.csv"
+    if indexed.exists():
+        try:
+            with indexed.open(encoding="utf-8-sig",newline="") as f:
+                for item in csv.DictReader(f):
+                    url=safeurl(item.get("source_url"))
+                    evidence=("<a rel='noopener noreferrer' href='"+esc(url)+"'>Source record</a>"
+                              if url else "Not linked")
+                    project_rows.append((
+                        esc(item.get("city") or ""),
+                        esc(item.get("address") or item.get("application_id") or ""),
+                        esc(str(item.get("description") or "")[:170]),
+                        esc(item.get("stage") or ""),
+                        evidence,
+                        "RESEARCH ONLY — BUYER UNVERIFIED"))
+                    if len(project_rows)>=40:
+                        break
+        except (OSError,csv.Error,UnicodeError):
+            pass
+    project_summary=state.get("project_intelligence") or {}
     runstate=esc(state.get("status") or "NEVER_RUN")
     status=("<b>Last run: "+runstate+"</b> · "+esc(state.get("finished_at") or "")+
             " · V8 "+esc(state.get("v8_status") or "NOT_RUN")+
             " · Early "+esc(state.get("early_status") or "NOT_RUN")+
+            " · Projects "+esc(state.get("project_status") or "NOT_RUN")+
             " · Import errors "+esc(state.get("import_errors",0))+
             " · DeepSeek OFF")
     metrics="".join("<div class='metric'><small>"+esc(label)+"</small><b>"+esc(f"{val:,}")+"</b></div>"
@@ -118,7 +140,9 @@ def build(home):
                          ("Feeds with records",totals["feeds"]),
                          ("Historical changes",totals["historical_events"]),
                          ("Record revisions",totals["record_versions"]),
-                         ("V8 source runs",totals["source_runs"])))
+                         ("V8 source runs",totals["source_runs"]),
+                         ("Research projects",project_summary.get("research_candidates",0)),
+                         ("Identity reviews",project_summary.get("needs_review",0))))
     css="""<style>body{font:15px Segoe UI,Arial,sans-serif;color:#1a2938;background:#f4f6fa;margin:0}
       main{max-width:1220px;margin:32px auto;padding:0 18px}
       .panel,.metric{border:1px solid #dce2e9;background:#fff;border-radius:10px;padding:17px;margin:12px 0}
@@ -146,6 +170,12 @@ def build(home):
         "</div><div class='panel'><h2>Recent evidence changes</h2>",
         table(("Observed","Source","Change","Title","Site"),
               activity or [("No post-baseline changes","","","","")]),"</div>",
+        "<div class='panel'><h2>Evidence-linked project research</h2>",
+        "<p class='muted'>Project identities are only grouped automatically by a published "
+        "application reference within one municipality. Address similarities are review-only. "
+        "Research candidates are NOT verified open purchases or verified buyers.</p>",
+        table(("City","Address / Application","Description","Stage","Evidence","Status"),
+              project_rows or [("No gated project research yet","","","","","")]),"</div>",
         "<div class='panel'><h2>Commercial research candidates</h2>",
         "<p class='muted'>Purchasing categories are hypotheses. No buyer or unawarded "
         "contract is verified by appearing in this table.</p>",
