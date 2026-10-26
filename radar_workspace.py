@@ -21,6 +21,8 @@ from datetime import datetime, timezone
 from contextlib import closing
 from pathlib import Path
 
+import radar_v8_migration as v8
+
 SCHEMA_VERSION = 1
 DB_NAME = "radar_master.sqlite"
 DATA_DIRS = ("Workspace/Data", "data", "Data")
@@ -81,6 +83,16 @@ def setup(home):
               added_events INTEGER NOT NULL DEFAULT 0,
               read_errors_json TEXT NOT NULL DEFAULT '[]'
             );
+            CREATE TABLE IF NOT EXISTS source_runs(
+              provenance TEXT NOT NULL, run_id INTEGER NOT NULL,
+              source_id TEXT, started_at TEXT, finished_at TEXT, success INTEGER,
+              baseline INTEGER, record_count INTEGER, new_count INTEGER,
+              updated_count INTEGER, removed_count INTEGER,
+              latest_source_date TEXT, error TEXT, metadata_json TEXT,
+              PRIMARY KEY(provenance, run_id)
+            );
+            CREATE INDEX IF NOT EXISTS idx_source_runs_id
+              ON source_runs(source_id, finished_at);
             CREATE TABLE IF NOT EXISTS feed_health(
               import_id TEXT NOT NULL, source_id TEXT NOT NULL,
               source_report TEXT NOT NULL, reported_status TEXT NOT NULL,
@@ -157,7 +169,8 @@ def _import_database(master, file, seen_at, counts):
             source, "changes",
             ("source_id", "record_id", "observed_at", "change_type", "content"))
         if not (has_snapshots or has_changes):
-            return False
+            return v8.import_v8(master, source, file, seen_at, counts,
+                                _has_fields, _payload)
         if has_snapshots:
             rows = source.execute(
                 "SELECT source_id,record_id,first_seen_at,last_seen_at,content FROM snapshots")
@@ -248,6 +261,7 @@ def import_history(home, roots):
     counts = {"new_records": 0, "added_versions": 0,
               "added_events": 0, "source_status_rows": 0,
               "source_databases_read": 0, "unsupported_databases": 0,
+              "source_runs_imported": 0,
               "read_errors": []}
     with closing(sqlite3.connect(master_file)) as db:
         db.execute(
@@ -261,7 +275,7 @@ def import_history(home, roots):
                 # Savepoint ensures a corrupt source does not partially import.
                 db.execute("SAVEPOINT source_import")
                 before = {name: counts[name] for name in
-                          ("new_records", "added_versions", "added_events")}
+                          ("new_records", "added_versions", "added_events", "source_runs_imported")}
                 try:
                     supported = _import_database(db, filename, started, counts)
                     if supported:
@@ -300,6 +314,7 @@ def status(home):
             "distinct_sources_with_records": one("SELECT COUNT(DISTINCT source_id) FROM records"),
             "record_versions": one("SELECT COUNT(*) FROM record_versions"),
             "historical_events": one("SELECT COUNT(*) FROM historical_events"),
+            "v8_source_runs": one("SELECT COUNT(*) FROM source_runs"),
             "imports": one("SELECT COUNT(*) FROM import_runs"),
             "last_import": db.execute(
                 "SELECT completed_at FROM import_runs ORDER BY started_at DESC LIMIT 1"
@@ -318,6 +333,8 @@ def main(argv=None):
     imported.add_argument("folders", nargs="+", help="Existing Radar folder(s)")
     sub.add_parser("status", help="Report actual normalized record/history counts")
     sub.add_parser("collect", help="Run existing early collectors without paid AI and import")
+    adoption = sub.add_parser("adopt-v8", help="Safely copy existing V8 collector DB once")
+    adoption.add_argument("database",help="Existing radar.sqlite full path")
     args = parser.parse_args(argv)
     home = home_path(args.home)
     if args.command == "init":
@@ -326,6 +343,12 @@ def main(argv=None):
         result = import_history(home, args.folders)
     elif args.command == "status":
         result = status(home)
+    elif args.command == "adopt-v8":
+        setup(home)
+        result = {"active_v8_database": v8.adopt_database(home,args.database,_has_fields),
+                  "original_database_unchanged": True}
+        # Index the adopted active V8 records too; this is history, not NEW.
+        result["historical_import"]=import_history(home,[home])
     else:
         # Use the existing collector pipeline without replacing its snapshot DBs.
         from early_investment_radar import run
