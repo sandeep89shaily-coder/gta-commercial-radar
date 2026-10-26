@@ -18,6 +18,7 @@ import sqlite3
 import sys
 import uuid
 from datetime import datetime, timezone
+from contextlib import closing
 from pathlib import Path
 
 SCHEMA_VERSION = 1
@@ -248,7 +249,7 @@ def import_history(home, roots):
               "added_events": 0, "source_status_rows": 0,
               "source_databases_read": 0, "unsupported_databases": 0,
               "read_errors": []}
-    with sqlite3.connect(master_file) as db:
+    with closing(sqlite3.connect(master_file)) as db:
         db.execute(
             "INSERT INTO import_runs(import_id,started_at,roots_json) VALUES(?,?,?)",
             (run_id, started, json.dumps([str(x) for x in checked])))
@@ -290,7 +291,7 @@ def import_history(home, roots):
 
 def status(home):
     dbfile = setup(home)
-    with sqlite3.connect(dbfile) as db:
+    with closing(sqlite3.connect(dbfile)) as db:
         def one(sql):
             return db.execute(sql).fetchone()[0]
         result = {

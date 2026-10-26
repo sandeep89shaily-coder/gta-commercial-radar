@@ -3,6 +3,7 @@ import json
 import sqlite3
 import tempfile
 import unittest
+from contextlib import closing
 from pathlib import Path
 
 import radar_workspace as rw
@@ -14,7 +15,7 @@ def create_legacy(base, *, records=1):
     data.mkdir(parents=True)
     result.mkdir(parents=True)
     dbfile = data / "early_planning_review.sqlite"
-    with sqlite3.connect(dbfile) as db:
+    with closing(sqlite3.connect(dbfile)) as db:
         db.execute("CREATE TABLE snapshots(source_id,record_id,first_seen_at,last_seen_at,content)")
         db.execute("CREATE TABLE changes(source_id,record_id,observed_at,change_type,content)")
         for i in range(records):
@@ -26,6 +27,7 @@ def create_legacy(base, *, records=1):
             db.execute("INSERT INTO changes VALUES(?,?,?,?,?)",
                        ("brampton_site_plans", str(i), "2026-10-02",
                         "UPDATED", item))
+        db.commit()
     (result / "GTA_RADAR_EARLY_SOURCES.csv").write_text(
         "source_id,runner,status,fetched\nbrampton_site_plans,early_planning_pilot,SUCCESS,1\n",
         encoding="utf-8")
@@ -57,10 +59,11 @@ class WorkspaceTests(unittest.TestCase):
             new = Path(temp) / "permanent"
             legacy = create_legacy(old)
             rw.import_history(new, [old])
-            with sqlite3.connect(legacy) as db:
+            with closing(sqlite3.connect(legacy)) as db:
                 db.execute("UPDATE snapshots SET content=?,last_seen_at=?",
                            (json.dumps({"site":"Different", "source_date":"2026-09-04"}),
                             "2026-10-03"))
+                db.commit()
             again = rw.import_history(new, [old])
             self.assertEqual(again["new_records"], 0)
             self.assertEqual(again["added_versions"], 1)
@@ -82,10 +85,11 @@ class WorkspaceTests(unittest.TestCase):
             old = Path(temp) / "old"
             new = Path(temp) / "permanent"
             legacy = create_legacy(old)
-            with sqlite3.connect(legacy) as db:
+            with closing(sqlite3.connect(legacy)) as db:
                 db.execute("INSERT INTO snapshots VALUES(?,?,?,?,?)",
                            ("brampton_site_plans", "bad", "2026-10-01",
                             "2026-10-02", "{not JSON"))
+                db.commit()
             result = rw.import_history(new, [old])
             self.assertEqual(result["new_records"], 0)
             self.assertEqual(result["added_versions"], 0)
@@ -98,7 +102,7 @@ class WorkspaceTests(unittest.TestCase):
             new = Path(temp) / "permanent"
             directory = old / "Workspace" / "Data"
             directory.mkdir(parents=True)
-            with sqlite3.connect(directory / "v8_main.sqlite") as db:
+            with closing(sqlite3.connect(directory / "v8_main.sqlite")) as db:
                 db.execute("CREATE TABLE v8_records(id INTEGER PRIMARY KEY)")
             result = rw.import_history(new, [old])
             self.assertEqual(result["source_databases_read"], 0)
