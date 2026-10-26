@@ -23,10 +23,10 @@ QUEUE_FIELDS = ("project_id", "address", "city", "document_count",
                 "evidence_count", "buyer_verified", "supplier_status",
                 "sale_ready", "review_reason")
 SIGNALS = {
-    "planning": r"\\b(?:rezoning|site.plan|official.plan.amendment|pre.consultation)\\b",
-    "development": r"\\b(?:industrial.development|warehouse|distribution.centre|commercial.development)\\b",
-    "procurement": r"\\b(?:request.for.proposal|request.for.tender|invitation.to.bid)\\b",
-    "award_mention": r"\\b(?:contract.awarded|successful.bidder|award.of.contract)\\b",
+    "planning": r"\b(?:rezoning|site.plan|official.plan.amendment|pre.consultation)\b",
+    "development": r"\b(?:industrial.development|warehouse|distribution.centre|commercial.development)\b",
+    "procurement": r"\b(?:request.for.proposal|request.for.tender|invitation.to.bid)\b",
+    "award_mention": r"\b(?:contract.awarded|successful.bidder|award.of.contract)\b",
 }
 MAX_DOCUMENT = 1_000_000
 MAX_EXCERPT = 230
@@ -72,10 +72,10 @@ def load_document(entry, base):
             return "", "document over limit"
         text = p.read_text(encoding="utf-8", errors="replace")
         if p.suffix.lower() in {".html", ".htm"}:
-            text = re.sub(r"(?is)<(script|style)\\b.*?</\\1\\s*>", " ", text)
+            text = re.sub(r"(?is)<(script|style)\b.*?</\1\s*>", " ", text)
             text = re.sub(r"(?s)<[^>]+>", " ", text)
             text = html.unescape(text)
-        return re.sub(r"\\s+", " ", text).strip(), ""
+        return re.sub(r"\s+", " ", text).strip(), ""
     except OSError as exc:
         return "", type(exc).__name__
 
