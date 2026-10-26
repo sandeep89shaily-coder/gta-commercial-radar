@@ -129,6 +129,14 @@ def safe_url(url):
 
 
 def queries(row):
+    if str(row.get('source_id') or '') in ('feddev_investment','investontario_investment'):
+        # An announcement URL is not a planning application number; search
+        # for the published company and stated investment instead.
+        company=' '.join(str(row.get('company_name') or '').split())[:75]
+        if not company:return []
+        city=' '.join(str(row.get('city') or 'Ontario').split())[:35]
+        return [f'"{company}" {city} manufacturing investment expansion',
+                f'"{company}" equipment procurement capital project supplier']
     addr=' '.join(str(row.get('address') or '').replace(', ON','').split()).strip()[:90]
     company=str(row.get('company_name') or '').strip()[:80]
     source=str(row.get('source_keys') or '').split(' | ')[0][:70]
@@ -145,7 +153,18 @@ def queries(row):
 
 
 def matches(row, content, url=''):
-    """Require evidence of the specific project, not just a matching business."""
+    """Require project-specific evidence; no generic company-directory matches."""
+    if str(row.get('source_id') or '') in ('feddev_investment','investontario_investment'):
+        # Directly published official company investment announcements are not
+        # building permits and often have no civic address yet. Require the
+        # same exact publisher URL plus named company plus spend/work language.
+        company=' '.join(str(row.get('company_name') or '').lower().split())
+        text=' '.join(str(content or '').lower().split())
+        same=(url==str(row.get('record_source_url') or '').strip())
+        specific=bool(re.search(r'\b(invest(?:ment|ing)?|expand\w*|'
+                     r'production|manufactur\w*|equip\w*|automati\w*|'
+                     r'facility|construction|plant)\b',text,re.I))
+        return bool(same and company and len(company)>4 and company in text and specific)
     return bool(content and project_evidence(row,content,url))
 
 
@@ -269,6 +288,19 @@ def analyze(row,evidence,key,transport=None):
             'Treat address-only pages as context, not proof of this permit scope or timing. '
             'Distinguish source-record event date from permit issuance. buyer_fit is a hypothesis only. '
             'If no pages provided mark SOURCE RECORD ONLY, independent verification missing.')
+    if str(row.get('source_id') or '') in ('feddev_investment','investontario_investment'):
+        system=('Investigate the exact named company capital investment from a public release. '
+                'The source may be a funding award, NOT proof that purchasing is open. '
+                'Use only source facts and fetched matching publisher evidence. Return '
+                'JSON keys operator, developer, contact, project_stage, buyer_fit, '
+                'next_verification, caveats, source_urls, owner, tenant, contractor. '
+                'buyer_fit describes POSSIBLE purchases only, not actual orders. '
+                'Distinguish approved funding, contemplated equipment, already installed '
+                'equipment, and closed procurement. Never claim a supplier is unawarded '
+                'or identify a purchasing decision maker without direct evidence. '
+                'If timing, buyer or vendor selection is unverified, say UNKNOWN. '
+                'Do not invent people, email addresses, budgets or contract status. '
+                'No outbound contact or solicitation.')
     payload={'model':MODEL,'thinking':{'type':'disabled'},'response_format':{'type':'json_object'},
              'max_tokens':MODEL_OUTPUT_TOKENS,'stream':False,'messages':[
                 {'role':'system','content':system},

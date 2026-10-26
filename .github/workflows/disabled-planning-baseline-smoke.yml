@@ -1,0 +1,27 @@
+name: Disabled planning baseline smoke
+on:
+  push:
+    branches: ['dev/integrate-early-feeds-v8-20261024']
+    paths:
+      - disabled_planning_baseline_smoke.py
+      - .github/workflows/disabled-planning-baseline-smoke.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  full-baseline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 13
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install -r requirements.txt
+      - name: Isolated first full source baseline and immediate repeat
+        run: python disabled_planning_baseline_smoke.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: disabled-planning-baseline-status
+          path: source-audit/DISABLED_PLANNING_BASELINE.csv

@@ -19,11 +19,15 @@ from opportunity_lifecycle import classify_status
 META = ('_queued_on', '_fingerprint')
 FINISHED = {'AI_EVIDENCE_REVIEW', 'AI_SOURCE_RECORD_REVIEW'}
 CLOSED = re.compile(r'\b(closed|refused|withdrawn|cancelled|canceled|rejected|denied|inactive)\b', re.I)
-LANES = {'PERMIT_REVIEW':0, 'BUSINESS_REVIEW':1, 'PLANNING_WATCH':2,
-         'ENVIRONMENT_WATCH':3, 'OTHER_WATCH':4, 'SOURCE_UPDATE_WATCH':5}
+# Genuine newly observed pre-permit cues precede late permit records.
+# This is investigation order, not proof the procurement window is still open.
+LANES = {'EARLY_SIGNAL_WATCH':0, 'PLANNING_WATCH':1,
+         'BUSINESS_REVIEW':2, 'PERMIT_REVIEW':3, 'ENVIRONMENT_WATCH':4,
+         'OTHER_WATCH':5, 'SOURCE_UPDATE_WATCH':6}
 SIGNATURE_FIELDS = ('project_id', 'source_id', 'source_keys', 'address',
                     'company_name', 'description', 'current_source_status',
-                    'record_source_url', 'permit_types')
+                    'record_source_url', 'permit_types', 'early_signal_stage',
+                    'early_signal_type', 'procurement_status')
 
 
 def fingerprint(row):
@@ -123,27 +127,35 @@ def source_region(row):
     return str(source.get('region') or 'Other')
 
 def fair_regional_order(ready):
-    """Interleave qualified projects by official region; never drop or reprice one.
+    """Interleave regions within each buying-stage lane.
 
-    Within each region the original research-priority and age ordering remains.
-    One per region per round prevents a large Toronto backlog monopolizing the
-    shared $1/day AI budget. It does NOT enforce fixed quotas or suppress Toronto.
+    Early buying cues must not lose to later permits merely because the
+    permit source happens to be in a region earlier in REGION_PRIORITY.
+    Within each lane, round-robin across regions to maintain GTA coverage.
     """
-    if not ready:return []
-    bins={}
-    for r in ready:
-        bins.setdefault(source_region(r),[]).append(r)
-    if len(bins)<=1:return ready
-    regions=[r for r in REGION_PRIORITY if r in bins]
-    regions += sorted(r for r in bins if r not in regions)
+    if not ready:
+        return []
+    by_lane = {}
+    for row in ready:
+        lane_rank = LANES.get(canonical_lane(row), 7)
+        by_lane.setdefault(lane_rank, []).append(row)
     from collections import deque
-    queues={name:deque(bins[name]) for name in regions}
-    ordered=[]
-    while any(queues.values()):
-        for name in regions:
-            if queues[name]:
-                ordered.append(queues[name].popleft())
-    return ordered
+    result = []
+    for lane_rank in sorted(by_lane):
+        bins = {}
+        for row in by_lane[lane_rank]:
+            bins.setdefault(source_region(row), []).append(row)
+        if len(bins) <= 1:
+            result.extend(by_lane[lane_rank])
+            continue
+        regions = [name for name in REGION_PRIORITY if name in bins]
+        regions += sorted(name for name in bins if name not in regions)
+        queues = {region: deque(bins[region]) for region in regions}
+        while any(queues.values()):
+            for region in regions:
+                if queues[region]:
+                    result.append(queues[region].popleft())
+    return result
 
 
 def due(pending, history, today):
@@ -172,8 +184,8 @@ def due(pending, history, today):
             age = max(0, (today - dt.date.fromisoformat(queued[:10])).days)
         except ValueError:
             age = 0
-        # Lane remains the primary sort key. Old health-inspection or source
-        # updates must NEVER outrank active commercial permits by aging.
+        # Lane is the primary key: credible early cues first, mature permits
+        # later. Old inspection and generic updates never jump lanes by age.
         base = LANES.get(canonical_lane(row), 6)
         effective = base
         prior = history.get(row.get('project_id'), {})

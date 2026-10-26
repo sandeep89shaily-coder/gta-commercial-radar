@@ -1,0 +1,47 @@
+name: Build early-cues-only desktop ZIP
+on:
+  push:
+    branches:
+      - 'dev/integrate-early-feeds-v8-20261024'
+    paths:
+      - unified_collector_inventory.py
+      - integrated_early_events.py
+      - early_only_mode.py
+      - run_desktop_early_only.py
+      - RUN_EARLY_ONLY.bat
+      - tests/test_early_only_mode.py
+      - EARLY_ONLY_FOCUS_README.md
+      - desktop_v8_early_preview.py
+      - RUN_V8_EARLY_PREVIEW.bat
+      - DESKTOP_V8_EARLY_PREVIEW_README.md
+      - tests/test_desktop_v8_early_preview.py
+      - .github/workflows/v8-desktop-preview-package.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install -r requirements.txt
+      - name: Verify preview backup safety
+        run: python -m unittest discover -s tests -p test_desktop_v8_early_preview.py
+      - name: Verify early-only mode does not run core collectors or AI
+        run: python -m unittest discover -s tests -p test_early_only_mode.py
+      - name: Build tested ZIP from this exact development commit
+        run: |
+          zip -q -r GTA_RADAR_EARLY_ONLY_DESKTOP.zip . \
+            -x ".git/*" ".github/*" "data/*" "GTA_RADAR_RESULTS/*" \
+            "**/__pycache__/*" "**/*.pyc" "*.sqlite" "*.sqlite-wal" "*.sqlite-shm"
+          unzip -t GTA_RADAR_EARLY_ONLY_DESKTOP.zip | tail -1
+          unzip -Z1 GTA_RADAR_EARLY_ONLY_DESKTOP.zip | grep -Fx 'RUN_EARLY_ONLY.bat'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gta-radar-early-only-desktop
+          path: GTA_RADAR_EARLY_ONLY_DESKTOP.zip
+          retention-days: 14

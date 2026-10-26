@@ -1,0 +1,120 @@
+{
+  "checked_utc": "2026-10-25",
+  "operational_doctor_run": "https://github.com/sandeep89shaily-coder/gta-commercial-radar/actions/runs/40160392713",
+  "planning_baseline_run": "https://github.com/sandeep89shaily-coder/gta-commercial-radar/actions/runs/40160631296",
+  "sources": [
+    {
+      "source_id": "toronto_cleared_building_permits",
+      "validation_state": "HISTORICAL_ONLY",
+      "reason": "CKAN resource resolves; cleared permits are historical backfill, not an early-stage lead feed.",
+      "opportunity_role": "HISTORICAL_CONTEXT",
+      "reactivation_decision": "KEEP_DISABLED",
+      "integration_reason": "Cleared permit history is too late to sell early procurement leads; use for lead-time comparison"
+    },
+    {
+      "source_id": "york_region_active_development_applications",
+      "validation_state": "BASELINE_PASS",
+      "reason": "6,773 records loaded in isolated full baseline; no historical change alerts. Need cross-feed deduplication before activation.",
+      "opportunity_role": "EARLY_PLANNING",
+      "reactivation_decision": "PILOT_OVERLAP_RECONCILE_FIRST",
+      "integration_reason": "Already covered by pilot york_region_development; avoid double research"
+    },
+    {
+      "source_id": "mississauga_site_plan_applications",
+      "validation_state": "IDENTITY_REVIEW",
+      "reason": "1,144 GIS features produced 1,143 application keys in isolated baseline; review the duplicate application ID before activation.",
+      "opportunity_role": "EARLY_PLANNING",
+      "reactivation_decision": "PILOT_OVERLAP_RECONCILE_FIRST",
+      "integration_reason": "Already covered by pilot mississauga_site_plans; one duplicate key needs verification"
+    },
+    {
+      "source_id": "mississauga_rezoning_applications",
+      "validation_state": "BASELINE_PASS",
+      "reason": "293 records loaded in isolated full baseline; zero historical change alerts. Activation still requires cross-feed review.",
+      "opportunity_role": "EARLY_PLANNING",
+      "reactivation_decision": "PILOT_OVERLAP_RECONCILE_FIRST",
+      "integration_reason": "Already covered by pilot mississauga_rezonings; prefer unified identity"
+    },
+    {
+      "source_id": "richmond_hill_active_development_applications",
+      "validation_state": "BASELINE_PASS",
+      "reason": "408 records loaded in isolated full baseline; zero historical change alerts. Review overlap with York Region.",
+      "opportunity_role": "EARLY_PLANNING",
+      "reactivation_decision": "STAGE_FOR_BASELINE_ACTIVATION",
+      "integration_reason": "408-record isolated baseline passed; first ensure overlap with York regional pilot does not double count"
+    },
+    {
+      "source_id": "hamilton_development_applications",
+      "validation_state": "DATE_REVIEW",
+      "reason": "5,237 records available but no configured source dates; a naive recent-window query returns all 5,237 as recent.",
+      "opportunity_role": "EARLY_PLANNING",
+      "reactivation_decision": "STAGE_FOR_DATELESS_CHANGE_TRACKING",
+      "integration_reason": "Source-date semantics missing; use baseline+first-observed not naive all-recent"
+    },
+    {
+      "source_id": "waterloo_city_building_permits",
+      "validation_state": "BASELINE_PENDING",
+      "reason": "33,525 records available; configured recent-window query works (33); full baseline not yet verified.",
+      "opportunity_role": "LATE_STAGE_PERMIT_CONFIRMATION",
+      "reactivation_decision": "LOW_PRIORITY_DO_NOT_AUTO_ENABLE",
+      "integration_reason": "Useful to validate stages and measure lead-time, not an early buying cue"
+    },
+    {
+      "source_id": "st_catharines_building_permits",
+      "validation_state": "BASELINE_PENDING",
+      "reason": "22,213 records available; recent-window query works (123); full baseline not yet verified.",
+      "opportunity_role": "LATE_STAGE_PERMIT_CONFIRMATION",
+      "reactivation_decision": "LOW_PRIORITY_DO_NOT_AUTO_ENABLE",
+      "integration_reason": "Useful to validate stages and measure lead-time, not an early buying cue"
+    },
+    {
+      "source_id": "durham_planit_consents",
+      "validation_state": "QUERY_FIX_NEEDED",
+      "reason": "665 records available; incremental date query fails; sampled Completed_Date is empty.",
+      "opportunity_role": "EARLY_PLANNING",
+      "reactivation_decision": "FIX_INCREMENTAL_QUERY",
+      "integration_reason": "Configured Completed_Date filter fails, but 665 public planning records available"
+    },
+    {
+      "source_id": "durham_planit_opa",
+      "validation_state": "QUERY_FIX_NEEDED",
+      "reason": "25 records available; incremental date query fails; sampled Completed_Date is empty.",
+      "opportunity_role": "EARLY_PLANNING",
+      "reactivation_decision": "FIX_INCREMENTAL_QUERY",
+      "integration_reason": "Configured Completed_Date filter fails, but 25 public planning records available"
+    },
+    {
+      "source_id": "durham_business_sites",
+      "validation_state": "ENRICHMENT_ONLY",
+      "reason": "6,874 businesses available; use for company/context enrichment rather than a new project signal; dates absent in sample.",
+      "opportunity_role": "BUYER_ENRICHMENT",
+      "reactivation_decision": "KEEP_DISABLED",
+      "integration_reason": "Directory useful for company identification, not an early project trigger"
+    },
+    {
+      "source_id": "durham_capital_projects",
+      "validation_state": "BASELINE_PENDING",
+      "reason": "13 project boundaries available; configured query works; public capital projects require buyer/procurement differentiation.",
+      "opportunity_role": "EARLY_PROJECT_CONTEXT",
+      "reactivation_decision": "STAGE_FOR_BASELINE_ACTIVATION",
+      "integration_reason": "Public project boundaries not verified private buying opportunity, 13 records"
+    },
+    {
+      "source_id": "hamilton_building_demolition_permits",
+      "validation_state": "BASELINE_PENDING",
+      "reason": "51,846 permit records available; configured query works; full baseline not yet verified.",
+      "opportunity_role": "LATE_STAGE_PERMIT_CONFIRMATION",
+      "reactivation_decision": "LOW_PRIORITY_DO_NOT_AUTO_ENABLE",
+      "integration_reason": "Useful to validate stages and measure lead-time, not an early buying cue"
+    },
+    {
+      "source_id": "kitchener_active_planning_applications",
+      "validation_state": "DATE_REVIEW",
+      "reason": "214 active planning applications available; INDATE and PUBLIC_STATUS_UPDATE are populated in sample but not yet configured for collection.",
+      "opportunity_role": "EARLY_PLANNING",
+      "reactivation_decision": "STAGE_FOR_DATELESS_CHANGE_TRACKING",
+      "integration_reason": "INDATE not original publication; preserve independent first-observed dates"
+    }
+  ],
+  "decision_basis": "Prioritize before-supplier-selection cues; keep duplicated and late-stage disabled core sources from suppressing pilot early signals."
+}

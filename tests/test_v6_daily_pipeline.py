@@ -63,7 +63,11 @@ class V6Tests(unittest.TestCase):
         outcome=v6.pipeline(self.ws,self.db,collector=collector,selector=selector,investigator=investigator)
         self.assertEqual(outcome['status'],'SUCCESS')
         self.assertEqual(outcome['investigated'],1)
-        self.assertEqual(events,['municipal_collector','business_collector','fresh_48h_opportunities','selector','investigator'])
+        self.assertEqual(events,['municipal_collector','business_collector',
+            'early_planning_pilot','early_industrial_cues','early_agendas',
+            'early_hamilton','early_notices','early_ajax','early_oakville',
+            'early_markham','early_investment_tenders','fresh_48h_opportunities',
+            'selector','investigator'])
         self.assertTrue((self.results/'GTA_RADAR_V6_DASHBOARD.html').exists())
         self.assertFalse((self.results/'V6_RUNNING.lock').exists())
 
@@ -114,6 +118,57 @@ class V6Tests(unittest.TestCase):
         html=(self.results/'GTA_RADAR_V6_DASHBOARD.html').read_text()
         self.assertIn('Collection attention needed',html)
 
+    def test_optional_early_pilot_failure_does_not_block_core_research(self):
+        events=[]
+        def collector(name,args,logs,**kwargs):
+            events.append(name)
+            if name=='fresh_48h_opportunities':
+                (self.data/'opportunities_ALL_REVIEW_ONLY.csv').write_text(
+                    'source_id,source_key,description,address\n',encoding='utf-8')
+            if name=='early_oakville':
+                return {'step':name,'status':'FAILED','detail':'offline pilot'}
+            return {'step':name,'status':'SUCCESS','detail':'done'}
+        def selector(src,dst,db):
+            (Path(dst)/'CANDIDATES_V4_ALL_REVIEW_ONLY.csv').write_text(
+                'project_id,address\n',encoding='utf-8')
+        outcome=v6.pipeline(self.ws,self.db,collector=collector,selector=selector,
+            investigator=lambda *_a,**_kw:{'processed':0,'with_public_pages':0,
+                                           'reserved_usd':0,'deepseek_configured':False})
+        self.assertEqual(outcome['status'],'SUCCESS')
+        self.assertIn('early_oakville',events)
+        self.assertIn({'step':'early_oakville','status':'FAILED'},outcome['early_pilot_results'])
+
+    def test_all_source_inventory_includes_disabled_and_review_only(self):
+        from unified_collector_inventory import build
+        results=self.results
+        status=[{'step':'early_ajax','status':'SUCCESS'},
+                {'step':'early_markham','status':'SUCCESS'},
+                {'step':'early_investment_tenders','status':'FAILED'},
+                {'step':'early_oakville','status':'SUCCESS'}]
+        path,counts=build(results,v6.ROOT/'config'/'sources.json',status)
+        with path.open(encoding='utf-8-sig',newline='') as file:
+            rows=list(csv.DictReader(file))
+        self.assertEqual(counts['disabled_count'],14)
+        york=next(r for r in rows if r['source_id']=='york_region_active_development_applications')
+        self.assertEqual(york['validation_state'],'BASELINE_PASS')
+        self.assertIn('6,773',york['reason'])
+        durham=next(r for r in rows if r['source_id']=='durham_planit_opa')
+        self.assertEqual(durham['validation_state'],'QUERY_FIX_NEEDED')
+        self.assertEqual(durham['reactivation_decision'],'FIX_INCREMENTAL_QUERY')
+        late=next(r for r in rows if r['source_id']=='waterloo_city_building_permits')
+        self.assertEqual(late['opportunity_role'],'LATE_STAGE_PERMIT_CONFIRMATION')
+        self.assertEqual(late['reactivation_decision'],'LOW_PRIORITY_DO_NOT_AUTO_ENABLE')
+        self.assertEqual(counts['review_only_pilots'],3)
+        self.assertEqual(counts['pilot_runner_count'],9)
+        self.assertEqual(counts['pilot_source_definitions'],21)
+        self.assertEqual(counts['pilot_source_overlaps_v8'],4)
+        self.assertEqual(counts['pilot_unique_outside_v8'],17)
+        self.assertIn('ajax_planning_properties',{r['source_id'] for r in rows})
+        self.assertIn('markham_circulated_application_reports',{r['source_id'] for r in rows})
+        self.assertIn('federal_open_tenders',{r['source_id'] for r in rows})
+        overlaps=[r for r in rows if r['integration_status']=='OVERLAPS_V8']
+        self.assertEqual(len(overlaps),4)
+
     def test_week_cooldown_skips_recently_investigated(self):
         import types
         stub=types.SimpleNamespace(CLOSED=v6.re.compile(r'closed',v6.re.I))
@@ -146,6 +201,31 @@ class V6Tests(unittest.TestCase):
         self.assertNotIn('<script>alert(1)</script>',contents)
         self.assertNotIn('href="javascript:',contents)
         self.assertIn('&lt;b&gt;unsafe&lt;/b&gt;',contents)
+
+    def test_dashboard_names_failed_toronto_publishers_and_partial_pilots(self):
+        self.results.mkdir()
+        logs=self.results/'V6_LOGS'
+        logs.mkdir()
+        (logs/'municipal_collector.log').write_text(
+            '[4/18] Toronto Business Licences\n  !! FAILED: 502 Bad Gateway\n'
+            '[5/18] Toronto DineSafe\n  !! FAILED: 502 Server Error\n',
+            encoding='utf-8')
+        with (self.results/'GTA_RADAR_ALL_SOURCE_STATUS.csv').open(
+                'w',encoding='utf-8-sig',newline='') as f:
+            w=csv.DictWriter(f,fieldnames=('source_id','group','execution_status'))
+            w.writeheader()
+            w.writerow(dict(source_id='burlington_ward_discovery',
+                            group='early_agendas',execution_status='PARTIAL_UNCOMMITTED'))
+            w.writerow(dict(source_id='brampton_building_permits',
+                            group='CORE_CONFIG',execution_status='CONFIGURED_ENABLED'))
+        statuses=v6.collector_attention(self.results)
+        self.assertEqual(len(statuses),3)
+        text=v6.render_dashboard(self.results,dict(
+            status='PARTIAL',investigation_date='2026-10-25',steps=[])).read_text()
+        self.assertIn('Toronto Business Licences',text)
+        self.assertIn('Toronto DineSafe',text)
+        self.assertIn('burlington_ward_discovery',text)
+        self.assertNotIn('brampton_building_permits</b>:',text)
 
     def test_same_folder_lock_prevents_overlapping_runs(self):
         self.results.mkdir()

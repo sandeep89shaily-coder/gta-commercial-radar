@@ -255,9 +255,10 @@ def select_unresearched(rows,limit,previous,day):
                if row.get('project_id') not in reviewed
                and not v5.CLOSED.search(str(row.get('current_source_status') or ''))]
     original_order=v5_original_queue(remaining,len(remaining),previous,day)
-    priorities={'PERMIT_REVIEW':0,'BUSINESS_REVIEW':1,'PLANNING_WATCH':2,
-                'OTHER_WATCH':3,'SOURCE_UPDATE_WATCH':4}
-    # Preserve earlier ordering within each lane but prioritize genuine permits.
+    priorities={'EARLY_SIGNAL_WATCH':0,'PLANNING_WATCH':1,
+                'BUSINESS_REVIEW':2,'PERMIT_REVIEW':3,
+                'OTHER_WATCH':4,'SOURCE_UPDATE_WATCH':5}
+    # Prioritize early commercial buying cues, not later permit issuance.
     original_order.sort(key=lambda row:(priorities.get(row.get('lane'),5),
                                          -int(row.get('review_priority') or 0)))
     return original_order[:max(0,limit)]
@@ -277,6 +278,36 @@ def investigate(data_dir, results_dir, max_projects=MAX_INVESTIGATIONS, *, enabl
                           results, legacy_data_dir=data_dir,
                           key=None if enable_ai else '',
                           max_projects=max_projects)
+
+def collector_attention(results):
+    """Extract specific source problems from existing logs and per-source status.
+
+    These are warnings, not fabricated zero-event results. Keep unavailable
+    publishers separate from bugs in V8 integration.
+    """
+    root=Path(results)
+    found=[]
+    log=root/'V6_LOGS'/'municipal_collector.log'
+    if log.is_file():
+        source=''
+        for line in log.read_text(encoding='utf-8',errors='replace').splitlines():
+            heading=re.match(r'^\[\d+/\d+\]\s+(.+)',line.strip())
+            if heading:
+                source=heading.group(1)
+            elif '!! FAILED:' in line:
+                reason=line.split('!! FAILED:',1)[1].strip()
+                found.append((source or 'Municipal source',reason[:230]))
+    inventory=root/'GTA_RADAR_ALL_SOURCE_STATUS.csv'
+    if inventory.is_file():
+        with inventory.open(encoding='utf-8-sig',newline='') as stream:
+            for row in csv.DictReader(stream):
+                if row.get('group')=='CORE_CONFIG':
+                    continue
+                state=str(row.get('execution_status') or '')
+                if state.startswith(('PARTIAL','FAILED','TIMEOUT','STALE','SOURCE_NOT_REPORTED','NOT_RUN')):
+                    found.append((row.get('source_id') or 'Pilot source',state))
+    return found[:30]
+
 
 def render_dashboard(results, state):
     """User-facing report must reveal when collectors failed or when no fresh events exist."""
@@ -326,6 +357,22 @@ def render_dashboard(results, state):
              '<a href="GTA_RADAR_QUALIFIED_OPPORTUNITY_SHORTLIST.csv">Download qualified shortlist</a> · '+
              '<a href="GTA_RADAR_OPPORTUNITY_RESEARCH_GAPS.csv">Records awaiting verification</a>.</p>',
              '<p><b>Commercial intelligence:</b> <a href="GTA_RADAR_LEAD_INTELLIGENCE.html">Open all classified opportunities and contact dashboard</a>.</p>',
+            '<h2>One collection system — source health</h2>',
+            f'<p><b>Pilot coverage:</b> {esc(state.get("pilot_unique_outside_v8","UNKNOWN"))} distinct feeds outside V8; '
+            f'{esc(state.get("pilot_source_overlaps_v8","UNKNOWN"))} overlap existing V8 sources, managed by '
+            f'{esc(state.get("pilot_runner_count","UNKNOWN"))} collector runner groups.</p>',
+            '<p><b>Unified source inventory:</b> <a href="GTA_RADAR_ALL_SOURCE_STATUS.csv">View status of every core, disabled, and independent collector</a>. '
+            'Review-only feeds are visible, but do not automatically trigger paid research.</p>',
+            '<p>All early collectors run under the same daily pipeline. An unsuccessful or review-only source is not a verified buying signal.</p>',
+            '<ul>'+''.join('<li>'+esc(s.get('step'))+': <b>'+esc(s.get('status'))+'</b></li>'
+                  for s in state.get('early_pilot_results',[]))+'</ul>',
+            '<p><b>Pre-permit early cue review:</b> '
+            '<a href="GTA_RADAR_EARLY_CUES_REVIEW.csv">View all fresh pilot cues, including evidence gaps and review-only signals</a>. '
+            'Cues are not proof that a supplier package remains available.</p>',
+            f'<p><b>Early post-baseline changes passed to the common opportunity engine:</b> {esc(state.get("early_pilot_changes_accepted",0))}. '
+            f'<b>Fresh pilot cues assessed:</b> {esc(state.get("early_cues_reviewed",0))}; '
+            f'<b>Held for review:</b> {esc(state.get("early_cues_review_only",0))}; '
+            f'<b>Disabled main sources (not activated):</b> {esc(state.get("disabled_source_count",14))}.</p>',
             f'<p><b>Collector database:</b> <span class="mono">{esc(state.get("database", ""))}</span></p>',
             f'<p><b>Window:</b> most recent 48 hours by source event/change date. <b>Projects this run:</b> {esc(state.get("projects",0))}. '
             f'<b>Projects investigated:</b> {esc(state.get("investigated",0))}. '
@@ -351,6 +398,15 @@ def render_dashboard(results, state):
             f'<b>Completed API-call cost estimate:</b> US${esc(state.get("charged_estimate_usd",0))}; '
             f'<b>Uncertain charges still reserved:</b> US${esc(state.get("unresolved_reservations_usd",0))}. '
             f'These are local estimates, not DeepSeek account billing.</p>']
+    warnings=collector_attention(rdir)
+    if warnings:
+        page.append('<article><h2>Specific sources requiring attention</h2>'
+                    '<p>These source failures/partial feeds are not zero projects, '
+                    'and do not mean the other collectors failed.</p><ul>'+
+                    ''.join('<li><b>'+esc(name)+'</b>: '+esc(reason)+'</li>'
+                            for name,reason in warnings)+
+                    '</ul><p>Open the unified source inventory for all pilot '
+                    'statuses and the V6_LOGS folder for details.</p></article>')
     if status != 'SUCCESS':
         incomplete_collector=any(step.get('status')!='SUCCESS' for step in state.get('steps',[]))
         heading='Collection attention needed' if incomplete_collector else 'Run attention needed'
@@ -495,9 +551,16 @@ def pipeline(workspace, database=None, *, run_collectors=True, run_research=True
     out.mkdir(parents=True, exist_ok=True)
     lock = once_lock(out)
     day = today or dt.date.today()
+    # Disabled sources remain accounted for in the unified report, not silently enabled.
+    try:
+        with (ROOT / 'config' / 'sources.json').open(encoding='utf-8') as source_file:
+            disabled_count=sum(not item.get('enabled',False) for item in json.load(source_file))
+    except (OSError,ValueError):
+        disabled_count='UNVERIFIED'
     state = {'version': VERSION, 'started_local': dt.datetime.now().astimezone().isoformat(timespec='seconds'),
              'database': str(db), 'status': 'RUNNING', 'investigation_date': day.isoformat(),
-             'steps': [], 'projects': 0, 'investigated': 0, 'reserved_usd': 0}
+             'steps': [], 'projects': 0, 'investigated': 0, 'reserved_usd': 0,
+             'disabled_source_count': disabled_count}
     manifest = out / 'GTA_RADAR_V6_RUN.json'
     try:
         atomic_json(manifest, state)
@@ -508,16 +571,44 @@ def pipeline(workspace, database=None, *, run_collectors=True, run_research=True
                 ('municipal_collector', ['main.py','poll','--data-dir',data,'--hours','48'], 1800),
                 ('business_collector', ['business_discovery.py','run','--data-dir',data], 1200),
             ]
+            # Keep independent source histories and only ingest verified changes.
+            steps.extend([
+                ('early_planning_pilot',['early_signal_watch.py','--data-dir',data,'--output-dir',out],1800),
+                ('early_industrial_cues',['early_cue_watch.py','--data-dir',data,'--output-dir',out],900),
+                ('early_agendas',['early_discovery_watch.py','--data-dir',data,'--output-dir',out],900),
+                ('early_hamilton',['early_hamilton_watch.py','--data-dir',data,'--output-dir',out],900),
+                ('early_notices',['early_public_notices.py','--data-dir',data,'--output-dir',out],900),
+                # Discovery-only pilot outputs: not forwarded to paid research.
+                ('early_ajax',['early_ajax_watch.py','--data-dir',data,'--output-dir',out],900),
+                ('early_oakville',['early_oakville_watch.py','--data-dir',data,'--output-dir',out],900),
+                ('early_markham',['early_markham_circulation.py','--data-dir',data,'--output-dir',out],900),
+                ('early_investment_tenders',['early_investment_tenders.py','--data-dir',data,'--output-dir',out],900),
+            ])
             for name, command, timeout in steps:
                 outcome = collector(name, command, out / 'V6_LOGS', timeout=timeout)
                 state['steps'].append(outcome)
                 atomic_json(manifest, state)
-            succeeded = sum(step['status'] == 'SUCCESS' for step in state['steps'])
-            if not succeeded:
+            # Optional early pilots are independently reported; do not convert a
+            # healthy core refresh into PARTIAL and suppress its selective AI.
+            core_steps = [step for step in state['steps']
+                          if step['step'] in ('municipal_collector','business_collector')]
+            core_succeeded = sum(step['status'] == 'SUCCESS' for step in core_steps)
+            state['early_pilot_results'] = [
+                {'step':step['step'],'status':step['status']}
+                for step in state['steps'] if step['step'].startswith('early_')]
+            # A single status inventory covers every configured and independent source.
+            try:
+                from unified_collector_inventory import build
+                _,inventory=build(out,ROOT/'config'/'sources.json',state['steps'],
+                                  run_started=state['started_local'])
+                state.update(inventory)
+            except (OSError,ValueError,csv.Error) as exc:
+                state['collector_inventory_error']=str(exc)[:200]
+            if not core_succeeded:
                 state['status'] = 'FAILED'
-                state['note'] = 'No collectors succeeded; prior export NOT reused and AI NOT run.'
+                state['note'] = 'No core collectors succeeded; prior export NOT reused and AI NOT run.'
                 return state
-            state['status'] = 'PARTIAL' if succeeded < len(steps) else 'SUCCESS'
+            state['status'] = 'PARTIAL' if core_succeeded < len(core_steps) else 'SUCCESS'
         else:
             # Tests and explicitly requested offline diagnostics; never fake a live refresh.
             state['status'] = 'OFFLINE_REVIEW_ONLY'
@@ -548,6 +639,22 @@ def pipeline(workspace, database=None, *, run_collectors=True, run_research=True
                 # Never misrepresent uncollected regions as successfully covered,
                 # and never damage the primary 48-hour collector output.
                 state['regional_bridge_error']=type(exc).__name__+': '+str(exc)[:180]
+        if use_default_selector and run_collectors:
+            try:
+                from integrated_early_events import merge
+                # Fail closed: previous status/CSV files may remain after a crash.
+                # Only use pilot outputs from collector steps successful THIS run.
+                successful_pilots={
+                    step['step'] for step in state['steps']
+                    if step.get('status')=='SUCCESS'
+                }
+                selection_file, integration=merge(
+                    selection_file,out,out/'GTA_RADAR_INTEGRATED_EARLY_EVENTS.csv',
+                    successful_steps=successful_pilots,
+                    run_started=state['started_local'])
+                state.update(integration)
+            except (OSError,ValueError,csv.Error) as exc:
+                state['early_integration_error']=str(exc)[:180]
         selector(selection_file, out, db)
         if use_default_selector and not state.get('regional_bridge_error'):
             from regional_candidate_bridge import selection_outcomes

@@ -49,7 +49,7 @@ class V6EvidenceRepairTests(unittest.TestCase):
         with patch.dict(sys.modules,{'v5_investigator':stub}):
             with patch.object(v6,'v5_original_queue',lambda rows,n,previous,day:rows):
                 selected=v6.select_unresearched(records,2,{},dt.date(2026,10,18))
-        self.assertEqual([r['project_id'] for r in selected],['permit','planning'])
+        self.assertEqual([r['project_id'] for r in selected],['planning','permit'])
 
 
 if __name__=='__main__':unittest.main()

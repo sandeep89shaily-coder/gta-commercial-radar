@@ -32,6 +32,8 @@ FILE=re.compile(r"\b((?:OPA\d{2}-A\d+|SPA\d{1,4}/\d{2}|SP\d{1,4}/\d{2}|"
   r"(Open|Approved|Closed|Refused|Withdrawn|Appealed|Pending)?\b",re.I)
 STATUS=("source_id","status","parsed","source_property_count","source_application_count",
     "new","updated","baseline","warning","error")
+CHANGES=("observed_at","source_id","record_id","change_type","title","site",
+         "source_url","commercial_fit","stage","source_application_date")
 COLUMNS=("source_id","record_id","title","site","company","company_role",
          "stage","source_application_date","source_date","source_url","commercial_fit","procurement_status",
          "verification","first_seen_at","last_seen_at","current_snapshot_status")
@@ -124,6 +126,14 @@ def run(data_dir="data",out_dir="GTA_RADAR_RESULTS",session=None,stamp=None):
               current_snapshot_status=("SOURCE_FAILED" if exit_code else
                  "OBSERVED_LATEST" if last==stamp else "NOT_LATEST_LISTING")))
         _write_csv(o/"EARLY_AJAX_PLANNING_REVIEW.csv",COLUMNS,review)
+        # Same post-baseline change contract as the other independent sources.
+        # Never turn historical snapshots into fresh opportunities.
+        changes=[dict(json.loads(content),observed_at=at,source_id=sid,
+                      record_id=rid,change_type=kind)
+            for at,sid,rid,kind,content in db.execute(
+                "SELECT observed_at,source_id,record_id,change_type,content FROM changes "
+                "WHERE observed_at=? AND source_id=?",(stamp,SOURCE))]
+        _write_csv(o/"EARLY_AJAX_CHANGES_REVIEW_ONLY.csv",CHANGES,changes)
         print(SOURCE,stat["status"],"public ArcGIS features",stat["parsed"],
              "post-baseline changes",stat["new"]+stat["updated"],
              "| unknown commercial use; no AI")

@@ -16,6 +16,33 @@ def row(desc,key='26 233562 BLD|00',group='MUNICIPAL_CHANGE'):
             'event_date_basis':'CHANGE_DETECTED_NOT_PERMIT_ISSUED'}
 
 class V4RegressionTests(unittest.TestCase):
+    def test_pilot_pre_permit_signal_stays_separate_from_permits(self):
+        from commercial_research_policy import research_route
+        candidate={
+            'source_id':'brampton_preconsultation','source_key':'APP-2026-39',
+            'source_group':'EARLY_PILOT_OBSERVED_CHANGE',
+            'description':'New industrial warehouse expansion proposed',
+            'early_signal_stage':'PRE_CONSULTATION',
+            'early_signal_type':'PLANNING_REVIEW',
+            'event_date':'2026-10-25',
+            'event_date_basis':'RADAR_OBSERVATION_NOT_PUBLICATION_DATE',
+            'source_record_date':'2026-10-15',
+            'first_observed_at':'2026-10-25T12:00:00Z',
+            'pre_permit_verification':'NOT_VERIFIED',
+            'procurement_status':'UNKNOWN',
+        }
+        result=v4.summarize([candidate],{})
+        self.assertEqual(result['lane'],'EARLY_SIGNAL_WATCH')
+        self.assertEqual(result['permit_count'],0)
+        self.assertEqual(result['early_signal_stage'],'PRE_CONSULTATION')
+        self.assertEqual(result['source_record_date'],'2026-10-15')
+        self.assertIn('NOT ORIGINAL POSTING',result['date_basis'])
+        self.assertEqual(result['pre_permit_verification'],'NOT_VERIFIED')
+        self.assertEqual(result['procurement_status'],'UNKNOWN')
+        self.assertEqual(research_route(result),'AI_WATCH')
+        residential=dict(candidate,description='Townhouse subdivision new construction')
+        self.assertTrue(v4.classify(residential)[0].startswith('EXCLUDE'))
+
     def test_residential_and_no_work(self):
         self.assertEqual(v4.classify(row('New 2-storey garden suite'))[0],'EXCLUDE_SMALL_RESIDENTIAL')
         self.assertEqual(v4.classify(row('20-storey mixed-use residential tower, 183 dwelling units and retail'))[0],'EXCLUDE_RESIDENTIAL_LED')

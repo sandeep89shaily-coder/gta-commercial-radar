@@ -15,6 +15,14 @@ ENVIRONMENT=re.compile(r'(environmental_instrument|environmental_compliance|\ber
 BUSINESS=re.compile(r'(licen[cs]|business_discovery|business_regist)',re.I)
 PROJECT=re.compile(r'\b(construction|construct\w*|renovat\w*|alterat\w*|installation|retrofit|expan\w*|fit[ -]?out|interior|new building|addition|new restaurant|new (?:business|facility|store|warehouse|factory)|change of use|convert\w*|modification|replacement|demolition|tenant improvement|mechanical|electrical|plumbing|sprinkler)\b',re.I)
 BUSINESS_TRIGGER=re.compile(r'\b(new (?:store|restaurant|business|facility|office|location)|opening|opened|relocation|expand\w*|newly registered|first licen[cs]e|change of use)\b',re.I)
+# Upstream project cues can predate both building permits and a formal
+# construction description. A stage phrase alone is not sufficient.
+EARLY_STAGE=re.compile(r'\b(pre[ -]?consultation|rezon(?:ing|e)|site[ -]?plan|'
+                       r'propos(?:al|ed)|grid[ -]?connection|connection assessment)\b',re.I)
+EARLY_COMMERCIAL=re.compile(r'\b(industrial|warehous\w*|manufactur\w*|'
+                            r'factory|logistic\w*|data cent(?:re|er)|'
+                            r'distribution cent(?:re|er)|commercial|'
+                            r'cold storage|office|retail|hotel)\b',re.I)
 ENV_TRIGGER=re.compile(r'\b(approval|amendment|compliance|emission|industrial|air|noise|wastewater|facility|proposal|permit)\b',re.I)
 DIRECTORY=re.compile(r'(yellowpages|pagesjaunes|allbiz|wheree|mapquest|canpages|squareyards|zillow|tripadvisor|ubereats|yelp|opencorporates|reviews\.)',re.I)
 PROJECT_LANGUAGE=re.compile(r'\b(permit|planning|project|site plan|construction|alteration|renovation|expansion|fit[ -]?out|development|redevelop|new building|addition|interior alterations|work described|application|environmental compliance approval|eca)\b',re.I)
@@ -30,6 +38,12 @@ def research_route(row):
     sid=str(row.get('source_id') or '')
     lane=str(row.get('lane') or row.get('priority') or '')
     desc=str(row.get('description') or '')
+    # Check the lane first: an observed pre-permit source is not an issued
+    # permit just because the publisher/source ID contains the word "permit".
+    if lane=='EARLY_SIGNAL_WATCH':
+        concrete=bool(PROJECT.search(desc) or
+                      (EARLY_STAGE.search(desc) and EARLY_COMMERCIAL.search(desc)))
+        return 'AI_WATCH' if concrete else 'ENRICHMENT_ONLY'
     if INSPECTION.search(sid):
         return 'ENRICHMENT_ONLY'
     if PERMIT.search(sid) or lane=='PERMIT_REVIEW':
@@ -51,6 +65,8 @@ def canonical_lane(row):
     if research_route(row)=='ENRICHMENT_ONLY':
         return 'ENRICHMENT_ONLY'
     sid=str(row.get('source_id') or '')
+    if str(row.get('lane') or '')=='EARLY_SIGNAL_WATCH':
+        return 'EARLY_SIGNAL_WATCH'
     if PERMIT.search(sid):
         return 'PERMIT_REVIEW'
     if PLANNING.search(sid):

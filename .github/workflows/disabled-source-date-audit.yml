@@ -1,0 +1,23 @@
+name: Disabled date field diagnostics
+on:
+  push:
+    branches: ['dev/integrate-early-feeds-v8-20261024']
+    paths: ['disabled_source_date_audit.py','.github/workflows/disabled-source-date-audit.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  date-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install requests
+      - run: python disabled_source_date_audit.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: disabled-date-field-report
+          path: date-audit/DISABLED_SOURCE_DATE_GAPS.csv

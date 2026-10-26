@@ -1,0 +1,27 @@
+name: Disabled source configured doctor
+on:
+  push:
+    branches: ['dev/integrate-early-feeds-v8-20261024']
+    paths:
+      - disabled_source_doctor.py
+      - tests/test_disabled_source_doctor.py
+      - .github/workflows/disabled-source-doctor.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check-all-disabled:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install -r requirements.txt
+      - name: Check configured filters and queries on all 14 disabled sources
+        run: python disabled_source_doctor.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: disabled-source-configured-health
+          path: source-audit/DISABLED_SOURCE_DOCTOR.csv
