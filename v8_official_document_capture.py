@@ -33,6 +33,8 @@ def scan(results, limit=6, fetch=False, fetcher=None):
     seen = {(r.get("project_id",""),r.get("source_url","")) for r in existing}
     audit, added = [], []
     attempted_domains = set()
+    blocked_hosts = {}
+    selected_urls = set()
     accepted = 0
     if fetch and fetcher is None:
         import requests
@@ -40,7 +42,18 @@ def scan(results, limit=6, fetch=False, fetcher=None):
         session.trust_env = False
         session.headers["User-Agent"] = "GTA Radar official evidence review/1.0"
         fetcher = lambda url: fetch_official_page(url,session)
+    # Diversify the first bounded batch across cities/sources rather than
+    # allowing the first six Brampton records to consume the whole budget.
+    candidates.sort(key=lambda r: (str(r.get("city","")).lower(), str(r.get("project_id",""))))
+    candidate_groups = {}
     for row in candidates:
+        candidate_groups.setdefault(str(row.get("city","")).strip().lower(),[]).append(row)
+    ordered = []
+    while any(candidate_groups.values()):
+        for city in list(candidate_groups):
+            if candidate_groups[city]:
+                ordered.append(candidate_groups[city].pop(0))
+    for row in ordered:
         pid = (row.get("project_id") or "").strip()
         if not pid:
             continue
@@ -51,19 +64,25 @@ def scan(results, limit=6, fetch=False, fetcher=None):
                 if url and url not in urls:
                     urls.append(url)
         for url in urls:
-            if (pid,url) in seen:
+            if (pid,url) in seen or url in selected_urls:
                 continue
             if accepted >= max(0,limit):
                 break
+            selected_urls.add(url)
             accepted += 1
             domain = urlparse(url).hostname or "unknown"
             attempted_domains.add(domain)
+            if domain in blocked_hosts:
+                audit.append(dict(project_id=pid,source_url=url,status="SKIPPED",reason="Host previously blocked: "+blocked_hosts[domain]))
+                continue
             if not fetch:
                 audit.append(dict(project_id=pid,source_url=url,status="DRY_RUN",reason="No network request"))
                 continue
             body, error = fetcher(url)
             if error or not body.strip():
                 reason = error or "empty page"
+                if reason in ("robots policy unavailable", "robots disallows page", "host is not publicly resolvable"):
+                    blocked_hosts[domain] = reason
                 audit.append(dict(project_id=pid,source_url=url,status="SKIPPED",reason=reason))
                 print("[DOCUMENT FETCH FAILED] " + domain + " | " + reason[:220], flush=True)
                 continue
