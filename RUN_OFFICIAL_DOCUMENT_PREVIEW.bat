@@ -23,7 +23,9 @@ if errorlevel 1 goto :failed
 if errorlevel 1 goto :failed
 start "" "%RESULTS%\GTA_RADAR_DOCUMENT_OPERATIONS.html"
 echo.
-echo Preview complete. Your normal V8 program and schedule were not changed.
+echo Preview finished. If CAPTURED=0, check the FAILED reasons above.
+echo Audit path: "%RESULTS%\DOCUMENT_REVIEW\OFFICIAL_DOCUMENT_FETCH_AUDIT.csv"
+echo Your normal V8 program and schedule were not changed.
 pause
 exit /b 0
 :failed
