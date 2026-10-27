@@ -32,6 +32,7 @@ def scan(results, limit=6, fetch=False, fetcher=None):
             existing = list(csv.DictReader(f))
     seen = {(r.get("project_id",""),r.get("source_url","")) for r in existing}
     audit, added = [], []
+    attempted_domains = set()
     accepted = 0
     if fetch and fetcher is None:
         import requests
@@ -55,12 +56,16 @@ def scan(results, limit=6, fetch=False, fetcher=None):
             if accepted >= max(0,limit):
                 break
             accepted += 1
+            domain = urlparse(url).hostname or "unknown"
+            attempted_domains.add(domain)
             if not fetch:
                 audit.append(dict(project_id=pid,source_url=url,status="DRY_RUN",reason="No network request"))
                 continue
             body, error = fetcher(url)
             if error or not body.strip():
-                audit.append(dict(project_id=pid,source_url=url,status="SKIPPED",reason=error or "empty page"))
+                reason = error or "empty page"
+                audit.append(dict(project_id=pid,source_url=url,status="SKIPPED",reason=reason))
+                print("[DOCUMENT FETCH FAILED] " + domain + " | " + reason[:220], flush=True)
                 continue
             # Never treat today's retrieval date as the publisher's source date.
             digest = hashlib.sha256((pid+"\n"+url).encode()).hexdigest()[:24]
@@ -73,6 +78,7 @@ def scan(results, limit=6, fetch=False, fetcher=None):
                          title="Official linked source — publisher date unverified")
             added.append(entry)
             seen.add((pid,url))
+            print("[DOCUMENT CAPTURED] " + domain + " | " + pid[:80], flush=True)
             audit.append(dict(project_id=pid,source_url=url,status="CAPTURED",
                               reason="HTML text; source date and relevance unverified"))
     if added:
@@ -86,7 +92,10 @@ def scan(results, limit=6, fetch=False, fetcher=None):
         writer=csv.DictWriter(f,fieldnames=AUDIT)
         writer.writeheader()
         writer.writerows(audit)
-    return dict(eligible_checked=accepted,captured=len(added),failures=sum(a["status"]=="SKIPPED" for a in audit),
+    print("[DOCUMENT AUDIT] " + str((out / "OFFICIAL_DOCUMENT_FETCH_AUDIT.csv").resolve()), flush=True)
+    if accepted == 0:
+        print("[DOCUMENT INFO] No eligible direct official links in candidate fields.", flush=True)
+    return dict(distinct_domains_checked=len(attempted_domains),eligible_checked=accepted,captured=len(added),failures=sum(a["status"]=="SKIPPED" for a in audit),
                 paid_ai_calls=0,mode="FETCH" if fetch else "DRY_RUN")
 
 
