@@ -86,7 +86,14 @@ def run(pdf,out,source_url,*,paid=False,key=None,transport=None,results=None,day
     try:
         legacy=v5._legacy_reserved(root/"deepseek_budget.sqlite",day)
         if not native.ledger_claim(budget,day,reservation_id,native.MODEL_RESERVE,legacy):
-            return {"status":"BUDGET_OR_DUPLICATE_REJECTED","paid_ai_calls":0}
+            duplicate=budget.execute("SELECT status FROM spends WHERE day=? AND candidate=?",
+                                     (day,reservation_id)).fetchone()
+            if duplicate:
+                return {"status":"DUPLICATE_ATTEMPT_BLOCKED","prior_status":duplicate[0],"paid_ai_calls":0}
+            used=native.effective_spend(budget,day)[0]
+            if used+legacy+native.MODEL_RESERVE>native.DAILY_LIMIT+1e-9:
+                return {"status":"LOCAL_LEDGER_BUDGET_BLOCKED","paid_ai_calls":0}
+            return {"status":"LEDGER_CLAIM_REJECTED_RECHECK","paid_ai_calls":0}
         key=v5.key_from_windows() if key is None else key
         if not key:
             native.ledger_finish(budget,day,reservation_id,"UNKNOWN")
