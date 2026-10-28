@@ -17,7 +17,7 @@ FIELDS=["document_url","sha256","page","field","value","excerpt",
         "supplier_award_verified"]
 PATTERNS={
     "planning_application_number": re.compile(
-        r"Planning Application Number\s*:\s*([0-9][0-9 ]{4,28}[A-Z]{1,4}(?:\s*[0-9A-Z]{1,4})?)",re.I),
+        r"Planning Application Number\s*:\s*([0-9]{2}\s+[0-9]{6}\s+[A-Z]{2,4}\s+[0-9]{1,3}\s+[A-Z]{1,4})",re.I),
     "report_date": re.compile(
         r"\bDate\s*:\s*((?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},\s+20\d{2})\b",re.I),
     "ward": re.compile(r"\bWard\s*:\s*(\d{1,2}\s*-\s*[^\n]{4,90})",re.I),
