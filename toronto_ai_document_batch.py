@@ -46,12 +46,15 @@ def process(audit_csv,out,results,*,paid=False,limit=4,analyzer=analyze_one):
                               result_file=str(target) if target.is_file() else "")
             except Exception as exc:
                 record.update(status="ERROR",detail=type(exc).__name__+": "+str(exc)[:250])
+                if "Truncated model response" in str(exc):
+                    record["ai_calls"]=1  # The provider returned a completion; this was a real attempted call.
         records.append(record)
     file=out/"TORONTO_AI_DOCUMENT_BATCH_AUDIT.csv"
     with file.open("w",encoding="utf-8-sig",newline="") as h:
         w=csv.DictWriter(h,fieldnames=FIELDS);w.writeheader();w.writerows(records)
     summary={"captured_pdf_records_checked":len(records),
              "ai_calls_reported":sum(r["ai_calls"] for r in records),
+             "note":"ai_calls_reported counts provider completions and successful analyses; network failures may also incur charges held in the shared ledger",
              "review_outputs":sum(bool(r["result_file"]) for r in records),
              "errors":sum(r["status"] in ("ERROR","CHECKSUM_MISMATCH","MISSING_PDF") for r in records),
              "sale_ready":0,"production_database_modified":False,"audit":str(file.resolve())}
