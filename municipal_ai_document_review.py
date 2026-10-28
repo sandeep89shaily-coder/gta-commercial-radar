@@ -32,8 +32,8 @@ Do not mark anything sale-ready."""
 
 def payload_for_pages(pages, source_url):
     selected=[]
-    for p in pages[:5]:
-        content=str(p.get("text",""))[:2600]
+    for p in pages[:4]:
+        content=str(p.get("text",""))[:1100]
         if content.strip():
             selected.append({"page":p["page"],"text":content})
     return {"source_url":source_url,"pages":selected}
