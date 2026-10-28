@@ -2,6 +2,8 @@ import csv
 import tempfile
 import unittest
 from pathlib import Path
+from io import BytesIO
+from pypdf import PdfWriter
 from toronto_pdf_download import valid_url, robots_allowed, fetch_one, batch
 
 URL="https://www.toronto.ca/legdocs/mmis/2026/cc/bgrd/backgroundfile-287146.pdf"
@@ -41,6 +43,21 @@ class DownloaderTest(unittest.TestCase):
                 session=Session(Response(b"<html>denied</html>")))
             self.assertEqual(result["reason"],"INVALID_PDF_SIGNATURE")
             self.assertFalse(path.exists())
+    def test_real_pdf_bytes_are_saved_and_checksums_match(self):
+        writer=PdfWriter()
+        writer.add_blank_page(width=612,height=792)
+        buffer=BytesIO()
+        writer.write(buffer)
+        data=buffer.getvalue()
+        self.assertTrue(data.startswith(b"%PDF-"))
+        with tempfile.TemporaryDirectory() as t:
+            target=Path(t)/"report.pdf"
+            result=fetch_one(URL,target,resolver=dns,
+                get_policy=lambda _: "User-agent: *\\nAllow: /",
+                session=Session(Response(data)))
+            self.assertEqual(result["status"],"CAPTURED")
+            self.assertEqual(result["bytes"],len(data))
+            self.assertEqual(target.read_bytes(),data)
     def test_batch_no_paid_ai_and_explicit_fetch_required(self):
         with tempfile.TemporaryDirectory() as t:
             path=Path(t)/"discovery.csv"
