@@ -46,7 +46,7 @@ def import_csv(content):
     def column(*terms):
         return next((k for k in columns if k and all(t in k.lower() for t in terms)),None)
     date=column("date")
-    name=column("meeting") or column("committee")
+    name=next((k for k in columns if k and ("meeting" in k.lower() or "committee" in k.lower()) and "date" not in k.lower() and "time" not in k.lower()),None)
     if not date or not name:
         raise ValueError("Unexpected official schedule CSV columns: "+str(columns))
     output=[];seen=set()
