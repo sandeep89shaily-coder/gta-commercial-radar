@@ -69,7 +69,7 @@ def build(agenda_html, meeting_url, output):
             "publisher_dates_verified":0,"paid_ai_calls":0,"file":str(output)}
 
 
-def extract_local_pdf(pdf_path, max_pages=12, max_bytes=12_000_000):
+def extract_local_pdf(pdf_path, max_pages=100, max_bytes=15_000_000):
     """Extract from an already-local digital PDF; never invokes OCR/network."""
     pdf_path=Path(pdf_path)
     if pdf_path.stat().st_size>max_bytes:
