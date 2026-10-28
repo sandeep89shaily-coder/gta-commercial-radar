@@ -145,11 +145,25 @@ def batch(input_csv,out_dir,*,fetch=False,max_files=3,session=None,resolver=sock
 
 def main():
     p=argparse.ArgumentParser()
-    p.add_argument("--discovered-csv",required=True)
+    p.add_argument("--discovered-csv")
+    p.add_argument("--url",help="Single official PDF URL for isolated validation")
     p.add_argument("--out",required=True)
     p.add_argument("--max-files",type=int,default=3)
     p.add_argument("--fetch",action="store_true")
     args=p.parse_args()
+    if bool(args.url)==bool(args.discovered_csv):
+        p.error("Supply exactly one of --url and --discovered-csv")
+    if args.url:
+        import tempfile
+        with tempfile.TemporaryDirectory() as temporary:
+            manifest=Path(temporary)/"links.csv"
+            with manifest.open("w",encoding="utf-8",newline="") as h:
+                writer=csv.DictWriter(h,fieldnames=["attachment_url"])
+                writer.writeheader()
+                writer.writerow({"attachment_url":args.url})
+            summary=batch(manifest,args.out,fetch=args.fetch,max_files=1)
+        print(json.dumps(summary,indent=2))
+        return
     print(json.dumps(batch(args.discovered_csv,args.out,fetch=args.fetch,
                            max_files=max(0,min(args.max_files,10))),indent=2))
 
