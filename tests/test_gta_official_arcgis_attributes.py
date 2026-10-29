@@ -7,6 +7,7 @@ class ArcGISAttributesTests(unittest.TestCase):
         "features":[{"attributes":{"BP_NO":"BP 3ALT 26-2522","STATUS":"ISSUED","DESCRIPTION":"Interior retail alteration","ADDRESS":"3899 TRELAWNY CIR"}}]}
   result=retrieve(URL,"BP 3ALT 26-2522",transport=lambda _:json.dumps(body))
   self.assertIn("Interior retail alteration",result)
+  self.assertIn("Interior retail alteration",retrieve(URL,"BP 3ALT 26-2522",transport=lambda _:json.dumps(body).encode("utf-8")))
   self.assertNotIn("XXXXX",result)
   self.assertIsNone(parse_features(body,"WRONG"))
  def test_key_fields_are_first_even_when_json_schema_order_is_bad(self):
