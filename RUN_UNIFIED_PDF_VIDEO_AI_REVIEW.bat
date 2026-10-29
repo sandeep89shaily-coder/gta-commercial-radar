@@ -34,7 +34,12 @@ goto approval
 :media
 echo Local faster-whisper required; first use downloads model. No audio upload.
 %PY% -c "import faster_whisper" 2>nul
-if errorlevel 1 (echo Run: %PY% -m pip install faster-whisper & goto fail)
+if errorlevel 1 (
+  choice /C YN /N /M "Install local faster-whisper dependency now? [Y/N]: "
+  if errorlevel 2 goto done
+  %PY% -m pip install faster-whisper
+  if errorlevel 1 goto fail
+)
 %PY% municipal_unified_intelligence.py --media "%SOURCE_PATH%" --source-url "%URL%" --results "%RESULTS%" --out "%REVIEW_OUT%"
 if errorlevel 1 goto fail
 set "SOURCE_PATH=%REVIEW_OUT%\MEETING_TRANSCRIPT.csv"
@@ -44,7 +49,12 @@ goto approval
 echo DeepSeek vision OCR is paid; no automatic PDF upload without your approval.
 echo First installing PyMuPDF if needed: %PY% -m pip install pymupdf
 %PY% -c "import fitz" 2>nul
-if errorlevel 1 (echo Run: %PY% -m pip install pymupdf & goto fail)
+if errorlevel 1 (
+  choice /C YN /N /M "Install local PyMuPDF renderer now? [Y/N]: "
+  if errorlevel 2 goto done
+  %PY% -m pip install pymupdf
+  if errorlevel 1 goto fail
+)
 %PY% municipal_pdf_vision_ocr.py --pdf "%SOURCE_PATH%" --source-url "%URL%" --results "%RESULTS%" --out "%REVIEW_OUT%"
 if errorlevel 1 goto fail
 echo This route reserves up to USD 0.04 per page and never bypasses the USD 0.25 cap.
