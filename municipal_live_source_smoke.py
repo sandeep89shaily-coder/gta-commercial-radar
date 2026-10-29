@@ -31,10 +31,11 @@ def main(out="LIVE_SOURCE_SMOKE"):
   audit["results"].append({"source":"TORONTO_PUBLIC_PROCUREMENT_ODATA",
       "status":"UNAVAILABLE","error_type":type(e).__name__})
  try:
-  current=collect_current(root/"TORONTO_CURRENT_OPEN_CKAN.json",limit=300)
+  current=collect_current(root/"TORONTO_CURRENT_OPEN_CKAN.json",limit=1200)
   audit["results"].append({"source":"TORONTO_CKAN_CURRENT_OPEN",
     "status":current["status"],"records":len(current["records"]),
     "future_closing_candidates":current["candidate_future_closing"],
+    "complete":current["complete"],
     "audit":current["audit"]})
  except Exception as exc:
   audit["results"].append({"source":"TORONTO_CKAN_CURRENT_OPEN",
