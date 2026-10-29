@@ -16,10 +16,13 @@ Output JSON with: event_type, project_mentions, commercial_status, summary.
 project_mentions is an array of {address, organization, role, stage, 
 source_marker, exact_quote}. Capture distinct projects/sites separately.
 source_marker MUST be exact page number (PDF) or start_seconds (audio).
+At most 4 mentions in a section; prioritize explicit commercial sites.
 Quote verbatim. commercial_status is UNVERIFIED unless public explicit procurement
 evidence is quoted; do not invent buyers, tenders, contracts or developers.
 An existing-property tax exemption is NOT new construction. Output JSON only."""
-STAGE="unified_source_intelligence_v1"
+STAGE="unified_source_intelligence_v2"
+RESERVATION_USD=0.015
+OUTPUT_TOKENS=1600
 
 def source_chunks(pdf=None,transcript=None,max_chars=2000):
     if bool(pdf)==bool(transcript):raise ValueError("Supply exactly one PDF or transcript CSV")
@@ -53,7 +56,7 @@ def interpret(piece,key,source_url,transport=None):
     response=native.request("/chat/completions",{
       "model":native.MODEL,"thinking":{"type":"disabled"},
       "messages":[{"role":"system","content":PROMPT},{"role":"user","content":payload}],
-      "response_format":{"type":"json_object"},"max_tokens":native.MODEL_OUTPUT_TOKENS,
+      "response_format":{"type":"json_object"},"max_tokens":OUTPUT_TOKENS,
       "stream":False},key,transport=transport)
     choice=response["choices"][0]
     if choice.get("finish_reason")=="length":raise ValueError("Truncated DeepSeek response")
@@ -103,7 +106,7 @@ def run(source_url,results,out,*,pdf=None,transcript=None,paid=False,
                         source_url+str(idx)).encode()).hexdigest()[:24]
             legacy=v5._legacy_reserved(root/"deepseek_budget.sqlite",day)
             # Use the shared production cap and reservations. No retries.
-            if not native.ledger_claim(db,day,reservation,native.MODEL_RESERVE,legacy,daily_limit=0.25):
+            if not native.ledger_claim(db,day,reservation,RESERVATION_USD,legacy,daily_limit=0.25):
                 failures.append({"chunk":idx,"reason":"SHARED_BUDGET_OR_DUPLICATE"});break
             status["AI_paid_requests"]+=1
             try:
