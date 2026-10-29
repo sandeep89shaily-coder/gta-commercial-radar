@@ -12,7 +12,8 @@ class UnifiedTests(unittest.TestCase):
     w.writerow({"start_seconds":15,"end_seconds":17,"transcript":"Tax exemption for housing"})
    chunks,meta=source_chunks(transcript=p)
    self.assertEqual(meta["segments_total"],2)
-   self.assertEqual([x["marker"] for x in chunks],[4.0,15.0])
+   self.assertEqual(len(chunks),1)
+   self.assertEqual(chunks[0]["valid_markers"],[4.0,15.0])
  def test_claim_requires_literal_quote_and_correct_timestamp(self):
   def transport(path,payload):
    self.assertEqual(payload["thinking"],{"type":"disabled"})
@@ -24,6 +25,13 @@ class UnifiedTests(unittest.TestCase):
   o=interpret({"kind":"audio","marker":4.0,"text":"Discuss proposed factory"},"x","https://www.toronto.ca/meeting",transport)
   self.assertEqual([v["evidence_check_passed"] for v in o["mentions"]],[True,False,False])
   self.assertEqual(o["commercial_status"],"UNVERIFIED")
+ def test_later_timestamp_in_group_is_accepted(self):
+  def transport(path,payload):
+   return {"choices":[{"finish_reason":"stop","message":{"content":json.dumps(
+     {"project_mentions":[{"source_marker":15.0,"exact_quote":"130 Augusta Avenue"}]})}}]}
+  piece={"kind":"audio","marker":4.0,"valid_markers":[4.0,15.0],"text":"[t=4.0] Planning. [t=15.0] 130 Augusta Avenue"}
+  r=interpret(piece,"x","https://www.toronto.ca/meeting",transport)
+  self.assertTrue(r["mentions"][0]["evidence_check_passed"])
  def test_paid_false_does_not_open_shared_ledger(self):
   with tempfile.TemporaryDirectory() as t:
    p=Path(t)/"transcript.csv"
