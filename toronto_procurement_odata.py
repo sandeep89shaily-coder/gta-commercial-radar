@@ -5,7 +5,7 @@ contacts in this feed represent municipal bids, NOT private project buyers.
 No auth, no artificial pagination or made-up contract status.
 """
 from __future__ import annotations
-import argparse,datetime as dt,json,re
+import argparse,csv,datetime as dt,json,re
 from pathlib import Path
 from urllib.parse import urlencode
 from urllib.request import Request,urlopen
@@ -83,6 +83,27 @@ def collect(out,*,fetch=download_json,max_pages=2,page_size=50):
    "limitation":"Only fetched page(s) are covered; current bid status must be rechecked at official portal before outreach."}
  dest=Path(out);dest.parent.mkdir(parents=True,exist_ok=True)
  dest.write_text(json.dumps(result,indent=2,ensure_ascii=False),encoding="utf-8")
+ tags=("hvac","cooling","refrigeration","mechanical","security","fire alarm",
+       "industrial","factory","warehouse","electrical","data centre","data center")
+ columns=["document_number","status","title","description","category","client_division",
+   "issue_date","closing_date","buyer_name","buyer_email","buyer_phone",
+   "awarded_supplier_names","potential_supplier_keywords","public_portal_url",
+   "source_url","current_status_rechecked","private_buyer_verified"]
+ with dest.with_suffix(".csv").open("w",encoding="utf-8-sig",newline="") as h:
+  w=csv.DictWriter(h,fieldnames=columns);w.writeheader()
+  for item in records:
+   content=(" "+str(item.get("title") or "")+" "+str(item.get("description") or "")+" ").lower()
+   w.writerow({"document_number":item["document_number"],"status":item["status"],
+      "title":item.get("title"),"description":item.get("description"),
+      "category":item.get("category"),"client_division":item.get("client_division"),
+      "issue_date":item.get("issue_date"),"closing_date":item.get("closing_date"),
+      "buyer_name":item.get("buyer_name_official_publication"),
+      "buyer_email":item.get("buyer_email_official_publication"),
+      "buyer_phone":item.get("buyer_phone_official_publication"),
+      "awarded_supplier_names":"; ".join(x["supplier"] for x in item["awarded_suppliers"]),
+      "potential_supplier_keywords":"; ".join(t for t in tags if t in content),
+      "public_portal_url":item["public_portal_url"],"source_url":item["source_url"],
+      "current_status_rechecked":False,"private_buyer_verified":False})
  return result
 def main():
  p=argparse.ArgumentParser();p.add_argument("--out",required=True)
