@@ -47,6 +47,26 @@ def normalized_status(raw):
  if s in ("OPEN","ACTIVE","AWARDED","CANCELLED","CANCELED","CLOSED",
            "PENDING_AWARD","PENDING"):return s
  return "UNKNOWN"
+def temporal_review(status,closing_date,*,today=None):
+ today=today or dt.datetime.now(dt.timezone.utc).date()
+ raw=str(closing_date or "").strip()
+ parsed=None
+ if raw:
+  try:
+   if re.fullmatch(r"\d{4}-\d{2}-\d{2}.*",raw):
+    parsed=dt.date.fromisoformat(raw[:10])
+   elif re.fullmatch(r"\d{4}/\d{2}/\d{2}.*",raw):
+    parsed=dt.datetime.strptime(raw[:10],"%Y/%m/%d").date()
+  except ValueError:
+   pass
+ if status not in ("OPEN","ACTIVE"):
+  return "NOT_OPEN_IN_SOURCE"
+ if parsed is None:
+  return "DATE_MISSING_OR_INVALID_UNVERIFIED"
+ if parsed<today:
+  return "PAST_CLOSING_DATE_STALE_OPEN_STATUS"
+ return "FUTURE_CLOSING_DATE_REQUIRES_LIVE_CONFIRMATION"
+
 def normalize(row,*,observed=None):
  if any(k not in row for k in ("Solicitation_Document_Number","Status")):
   raise ValueError("Required procurement schema fields are missing")
@@ -59,7 +79,7 @@ def normalize(row,*,observed=None):
    awards.append({"supplier":str(item["Successful_Bidder"])[:200],
        "award_date":item.get("Date_Awarded"),"amount_unparsed":item.get("Award_Amount")})
  return {"document_number":doc,"status":normalized_status(raw_status),
-   "raw_status":raw_status,"title":row.get("Posting_Title"),
+   "raw_status":raw_status,"temporal_review":temporal_review(normalized_status(raw_status),row.get("Closing_Date")),"title":row.get("Posting_Title"),
    "description":row.get("Solicitation_Document_Description"),
    "category":row.get("Solicitation_Document_Type"),
    "issue_date":row.get("Issue_Date"),"closing_date":row.get("Closing_Date"),
@@ -102,7 +122,7 @@ def collect(out,*,fetch=download_json,max_pages=2,page_size=50):
  columns=["document_number","status","title","description","category","client_division",
    "issue_date","closing_date","buyer_name","buyer_email","buyer_phone",
    "awarded_supplier_names","potential_supplier_keywords","public_portal_url",
-   "source_url","current_status_rechecked","private_buyer_verified"]
+   "source_url","temporal_review","current_status_rechecked","private_buyer_verified"]
  with dest.with_suffix(".csv").open("w",encoding="utf-8-sig",newline="") as h:
   w=csv.DictWriter(h,fieldnames=columns);w.writeheader()
   for item in records:
@@ -117,7 +137,7 @@ def collect(out,*,fetch=download_json,max_pages=2,page_size=50):
       "awarded_supplier_names":"; ".join(x["supplier"] for x in item["awarded_suppliers"]),
       "potential_supplier_keywords":"; ".join(t for t in tags if t in content),
       "public_portal_url":item["public_portal_url"],"source_url":item["source_url"],
-      "current_status_rechecked":False,"private_buyer_verified":False})
+      "temporal_review":item["temporal_review"],"current_status_rechecked":False,"private_buyer_verified":False})
  return result
 def main():
  p=argparse.ArgumentParser();p.add_argument("--out",required=True)
