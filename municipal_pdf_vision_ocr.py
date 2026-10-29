@@ -49,9 +49,20 @@ def run(pdf,source_url,results,out,*,paid=False,max_pages=2,key=None,
     document=extract_local_pdf(pdf)
     all_pages=[p["page"] for p in document["pages"] if not p["text_present"]]
     out=Path(out);out.mkdir(parents=True,exist_ok=True)
+    csv_path=out/"PDF_OCR_PAGES.csv"
+    coverage_file=out/"PDF_OCR_COVERAGE.json"
+    previous=json.loads(coverage_file.read_text(encoding="utf-8")) if coverage_file.is_file() else {}
+    if previous and (previous.get("pdf_sha256")!=document["sha256"] or
+                     previous.get("source_url")!=source_url):
+        raise ValueError("OCR folder belongs to a different source")
+    rows=[]
+    if csv_path.is_file():
+        with csv_path.open(encoding="utf-8-sig",newline="") as h:
+            rows=list(csv.DictReader(h))
+    done={int(row["page"]) for row in rows}
     report={"status":"PREFLIGHT","source_url":source_url,"pdf_sha256":document["sha256"],
-            "unreadable_pages":all_pages,"ocr_attempted":0,"ocr_succeeded":0,
-            "remaining_pages":len(all_pages),"paid_ai_requests":0,
+            "unreadable_pages":all_pages,"ocr_attempted":0,"ocr_succeeded":len(done),
+            "remaining_pages":len(set(all_pages)-done),"paid_ai_requests":0,
             "verified_projects":0,"verified_buyers":0}
     if not paid:
         (out/"PDF_OCR_COVERAGE.json").write_text(json.dumps(report,indent=2),encoding="utf-8")
@@ -61,10 +72,10 @@ def run(pdf,source_url,results,out,*,paid=False,max_pages=2,key=None,
     key=v5.key_from_windows() if key is None else key
     if not key:return {**report,"status":"MISSING_API_KEY"}
     db=v5._ledger(root/"v5_ai_budget.sqlite")
-    rows=[];failures=[]
+    failures=[]
     day=dt.date.today().isoformat()
     try:
-        for page in all_pages[:max(0,min(int(max_pages),5))]:
+        for page in [p for p in all_pages if p not in done][:max(0,min(int(max_pages),5))]:
             claim="pdf_vision_"+hashlib.sha256((STAGE+document["sha256"]+
                     source_url+str(page)).encode()).hexdigest()[:24]
             legacy=v5._legacy_reserved(root/"deepseek_budget.sqlite",day)
@@ -77,18 +88,18 @@ def run(pdf,source_url,results,out,*,paid=False,max_pages=2,key=None,
                 native.ledger_finish(db,day,claim,"UNKNOWN")
                 rows.append({"page":page,"text":text,"source_url":source_url,
                     "verification_status":"UNVERIFIED_VISION_OCR"})
-                report["ocr_succeeded"]+=1
+                done.add(page)
+                report["ocr_succeeded"]=len(done)
+                with csv_path.open("w",encoding="utf-8-sig",newline="") as h:
+                    writer=csv.DictWriter(h,fieldnames=["page","text","source_url","verification_status"])
+                    writer.writeheader();writer.writerows(rows)
             except Exception as exc:
                 native.ledger_finish(db,day,claim,"UNKNOWN")
                 failures.append({"page":page,"status":"FAILED_"+type(exc).__name__})
                 break
     finally:db.close()
     # CSV can feed the same text-understanding stage with original page IDs.
-    csv_path=out/"PDF_OCR_PAGES.csv"
-    with csv_path.open("w",encoding="utf-8-sig",newline="") as f:
-        writer=csv.DictWriter(f,fieldnames=["page","text","source_url","verification_status"])
-        writer.writeheader();writer.writerows(rows)
-    report["remaining_pages"]=len(all_pages)-len(rows)
+    report["remaining_pages"]=len(set(all_pages)-done)
     report["status"]="OCR_REVIEW_ONLY_COMPLETE" if not report["remaining_pages"] and not failures else "OCR_INCOMPLETE_REVIEW"
     (out/"PDF_OCR_COVERAGE.json").write_text(json.dumps(report,indent=2),encoding="utf-8")
     (out/"PDF_OCR_FAILURES.json").write_text(json.dumps(failures,indent=2),encoding="utf-8")
