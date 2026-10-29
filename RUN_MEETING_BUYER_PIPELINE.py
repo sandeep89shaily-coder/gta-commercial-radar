@@ -11,7 +11,7 @@ from municipal_official_buyer_research import shortlist
 from municipal_buyer_procurement import PORTALS
 from municipal_evidence_graph import graph
 def pipeline(city,out,*,recording_url=None,capture_authorized=False,address=None,
-             fetch=None,runner=None,research_fetch=None,discover_archive=False):
+             fetch=None,runner=None,research_fetch=None,discover_archive=False,deepseek_buyer=False,results=None):
  out=Path(out);out.mkdir(parents=True,exist_ok=True)
  meeting=discover(city,fetch=fetch)
  if discover_archive and city=="Toronto":
@@ -58,7 +58,15 @@ def pipeline(city,out,*,recording_url=None,capture_authorized=False,address=None
   buyer_file.write_text(json.dumps(research,indent=2),encoding="utf-8")
   state["buyer_evidence_status"]="SOURCE_CHECKED_NOT_VERIFIED"
   state["buyer_audit"]=str(buyer_file)
- graph_data=graph(meeting=str(discovery))
+ buyer_ai_file=None
+ if deepseek_buyer and address:
+  if not results:raise ValueError("Existing shared results folder needed for DeepSeek")
+  from municipal_deepseek_buyer_research import propose
+  source_rows=[x for x in research["observations"] if x.get("quote")]
+  if source_rows:
+   buyer_ai_file=out/"DEEPSEEK_BUYER_REVIEW.json"
+   state["buyer_ai_result"]=propose(source_rows[:8],results,buyer_ai_file,paid=True)
+ graph_data=graph(meeting=str(discovery),buyer_ai=str(buyer_ai_file) if buyer_ai_file and buyer_ai_file.is_file() else None)
  (out/"PROJECT_EVIDENCE_GRAPH.json").write_text(json.dumps(graph_data,indent=2),encoding="utf-8")
  (out/"INTEGRATED_PILOT_AUDIT.json").write_text(json.dumps(state,indent=2),encoding="utf-8")
  return state
@@ -70,8 +78,10 @@ def main():
  p.add_argument("--authorize-caption-capture",action="store_true")
  p.add_argument("--address")
  p.add_argument("--discover-archive",action="store_true")
+ p.add_argument("--deepseek-buyer",action="store_true")
+ p.add_argument("--results")
  a=p.parse_args()
  print(json.dumps(pipeline(a.city,a.out,recording_url=a.recording_url,
    capture_authorized=a.authorize_caption_capture,address=a.address,
-   discover_archive=a.discover_archive),indent=2))
+   discover_archive=a.discover_archive,deepseek_buyer=a.deepseek_buyer,results=a.results),indent=2))
 if __name__=="__main__":main()
