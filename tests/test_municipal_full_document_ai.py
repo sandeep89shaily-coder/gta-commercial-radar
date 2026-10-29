@@ -6,7 +6,7 @@ class FullDocumentTests(unittest.TestCase):
   pages=[{"page":1,"text":"A"*5001},{"page":2,"text":"Property 130 Augusta Avenue"},{"page":3,"text":""}]
   chunks=sections(pages,max_chars=2200)
   self.assertEqual([x["pages"][0]["page"] for x in chunks],[1,1,1,2])
-  self.assertEqual(sum(len(x["pages"][0]["text"]) for x in chunks),5027)
+  self.assertEqual(sum(len(x["pages"][0]["text"]) for x in chunks),5028)
  def test_multi_property_evidence_quote_is_checked(self):
   def transport(path,payload):
    self.assertEqual(payload["thinking"],{"type":"disabled"})
