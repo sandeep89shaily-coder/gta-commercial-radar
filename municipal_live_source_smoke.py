@@ -3,6 +3,7 @@ import datetime as dt,json
 from pathlib import Path
 from municipal_meeting_capture import discover
 from toronto_procurement_odata import collect
+from toronto_current_open_ckan import collect as collect_current
 def main(out="LIVE_SOURCE_SMOKE"):
  root=Path(out);root.mkdir(parents=True,exist_ok=True)
  audit={"checked_utc":dt.datetime.now(dt.timezone.utc).isoformat(),"results":[],"deepseek_calls":0}
@@ -16,7 +17,7 @@ def main(out="LIVE_SOURCE_SMOKE"):
    audit["results"].append({"source":city+"_MEETING_INDEX",
       "status":"UNAVAILABLE","error_type":type(e).__name__})
  try:
-  bids=collect(root/"TORONTO_OFFICIAL_PROCUREMENT.json",max_pages=1,page_size=50,recent_first=True)
+  bids=collect(root/"TORONTO_OFFICIAL_PROCUREMENT.json",max_pages=1,page_size=20,recent_first=False)
   audit["results"].append({"source":"TORONTO_PUBLIC_PROCUREMENT_ODATA",
       "status":bids["status"],"records":len(bids["records"]),
       "page_audit":bids["page_audit"],
@@ -29,6 +30,15 @@ def main(out="LIVE_SOURCE_SMOKE"):
  except Exception as e:
   audit["results"].append({"source":"TORONTO_PUBLIC_PROCUREMENT_ODATA",
       "status":"UNAVAILABLE","error_type":type(e).__name__})
+ try:
+  current=collect_current(root/"TORONTO_CURRENT_OPEN_CKAN.json",limit=300)
+  audit["results"].append({"source":"TORONTO_CKAN_CURRENT_OPEN",
+    "status":current["status"],"records":len(current["records"]),
+    "future_closing_candidates":current["candidate_future_closing"],
+    "audit":current["audit"]})
+ except Exception as exc:
+  audit["results"].append({"source":"TORONTO_CKAN_CURRENT_OPEN",
+    "status":"FAILED","error_type":type(exc).__name__,"detail":str(exc)[:160]})
  (root/"LIVE_SOURCE_AUDIT.json").write_text(json.dumps(audit,indent=2),encoding="utf-8")
  print(json.dumps(audit,indent=2))
  return audit
