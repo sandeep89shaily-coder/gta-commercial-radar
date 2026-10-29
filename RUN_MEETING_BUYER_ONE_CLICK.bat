@@ -12,7 +12,7 @@ choice /C TB /N /M "Toronto [T] or Brampton [B]? "
 if errorlevel 2 (set "CITY=Brampton") else (set "CITY=Toronto")
 set "OUT=%OUT%\%CITY%"
 echo Checking official municipal index and permitted metadata.
-%PY% RUN_MEETING_BUYER_PIPELINE.py --city "%CITY%" --out "%OUT%" --discover-archive
+%PY% RUN_MEETING_BUYER_PIPELINE.py --city "%CITY%" --out "%OUT%" --discover-archive --include-procurement
 if errorlevel 1 goto fail
 echo.
 echo Recording leads: "%OUT%\%CITY%_MEETINGS.json"
@@ -35,13 +35,13 @@ if errorlevel 2 goto buyer
 if errorlevel 1 goto fail
 :buyer
 if not defined ADDRESS goto done
-%PY% RUN_MEETING_BUYER_PIPELINE.py --city "%CITY%" --out "%OUT%" --discover-archive --address "%ADDRESS%"
+%PY% RUN_MEETING_BUYER_PIPELINE.py --city "%CITY%" --out "%OUT%" --discover-archive --include-procurement --address "%ADDRESS%"
 if errorlevel 1 goto fail
 echo Buyer source evidence: "%OUT%\BUYER_OFFICIAL_SOURCE_AUDIT.json"
 if not exist "%RESULTS%\" goto done
 choice /C YN /N /M "Authorize DeepSeek to investigate cited official buyer-role evidence? [Y/N]: "
 if errorlevel 2 goto done
-%PY% RUN_MEETING_BUYER_PIPELINE.py --city "%CITY%" --out "%OUT%" --discover-archive --address "%ADDRESS%" --deepseek-buyer --results "%RESULTS%"
+%PY% RUN_MEETING_BUYER_PIPELINE.py --city "%CITY%" --out "%OUT%" --discover-archive --include-procurement --address "%ADDRESS%" --deepseek-buyer --results "%RESULTS%"
 if errorlevel 1 goto fail
 echo Review graph: "%OUT%\PROJECT_EVIDENCE_GRAPH.json"
 goto done
