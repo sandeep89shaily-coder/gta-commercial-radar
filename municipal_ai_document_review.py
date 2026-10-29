@@ -72,7 +72,7 @@ def analyze(pages, source_url, key, *, transport=None):
             "status":"AI_REVIEW_ONLY_NOT_SALE_READY",
             "usage":response.get("usage",{})}
 
-def run(pdf,out,source_url,*,paid=False,key=None,transport=None,results=None,day=None):
+def run(pdf,out,source_url,*,paid=False,key=None,transport=None,results=None,day=None,retry_version=None):
     if not paid:
         return {"status":"NO_AI_CALL_EXPLICIT_PAID_FLAG_REQUIRED","paid_ai_calls":0}
     document=extract_local_pdf(pdf)
@@ -82,7 +82,8 @@ def run(pdf,out,source_url,*,paid=False,key=None,transport=None,results=None,day
     # Existing production ledger path is caller-supplied results folder;
     # NEVER create a competing independent cost ledger.
     budget=v5._ledger(root/"v5_ai_budget.sqlite")
-    reservation_id="municipal_report_compact_v2_"+hashlib.sha256((document["sha256"]+source_url).encode()).hexdigest()[:24]
+    reservation_prefix="municipal_report_compact_v3_" if retry_version=="one_approved_retry_v3" else "municipal_report_compact_v2_"
+    reservation_id=reservation_prefix+hashlib.sha256((document["sha256"]+source_url).encode()).hexdigest()[:24]
     try:
         legacy=v5._legacy_reserved(root/"deepseek_budget.sqlite",day)
         if not native.ledger_claim(budget,day,reservation_id,native.MODEL_RESERVE,legacy):
