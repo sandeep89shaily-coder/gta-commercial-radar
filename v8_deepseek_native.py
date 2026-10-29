@@ -162,10 +162,22 @@ def fetch_native(row, key, db, day, legacy, transport=None, *, daily_limit=None)
 
     def append(url,content,kind):
         page_identity=identity_of_page(row,content)
-        # Unrelated occupants at the same civic address are never project corroboration.
+        # The address alone proves nothing. A clearly project-specific architect
+        # or municipal publication may be retained as CONTEXT, never as an
+        # exact application identity or verified procurement record.
         if page_identity=='ADDRESS_CONTEXT_UNCONFIRMED':
-            calls['errors'].append('ADDRESS_ONLY_SOURCE_REJECTED')
-            return False
+            address=' '.join(str(row.get('address') or '').casefold().split())
+            body=' '.join(content.casefold().split())
+            project_terms=('development','redevelopment','proposed','construction',
+                           'site plan','architect','building permit','hotel project')
+            source_host=urlparse(url).hostname or ''
+            trustworthy=('toronto.ca','ontario.ca','urbantoronto.ca')
+            known_source=any(source_host==d or source_host.endswith('.'+d) for d in trustworthy)
+            explicit_project=bool(address and address in body and any(t in body for t in project_terms))
+            if not (known_source and explicit_project):
+                calls['errors'].append('ADDRESS_ONLY_SOURCE_REJECTED')
+                return False
+            page_identity='PROJECT_CONTEXT_NOT_APPLICATION_VERIFIED'
         if re.search(r'(?:opencorpdata\\.com|corporationwiki\\.com)',url,re.I) and not (
                 str(row.get('source_keys') or '').split(' | ')[0].strip() in content):
             calls['errors'].append('UNRELATED_COMPANY_DIRECTORY_REJECTED')
