@@ -62,6 +62,18 @@ def run(home,results,*,paid=False,day=None,audit=None):
         return {"status":"MISSING_SHARED_LEDGER_STOPPED","ledger":status}
     if not status.get("budget_allows_new_request"):
         return {"status":"LOCAL_BUDGET_HOLD_STOPPED","ledger":status}
+    import hashlib
+    with audit.open(encoding="utf-8-sig",newline="") as handle:
+        first=next((row for row in csv.DictReader(handle) if row.get("status")=="CAPTURED"),None)
+    if first:
+        digest=first.get("sha256","")
+        url=first.get("attachment_url") or first.get("url") or ""
+        attempt="municipal_report_compact_v2_"+hashlib.sha256((digest+url).encode()).hexdigest()[:24]
+        for entry in status.get("municipal_attempts",[]):
+            if entry.get("id")==attempt:
+                return {"status":"DUPLICATE_ATTEMPT_BLOCKED_BEFORE_API",
+                        "prior_status":entry.get("status"),"paid_ai_calls":0,
+                        "next":"No retry today. Preserve earlier reservations and check next budget day."}
     batch=process(audit,out,results,limit=1,paid=True)
     review=make_review(out)
     with (out/"TORONTO_AI_DOCUMENT_BATCH_AUDIT.csv").open(encoding="utf-8-sig") as f:
