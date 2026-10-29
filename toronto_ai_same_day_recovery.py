@@ -27,7 +27,7 @@ def recover(home,results,*,audit=None,paid=False):
         return {"status":"SHARED_LEDGER_NOT_VERIFIED","calls":0}
     fingerprint=hashlib.sha256((sha+url).encode()).hexdigest()[:24]
     existing={a["id"]:a["status"] for a in ledger.get("municipal_attempts",[])}
-    recovery_id="municipal_report_compact_v3_"+fingerprint
+    recovery_id="municipal_report_nonthinking_v4_"+fingerprint
     if recovery_id in existing:
         return {"status":"SAME_DAY_RECOVERY_ALREADY_ATTEMPTED","prior_status":existing[recovery_id],"calls":0}
     if not ledger.get("budget_allows_new_request"):
@@ -38,7 +38,7 @@ def recover(home,results,*,audit=None,paid=False):
     out.mkdir(parents=True,exist_ok=True)
     target=out/(sha[:24]+"_AI_REVIEW_ONLY.json")
     try:
-        result=analyze(pdf,target,url,paid=True,results=results,retry_version="one_approved_retry_v3")
+        result=analyze(pdf,target,url,paid=True,results=results,retry_version="one_approved_nonthinking_v4")
         status=result.get("status","UNKNOWN")
         summary={"status":status,"calls_reported":result.get("paid_ai_calls",0),
                  "supported_claims":result.get("supported_claims",0),
