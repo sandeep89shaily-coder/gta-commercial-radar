@@ -54,8 +54,16 @@ def main(out="LIVE_SOURCE_SMOKE"):
   try:
    evidence=retrieve(url,application)
    attrs=json.loads(evidence)["attributes"][0] if evidence else {}
+   response_diagnostic={}
+   if not attrs:
+    from urllib.request import urlopen
+    with urlopen(url,timeout=15) as response:
+     raw=json.load(response)
+    response_diagnostic={"feature_count":len(raw.get("features",[])),
+     "reported_error_code":raw.get("error",{}).get("code") if isinstance(raw.get("error"),dict) else None,
+     "returned_field_names":list((raw.get("features") or [{}])[0].get("attributes",{}))[:16]}
    audit["results"].append({"source":label,"status":"EXACT_ID_MATCHED" if attrs else "NO_MATCH",
-     "attribute_fields":len(attrs),"has_scope":any(k.upper() in ("DESCRIPTION","SCOPE","APP_DETAIL") for k in attrs),
+     "attribute_fields":len(attrs),"response_diagnostic":response_diagnostic,"has_scope":any(k.upper() in ("DESCRIPTION","SCOPE","APP_DETAIL") for k in attrs),
      "source_url":url})
   except Exception as exc:
    audit["results"].append({"source":label,"status":"UNAVAILABLE","error_type":type(exc).__name__})
