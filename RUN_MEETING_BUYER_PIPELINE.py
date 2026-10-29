@@ -84,6 +84,12 @@ def pipeline(city,out,*,recording_url=None,capture_authorized=False,address=None
     **({"fetch":procurement_fetch} if procurement_fetch else {}))
   state["official_procurement_status"]=result["status"]
   state["official_procurement_records"]=len(result["records"])
+  from toronto_current_open_ckan import collect as collect_open
+  current_file=out/"TORONTO_CURRENT_OPEN_CKAN.json"
+  current=collect_open(current_file,limit=1200)
+  state["current_open_feed_status"]=current["status"]
+  state["future_closing_candidates"]=current["candidate_future_closing"]
+  state["current_open_feed_complete"]=current["complete"]
  graph_data=graph(meeting=str(discovery),buyer_ai=str(buyer_ai_file) if buyer_ai_file and buyer_ai_file.is_file() else None,project_address=address,
     procurement=str(procurement_file) if procurement_file and procurement_file.is_file() else None)
  (out/"PROJECT_EVIDENCE_GRAPH.json").write_text(json.dumps(graph_data,indent=2),encoding="utf-8")
