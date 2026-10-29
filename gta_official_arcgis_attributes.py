@@ -23,7 +23,10 @@ def parse_features(raw,expected_key=None):
         if expected_key and not any(str(v).strip().casefold()==str(expected_key).strip().casefold() for v in attrs.values()):
             continue
         # Only application attributes; omit geometry and giant schema/field metadata.
-        compact={str(k):str(v)[:750] for k,v in attrs.items() if v is not None and str(v).strip()}
+        priority=("APPLICATION_NUMBER","PERMITNUMBER","BP_NO","STATUS","DESCRIPTION","SCOPE","ADDRESS","UNIT_NO","FILE_TYPE","BLDG_TYPE","APP_DETAIL","APPLICANT","OWNER","CONTRACTOR","ISSUED_DATE")
+        pairs=[(str(k),str(v)[:750]) for k,v in attrs.items() if v is not None and str(v).strip()]
+        pairs.sort(key=lambda item:(priority.index(item[0].upper()) if item[0].upper() in priority else len(priority),item[0]))
+        compact=dict(pairs)
         if compact:matches.append(compact)
     return {"attributes":matches[:3],"matched":len(matches)} if matches else None
 def retrieve(url,expected_key,*,transport=None):
