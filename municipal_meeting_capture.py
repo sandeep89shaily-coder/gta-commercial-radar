@@ -71,6 +71,27 @@ def fetch_html(url):
  if len(body)>1_000_000:raise ValueError("Index too large")
  return body.decode("utf-8","replace")
 
+def discover_channel(channel_url,*,limit=20,runner=subprocess.run):
+    """Public channel listing, metadata-only; not a download or rights bypass."""
+    if channel_url not in ("https://www.youtube.com/@TorontoCityCouncilLive/videos",
+                           "https://www.youtube.com/@CityofBrampton/videos"):
+        raise ValueError("Unknown channel; require official confirmation")
+    cmd=[sys.executable,"-m","yt_dlp","--flat-playlist","--dump-single-json",
+         "--playlist-end",str(max(1,min(int(limit),50))),channel_url]
+    response=runner(cmd,capture_output=True,text=True,timeout=120)
+    if response.returncode:raise RuntimeError("Channel listing unavailable; no workaround attempted")
+    data=json.loads(response.stdout)
+    found=[]
+    for row in data.get("entries",[]):
+        if not isinstance(row,dict):continue
+        vid=row.get("id","")
+        if not re.fullmatch(r"[\w-]{11}",str(vid)):continue
+        found.append({"recording_url":"https://www.youtube.com/watch?v="+vid,
+                      "meeting_title_unverified":row.get("title",""),
+                      "meeting_id":"UNRESOLVED","agenda_match":"UNRESOLVED",
+                      "discovery_source":channel_url})
+    return found
+
 def capture(url,out,*,authorized=False,runner=subprocess.run):
  video=normalize_video(url)
  if not video:raise ValueError("Only specific public YouTube meeting recording IDs accepted")
