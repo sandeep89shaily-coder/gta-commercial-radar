@@ -4,7 +4,7 @@ import argparse,hashlib,json,re
 from pathlib import Path
 def key(address):
  return " ".join(re.findall(r"[a-z0-9]+",str(address).lower()))
-def graph(synthesis=None,buyer=None,meeting=None):
+def graph(synthesis=None,buyer=None,meeting=None,buyer_ai=None):
  nodes={};edges=[];uncertain=[]
  if synthesis:
   source=json.loads(Path(synthesis).read_text(encoding="utf-8"))
@@ -32,6 +32,14 @@ def graph(synthesis=None,buyer=None,meeting=None):
     edges.append({"from":nid,"to":oid,"role":o.get("role","UNVERIFIED"),
                   "evidence_id":o.get("evidence_id"),"verified":False})
    n["candidate_buyers"]=len(research.get("organizations",[]))
+ if buyer_ai:
+  data=json.loads(Path(buyer_ai).read_text(encoding="utf-8"))
+  for item in data.get("observations",[]):
+   name=item.get("organization") or ""
+   if name:
+    oid="org_"+hashlib.sha256(name.lower().encode()).hexdigest()[:18]
+    nodes.setdefault(oid,{"id":oid,"name":name,"organization_verified":False})
+    uncertain.append({"type":"POSSIBLE_BUYER_ROLE","organization_id":oid,"role":item.get("role"),"source_url":item.get("source_url"),"verified":False})
  if meeting:
   records=json.loads(Path(meeting).read_text(encoding="utf-8"))
   for r in records.get("meetings",[]):
@@ -44,8 +52,8 @@ def graph(synthesis=None,buyer=None,meeting=None):
    "requires_human_review":True}
 def main():
  p=argparse.ArgumentParser();p.add_argument("--synthesis");p.add_argument("--buyer")
- p.add_argument("--meeting");p.add_argument("--out",required=True);a=p.parse_args()
- result=graph(a.synthesis,a.buyer,a.meeting)
+ p.add_argument("--meeting");p.add_argument("--buyer-ai");p.add_argument("--out",required=True);a=p.parse_args()
+ result=graph(a.synthesis,a.buyer,a.meeting,a.buyer_ai)
  target=Path(a.out);target.parent.mkdir(parents=True,exist_ok=True)
  target.write_text(json.dumps(result,indent=2),encoding="utf-8")
  print(json.dumps({"graph_nodes":len(result["nodes"]),"graph_edges":len(result["edges"]),
