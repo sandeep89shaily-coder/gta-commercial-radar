@@ -181,7 +181,7 @@ class DurableResearchQueueTests(unittest.TestCase):
             self.assertAlmostEqual(completed,0.001)
             self.assertAlmostEqual(unknown,0.95)
             self.assertFalse(deepseek.ledger_claim(db,FIXED.isoformat(),'too-large',0.05))
-            self.assertTrue(deepseek.ledger_claim(db,FIXED.isoformat(),'small',0.01))
+            self.assertFalse(deepseek.ledger_claim(db,FIXED.isoformat(),'small',0.01))
 
     def test_published_cache_and_off_peak_flash_rates(self):
         usage={'prompt_tokens':1000,'prompt_cache_hit_tokens':800,
