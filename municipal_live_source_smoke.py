@@ -32,9 +32,12 @@ def main(out="LIVE_SOURCE_SMOKE"):
       "status":"UNAVAILABLE","error_type":type(e).__name__})
  try:
   current=collect_current(root/"TORONTO_CURRENT_OPEN_CKAN.json",limit=1200)
+  from gta_commercial_qualification import create as make_board
+  board=make_board(root/"TORONTO_CURRENT_OPEN_CKAN.json",root/"RANKED_SUPPLIER_REVIEW.json")
   audit["results"].append({"source":"TORONTO_CKAN_CURRENT_OPEN",
     "status":current["status"],"records":len(current["records"]),
     "future_closing_candidates":current["candidate_future_closing"],
+    "trade_relevant_research_candidates":board["relevant_trade_candidates"],
     "complete":current["complete"],
     "audit":current["audit"]})
  except Exception as exc:
