@@ -22,7 +22,7 @@ class ExecuteAITests(unittest.TestCase):
    with patch("gta_execute_ai_project_research.native.fetch_native",return_value=([{"url":"https://www.toronto.ca/planning","text":"Warehouse plan"}],{"search":1,"fetch":1})),patch("gta_execute_ai_project_research.native.analyze",return_value=({"owner":"Example Corp"},0.001)) as analyze:
     status=execute(p,root,root/"review",paid=True,key="mock")
    self.assertEqual(status["completed"],1)
-   payloads=list((root/"review").glob("AI_PROJECT_*.json"))
+   payloads=list((root/"review").glob("AI_PROJECT_????????????????.json"))
    self.assertEqual(len(payloads),1)
    saved=json.loads(payloads[0].read_text())
    self.assertFalse(saved["sale_ready"])
