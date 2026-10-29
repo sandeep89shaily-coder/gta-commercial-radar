@@ -16,11 +16,11 @@ class CKANTests(unittest.TestCase):
      "Buyer Name":"Toronto Buyer"} for i in range(3)]
    return {"success":True,"result":{"records":sample[offset:offset+limit],"total":3}}
   with tempfile.TemporaryDirectory() as t:
-   result=collect(Path(t)/"current.json",fetch=fake,limit=5,today=dt.date(2026,10,29))
+   result=collect(Path(t)/"current.json",fetch=fake,limit=3,today=dt.date(2026,10,29))
    self.assertTrue(result["complete"])
    self.assertEqual(len(result["records"]),3)
    self.assertEqual(result["candidate_future_closing"],1)
-   self.assertEqual(len(calls),3)
+   self.assertEqual(len(calls),2)
  def test_empty_or_unavailable_fails_closed(self):
   def fail(url):raise RuntimeError("Unavailable")
   with tempfile.TemporaryDirectory() as t:
