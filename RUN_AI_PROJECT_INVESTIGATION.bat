@@ -18,7 +18,7 @@ if errorlevel 1 goto fail
 if exist "%RESULTS%\GTA_RADAR_V8_PENDING_QUEUE.csv" (
  %PY% gta_discovery_tracking.py --queue "%RESULTS%\GTA_RADAR_V8_PENDING_QUEUE.csv" --folder "%RESULTS%"
 )
-echo Identifying project sources and budget...
+echo Checking free early intelligence feeds...\n%PY% gta_early_signal_feed_monitor.py --out "%RESULTS%"\necho Identifying project sources and budget...
 %PY% gta_execute_ai_project_research.py --results "%RESULTS%" --out "%OUT%"
 if errorlevel 1 goto fail
 set "PAID_AI=0"
