@@ -8,6 +8,10 @@ One entrypoint: `RUN_UNIFIED_PDF_VIDEO_AI_REVIEW.bat`. Accepts:
 2. A timestamped local transcript CSV — preserves all text segments.
 3. An authorized local audio/video recording — `faster-whisper` transcribes
    it locally, then DeepSeek can interpret the resulting transcript.
+4. A scanned PDF — optional `municipal_pdf_vision_ocr.py` renders unreadable
+   pages using PyMuPDF and calls DeepSeek Vision after separate authorization.
+   OCR text then enters the same page-marked DeepSeek understanding stage.
+   Requires `py -3 -m pip install pymupdf`.
 
 All paths converge on `municipal_unified_intelligence.py`: chunked inputs
 with source markers → DeepSeek JSON interpretation → literal quote and
@@ -17,9 +21,10 @@ page/timestamp checks → review-only outputs.
 DeepSeek **interprets** the extracted text (project mentions, event type,
 organizations and quoted evidence). Whisper, **not DeepSeek**, converts raw
 audio/video to words. Pypdf, **not DeepSeek**, extracts text from digital
-PDFs. Current Chat Completions endpoint can accept images and some files,
-but this pilot has not implemented those optional multimodal upload
-routes or proved OCR of scans. No claims about reliable PDF/OCR/video
+PDFs. DeepSeek Vision is used for scanned PDF pages only when separately authorized;
+video still goes through local Whisper and not through a native DeepSeek audio
+transcription API. Vision OCR has only mocked API tests, not a verified live
+scanned-PDF result. No claims about reliable PDF/OCR/video
 processing without tests.
 
 ## First-run requirements
@@ -50,8 +55,9 @@ Star's **US$0.25/day** cap in addition to existing shared V8 reservations.
   a partial run. The coverage JSON reports the remainder.
 - No cross-document knowledge graph or semantic fact verification is yet
   performed by this unified pilot.
-- Scanned/image-only PDFs are detected as unreadable; OCR/vision processing
-  has not yet been integrated.
+- Scanned/image-only PDF pages are detected, and optional DeepSeek Vision OCR
+  can process up to two pages by default. It has not yet been tested on a real
+  source using Windows credentials; OCR may misread names, layout or numbers.
 - Audio transcription can misspell addresses, numbers and names; speaker
   identity is unknown.
 - Meeting transcripts can contain statements absent from a staff report.
