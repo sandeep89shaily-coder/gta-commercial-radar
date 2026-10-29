@@ -12,7 +12,7 @@ def is_official_query(url):
     except (TypeError,ValueError,IndexError):
         return False
 def parse_features(raw,expected_key=None):
-    data=json.loads(raw) if isinstance(raw,str) else raw
+    data=json.loads(raw) if isinstance(raw,(str,bytes,bytearray)) else raw
     if not isinstance(data,dict):return None
     features=data.get("features")
     if not isinstance(features,list) or not features:return None
