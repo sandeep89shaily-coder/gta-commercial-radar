@@ -1,6 +1,7 @@
 import tempfile,unittest,json
 from pathlib import Path
-from toronto_procurement_odata import normalize,collect,endpoint
+from toronto_procurement_odata import normalize,collect,endpoint,temporal_review
+import datetime as dt
 class ProcurementTests(unittest.TestCase):
  def test_buyer_and_award_evidence_preserved(self):
   r=normalize({"Solicitation_Document_Number":"1234567890","Status":"Awarded",
@@ -29,6 +30,15 @@ class ProcurementTests(unittest.TestCase):
    self.assertEqual(rows[0]["status"],"OPEN")
    self.assertEqual(rows[0]["current_status_rechecked"],"False")
    self.assertEqual(result["verified_private_opportunities"],0)
+ def test_historical_open_2010_is_not_current(self):
+  self.assertEqual(temporal_review("OPEN","2010-11-24",today=dt.date(2026,10,29)),
+    "PAST_CLOSING_DATE_STALE_OPEN_STATUS")
+  self.assertEqual(temporal_review("OPEN","2026-11-24",today=dt.date(2026,10,29)),
+    "FUTURE_CLOSING_DATE_REQUIRES_LIVE_CONFIRMATION")
+  self.assertEqual(temporal_review("OPEN",None,today=dt.date(2026,10,29)),
+    "DATE_MISSING_OR_INVALID_UNVERIFIED")
+  self.assertEqual(temporal_review("AWARDED","2026-11-24",today=dt.date(2026,10,29)),
+    "NOT_OPEN_IN_SOURCE")
  def test_paging_cap(self):
   self.assertRaises(ValueError,endpoint,0,1000)
 if __name__=="__main__":unittest.main()
