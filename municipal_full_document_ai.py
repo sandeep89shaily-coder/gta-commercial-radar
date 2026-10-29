@@ -90,7 +90,7 @@ def run(pdf,url,out,results,*,paid=False,max_sections=6,key=None,transport=None)
             manifest["sections_attempted"]+=1
             try:
                 extracted,usage=extract_section(chunk,url,key,transport)
-                actual=native.estimate_cost(usage) if hasattr(native,"estimate_cost") else None
+                actual=None  # Unknown usage retains full reservation conservatively
                 native.ledger_finish(db,today,reservation,"DONE" if actual is not None else "UNKNOWN",actual)
                 manifest["sections_succeeded"]+=1
                 audit.append({"section":idx,"status":"AI_REVIEW_ONLY"})
@@ -111,6 +111,8 @@ def run(pdf,url,out,results,*,paid=False,max_sections=6,key=None,transport=None)
     finally:db.close()
     manifest["sections_unprocessed"]=len(chunks)-manifest["sections_attempted"]
     manifest["status"]="PARTIAL_REVIEW" if manifest["sections_unprocessed"] else "EXTRACTED_REVIEW_ONLY"
+    manifest["properties_extracted"]=len(records)
+    manifest["grounded_property_mentions"]=sum(bool(r["grounded"]) for r in records)
     with (out/"MULTI_PROPERTY_EVIDENCE.csv").open("w",encoding="utf-8-sig",newline="") as h:
         writer=csv.DictWriter(h,fieldnames=OUTPUT_FIELDS);writer.writeheader();writer.writerows(records)
     (out/"SECTION_AUDIT.json").write_text(json.dumps(audit,indent=2),encoding="utf-8")
