@@ -39,6 +39,16 @@ def render(folder):
 <div class="tile"><b>{open_bids}</b><small>Future-closing candidates, unverified</small></div>
 <div class="tile"><b>{buying}</b><small>Published city buyer email fields</small></div></div>
 <div class="note">Current-open source: {esc(current.get("status"))}; full coverage: {esc(current.get("complete"))}. Historical OPEN but already past closing: {stale_bids}. Published tender status is not a confirmed current offer. No verified private purchasing decision-makers, unawarded private contracts or sale-ready leads are claimed.</div>"""]
+ ranked_file=root/"RANKED_SUPPLIER_REVIEW.json"
+ ranked=json.loads(ranked_file.read_text(encoding="utf-8")) if ranked_file.is_file() else {"leads":[]}
+ relevant=[x for x in ranked.get("leads",[]) if x.get("service_categories")]
+ if relevant:
+  sections.append("<section><h2>Supplier-focused review queue · unverified</h2><p>Ranked by rough commercial fit and deadline; not private pre-procurement leads or confirmed active tenders.</p><table><tr><th>Reference</th><th>Trade</th><th>Closing</th><th>Public City buyer</th></tr>")
+  for x in relevant[:50]:
+   sections.append("<tr><td>"+esc(x.get("reference"))+"</td><td>"+esc(", ".join(x.get("service_categories",[])))+
+     "<p class='mini'>"+esc(str(x.get("description") or "")[:160])+"</p></td><td>"+esc(x.get("closing_date"))+
+     "</td><td>"+esc(x.get("published_buyer_name"))+"</td></tr>")
+  sections.append("</table></section>")
  if current_rows:
   sections.append("<section><h2>Future-closing bids from official open dataset</h2><p>Unverified for current availability. Recheck the official City portal and addenda.</p><table><thead><tr><th>Number</th><th>Description</th><th>City buyer</th><th>Closing</th></tr></thead><tbody>")
   for item in current_rows[:250]:
