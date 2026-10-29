@@ -9,7 +9,7 @@ choice /C TB /N /M "Choose Toronto [T] or Brampton [B]: "
 if errorlevel 2 (set "CITY=Brampton") else (set "CITY=Toronto")
 set "OUT=%~dp0MUNICIPAL_MEETING_BUYER_REVIEW\%CITY%"
 echo Step 1: discover recording links and create preliminary evidence graph.
-%PY% RUN_MEETING_BUYER_PIPELINE.py --city "%CITY%" --out "%OUT%"
+%PY% RUN_MEETING_BUYER_PIPELINE.py --city "%CITY%" --out "%OUT%" --discover-archive
 if errorlevel 1 goto fail
 echo.
 echo See "%OUT%\%CITY%_MEETINGS.json" for official-source recording links.
