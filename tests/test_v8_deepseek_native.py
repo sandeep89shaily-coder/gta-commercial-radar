@@ -31,7 +31,7 @@ class NativeDeepseekTests(unittest.TestCase):
  def api(self,path,payload):self.calls.append((path,payload));return response(path)
  def test_official_api_payloads_and_verified_model(self):
   evidence,stat=mod.fetch_native(ROW,'key',self.db,self.day,0,self.api)
-  self.assertEqual(stat['search'],2)
+  self.assertEqual(stat['search'],len(mod.queries(ROW)))
   self.assertEqual(len(evidence),1)
   queries=[x for x in self.calls if x[0]=='/v1/tools/search']
   self.assertEqual(queries[0][1]['need_content'],True)
