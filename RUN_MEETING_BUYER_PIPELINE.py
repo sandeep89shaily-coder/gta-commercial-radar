@@ -5,7 +5,7 @@ a selected recording's caption capture. Procurement checks remain unverified.
 """
 import argparse,json
 from pathlib import Path
-from municipal_meeting_capture import discover,capture,discover_channel
+from municipal_meeting_capture import discover,capture
 from municipal_captions_to_transcript import convert
 from municipal_official_buyer_research import shortlist
 from municipal_buyer_procurement import PORTALS
@@ -17,8 +17,11 @@ def pipeline(city,out,*,recording_url=None,capture_authorized=False,address=None
  meeting=discover(city,fetch=fetch)
  if discover_archive and city=="Toronto":
   try:
-   archive=discover_channel("https://www.youtube.com/TorontoCityCouncilLive/videos",
-                           runner=runner or __import__("subprocess").run)
+   from municipal_youtube_api import list_videos
+   import os
+   api=list_videos("Toronto",os.environ.get("YOUTUBE_DATA_API_KEY",""))
+   archive=[{"recording_url":x["recording_url"],"meeting_title_unverified":x["title"],"discovery_source":"OFFICIAL_YOUTUBE_DATA_API"} for x in api["records"]]
+   meeting["archive_discovery_status"]=api["status"]
    known={x["recording_url"] for x in meeting["meetings"]}
    for m in archive:
     if m["recording_url"] not in known:
