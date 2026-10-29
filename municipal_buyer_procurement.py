@@ -48,11 +48,9 @@ def dossier(project_id,project_address,observations,*,as_of=None):
   if status not in STATES:status="UNKNOWN"
   # Never trust a user's unverified label as evidence of tender status.
   if status!="UNKNOWN":
-   has_official=r.get("source_kind")=="official_procurement_notice"
-   has_reference=bool(r.get("tender_reference"))
-   has_human_confirmation=r.get("procurement_verified") is True
-   if not (has_official and has_reference and has_human_confirmation):
-    status="UNKNOWN"
+   # A submitted field is NOT independently checked against the live source.
+   # Even an apparent official reference is only a candidate for verification.
+   status="UNKNOWN"
   contracts.append({"service_package":r.get("service_package",""),
     "status":status,"tender_reference":r.get("tender_reference",""),
     "buyer":r.get("buyer",""),"evidence_id":ev["evidence_id"],
