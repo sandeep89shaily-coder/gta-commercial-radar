@@ -60,7 +60,7 @@ def graph(synthesis=None,buyer=None,meeting=None,buyer_ai=None,project_address=N
      "verified_for_private_project":False,"current_status_rechecked":False}
    if site_id:
     raw=" ".join(str(item.get(x) or "") for x in ("title","description"))
-    if key(project_address) and key(project_address) in key(raw):
+    if key(project_address) and (" "+key(project_address)+" ") in (" "+key(raw)+" "):
      edges.append({"from":site_id,"to":pid,"role":"POSSIBLE_TENDER_MATCH",
        "match_basis":"EXACT_ADDRESS_IN_CITY_TENDER_TEXT",
        "verified":False,"procurement_stage_needs_refresh":True})
