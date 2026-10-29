@@ -54,12 +54,16 @@ def execute(candidate_file,shared_results,out,*,paid=False,max_projects=3,
            "verified_private_leads":0,"deepseek_budget_limit_usd":0.49}
     manifest=dest/"AI_PROJECT_RESEARCH_MANIFEST.json"
     if not paid:
-        manifest.write_text(json.dumps(state,indent=2),encoding="utf-8")
+        preview=dest/"AI_PROJECT_PREFLIGHT.json"
+        preview.write_text(json.dumps(state,indent=2),encoding="utf-8")
         return state
     root=Path(shared_results)
     if not root.is_dir():raise ValueError("Existing shared results folder required")
     key=v5.key_from_windows() if key is None else key
-    if not key:return {**state,"status":"MISSING_API_KEY"}
+    if not key:
+        state["status"]="MISSING_API_KEY"
+        manifest.write_text(json.dumps(state,indent=2),encoding="utf-8")
+        return state
     db=v5._ledger(root/"v5_ai_budget.sqlite")
     day=(today or dt.date.today()).isoformat()
     legacy=v5._legacy_reserved(root/"deepseek_budget.sqlite",day)
