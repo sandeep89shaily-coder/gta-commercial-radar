@@ -76,7 +76,7 @@ def pipeline(city,out,*,recording_url=None,capture_authorized=False,address=None
   if source_rows:
    buyer_ai_file=out/"DEEPSEEK_BUYER_REVIEW.json"
    state["buyer_ai_result"]=propose(source_rows[:8],results,buyer_ai_file,paid=True)
- graph_data=graph(meeting=str(discovery),buyer_ai=str(buyer_ai_file) if buyer_ai_file and buyer_ai_file.is_file() else None)
+ graph_data=graph(meeting=str(discovery),buyer_ai=str(buyer_ai_file) if buyer_ai_file and buyer_ai_file.is_file() else None,project_address=address)
  (out/"PROJECT_EVIDENCE_GRAPH.json").write_text(json.dumps(graph_data,indent=2),encoding="utf-8")
  (out/"INTEGRATED_PILOT_AUDIT.json").write_text(json.dumps(state,indent=2),encoding="utf-8")
  return state
