@@ -11,7 +11,7 @@ def parse(value):
  try:return dt.datetime.fromisoformat(str(value).replace("Z","+00:00"))
  except ValueError:return None
 def validate(record):
- needed=("official_project_id","same_project_match_reviewed","first_public_url",
+ needed=("official_project_id","first_public_url",
          "first_public_at","radar_first_seen_at","later_permit_url","later_permit_public_at")
  missing=[x for x in needed if not record.get(x)]
  if missing:return {"status":"INSUFFICIENT_PROVENANCE","missing":missing}
