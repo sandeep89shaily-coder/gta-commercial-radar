@@ -15,6 +15,16 @@ class SourceAPITests(unittest.TestCase):
   self.assertEqual(calls,["channels","playlistItems"])
   self.assertFalse(result["records"][0]["downloaded"])
   self.assertEqual(result["records"][0]["agenda_match"],"UNRESOLVED")
+ def test_brampton_official_playlist_metadata(self):
+  called=[]
+  def fake(endpoint,params):
+   called.append((endpoint,params))
+   return {"items":[{"snippet":{"resourceId":{"videoId":"abcdefghijk"},
+     "title":"Brampton Council 2026"}}]}
+  result=list_videos("Brampton","mock_key",fetch=fake)
+  self.assertEqual(len(result["records"]),1)
+  self.assertEqual(called[0][0],"playlistItems")
+  self.assertEqual(called[0][1]["playlistId"],"PLwPpn41MA71TK6VpRGWpHTrZiot2r7sHw")
  def test_no_platform_permission_no_download(self):
   with tempfile.TemporaryDirectory() as td:
    result=capture("https://www.youtube.com/watch?v=abcdefghijk",td,authorized=True)
