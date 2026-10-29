@@ -11,7 +11,7 @@ if not exist "%RESULTS%\" (
  pause
  exit /b 1
 )
-echo GTA RADAR - ACTUAL DEEPSEEK PROJECT RESEARCH
+echo DeepSeek ledger and execution diagnostic:\n%PY% gta_deepseek_budget_diagnostic.py --results "%RESULTS%" --out "%~dp0DEEPSEEK_BUDGET_DIAGNOSTIC.json"\necho GTA RADAR - ACTUAL DEEPSEEK PROJECT RESEARCH
 echo Automatically locating the V8 project queue in existing results folders.
 set "OUT=%~dp0AI_PROJECT_REVIEW_V2"
 %PY% gta_execute_ai_project_research.py --results "%RESULTS%" --out "%OUT%"
