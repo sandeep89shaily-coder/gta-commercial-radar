@@ -28,6 +28,8 @@ if errorlevel 1 goto fail
 if exist "%~dp0AI_PROJECT_REVIEW\AI_PROJECT_RESEARCH_MANIFEST.json" (
  %PY% gta_ai_quality_comparison.py --before "%~dp0AI_PROJECT_REVIEW" --after "%OUT%" --out "%OUT%\AI_QUALITY_COMPARISON.json"
 )
+%PY% gta_release_acceptance.py --folder "%OUT%" --baseline "%~dp0AI_PROJECT_REVIEW"
+if errorlevel 1 goto fail
 start "" "%OUT%\COMMERCIAL_REVIEW.html"
 echo Review created in "%OUT%".
 goto done
