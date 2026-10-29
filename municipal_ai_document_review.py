@@ -46,6 +46,7 @@ def analyze(pages, source_url, key, *, transport=None):
         raise ValueError("Document exceeds bounded model input")
     response=native.request("/chat/completions",{
         "model":native.MODEL,
+        "thinking":{"type":"disabled"},
         "messages":[{"role":"system","content":PROMPT},
                     {"role":"user","content":doc}],
         "response_format":{"type":"json_object"},
@@ -83,6 +84,8 @@ def run(pdf,out,source_url,*,paid=False,key=None,transport=None,results=None,day
     # NEVER create a competing independent cost ledger.
     budget=v5._ledger(root/"v5_ai_budget.sqlite")
     reservation_prefix="municipal_report_compact_v3_" if retry_version=="one_approved_retry_v3" else "municipal_report_compact_v2_"
+    if retry_version=="one_approved_nonthinking_v4":
+        reservation_prefix="municipal_report_nonthinking_v4_"
     reservation_id=reservation_prefix+hashlib.sha256((document["sha256"]+source_url).encode()).hexdigest()[:24]
     try:
         legacy=v5._legacy_reserved(root/"deepseek_budget.sqlite",day)
