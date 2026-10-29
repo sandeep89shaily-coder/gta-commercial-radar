@@ -117,7 +117,11 @@ def execute(candidate_file,shared_results,out,*,paid=False,max_projects=3,
                     "native_fetches":stats["fetch"],"sources":evidence,
                     "rejected_address_only_sources":[{"url":e.get("url"),"reason":"ADDRESS_CONTEXT_UNCONFIRMED"} for e in rejected],
                     "model_suggestions":answer,"verified_buying_authority":False,
-                    "verified_supplier_unselected":False,"sale_ready":False}
+                    "verified_supplier_unselected":False,"sale_ready":False,
+                    "qualification_status":"RESEARCH_ONLY",
+                    "missing_commercial_proof":["Purchasing authority linked to project",
+                        "Official unawarded work package confirmation",
+                        "Current procurement status"]}
                 filename.write_text(json.dumps(output,indent=2,ensure_ascii=False),encoding="utf-8")
                 state["completed"]+=1
                 audit.append({"project_id":rid,"status":"AI_REVIEW_SAVED",
