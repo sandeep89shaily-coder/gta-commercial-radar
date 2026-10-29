@@ -8,6 +8,7 @@ from pathlib import Path
 from municipal_meeting_capture import discover,capture
 from municipal_captions_to_transcript import convert
 from municipal_official_buyer_research import shortlist
+from municipal_buyer_procurement import PORTALS
 from municipal_evidence_graph import graph
 def pipeline(city,out,*,recording_url=None,capture_authorized=False,address=None,
              fetch=None,runner=None,research_fetch=None):
@@ -35,7 +36,7 @@ def pipeline(city,out,*,recording_url=None,capture_authorized=False,address=None
     if cap:
      state["transcript"]=convert(cap,out/"MEETING_TRANSCRIPT.csv",recording_url)
  if address:
-  research=shortlist(address,[],fetch=research_fetch) if research_fetch else shortlist(address,[])
+  research=shortlist(address,list(PORTALS.values()),fetch=research_fetch) if research_fetch else shortlist(address,list(PORTALS.values()))
   buyer_file=out/"BUYER_OFFICIAL_SOURCE_AUDIT.json"
   buyer_file.write_text(json.dumps(research,indent=2),encoding="utf-8")
   state["buyer_evidence_status"]="SOURCE_CHECKED_NOT_VERIFIED"
