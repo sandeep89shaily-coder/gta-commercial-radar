@@ -46,7 +46,8 @@ def propose(source_items,results,out,*,paid=False,key=None,transport=None):
    result=response["choices"][0]
    if result.get("finish_reason")=="length":raise ValueError("Truncated buyer role extraction")
    raw=json.loads(result["message"]["content"])
-   native.ledger_finish(db,today,rid,"UNKNOWN")
+   actual=native.model_usage_cost(response.get("usage",{}))
+   native.ledger_finish(db,today,rid,"DONE" if actual is not None else "UNKNOWN",actual)
   except Exception:
    native.ledger_finish(db,today,rid,"UNKNOWN");raise
  finally:db.close()
