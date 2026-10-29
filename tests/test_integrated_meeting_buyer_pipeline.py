@@ -12,7 +12,7 @@ class EndToEndTests(unittest.TestCase):
    self.assertEqual(result["buyer_evidence_status"],"SOURCE_CHECKED_NOT_VERIFIED")
    graph=json.loads((Path(td)/"PROJECT_EVIDENCE_GRAPH.json").read_text())
    self.assertEqual(graph["sale_ready_opportunities"],0)
-   self.assertEqual(len(graph["nodes"]),1)
+   self.assertEqual(len(graph["nodes"]),2)
  def test_unmatched_recording_no_download(self):
   with tempfile.TemporaryDirectory() as td:
    result=pipeline("Brampton",Path(td),fetch=lambda url:"<html/>",
