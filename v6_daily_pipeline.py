@@ -321,7 +321,7 @@ def render_dashboard(results, state):
             f'<p><b>Run state: {esc(status)}</b> · {esc(state.get("started_local", ""))}</p>',
             '<p><b>Research only:</b> an application or AI suggestion is not proof of purchasing intent. No unverified project is sale-ready.</p>',
              '<p><b>DAILY PUBLIC RECORD WATCH:</b> <a href="GTA_RADAR_DAILY_NEW_DEVELOPMENTS.html">Newly observed and changed municipal projects</a> · '+
-             '<a href="GTA_RADAR_DAILY_PUBLIC_RECORDS.csv">Full public-record collection</a>. Selective DeepSeek uses a separate $0.25 daily ceiling.</p>',
+             '<a href="GTA_RADAR_DAILY_PUBLIC_RECORDS.csv">Full public-record collection</a>. Selective DeepSeek uses a separate $0.49 daily ceiling.</p>',
              '<p><b>INVESTIGATE NEXT:</b> <a href="GTA_RADAR_SHORTLIST.html">Open high-confidence commercial opportunities</a> · '+
              '<a href="GTA_RADAR_QUALIFIED_OPPORTUNITY_SHORTLIST.csv">Download qualified shortlist</a> · '+
              '<a href="GTA_RADAR_OPPORTUNITY_RESEARCH_GAPS.csv">Records awaiting verification</a>.</p>',
@@ -347,7 +347,7 @@ def render_dashboard(results, state):
             f'<b>Ready for the next run:</b> {esc(state.get("queue_due",0))}; '
             f'<b>Current AI stop reason:</b> {esc(state.get("queue_stop_reason","NOT_RUN"))}; '
             f'<b>Without corroborated evidence:</b> {esc(state.get("no_corroboration",0))}. '
-            f'<b>DeepSeek daily budget used (completed-token estimates + unknown holds):</b> US${esc(state.get("reserved_usd",0))} / $1.00. '
+            f'<b>DeepSeek daily budget used (completed-token estimates + unknown holds):</b> US${esc(state.get("reserved_usd",0))} / $0.49. '
             f'<b>Completed API-call cost estimate:</b> US${esc(state.get("charged_estimate_usd",0))}; '
             f'<b>Uncertain charges still reserved:</b> US${esc(state.get("unresolved_reservations_usd",0))}. '
             f'These are local estimates, not DeepSeek account billing.</p>']
@@ -417,7 +417,7 @@ def render_dashboard(results, state):
                     '<a href="GTA_RADAR_DAILY_NEW_DEVELOPMENTS.html">Open this run\'s source-event report</a>.</p>')
     if state.get('selective_ai'):
         ai=state['selective_ai']
-        page.append('<p><b>Selective DeepSeek (US$0.25/day maximum):</b> '+
+        page.append('<p><b>Selective DeepSeek (US$0.49/day maximum):</b> '+
                     esc(ai.get('new_eligible',0))+' newly eligible · '+
                     esc(ai.get('pending_before',0))+' eligible pending · '+
                     esc(ai.get('paid_research_attempts',0))+' model calls attempted · '+
@@ -604,7 +604,7 @@ def pipeline(workspace, database=None, *, run_collectors=True, run_research=True
                 from selective_daily_ai import run as selective_run
                 if state['status']=='PARTIAL':
                     state['selective_ai']={'status':'COLLECTOR_PARTIAL_SKIP_PAID_AI',
-                                           'daily_ceiling_usd':0.25,
+                                           'daily_ceiling_usd':0.49,
                                            'paid_research_attempts':0}
                 else:
                     state['selective_ai']=selective_run(
@@ -616,7 +616,7 @@ def pipeline(workspace, database=None, *, run_collectors=True, run_research=True
                 state['active_stage']='COMMERCIAL_REPORTING'
                 from commercial_lead_reports import build as build_commercial_reports
                 state['lead_reports']=build_commercial_reports(out)
-                state['note']='Selective AI limited to eligible new/changed projects; daily ceiling US$0.25.'
+                state['note']='Selective AI limited to eligible new/changed projects; daily ceiling US$0.49.'
         return state
     except Exception as exc:
         state['status'] = 'FAILED'
@@ -664,9 +664,9 @@ def main(argv=None):
     parser.add_argument('--unattended', action='store_true')
     parser.add_argument('--no-ai', action='store_true')
     parser.add_argument('--selective-ai',action='store_true',
-                        help='New and changed commercial project AI, max USD 0.25/day')
+                        help='New and changed commercial project AI, max USD 0.49/day')
     parser.add_argument('--install-selective-schedule',action='store_true',
-                        help='Set 08:30 selective USD 0.25 task without running AI')
+                        help='Set 08:30 selective USD 0.49 task without running AI')
     parser.add_argument('--install-free-schedule',action='store_true',
                         help='Only schedule the 08:30 daily free-data run; do not run collectors or DeepSeek')
     parser.add_argument('--offline-test', action='store_true', help='Only for local diagnostics, never marketed as fresh collection')
@@ -685,7 +685,7 @@ def main(argv=None):
             if not installed.is_file():
                 say('Selective schedule NOT installed: stable runner missing.');return 1
             status=schedule_daily(installed,workspace,selective_ai=True)
-            say('Daily 08:30 selective (US$0.25) task: '+status)
+            say('Daily 08:30 selective (US$0.49) task: '+status)
             say('Setup made NO DeepSeek requests and did not run collectors.')
             return 0 if status.startswith('SUCCESS') else 1
         if args.install_free_schedule:
