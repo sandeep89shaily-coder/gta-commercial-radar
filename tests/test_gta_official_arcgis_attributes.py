@@ -9,6 +9,14 @@ class ArcGISAttributesTests(unittest.TestCase):
   self.assertIn("Interior retail alteration",result)
   self.assertNotIn("XXXXX",result)
   self.assertIsNone(parse_features(body,"WRONG"))
+ def test_key_fields_are_first_even_when_json_schema_order_is_bad(self):
+  raw={"features":[{"attributes":{"UNUSED":"X"*500,"EXTRA":"noise","BP_NO":"BP 3ALT 26-2522",
+        "ADDRESS":"3899 TRELAWNY CIR","DESCRIPTION":"Retail alteration","STATUS":"ISSUED"}}]}
+  result=retrieve(URL,"BP 3ALT 26-2522",transport=lambda _:json.dumps(raw))
+  payload=json.loads(result)["attributes"][0]
+  self.assertEqual(list(payload)[0],"BP_NO")
+  self.assertEqual(list(payload)[1],"STATUS")
+  self.assertEqual(list(payload)[2],"DESCRIPTION")
  def test_blocks_nonofficial_hosts(self):
   self.assertFalse(is_official_query(URL.replace("services6.arcgis.com","evil.example")))
 if __name__=="__main__":unittest.main()
