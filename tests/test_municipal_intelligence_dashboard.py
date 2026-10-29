@@ -18,4 +18,20 @@ class DashboardTests(unittest.TestCase):
    self.assertNotIn("<script>alert(1)</script>",html)
    self.assertIn("not a confirmed current offer",html)
    self.assertIn("buyer@toronto.ca",html)
+ def test_future_closing_candidates_from_ckan_appear_first(self):
+  with tempfile.TemporaryDirectory() as td:
+   root=Path(td)
+   (root/"INTEGRATED_PILOT_AUDIT.json").write_text(json.dumps({"city":"Toronto"}))
+   (root/"TORONTO_MEETINGS.json").write_text(json.dumps({"meetings":[]}))
+   (root/"TORONTO_CURRENT_OPEN_CKAN.json").write_text(json.dumps({
+    "status":"FETCHED","complete":True,"records":[
+      {"document_number":"1234567890","title":"Future mechanical maintenance",
+       "closing_date":"2026-11-23","buyer_name_official_publication":"City procurement",
+       "temporal_review":"FUTURE_CLOSING_DATE_REQUIRES_LIVE_CONFIRMATION"},
+      {"document_number":"9876543210","title":"2010 archival bid",
+       "closing_date":"2010-11-24","temporal_review":"PAST_CLOSING_DATE_STALE_OPEN_STATUS"}]}))
+   data=render(root).read_text(encoding="utf-8")
+   self.assertIn("Future mechanical maintenance",data)
+   self.assertNotIn("2010 archival bid",data)
+   self.assertIn("Future-closing bids from official open dataset",data)
 if __name__=="__main__":unittest.main()
