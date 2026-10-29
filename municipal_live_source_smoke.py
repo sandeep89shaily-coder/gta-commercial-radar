@@ -60,6 +60,7 @@ def main(out="LIVE_SOURCE_SMOKE"):
     with urlopen(url,timeout=15) as response:
      raw=json.load(response)
     response_diagnostic={"feature_count":len(raw.get("features",[])),
+     "returned_application_number":(raw.get("features") or [{}])[0].get("attributes",{}).get("BP_NO") or (raw.get("features") or [{}])[0].get("attributes",{}).get("PERMITNUMBER"),
      "reported_error_code":raw.get("error",{}).get("code") if isinstance(raw.get("error"),dict) else None,
      "returned_field_names":list((raw.get("features") or [{}])[0].get("attributes",{}))[:16]}
    audit["results"].append({"source":label,"status":"EXACT_ID_MATCHED" if attrs else "NO_MATCH",
