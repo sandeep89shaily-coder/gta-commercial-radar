@@ -47,7 +47,11 @@ def transcribe_file(media,meeting_url,out,*,model="small",device="cpu",compute_t
     rows=label_segments({"start":s.start,"end":s.end,"text":s.text} for s in segments)
     out=Path(out)
     out.mkdir(parents=True,exist_ok=True)
-    digest=hashlib.sha256(media.read_bytes()).hexdigest()
+    hasher=hashlib.sha256()
+    with media.open("rb") as source:
+        for block in iter(lambda:source.read(4*1024*1024),b""):
+            hasher.update(block)
+    digest=hasher.hexdigest()
     for row in rows:
         row["meeting_url"]=meeting_url
         row["recording_sha256"]=digest
