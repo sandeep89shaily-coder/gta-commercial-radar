@@ -46,7 +46,10 @@ def source_chunks(pdf=None,transcript=None,ocr_csv=None,max_chars=2000):
             for i in range(0,len(value),max_chars):
                 pieces.append({"kind":"pdf","marker":int(row["page"]),
                                "text":value[i:i+max_chars]})
-        metadata={"type":"pdf_vision_ocr","source_sha256":hashlib.sha256(data).hexdigest(),
+        coverage_path=original.parent/"PDF_OCR_COVERAGE.json"
+        coverage=json.loads(coverage_path.read_text(encoding="utf-8")) if coverage_path.is_file() else {}
+        source_sha=coverage.get("pdf_sha256") or hashlib.sha256(data).hexdigest()
+        metadata={"type":"pdf_vision_ocr","source_sha256":source_sha,
                   "pages_total":len(rows),"unreadable_pages":[],"ocr_unverified":True}
     else:
         transcript=Path(transcript)
