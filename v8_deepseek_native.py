@@ -129,18 +129,19 @@ def safe_url(url):
 
 
 def queries(row):
+    """Prefer exact application identity and official primary records over address noise."""
     addr=' '.join(str(row.get('address') or '').replace(', ON','').split()).strip()[:90]
+    city=str(row.get('city') or 'Toronto').strip()[:40]
     company=str(row.get('company_name') or '').strip()[:80]
-    source=str(row.get('source_keys') or '').split(' | ')[0][:70]
-    city=str(row.get('city') or '').strip()[:40]
+    ident=str(row.get('source_keys') or '').split(' | ')[0].strip()[:70]
     terms=[]
+    if ident and len(ident)>=7 and any(c.isdigit() for c in ident):
+        terms.append(f'"{ident}" Toronto development application decision applicant')
     if addr:
-        terms.extend([f'"{addr}" development permit contractor',
-                      f'"{addr}" {city or "Ontario"} business industrial project'])
-    if source and len(source)>=7 and any(c.isalpha() for c in source):
-        terms.append(f'"{source}" {city or "Ontario"} municipal planning')
+        terms.append(f'"{addr}" developer architect project site plan Toronto')
+        terms.append(f'"{addr}" {city} construction status developer operator')
     elif company and company.casefold() not in ('unknown','none'):
-        terms.append(f'"{company}" {city or "Ontario"} expansion development')
+        terms.append(f'"{company}" {city} expansion development')
     return [q[:128] for q in dict.fromkeys(terms) if q.strip()][:MAX_SEARCHES]
 
 
@@ -161,6 +162,14 @@ def fetch_native(row, key, db, day, legacy, transport=None, *, daily_limit=None)
 
     def append(url,content,kind):
         page_identity=identity_of_page(row,content)
+        # Unrelated occupants at the same civic address are never project corroboration.
+        if page_identity=='ADDRESS_CONTEXT_UNCONFIRMED':
+            calls['errors'].append('ADDRESS_ONLY_SOURCE_REJECTED')
+            return False
+        if re.search(r'(?:opencorpdata\\.com|corporationwiki\\.com)',url,re.I) and not (
+                str(row.get('source_keys') or '').split(' | ')[0].strip() in content):
+            calls['errors'].append('UNRELATED_COMPANY_DIRECTORY_REJECTED')
+            return False
         if (page_identity=='DIFFERENT_PERMIT_ID_AT_ADDRESS'):
             calls['errors'].append('OTHER_PERMIT_DIFFERENT_PROJECT')
             return False
