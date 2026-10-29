@@ -51,8 +51,9 @@ Star's **US$0.25/day** cap in addition to existing shared V8 reservations.
 
 ## Important limitations (do not misstate)
 - A long document may have many chunks. The opt-in launcher analyzes only
-  the first 3 per run; it **cannot claim full-document understanding** from
-  a partial run. The coverage JSON reports the remainder.
+  the next 3 unprocessed chunks per run and saves progress after each successful
+  chunk; it **cannot claim full-document understanding** until all chunks have
+  been processed. The coverage JSON reports the remaining chunks.
 - No cross-document knowledge graph or semantic fact verification is yet
   performed by this unified pilot.
 - Scanned/image-only PDF pages are detected, and optional DeepSeek Vision OCR
@@ -60,6 +61,8 @@ Star's **US$0.25/day** cap in addition to existing shared V8 reservations.
   source using Windows credentials; OCR may misread names, layout or numbers.
 - Audio transcription can misspell addresses, numbers and names; speaker
   identity is unknown.
+- Timestamped transcript segments are batched to reduce paid API calls, with
+  each original segment timestamp retained for evidence checks.
 - Meeting transcripts can contain statements absent from a staff report.
   This is only a *candidate signal* until checked against the original
   recording and associated documents.
