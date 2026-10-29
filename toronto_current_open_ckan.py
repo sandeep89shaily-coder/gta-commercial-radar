@@ -45,20 +45,27 @@ def normalize(row,today=None):
    "current_status_rechecked":False}
 
 def collect(out,*,fetch=fetch_json,limit=500,today=None):
- if not 1<=limit<=1000:raise ValueError("CKAN row cap 1-1000")
+ if not 1<=limit<=3000:raise ValueError("CKAN row cap 1-3000")
  audit=[];records=[]
  try:
   package=action("package_show",{"id":DATASET},fetch)
   resources=[r for r in package.get("resources",[]) if r.get("datastore_active")]
   if not resources:raise ValueError("Official CKAN open solicitations has no active datastore")
   resource=resources[0]["id"]
-  data=action("datastore_search",{"resource_id":resource,"limit":limit,"offset":0},fetch)
-  raw=data.get("records",[])
-  for row in raw:
-   record=normalize(row,today=today)
-   if record:records.append(record)
-  audit.append({"status":"SUCCESS","raw_rows":len(raw),"resource_id":resource,
-                "total_reported":data.get("total")})
+  offset=0;count=0;total=None;seen=set()
+  while count<limit:
+   page_size=min(200,limit-count)
+   data=action("datastore_search",{"resource_id":resource,"limit":page_size,"offset":offset},fetch)
+   raw=data.get("records",[])
+   total=data.get("total",total)
+   for row in raw:
+    record=normalize(row,today=today)
+    if record and record["document_number"] not in seen:
+     seen.add(record["document_number"]);records.append(record)
+   count+=len(raw);offset+=len(raw)
+   if not raw or len(raw)<page_size:break
+  audit.append({"status":"SUCCESS","raw_rows":count,"resource_id":resource,
+                "total_reported":total})
  except Exception as exc:
   audit.append({"status":"FAILED","error_type":type(exc).__name__,"error_detail":str(exc)[:200]})
  eligible=sum(r["temporal_review"]=="FUTURE_CLOSING_DATE_REQUIRES_LIVE_CONFIRMATION" for r in records)
@@ -71,7 +78,7 @@ def collect(out,*,fetch=fetch_json,limit=500,today=None):
  path.write_text(json.dumps(result,indent=2),encoding="utf-8")
  return result
 def main():
- p=argparse.ArgumentParser();p.add_argument("--out",required=True);p.add_argument("--limit",type=int,default=500)
+ p=argparse.ArgumentParser();p.add_argument("--out",required=True);p.add_argument("--limit",type=int,default=1200)
  a=p.parse_args();r=collect(a.out,limit=a.limit)
  print(json.dumps({"status":r["status"],"records":len(r["records"]),
    "future_closing_candidates":r["candidate_future_closing"],"audit":r["audit"]},indent=2))
