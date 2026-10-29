@@ -16,6 +16,12 @@ echo Checking official municipal index and permitted metadata.
 if errorlevel 1 goto fail
 echo.
 echo Recording leads: "%OUT%\%CITY%_MEETINGS.json"
+if exist "%OUT%\TORONTO_OFFICIAL_PROCUREMENT.json" %PY% -c "import json,sys; d=json.load(open(sys.argv[1],encoding='utf-8')); print('Toronto procurement:',len(d.get('records',[])),'records;',d.get('status')); [print('SOURCE FAILURE:',x.get('error_type'),x.get('error_detail','')) for x in d.get('page_audit',[]) if x.get('status')=='FAILED']" "%OUT%\TORONTO_OFFICIAL_PROCUREMENT.json"
+if exist "%OUT%\MUNICIPAL_INTELLIGENCE_REVIEW.html" start "" "%OUT%\MUNICIPAL_INTELLIGENCE_REVIEW.html"
+echo.
+echo Optional extended analysis: You can skip all inputs to finish now.
+choice /C YN /N /M "Investigate a specific video, caption or project address? [Y/N]: "
+if errorlevel 2 goto done
 echo YouTube metadata access does NOT grant permission to download recordings.
 set /p "RECORDING=Original official meeting video URL (blank if none): "
 set /p "CAPTION=Authorized local VTT/SRT caption path (blank if none): "
