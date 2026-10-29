@@ -166,7 +166,7 @@ def fetch_native(row, key, db, day, legacy, transport=None, *, daily_limit=None)
         # or municipal publication may be retained as CONTEXT, never as an
         # exact application identity or verified procurement record.
         if page_identity=='ADDRESS_CONTEXT_UNCONFIRMED':
-            address=' '.join(str(row.get('address') or '').casefold().split())
+            address=' '.join(str(row.get('address') or '').split(',')[0].casefold().split())
             body=' '.join(content.casefold().split())
             project_terms=('development','redevelopment','proposed','construction',
                            'site plan','architect','building permit','hotel project')
