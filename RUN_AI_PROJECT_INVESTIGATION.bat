@@ -21,12 +21,18 @@ if exist "%RESULTS%\GTA_RADAR_V8_PENDING_QUEUE.csv" (
 echo Identifying project sources and budget...
 %PY% gta_execute_ai_project_research.py --results "%RESULTS%" --out "%OUT%"
 if errorlevel 1 goto fail
+set "PAID_AI=0"
 choice /C YN /N /M "Run up to three paid AI investigations (shared US$0.49 daily cap)? [Y/N]: "
 if errorlevel 2 goto report
+set "PAID_AI=1"
 %PY% gta_execute_ai_project_research.py --results "%RESULTS%" --out "%OUT%" --paid --max-projects 3
 if errorlevel 1 goto fail
 :report
-%PY% gta_integrated_buyer_investigation.py --folder "%OUT%" --results "%RESULTS%"
+if "%PAID_AI%"=="1" (
+ %PY% gta_integrated_buyer_investigation.py --folder "%OUT%" --results "%RESULTS%" --paid
+) else (
+ %PY% gta_integrated_buyer_investigation.py --folder "%OUT%" --results "%RESULTS%"
+)
 if errorlevel 1 goto fail
 %PY% gta_commercial_review_html.py --folder "%OUT%"
 if errorlevel 1 goto fail
