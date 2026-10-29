@@ -71,49 +71,17 @@ def fetch_html(url):
  if len(body)>1_000_000:raise ValueError("Index too large")
  return body.decode("utf-8","replace")
 
-def discover_channel(channel_url,*,limit=20,runner=subprocess.run):
-    """Public channel listing, metadata-only; not a download or rights bypass."""
-    if channel_url not in ("https://www.youtube.com/@TorontoCityCouncilLive/videos",
-                           "https://www.youtube.com/TorontoCityCouncilLive/videos"):
-        raise ValueError("Unknown channel; require official confirmation")
-    cmd=[sys.executable,"-m","yt_dlp","--flat-playlist","--dump-single-json",
-         "--playlist-end",str(max(1,min(int(limit),50))),channel_url]
-    response=runner(cmd,capture_output=True,text=True,timeout=120)
-    if response.returncode:raise RuntimeError("Channel listing unavailable; no workaround attempted")
-    data=json.loads(response.stdout)
-    found=[]
-    for row in data.get("entries",[]):
-        if not isinstance(row,dict):continue
-        vid=row.get("id","")
-        if not re.fullmatch(r"[\w-]{11}",str(vid)):continue
-        found.append({"recording_url":"https://www.youtube.com/watch?v="+vid,
-                      "meeting_title_unverified":row.get("title",""),
-                      "meeting_id":"UNRESOLVED","agenda_match":"UNRESOLVED",
-                      "discovery_source":channel_url})
-    return found
-
-def capture(url,out,*,authorized=False,runner=subprocess.run):
- video=normalize_video(url)
- if not video:raise ValueError("Only specific public YouTube meeting recording IDs accepted")
- if not authorized:raise PermissionError("Explicit authorization and source-use rights required")
- out=Path(out);out.mkdir(parents=True,exist_ok=True)
- # Metadata/captions preferred. Allow operator to provide yt-dlp installed.
- base=[sys.executable,"-m","yt_dlp","--no-playlist","--no-progress",
-       "--no-overwrites","--restrict-filenames"]
- identity=hashlib.sha256(video.encode()).hexdigest()[:20]
- dst=out/identity
- dst.mkdir(exist_ok=True)
- meta=runner(base+["--skip-download","--write-info-json","--write-subs",
-                    "--write-auto-subs","--sub-langs","en.*",
-                    "-o",str(dst/"meeting.%(ext)s"),video],
-             capture_output=True,text=True,timeout=180)
- files=sorted(p.name for p in dst.iterdir() if p.is_file())
- status="CAPTIONS_CAPTURED" if any(p.endswith((".vtt",".srt")) for p in files) else "NO_CAPTIONS_OR_CAPTURE_FAILED"
- result={"source_url":video,"status":status,"files":files,"returncode":meta.returncode,
-         "transcript_verified":False,"media_downloaded":False}
- # Never fall back to downloading full media silently.
- (dst/"CAPTURE_AUDIT.json").write_text(json.dumps(result,indent=2),encoding="utf-8")
- return result
+def capture(url,out,*,authorized=False,runner=None):
+    """Fail closed: YouTube metadata access does not confer download rights."""
+    video=normalize_video(url)
+    if not video:raise ValueError("Individual YouTube recording URL required")
+    if not authorized:raise PermissionError("Explicit authorization is required")
+    target=Path(out);target.mkdir(parents=True,exist_ok=True)
+    result={"source_url":video,"status":"PLATFORM_DOWNLOAD_PERMISSION_NOT_VERIFIED",
+            "files":[],"media_downloaded":False,"captions_downloaded":False,
+            "next":"Use officially downloadable municipal captions or authorized local media"}
+    (target/"CAPTURE_AUDIT.json").write_text(json.dumps(result,indent=2),encoding="utf-8")
+    return result
 
 def main():
  p=argparse.ArgumentParser()
