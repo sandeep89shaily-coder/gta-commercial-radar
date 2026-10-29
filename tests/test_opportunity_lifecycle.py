@@ -154,7 +154,7 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual(queue.due([inspected,applied],{},TODAY)[0]['project_id'],'B')
 
     def test_deepseek_budget_unchanged(self):
-        self.assertEqual(native.DAILY_LIMIT,1.0)
+        self.assertEqual(native.DAILY_LIMIT,0.49)
 
 if __name__=='__main__':
     unittest.main()
