@@ -14,7 +14,7 @@ if not exist "%RESULTS%\" (
 echo GTA RADAR - ACTUAL DEEPSEEK PROJECT RESEARCH
 echo Enter a sourced project CSV containing:
 echo project_id,address,source_id,source_keys,record_source_url,description
-set /p "CANDIDATES=Full path to your project CSV: "
+set "CANDIDATES=%RESULTS%\GTA_RADAR_V8_PENDING_QUEUE.csv"
 if not exist "%CANDIDATES%" (
  echo CSV not found.
  pause
