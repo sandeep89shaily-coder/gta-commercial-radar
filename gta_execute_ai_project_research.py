@@ -99,7 +99,10 @@ def execute(candidate_file,shared_results,out,*,paid=False,max_projects=3,
                 break
             # Existing V8 implements conservative native search/fetch billing.
             state["attempted"]+=1
-            evidence,stats=native.fetch_native(row,key,db,day,legacy,transport,daily_limit=0.49)
+            from gta_adaptive_deepseek_planner import plan
+            investigation_plan=plan(row,key,db,day,legacy,transport,daily_limit=0.49)
+            planned_row={**row,"_adaptive_query_order":investigation_plan["queries"]}
+            evidence,stats=native.fetch_native(planned_row,key,db,day,legacy,transport,daily_limit=0.49)
             rejected=[e for e in evidence if e.get("page_identity")=="ADDRESS_CONTEXT_UNCONFIRMED"]
             evidence=[e for e in evidence if e.get("page_identity")!="ADDRESS_CONTEXT_UNCONFIRMED"]
             if not native.ledger_claim(db,day,reservation,native.MODEL_RESERVE,legacy,daily_limit=0.49):
@@ -113,7 +116,7 @@ def execute(candidate_file,shared_results,out,*,paid=False,max_projects=3,
                 # require independent confirmation before promotion.
                 output={"project_id":rid,"input_hash":identity,
                     "source_url":row["record_source_url"],"address":row["address"],
-                    "research_status":"AI_REVIEW_ONLY","native_searches":stats["search"],
+                    "research_status":"AI_REVIEW_ONLY","investigation_plan":investigation_plan,"native_searches":stats["search"],
                     "native_fetches":stats["fetch"],"sources":evidence,
                     "rejected_address_only_sources":[{"url":e.get("url"),"reason":"ADDRESS_CONTEXT_UNCONFIRMED"} for e in rejected],
                     "model_suggestions":answer,"verified_buying_authority":False,
