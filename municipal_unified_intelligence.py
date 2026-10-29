@@ -114,10 +114,20 @@ def run(source_url,results,out,*,pdf=None,transcript=None,ocr_csv=None,paid=Fals
     if not public_url(source_url):raise ValueError("Public HTTPS source URL required")
     pieces,meta=source_chunks(pdf,transcript,ocr_csv)
     out=Path(out);out.mkdir(parents=True,exist_ok=True)
+    evidence_file=out/"UNIFIED_EVIDENCE.json"
+    previous={}
+    if evidence_file.is_file():
+        previous=json.loads(evidence_file.read_text(encoding="utf-8"))
+        if (previous.get("source_sha256")!=meta["source_sha256"] or
+                previous.get("source_url")!=source_url):
+            raise ValueError("Review folder belongs to a different source; use another out folder")
+    claims=list(previous.get("mentions",[]))
+    completed=set(int(n) for n in previous.get("completed_chunks",[]))
+    failures=list(previous.get("failures",[]))
     status={"status":"PREFLIGHT","source_url":source_url,**meta,
-            "chunks_total":len(pieces),"chunks_completed":0,
-            "chunks_unprocessed":len(pieces),"AI_paid_requests":0,
-            "verified_opportunities":0}
+            "chunks_total":len(pieces),"chunks_completed":len(completed),
+            "chunks_unprocessed":max(0,len(pieces)-len(completed)),
+            "AI_paid_requests":0,"verified_opportunities":0}
     if not paid:
         (out/"UNIFIED_COVERAGE.json").write_text(json.dumps(status,indent=2),encoding="utf-8")
         return status
@@ -126,33 +136,44 @@ def run(source_url,results,out,*,pdf=None,transcript=None,ocr_csv=None,paid=Fals
     key=v5.key_from_windows() if key is None else key
     if not key:return {**status,"status":"MISSING_KEY"}
     db=v5._ledger(root/"v5_ai_budget.sqlite")
-    claims=[];failures=[];day=dt.date.today().isoformat()
+    day=dt.date.today().isoformat()
     try:
-        for idx,piece in enumerate(pieces[:max(0,min(int(max_chunks),10))],1):
+        limit=max(0,min(int(max_chunks),10))
+        for idx,piece in enumerate(pieces,1):
+            if idx in completed:continue
+            if status["AI_paid_requests"]>=limit:break
             reservation="municipal_unified_"+hashlib.sha256((STAGE+meta["source_sha256"]+
                         source_url+str(idx)).encode()).hexdigest()[:24]
             legacy=v5._legacy_reserved(root/"deepseek_budget.sqlite",day)
-            # Use the shared production cap and reservations. No retries.
             if not native.ledger_claim(db,day,reservation,RESERVATION_USD,legacy,daily_limit=0.25):
                 failures.append({"chunk":idx,"reason":"SHARED_BUDGET_OR_DUPLICATE"});break
             status["AI_paid_requests"]+=1
             try:
                 result=interpret(piece,key,source_url,transport=transport)
-                # Preserve full reservation for unknown usage/cost.
                 native.ledger_finish(db,day,reservation,"UNKNOWN")
-                status["chunks_completed"]+=1
+                completed.add(idx)
                 claims.extend([{**x,"chunk":idx} for x in result["mentions"]])
+                # Save after EACH success to survive unexpected shutdowns.
+                evidence_file.write_text(json.dumps({
+                    "source_sha256":meta["source_sha256"],"source_url":source_url,
+                    "completed_chunks":sorted(completed),"mentions":claims,
+                    "failures":failures,"warning":"Literal quotes only. No verified buyers or supplier awards."
+                },indent=2,ensure_ascii=False),encoding="utf-8")
             except Exception as exc:
                 native.ledger_finish(db,day,reservation,"UNKNOWN")
                 failures.append({"chunk":idx,"reason":type(exc).__name__})
                 break
     finally:db.close()
-    status["chunks_unprocessed"]=len(pieces)-status["chunks_completed"]
+    status["chunks_completed"]=len(completed)
+    status["chunks_unprocessed"]=max(0,len(pieces)-len(completed))
     status["status"]="REVIEW_ONLY_COMPLETE" if not status["chunks_unprocessed"] and not meta["unreadable_pages"] else "INCOMPLETE_REVIEW"
     status["evidence_mentions"]=len(claims)
     status["evidence_quote_matches"]=sum(bool(c["evidence_check_passed"]) for c in claims)
-    (out/"UNIFIED_EVIDENCE.json").write_text(json.dumps({"mentions":claims,"failures":failures,
-           "warning":"Evidence quotes not semantic verification, no supplier selection confirmed."},indent=2),encoding="utf-8")
+    evidence_file.write_text(json.dumps({"source_sha256":meta["source_sha256"],
+        "source_url":source_url,"completed_chunks":sorted(completed),
+        "mentions":claims,"failures":failures,
+        "warning":"Evidence quotes are not semantic verification; supplier selection remains unverified."
+    },indent=2,ensure_ascii=False),encoding="utf-8")
     (out/"UNIFIED_COVERAGE.json").write_text(json.dumps(status,indent=2),encoding="utf-8")
     return status
 
