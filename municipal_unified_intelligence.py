@@ -53,12 +53,27 @@ def source_chunks(pdf=None,transcript=None,ocr_csv=None,max_chars=2000):
         data=transcript.read_bytes()
         with transcript.open(encoding="utf-8-sig",newline="") as fh:
             rows=list(csv.DictReader(fh))
+        group=[];starts=[];length=0;last_end=0.0
+        def flush():
+            nonlocal group,starts,length,last_end
+            if group:
+                pieces.append({"kind":"audio","marker":starts[0],
+                               "valid_markers":list(starts),"end_seconds":last_end,
+                               "text":"\\n".join(group)})
+                group=[];starts=[];length=0
         for row in rows:
             text=str(row.get("transcript") or "").strip()
-            for i in range(0,len(text),max_chars):
-                pieces.append({"kind":"audio","marker":float(row["start_seconds"]),
-                               "end_seconds":float(row["end_seconds"]),
-                               "text":text[i:i+max_chars]})
+            if not text:continue
+            start=float(row["start_seconds"]);end=float(row["end_seconds"])
+            if start<0 or end<start:raise ValueError("Invalid transcript timestamp")
+            # Keep a segment's exact timestamp visible to the model.
+            for off in range(0,len(text),max_chars-40):
+                sub=text[off:off+max_chars-40]
+                line="[t="+str(start)+"] "+sub
+                if group and length+len(line)+1>max_chars:flush()
+                group.append(line);starts.append(start);length+=len(line)+1
+                last_end=end
+        flush()
         metadata={"type":"audio","source_sha256":hashlib.sha256(data).hexdigest(),
                   "segments_total":len(rows),"unreadable_pages":[]}
     return pieces,metadata
@@ -83,7 +98,7 @@ def interpret(piece,key,source_url,transport=None):
         if piece["kind"]=="pdf":
             marker_valid=str(marker)==str(piece["marker"])
         else:
-            try:marker_valid=abs(float(marker)-float(piece["marker"]))<0.05
+            try:marker_valid=any(abs(float(marker)-float(m))<0.05 for m in piece.get("valid_markers",[piece["marker"]]))
             except (TypeError,ValueError):marker_valid=False
         claims.append({**item,"source_kind":piece["kind"],"source_marker_expected":piece["marker"],
                        "quote_present":bool(quote and quote in piece["text"]),
