@@ -23,9 +23,23 @@ def endpoint(skip,top):
                        "$format":"application/json;odata.metadata=none"})
 def download_json(url):
  if not url.startswith(BASE+ENTITY+"?"):raise ValueError("Only approved OData endpoint")
- with urlopen(Request(url,headers={"User-Agent":"Mozilla/5.0 (compatible; GTARadarEvidenceReview/1.0)","Accept":"application/json"}),timeout=20) as f:
-  if f.status!=200:raise RuntimeError("Official OData endpoint unavailable")
-  body=f.read(1_500_001)
+ try:
+  with urlopen(Request(url,headers={"User-Agent":"Mozilla/5.0 (compatible; GTARadarEvidenceReview/1.0)","Accept":"application/json"}),timeout=20) as f:
+   if f.status!=200:raise RuntimeError("Official OData endpoint unavailable")
+   body=f.read(1_500_001)
+ except (ssl.SSLError, OSError) as original:
+  # Some Windows Python distributions lack an up-to-date CA store. The
+  # built-in curl.exe can use the Windows trust store; NEVER disable TLS.
+  if __import__("os").name!="nt" or not isinstance(original,ssl.SSLError) and "CERTIFICATE_VERIFY_FAILED" not in str(original):
+   raise
+  try:
+   response=subprocess.run(["curl.exe","--fail","--silent","--show-error","--location",
+    "--max-time","25","--max-filesize","1500000",url],
+    capture_output=True,timeout=30,check=False)
+  except (OSError,subprocess.TimeoutExpired) as exc:
+   raise RuntimeError("Windows TLS fallback unavailable") from exc
+  if response.returncode:raise RuntimeError("Windows TLS fallback failed: "+response.stderr.decode("utf-8","replace")[:160]) from original
+  body=response.stdout
  if len(body)>1_500_000:raise ValueError("OData page too large")
  return json.loads(body)
 def normalized_status(raw):
