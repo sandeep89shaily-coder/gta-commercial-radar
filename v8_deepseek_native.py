@@ -169,7 +169,7 @@ def fetch_native(row, key, db, day, legacy, transport=None, *, daily_limit=None)
             address=' '.join(str(row.get('address') or '').split(',')[0].casefold().split())
             body=' '.join(content.casefold().split())
             project_terms=('development','redevelopment','proposed','construction',
-                           'site plan','architect','building permit','hotel project')
+                           'site plan','architect','building permit','hotel project','project at')
             source_host=urlparse(url).hostname or ''
             trustworthy=('toronto.ca','ontario.ca','urbantoronto.ca')
             known_source=any(source_host==d or source_host.endswith('.'+d) for d in trustworthy)
