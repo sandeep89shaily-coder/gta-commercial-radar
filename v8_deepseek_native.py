@@ -235,7 +235,11 @@ def fetch_native(row, key, db, day, legacy, transport=None, *, daily_limit=None)
         if re.fullmatch(r'\d{3}-\d{3,5}',key_id):
             fetch_one('https://ero.ontario.ca/notice/'+key_id)
 
-    for i,q in enumerate(queries(row)):
+    permitted=queries(row)
+    proposed=row.get('_adaptive_query_order')
+    ordered=([q for q in proposed if isinstance(q,str) and q in permitted] if isinstance(proposed,list) else [])
+    ordered=list(dict.fromkeys(ordered+permitted))[:MAX_SEARCHES]
+    for i,q in enumerate(ordered):
         if len(evidence)>=3:break
         charge='S8:'+ident+':'+str(i)
         if not ledger_claim(db,day,charge,SEARCH_COST,legacy,daily_limit=daily_limit):
