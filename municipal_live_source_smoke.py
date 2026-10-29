@@ -19,7 +19,11 @@ def main(out="LIVE_SOURCE_SMOKE"):
   bids=collect(root/"TORONTO_OFFICIAL_PROCUREMENT.json",max_pages=1,page_size=10)
   audit["results"].append({"source":"TORONTO_PUBLIC_PROCUREMENT_ODATA",
       "status":bids["status"],"records":len(bids["records"]),
-      "page_audit":bids["page_audit"]})
+      "page_audit":bids["page_audit"],
+      "sample_statuses":{status:sum(r.get("status")==status for r in bids["records"]) for status in sorted({r.get("status") for r in bids["records"]})},
+      "sample_public_buyer_names":sum(bool(r.get("buyer_name_official_publication")) for r in bids["records"]),
+      "sample_public_buyer_emails":sum(bool(r.get("buyer_email_official_publication")) for r in bids["records"]),
+      "sample_awarded_supplier_lines":sum(len(r.get("awarded_suppliers",[])) for r in bids["records"])})
  except Exception as e:
   audit["results"].append({"source":"TORONTO_PUBLIC_PROCUREMENT_ODATA",
       "status":"UNAVAILABLE","error_type":type(e).__name__})
