@@ -74,7 +74,7 @@ def fetch_html(url):
 def discover_channel(channel_url,*,limit=20,runner=subprocess.run):
     """Public channel listing, metadata-only; not a download or rights bypass."""
     if channel_url not in ("https://www.youtube.com/@TorontoCityCouncilLive/videos",
-                           "https://www.youtube.com/@CityofBrampton/videos"):
+                           "https://www.youtube.com/TorontoCityCouncilLive/videos"):
         raise ValueError("Unknown channel; require official confirmation")
     cmd=[sys.executable,"-m","yt_dlp","--flat-playlist","--dump-single-json",
          "--playlist-end",str(max(1,min(int(limit),50))),channel_url]
