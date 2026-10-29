@@ -12,17 +12,20 @@ echo Choose input type:
 echo 1. Existing PDF (text-readable)
 echo 2. Existing meeting transcript CSV
 echo 3. Existing local meeting audio/video (Whisper installed)
-choice /C 123 /N /M "Select 1, 2, or 3: "
+echo 4. Scanned PDF (DeepSeek vision OCR, paid)
+choice /C 1234 /N /M "Select 1, 2, 3 or 4: "
 set "TYPE=%ERRORLEVEL%"
 if "%TYPE%"=="1" (set /p "SOURCE_PATH=Full PDF file path: " & set "FLAG=--pdf")
 if "%TYPE%"=="2" (set /p "SOURCE_PATH=Full transcript CSV path: " & set "FLAG=--transcript")
 if "%TYPE%"=="3" (set /p "SOURCE_PATH=Full local audio/video file path: " & set "FLAG=--media")
+if "%TYPE%"=="4" (set /p "SOURCE_PATH=Full scanned PDF file path: " & set "FLAG=--pdf")
 set /p "URL=Official HTTPS source URL: "
 if not defined SOURCE_PATH goto done
 if not defined URL goto done
 echo.
 echo Stage 1: no-cost source coverage preflight.
 if "%TYPE%"=="3" goto media
+if "%TYPE%"=="4" goto scanned
 %PY% municipal_unified_intelligence.py %FLAG% "%SOURCE_PATH%" --source-url "%URL%" --results "%RESULTS%" --out "%~dp0UNIFIED_INTELLIGENCE_REVIEW"
 if errorlevel 1 goto fail
 goto approval
@@ -34,6 +37,20 @@ if errorlevel 1 (echo Run: %PY% -m pip install faster-whisper & goto fail)
 if errorlevel 1 goto fail
 set "SOURCE_PATH=%~dp0UNIFIED_INTELLIGENCE_REVIEW\MEETING_TRANSCRIPT.csv"
 set "FLAG=--transcript"
+:scanned
+echo DeepSeek vision OCR is paid; no automatic PDF upload without your approval.
+echo First installing PyMuPDF if needed: %PY% -m pip install pymupdf
+%PY% -c "import fitz" 2>nul
+if errorlevel 1 (echo Run: %PY% -m pip install pymupdf & goto fail)
+%PY% municipal_pdf_vision_ocr.py --pdf "%SOURCE_PATH%" --source-url "%URL%" --results "%RESULTS%" --out "%~dp0UNIFIED_INTELLIGENCE_REVIEW"
+if errorlevel 1 goto fail
+echo This route reserves up to USD 0.04 per page and never bypasses the USD 0.25 cap.
+choice /C YN /N /M "Authorize vision OCR of up to 2 scanned pages? [Y/N]: "
+if errorlevel 2 goto done
+%PY% municipal_pdf_vision_ocr.py --pdf "%SOURCE_PATH%" --source-url "%URL%" --results "%RESULTS%" --out "%~dp0UNIFIED_INTELLIGENCE_REVIEW" --paid --max-pages 2
+if errorlevel 1 goto fail
+set "SOURCE_PATH=%~dp0UNIFIED_INTELLIGENCE_REVIEW\PDF_OCR_PAGES.csv"
+set "FLAG=--ocr-csv"
 :approval
 echo.
 echo DeepSeek analysis is OPTIONAL. Existing shared ledger and USD 0.25 daily ceiling apply.
