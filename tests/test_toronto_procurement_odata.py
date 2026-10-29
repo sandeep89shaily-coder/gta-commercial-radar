@@ -23,6 +23,11 @@ class ProcurementTests(unittest.TestCase):
    self.assertEqual(len(called),1)
    self.assertIn("%24top=5",called[0])
    self.assertEqual(result["records"][0]["status"],"OPEN")
+   import csv
+   with (Path(td)/"out.csv").open(encoding="utf-8-sig",newline="") as h:
+    rows=list(csv.DictReader(h))
+   self.assertEqual(rows[0]["status"],"OPEN")
+   self.assertEqual(rows[0]["current_status_rechecked"],"False")
    self.assertEqual(result["verified_private_opportunities"],0)
  def test_paging_cap(self):
   self.assertRaises(ValueError,endpoint,0,1000)
