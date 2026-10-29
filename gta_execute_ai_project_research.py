@@ -26,12 +26,32 @@ def read_candidates(path):
         valid.append(row)
     return valid
 
+def locate_candidates(results,explicit=None):
+    """Find V8 queue across normal and legacy result layouts; verify content."""
+    root=Path(results)
+    locations=[root,root/"results",root/"RESULTS",root.parent,root.parent/"GTA_RADAR_RESULTS"]
+    names=("GTA_RADAR_V8_PENDING_QUEUE.csv","GTA_RADAR_V8_PROJECTS.csv",
+           "GTA_RADAR_V8_AI_CANDIDATES.csv","GTA_RADAR_V4_PROJECTS_FOR_AI.csv")
+    checked=[]
+    paths=[Path(explicit)] if explicit else [folder/name for folder in locations for name in names]
+    for path in paths:
+        if not path.is_file():continue
+        try:
+            rows=read_candidates(path)
+        except (ValueError,OSError,UnicodeError) as exc:
+            checked.append({"path":str(path),"reason":type(exc).__name__})
+            continue
+        if rows:return path,rows
+        checked.append({"path":str(path),"reason":"NO_ELIGIBLE_SOURCED_PROJECTS"})
+    raise ValueError("No eligible V8 sourced project queue found; checked: "+json.dumps(checked)[:900])
+
 def execute(candidate_file,shared_results,out,*,paid=False,max_projects=3,
             key=None,transport=None,today=None):
-    projects=read_candidates(candidate_file)
+    candidate_file,projects=locate_candidates(shared_results,candidate_file)
     dest=Path(out);dest.mkdir(parents=True,exist_ok=True)
     state={"status":"PREFLIGHT","candidates":len(projects),"attempted":0,
-           "completed":0,"verified_private_leads":0,"deepseek_budget_limit_usd":0.49}
+           "completed":0,"candidate_source":str(candidate_file),
+           "verified_private_leads":0,"deepseek_budget_limit_usd":0.49}
     manifest=dest/"AI_PROJECT_RESEARCH_MANIFEST.json"
     if not paid:
         manifest.write_text(json.dumps(state,indent=2),encoding="utf-8")
@@ -91,7 +111,7 @@ def execute(candidate_file,shared_results,out,*,paid=False,max_projects=3,
 
 def main():
     p=argparse.ArgumentParser()
-    p.add_argument("--candidates",required=True);p.add_argument("--results",required=True)
+    p.add_argument("--candidates");p.add_argument("--results",required=True)
     p.add_argument("--out",required=True);p.add_argument("--paid",action="store_true")
     p.add_argument("--max-projects",type=int,default=3)
     a=p.parse_args()
