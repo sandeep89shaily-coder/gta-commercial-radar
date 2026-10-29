@@ -40,6 +40,22 @@ The launcher performs a free coverage preflight first. An opt-in authorization
 then permits up to 3 bounded paid chunks and applies the repository North
 Star's **US$0.25/day** cap in addition to existing shared V8 reservations.
 
+
+## Cross-source DeepSeek understanding
+Each source gets its own stable folder under `UNIFIED_REVIEWS/<local source name>/`,
+so analyzing a committee video does not overwrite the associated PDF review.
+After an authorized DeepSeek extraction, the launcher can compare another
+completed `UNIFIED_EVIDENCE.json` from a different source. The optional
+`municipal_cross_source_synthesis.py` step groups cited observations into
+review-only candidate projects, corroborations, novel audio statements and
+conflicts. It rejects unknown evidence IDs. It does not declare an awarded
+supplier, verified purchasing contact or sale-ready opportunity.
+
+The main interpretation stage stores `completed_chunks` and evidence after
+each successful chunk. Reopening the **same source** continues with the next
+unprocessed chunk; known completed chunks do not consume additional requests.
+The shared daily ledger still limits total requests and retains unknown holds.
+
 ## What the outputs mean
 - `UNIFIED_COVERAGE.json`: source hash, total chunks, processed/unprocessed
   chunks, unreadable pages and conservative status.
