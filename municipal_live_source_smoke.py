@@ -16,7 +16,7 @@ def main(out="LIVE_SOURCE_SMOKE"):
    audit["results"].append({"source":city+"_MEETING_INDEX",
       "status":"UNAVAILABLE","error_type":type(e).__name__})
  try:
-  bids=collect(root/"TORONTO_OFFICIAL_PROCUREMENT.json",max_pages=1,page_size=10)
+  bids=collect(root/"TORONTO_OFFICIAL_PROCUREMENT.json",max_pages=1,page_size=50)
   audit["results"].append({"source":"TORONTO_PUBLIC_PROCUREMENT_ODATA",
       "status":bids["status"],"records":len(bids["records"]),
       "page_audit":bids["page_audit"],
