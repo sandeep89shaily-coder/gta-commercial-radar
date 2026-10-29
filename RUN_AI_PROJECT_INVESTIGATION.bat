@@ -12,7 +12,7 @@ if not exist "%RESULTS%\" (
  exit /b 1
 )
 set "OUT=%~dp0AI_PROJECT_REVIEW_V2"
-echo Inspecting the shared DeepSeek ledger...
+echo Reviewing production evidence and collector status...\n%PY% gta_local_results_audit.py --results "%RESULTS%"\necho Inspecting the shared DeepSeek ledger...
 %PY% gta_deepseek_budget_diagnostic.py --results "%RESULTS%" --out "%OUT%\DEEPSEEK_BUDGET_DIAGNOSTIC.json"
 if errorlevel 1 goto fail
 if exist "%RESULTS%\GTA_RADAR_V8_PENDING_QUEUE.csv" (
