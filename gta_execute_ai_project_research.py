@@ -64,6 +64,8 @@ def execute(candidate_file,shared_results,out,*,paid=False,max_projects=3,
     day=(today or dt.date.today()).isoformat()
     legacy=v5._legacy_reserved(root/"deepseek_budget.sqlite",day)
     audit=[]
+    state["skipped_previous_requests"]=0
+    state["budget_remaining_usd"]=None
     try:
         limit=max(0,min(int(max_projects),10))
         for row in projects:
@@ -77,14 +79,29 @@ def execute(candidate_file,shared_results,out,*,paid=False,max_projects=3,
                 if previous.get("input_hash")==identity:
                     audit.append({"project_id":rid,"status":"ALREADY_REVIEWED"});continue
                 raise ValueError("Project changed; use a new output folder to preserve history")
+            reservation="project_ai_v1_"+hashlib.sha256((rid+identity).encode()).hexdigest()[:24]
+            prior=db.execute("SELECT status FROM spends WHERE day=? AND candidate=?",(day,reservation)).fetchone()
+            if prior:
+                state["skipped_previous_requests"]+=1
+                audit.append({"project_id":rid,"status":"ALREADY_ATTEMPTED_TODAY","ledger_status":prior[0]})
+                continue
+            used=native.effective_spend(db,day)[0]
+            remaining=max(0.0,0.49-used-legacy)
+            state["budget_remaining_usd"]=round(remaining,6)
+            # Reserve space for discovery and the model before paid discovery.
+            max_job=native.MODEL_RESERVE+native.MAX_SEARCHES*native.SEARCH_COST+native.MAX_FETCHES*native.FETCH_COST
+            if remaining+1e-9<max_job:
+                state["stop_reason"]="DAILY_BUDGET_EXHAUSTED_OR_HELD"
+                break
             # Existing V8 implements conservative native search/fetch billing.
             state["attempted"]+=1
             evidence,stats=native.fetch_native(row,key,db,day,legacy,transport,daily_limit=0.49)
             rejected=[e for e in evidence if e.get("page_identity")=="ADDRESS_CONTEXT_UNCONFIRMED"]
             evidence=[e for e in evidence if e.get("page_identity")!="ADDRESS_CONTEXT_UNCONFIRMED"]
-            reservation="project_ai_v1_"+hashlib.sha256((rid+identity).encode()).hexdigest()[:24]
             if not native.ledger_claim(db,day,reservation,native.MODEL_RESERVE,legacy,daily_limit=0.49):
-                audit.append({"project_id":rid,"status":"BUDGET_OR_PRIOR_REQUEST"});break
+                audit.append({"project_id":rid,"status":"MODEL_BUDGET_OR_CONCURRENT_REQUEST"})
+                state["stop_reason"]="BUDGET_OR_CONCURRENT_REQUEST"
+                break
             try:
                 answer,cost=native.analyze(row,evidence,key,transport)
                 native.ledger_finish(db,day,reservation,"DONE",cost)
@@ -106,8 +123,14 @@ def execute(candidate_file,shared_results,out,*,paid=False,max_projects=3,
                 audit.append({"project_id":rid,"status":"MODEL_FAILURE",
                               "error_type":type(exc).__name__})
                 break
-    finally:db.close()
-    state["status"]="REVIEW_ONLY_RESULTS" if state["completed"] else "NO_COMPLETED_AI_REVIEWS"
+    finally:
+        state["budget_used_or_held_usd"]=round(native.effective_spend(db,day)[0]+legacy,6)
+        state["budget_remaining_usd"]=round(max(0,0.49-state["budget_used_or_held_usd"]),6)
+        db.close()
+    state["status"]=("REVIEW_ONLY_RESULTS" if state["completed"] else
+        "BUDGET_EXHAUSTED" if state.get("stop_reason")=="DAILY_BUDGET_EXHAUSTED_OR_HELD" else
+        "ALREADY_PROCESSED_TODAY" if state["skipped_previous_requests"] and not state["attempted"] else
+        "NO_COMPLETED_AI_REVIEWS")
     state["audit"]=audit
     manifest.write_text(json.dumps(state,indent=2),encoding="utf-8")
     return state
