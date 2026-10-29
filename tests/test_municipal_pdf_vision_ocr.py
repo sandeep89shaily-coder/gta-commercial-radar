@@ -29,4 +29,21 @@ class VisionTests(unittest.TestCase):
     self.assertEqual(report["unreadable_pages"],[1])
     self.assertEqual(report["paid_ai_requests"],0)
     ledger.assert_not_called()
+ def test_ocr_resumes_second_page_without_reusing_first(self):
+  with tempfile.TemporaryDirectory() as t:
+   root=Path(t)
+   d={"sha256":"two_pages","pages":[{"page":1,"text":"","text_present":False},{"page":2,"text":"","text_present":False}]}
+   calls=[]
+   def transport(path,payload):
+    calls.append(1)
+    return {"choices":[{"finish_reason":"stop","message":{"content":"175 Oak Street"}}]}
+   with patch("municipal_pdf_vision_ocr.extract_local_pdf",return_value=d):
+    for n in (1,2):
+     r=run("pdf","https://www.toronto.ca/report.pdf",root,root/"out",
+          paid=True,max_pages=1,key="fake",transport=transport,
+          renderer=lambda pdf,page:"data:image/png;base64,AA")
+     self.assertEqual(r["ocr_succeeded"],n)
+   self.assertEqual(len(calls),2)
+   with (root/"out"/"PDF_OCR_PAGES.csv").open(encoding="utf-8-sig") as h:
+    self.assertEqual([int(r["page"]) for r in csv.DictReader(h)],[1,2])
 if __name__=="__main__":unittest.main()
