@@ -36,7 +36,7 @@ def propose(source_items,results,out,*,paid=False,key=None,transport=None):
  db=v5._ledger(root/"v5_ai_budget.sqlite")
  try:
   legacy=v5._legacy_reserved(root/"deepseek_budget.sqlite",today)
-  if not native.ledger_claim(db,today,rid,0.02,legacy,daily_limit=0.25):
+  if not native.ledger_claim(db,today,rid,0.02,legacy,daily_limit=0.49):
    return {**state,"status":"SHARED_BUDGET_OR_DUPLICATE_BLOCKED"}
   try:
    response=native.request("/chat/completions",{"model":native.MODEL,
