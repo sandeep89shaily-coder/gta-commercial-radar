@@ -31,11 +31,11 @@ The public visibility of a video does not authorize YouTube scraping/downloading
 Official procurement portals can load records via JavaScript. Checking only static HTML does NOT prove no tender exists. Merely naming an architect, site developer, or agent does not verify a purchasing decision-maker. AI-suggested roles and vendor status remain unverified.
 
 ## Actual live-source validation — October 29, 2026 UTC
-- GitHub Actions live audit: https://github.com/sandeep89shaily-coder/gta-commercial-radar/actions/runs/40807989502
-- Official Toronto solicitation OData: SUCCESS, 10 real records in a bounded page.
-- Source-published status: 7 OPEN, 3 AWARDED (snapshot, not individually rechecked).
-- Published buyer name fields: 10/10; public buyer email fields: 10/10.
-- Awarded-supplier entries: 15 in the sample; individual award lines may repeat suppliers.
+- GitHub Actions live audit: https://github.com/sandeep89shaily-coder/gta-commercial-radar/actions/runs/40808376862
+- Official Toronto solicitation OData: SUCCESS, 50 source rows, 47 valid distinct records in a bounded page.
+- Source-published status: 29 OPEN, 16 AWARDED, 2 CANCELLED (snapshot, not individually rechecked).
+- Published buyer name fields: 47/47; public buyer email fields: 47/47.
+- Awarded-supplier entries: 37 in the sample; individual award lines may repeat suppliers.
 - Toronto official meeting index HTML: fetched successfully, 0 direct individual video links exposed.
 - Brampton official meeting index HTML: fetched successfully, 0 direct individual video links exposed.
 - Brampton municipal site points to a verified council YouTube playlist; metadata discovery now supported via YouTube Data API with user-provided key, but no live API-key test.
@@ -58,3 +58,9 @@ Official procurement portals can load records via JavaScript. Checking only stat
 5. Keep shared DeepSeek budget at or under USD 0.25/day and production V8 unchanged until these gates pass.
 
 Use RUN_MEETING_BUYER_ONE_CLICK.bat from the branch for a review-only local run. A completed GitHub test proves code correctness, not commercial lead quality.
+
+## Current deliverables
+- Source review HTML dashboard: MUNICIPAL_INTELLIGENCE_REVIEW.html.
+- Official Toronto tender JSON and CSV export with published buyer contact and supplier category keywords; no private lead or live status guarantee.
+- Brampton official meeting playlist metadata discovery via YouTube Data API when user supplies valid API key.
+- Controlled no-cost source audit workflow on development branch; downloadable GitHub Actions artifact.
