@@ -10,8 +10,9 @@ from municipal_captions_to_transcript import convert
 from municipal_official_buyer_research import shortlist
 from municipal_buyer_procurement import PORTALS
 from municipal_evidence_graph import graph
+from municipal_agenda_video_link import match_video
 def pipeline(city,out,*,recording_url=None,capture_authorized=False,address=None,
-             fetch=None,runner=None,research_fetch=None,discover_archive=False,deepseek_buyer=False,results=None):
+             fetch=None,runner=None,research_fetch=None,discover_archive=False,deepseek_buyer=False,results=None,agenda_url=None,agenda_html=None):
  out=Path(out);out.mkdir(parents=True,exist_ok=True)
  meeting=discover(city,fetch=fetch)
  if discover_archive and city=="Toronto":
@@ -31,6 +32,12 @@ def pipeline(city,out,*,recording_url=None,capture_authorized=False,address=None
    meeting["discovered"]=len(meeting["meetings"])
   except Exception as exc:
    meeting["archive_discovery_status"]="UNAVAILABLE_"+type(exc).__name__
+ if agenda_url and agenda_html and recording_url:
+  association=match_video(recording_url,agenda_url,Path(agenda_html).read_text(encoding="utf-8"))
+  for item in meeting["meetings"]:
+   if item["recording_url"]==association["recording_url"]:
+    item["agenda_match"]=association["agenda_match"]
+    item["agenda_evidence_url"]=agenda_url
  discovery=out/(city.upper()+"_MEETINGS.json")
  discovery.write_text(json.dumps(meeting,indent=2),encoding="utf-8")
  state={"city":city,"official_videos_discovered":meeting["discovered"],
@@ -80,8 +87,10 @@ def main():
  p.add_argument("--discover-archive",action="store_true")
  p.add_argument("--deepseek-buyer",action="store_true")
  p.add_argument("--results")
+ p.add_argument("--agenda-url")
+ p.add_argument("--agenda-html")
  a=p.parse_args()
  print(json.dumps(pipeline(a.city,a.out,recording_url=a.recording_url,
    capture_authorized=a.authorize_caption_capture,address=a.address,
-   discover_archive=a.discover_archive,deepseek_buyer=a.deepseek_buyer,results=a.results),indent=2))
+   discover_archive=a.discover_archive,deepseek_buyer=a.deepseek_buyer,results=a.results,agenda_url=a.agenda_url,agenda_html=a.agenda_html),indent=2))
 if __name__=="__main__":main()
