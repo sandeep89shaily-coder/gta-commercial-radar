@@ -6,6 +6,9 @@ on:
       - dev/municipal-document-registry-20261027
     paths:
       - municipal_live_source_smoke.py
+      - gta_official_arcgis_attributes.py
+      - gta_execute_ai_project_research.py
+      - gta_release_acceptance.py
       - .github/workflows/meeting-buyer-live-smoke.yml
 permissions:
   contents: read
