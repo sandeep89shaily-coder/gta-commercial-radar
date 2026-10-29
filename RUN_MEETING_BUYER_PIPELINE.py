@@ -88,6 +88,8 @@ def pipeline(city,out,*,recording_url=None,capture_authorized=False,address=None
     procurement=str(procurement_file) if procurement_file and procurement_file.is_file() else None)
  (out/"PROJECT_EVIDENCE_GRAPH.json").write_text(json.dumps(graph_data,indent=2),encoding="utf-8")
  (out/"INTEGRATED_PILOT_AUDIT.json").write_text(json.dumps(state,indent=2),encoding="utf-8")
+ from municipal_intelligence_dashboard import render
+ state["dashboard"]=str(render(out))
  return state
 def main():
  p=argparse.ArgumentParser()
