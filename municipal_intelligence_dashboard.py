@@ -23,7 +23,8 @@ def render(folder):
  procurement=list(csv.DictReader(bids.open(encoding="utf-8-sig",newline=""))) if bids.is_file() else []
  index=root/(city.upper()+"_MEETINGS.json")
  meetings=json.loads(index.read_text(encoding="utf-8"))["meetings"] if index.is_file() else []
- open_bids=sum(x.get("status")=="OPEN" for x in procurement)
+ open_bids=sum(x.get("status")=="OPEN" and x.get("temporal_review")=="FUTURE_CLOSING_DATE_REQUIRES_LIVE_CONFIRMATION" for x in procurement)
+ stale_bids=sum(x.get("temporal_review")=="PAST_CLOSING_DATE_STALE_OPEN_STATUS" for x in procurement)
  buying=sum(bool(x.get("buyer_email")) for x in procurement)
  sections=[f"""<!doctype html><html><head><meta charset="utf-8">
 <title>GTA Radar | {esc(city)} Intelligence Review</title><style>{STYLE}</style></head><body>
@@ -31,14 +32,14 @@ def render(folder):
 <div class="tiles">
 <div class="tile"><b>{len(meetings)}</b><small>Recording references discovered</small></div>
 <div class="tile"><b>{len(procurement)}</b><small>City tender records sampled</small></div>
-<div class="tile"><b>{open_bids}</b><small>Source-listed OPEN bids</small></div>
+<div class="tile"><b>{open_bids}</b><small>Future-closing OPEN candidates, unverified</small></div>
 <div class="tile"><b>{buying}</b><small>Published city buyer email fields</small></div></div>
-<div class="note">Published tender status is not a confirmed current offer. No verified private purchasing decision-makers, unawarded private contracts or sale-ready leads are claimed.</div>"""]
+<div class="note">Source OPEN but already past closing: {stale_bids} archived or stale records. Published tender status is not a confirmed current offer. No verified private purchasing decision-makers, unawarded private contracts or sale-ready leads are claimed.</div>"""]
  if procurement:
   sections.append("<section><h2>Official procurement evidence</h2><table><thead><tr><th>Reference / status</th><th>Title / service indication</th><th>Published buyer contact</th><th>Closing / award</th></tr></thead><tbody>")
   for x in procurement[:150]:
    sections.append("<tr><td><b>"+esc(x.get("document_number"))+"</b><p>"+esc(x.get("status"))+"</p></td><td>"+esc(x.get("title"))+
-    "<p class='mini'>"+esc(x.get("potential_supplier_keywords"))+"</p></td><td>"+esc(x.get("buyer_name"))+
+    "<p class='mini'>"+esc(x.get("temporal_review") or "DATE_NOT_ASSESSED")+" · "+esc(x.get("potential_supplier_keywords"))+"</p></td><td>"+esc(x.get("buyer_name"))+
     "<p class='mini'>"+esc(x.get("buyer_email"))+"</p></td><td>"+esc(x.get("closing_date"))+
     "<p class='mini'>"+esc(x.get("awarded_supplier_names"))+"</p></td></tr>")
   sections.append("</tbody></table><p><a href='"+esc(procurement[0].get("public_portal_url"))+"'>Recheck current status at Toronto Bids</a></p></section>")
