@@ -24,8 +24,8 @@ STAGE="unified_source_intelligence_v2"
 RESERVATION_USD=0.015
 OUTPUT_TOKENS=1600
 
-def source_chunks(pdf=None,transcript=None,max_chars=2000):
-    if bool(pdf)==bool(transcript):raise ValueError("Supply exactly one PDF or transcript CSV")
+def source_chunks(pdf=None,transcript=None,ocr_csv=None,max_chars=2000):
+    if sum(bool(x) for x in (pdf,transcript,ocr_csv))!=1:raise ValueError("Supply exactly one PDF, transcript CSV or vision OCR CSV")
     pieces=[]
     if pdf:
         doc=extract_local_pdf(pdf)
@@ -36,6 +36,18 @@ def source_chunks(pdf=None,transcript=None,max_chars=2000):
         metadata={"type":"pdf","source_sha256":doc["sha256"],
                   "pages_total":len(doc["pages"]),
                   "unreadable_pages":[p["page"] for p in doc["pages"] if not p["text_present"]]}
+    elif ocr_csv:
+        original=Path(ocr_csv)
+        data=original.read_bytes()
+        with original.open(encoding="utf-8-sig",newline="") as fh:
+            rows=list(csv.DictReader(fh))
+        for row in rows:
+            value=str(row.get("text") or "").strip()
+            for i in range(0,len(value),max_chars):
+                pieces.append({"kind":"pdf","marker":int(row["page"]),
+                               "text":value[i:i+max_chars]})
+        metadata={"type":"pdf_vision_ocr","source_sha256":hashlib.sha256(data).hexdigest(),
+                  "pages_total":len(rows),"unreadable_pages":[],"ocr_unverified":True}
     else:
         transcript=Path(transcript)
         data=transcript.read_bytes()
@@ -82,10 +94,10 @@ def interpret(piece,key,source_url,transport=None):
             "commercial_status":"UNVERIFIED","mentions":claims,
             "usage":response.get("usage",{})}
 
-def run(source_url,results,out,*,pdf=None,transcript=None,paid=False,
+def run(source_url,results,out,*,pdf=None,transcript=None,ocr_csv=None,paid=False,
         max_chunks=3,key=None,transport=None):
     if not public_url(source_url):raise ValueError("Public HTTPS source URL required")
-    pieces,meta=source_chunks(pdf,transcript)
+    pieces,meta=source_chunks(pdf,transcript,ocr_csv)
     out=Path(out);out.mkdir(parents=True,exist_ok=True)
     status={"status":"PREFLIGHT","source_url":source_url,**meta,
             "chunks_total":len(pieces),"chunks_completed":0,
@@ -131,15 +143,15 @@ def run(source_url,results,out,*,pdf=None,transcript=None,paid=False,
 
 def main():
     p=argparse.ArgumentParser()
-    p.add_argument("--pdf");p.add_argument("--transcript");p.add_argument("--media")
+    p.add_argument("--pdf");p.add_argument("--transcript");p.add_argument("--media");p.add_argument("--ocr-csv")
     p.add_argument("--source-url",required=True);p.add_argument("--results",required=True)
     p.add_argument("--out",required=True);p.add_argument("--paid",action="store_true")
     p.add_argument("--max-chunks",type=int,default=3)
     a=p.parse_args()
     if a.media:
-        if a.pdf or a.transcript:raise SystemExit("Supply media OR PDF OR existing transcript")
+        if a.pdf or a.transcript or a.ocr_csv:raise SystemExit("Supply exactly one media, PDF, OCR or existing transcript")
         transcribe_file(a.media,a.source_url,a.out)
         a.transcript=str(Path(a.out)/"MEETING_TRANSCRIPT.csv")
     print(json.dumps(run(a.source_url,a.results,a.out,pdf=a.pdf,transcript=a.transcript,
-      paid=a.paid,max_chunks=a.max_chunks),indent=2))
+      ocr_csv=a.ocr_csv,paid=a.paid,max_chunks=a.max_chunks),indent=2))
 if __name__=="__main__":main()
