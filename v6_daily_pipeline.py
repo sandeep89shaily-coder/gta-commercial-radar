@@ -557,6 +557,26 @@ def pipeline(workspace, database=None, *, run_collectors=True, run_research=True
             raise RuntimeError('V4 did not produce a candidate CSV.')
         with projects.open(encoding='utf-8-sig',newline='') as f:
             state['projects'] = sum(1 for _ in csv.DictReader(f))
+        # Genuine live daily collection only: capture early official index changes,
+        # and maintain immutable first-observed project timestamps. Offline and
+        # mocked tests never make network requests.
+        if run_collectors and collector is run_step:
+            state['active_stage']='EARLY_SIGNALS_AND_DISCOVERY_LEDGER'
+            try:
+                from gta_early_signal_feed_monitor import collect as early_collect
+                early=early_collect(out)
+                state['early_feed_fetched']=sum(x['status']=='INDEX_FETCHED' for x in early['feeds'])
+                state['early_feed_failed']=[x['feed'] for x in early['feeds'] if x['status']!='INDEX_FETCHED']
+                state['early_feed_candidate_links']=len(early['candidate_links'])
+            except Exception as exc:
+                state['early_feed_error']=type(exc).__name__
+            try:
+                from gta_discovery_tracking import track
+                timing=track(projects,out)
+                state['observed_project_count']=timing['total']
+                state['measured_early_leadtime_projects']=timing['measurable']
+            except Exception as exc:
+                state['discovery_tracking_error']=type(exc).__name__
         if run_research:
             state['active_stage']='DEEPSEEK_RESEARCH'
             outcome = investigator(data, out, max_projects=max_projects)
