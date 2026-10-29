@@ -30,7 +30,7 @@ def shortlist(address,urls,*,fetch=retrieve):
  words=re.findall(r"[A-Za-z0-9]+",address)
  if len(words)<2:raise ValueError("A specific project street address is required")
  # Match the whole address phrase; matching only Street, Road or Avenue creates false hits.
- phrase=r"\\b"+r"\\s+".join(re.escape(x) for x in words)+r"\\b"
+ phrase=r"\b"+r"\s+".join(re.escape(x) for x in words)+r"\b"
  results=[]
  for url in urls[:8]:
   try:
