@@ -8,6 +8,7 @@ class MunicipalAIReviewTest(unittest.TestCase):
         pages=[{"page":1,"text":"Planning Application Number: 26 132130 STE 14 OZ\nThis is a zoning report."}]
         def fake(path,payload):
             self.assertEqual(path,"/chat/completions")
+            self.assertEqual(payload["thinking"],{"type":"disabled"})
             self.assertEqual(payload["messages"][1]["role"],"user")
             return {"choices":[{"finish_reason":"stop","message":{"content":json.dumps({
                 "claims":[
