@@ -5,15 +5,32 @@ a selected recording's caption capture. Procurement checks remain unverified.
 """
 import argparse,json
 from pathlib import Path
-from municipal_meeting_capture import discover,capture
+from municipal_meeting_capture import discover,capture,discover_channel
 from municipal_captions_to_transcript import convert
 from municipal_official_buyer_research import shortlist
 from municipal_buyer_procurement import PORTALS
 from municipal_evidence_graph import graph
 def pipeline(city,out,*,recording_url=None,capture_authorized=False,address=None,
-             fetch=None,runner=None,research_fetch=None):
+             fetch=None,runner=None,research_fetch=None,discover_archive=False):
  out=Path(out);out.mkdir(parents=True,exist_ok=True)
  meeting=discover(city,fetch=fetch)
+ if discover_archive and city=="Toronto":
+  try:
+   archive=discover_channel("https://www.youtube.com/TorontoCityCouncilLive/videos",
+                           runner=runner or __import__("subprocess").run)
+   known={x["recording_url"] for x in meeting["meetings"]}
+   for m in archive:
+    if m["recording_url"] not in known:
+     meeting["meetings"].append({"recording_url":m["recording_url"],
+       "official_discovery_url":meeting["official_page"],
+       "agenda_directory_url":"https://www.toronto.ca/city-government/council/council-committee-meetings/",
+       "agenda_match":"UNRESOLVED_NEEDS_OFFICIAL_MEETING_ID",
+       "title_hint":m["meeting_title_unverified"],"city":city,
+       "capture_status":"LINK_ONLY_NOT_DOWNLOADED",
+       "archive_channel_url":m["discovery_source"]})
+   meeting["discovered"]=len(meeting["meetings"])
+  except Exception as exc:
+   meeting["archive_discovery_status"]="UNAVAILABLE_"+type(exc).__name__
  discovery=out/(city.upper()+"_MEETINGS.json")
  discovery.write_text(json.dumps(meeting,indent=2),encoding="utf-8")
  state={"city":city,"official_videos_discovered":meeting["discovered"],
@@ -52,7 +69,9 @@ def main():
  p.add_argument("--recording-url")
  p.add_argument("--authorize-caption-capture",action="store_true")
  p.add_argument("--address")
+ p.add_argument("--discover-archive",action="store_true")
  a=p.parse_args()
  print(json.dumps(pipeline(a.city,a.out,recording_url=a.recording_url,
-   capture_authorized=a.authorize_caption_capture,address=a.address),indent=2))
+   capture_authorized=a.authorize_caption_capture,address=a.address,
+   discover_archive=a.discover_archive),indent=2))
 if __name__=="__main__":main()
