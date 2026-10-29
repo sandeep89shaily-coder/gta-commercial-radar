@@ -27,12 +27,15 @@ def retrieve(url):
  h=Visible();h.feed(data.decode("utf-8","replace"))
  return " ".join(" ".join(h.parts).split())
 def shortlist(address,urls,*,fetch=retrieve):
- needles=[x for x in re.findall(r"[A-Za-z0-9]+",address) if len(x)>=4]
+ words=re.findall(r"[A-Za-z0-9]+",address)
+ if len(words)<2:raise ValueError("A specific project street address is required")
+ # Match the whole address phrase; matching only Street, Road or Avenue creates false hits.
+ phrase=r"\\b"+r"\\s+".join(re.escape(x) for x in words)+r"\\b"
  results=[]
  for url in urls[:8]:
   try:
    body=fetch(url)
-   for match in list(re.finditer("|".join(re.escape(t) for t in needles),body,re.I))[:8] if needles else []:
+   for match in list(re.finditer(phrase,body,re.I))[:8]:
     quote=body[max(0,match.start()-160):min(len(body),match.end()+160)]
     results.append({"source_url":url,"quote":quote,"location":"web_excerpt",
       "address":address,"classification":"ADDRESS_MENTION_UNVERIFIED",
