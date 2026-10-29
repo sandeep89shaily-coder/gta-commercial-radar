@@ -210,7 +210,25 @@ def fetch_native(row, key, db, day, legacy, transport=None, *, daily_limit=None)
             calls['errors'].append('FETCH_'+type(exc).__name__)
 
     direct=str(row.get('record_source_url') or '').strip()
-    if safe_url(direct):
+    # Official structured ArcGIS evidence is free and should be decoded into
+    # application ATTRIBUTES, not run through an AI fetch that truncates fields.
+    official_decoded=False
+    if transport is None:
+        from gta_official_arcgis_attributes import is_official_query,retrieve
+        if is_official_query(direct):
+            try:
+                identity=str(row.get('source_keys') or '').split(' | ')[0].strip()
+                structured=retrieve(direct,identity)
+                if structured:
+                    evidence.append({'url':direct,'text':structured[:2300],
+                                     'kind':'OFFICIAL_ARCGIS_ATTRIBUTES',
+                                     'page_identity':'EXACT_CURRENT_PERMIT_ID_IN_PAGE'})
+                    official_decoded=True
+                else:
+                    calls['errors'].append('ARCGIS_NO_MATCHED_APPLICATION_ATTRIBUTES')
+            except Exception as exc:
+                calls['errors'].append('ARCGIS_'+type(exc).__name__)
+    if safe_url(direct) and not official_decoded:
         fetch_one(direct)
     if str(row.get('source_id') or '').startswith('ero_'):
         key_id=str(row.get('source_keys') or '').strip()
