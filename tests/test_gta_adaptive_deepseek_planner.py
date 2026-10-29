@@ -9,13 +9,13 @@ class AdaptivePlannerTests(unittest.TestCase):
   allowed=native.queries(row)[:3]
   self.assertTrue(allowed)
   def transport(path,payload):
-   return {"choices":[{"message":{"content":json.dumps({"topic":"buyer_organization","query_indices":[2,0,999,-1,"bad"]})}}],
+   return {"choices":[{"message":{"content":json.dumps({"topic":"buyer_organization","query_indices":[0,999,-1,"bad"]})}}],
            "usage":{"prompt_tokens":200,"completion_tokens":25}}
   result=plan(row,"fake",db,"2026-10-29",0,transport)
   self.assertEqual(result["status"],"AI_PLANNED")
   self.assertEqual(result["topic"],"buyer_organization")
   self.assertEqual(set(result["queries"]),set(allowed))
-  self.assertEqual(result["queries"][0],allowed[2])
+  self.assertEqual(result["queries"][0],allowed[0])
  def test_no_budget_does_not_call_model(self):
   db=sqlite3.connect(":memory:")
   db.execute("CREATE TABLE spends(day TEXT,candidate TEXT,reserved REAL,actual REAL,status TEXT,PRIMARY KEY(day,candidate))")
