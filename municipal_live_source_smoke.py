@@ -43,6 +43,22 @@ def main(out="LIVE_SOURCE_SMOKE"):
  except Exception as exc:
   audit["results"].append({"source":"TORONTO_CKAN_CURRENT_OPEN",
     "status":"FAILED","error_type":type(exc).__name__,"detail":str(exc)[:160]})
+ # Directly test existing official records from the Windows pilot, not AI mock data.
+ from gta_official_arcgis_attributes import retrieve
+ from urllib.parse import quote
+ samples=[
+   ("MISSISSAUGA_BUILDING_PERMIT","https://services6.arcgis.com/hM5ymMLbxIyWTjn2/arcgis/rest/services/Issued_Building_Permits/FeatureServer/0/query?where="+quote("BP_NO = 'BP 3ALT 26-2522'")+"&outFields=*&returnGeometry=false&f=json","BP 3ALT 26-2522"),
+   ("BRAMPTON_BUILDING_PERMIT","https://maps1.brampton.ca/arcgis/rest/services/BuildingPermit/Building_Permits/FeatureServer/0/query?where="+quote("PERMITNUMBER = '26-126866-000-00'")+"&outFields=*&returnGeometry=false&f=json","26-126866-000-00"),
+ ]
+ for label,url,application in samples:
+  try:
+   evidence=retrieve(url,application)
+   attrs=json.loads(evidence)["attributes"][0] if evidence else {}
+   audit["results"].append({"source":label,"status":"EXACT_ID_MATCHED" if attrs else "NO_MATCH",
+     "attribute_fields":len(attrs),"has_scope":any(k.upper() in ("DESCRIPTION","SCOPE","APP_DETAIL") for k in attrs),
+     "source_url":url})
+  except Exception as exc:
+   audit["results"].append({"source":label,"status":"UNAVAILABLE","error_type":type(exc).__name__})
  (root/"LIVE_SOURCE_AUDIT.json").write_text(json.dumps(audit,indent=2),encoding="utf-8")
  print(json.dumps(audit,indent=2))
  return audit
