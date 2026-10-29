@@ -17,10 +17,10 @@ FIELDS=("Solicitation_Document_Number","Status","Solicitation_Document_Type",
         "Closing_Date","Buyer_Name","Buyer_Email","Buyer_Phone_Number",
         "Client_Division","Awarded_Suppliers")
 PORTAL="https://www.toronto.ca/business-economy/doing-business-with-the-city/searching-bidding-on-city-contracts/toronto-bids-portal/"
-def endpoint(skip,top):
+def endpoint(skip,top,*,recent_first=False):
  if top<1 or top>200 or skip<0:raise ValueError("Bounded paging required")
- return BASE+ENTITY+"?"+urlencode({"$top":top,"$skip":skip,
-                       "$format":"application/json;odata.metadata=none"})
+ return BASE+ENTITY+"?"+urlencode({**{"$top":top,"$skip":skip,
+                       "$format":"application/json;odata.metadata=none"},**({"$orderby":"Closing_Date desc"} if recent_first else {})})
 def download_json(url):
  if not url.startswith(BASE+ENTITY+"?"):raise ValueError("Only approved OData endpoint")
  try:
@@ -92,12 +92,12 @@ def normalize(row,*,observed=None):
    "public_portal_url":PORTAL,"first_observed_utc":observed or dt.datetime.now(dt.timezone.utc).isoformat(),
    "verified_private_work_package":False,
    "official_feed_record_not_independently_rechecked":True}
-def collect(out,*,fetch=download_json,max_pages=2,page_size=50):
+def collect(out,*,fetch=download_json,max_pages=2,page_size=50,recent_first=True):
  if not 1<=max_pages<=10:raise ValueError("Page cap 1-10")
  records=[];page_audit=[];seen=set()
  now=dt.datetime.now(dt.timezone.utc).isoformat()
  for n in range(max_pages):
-  url=endpoint(n*page_size,page_size)
+  url=endpoint(n*page_size,page_size,recent_first=recent_first)
   try:
    data=fetch(url)
    items=data.get("value",[])
@@ -113,6 +113,7 @@ def collect(out,*,fetch=download_json,max_pages=2,page_size=50):
    break
  result={"status":"REVIEW_ONLY_FETCHED" if records else "NO_RECORDS_OR_SOURCE_UNAVAILABLE",
    "official_source":BASE+ENTITY,"observed_at":now,"records":records,
+   "recent_first_requested":recent_first,
    "page_audit":page_audit,"verified_private_opportunities":0,
    "limitation":"Only fetched page(s) are covered; current bid status must be rechecked at official portal before outreach."}
  dest=Path(out);dest.parent.mkdir(parents=True,exist_ok=True)
