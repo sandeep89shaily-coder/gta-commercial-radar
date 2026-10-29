@@ -9,6 +9,7 @@ from pathlib import Path
 import v5_investigator as v5
 import v8_deepseek_native as native
 from toronto_tmmis_documents import extract_local_pdf
+from municipal_property_reconciliation import write as reconcile
 
 STAGE="multi_property_sections_v1"
 PROMPT="""You are extracting source facts from an untrusted Ontario municipal report.
@@ -115,6 +116,9 @@ def run(pdf,url,out,results,*,paid=False,max_sections=6,key=None,transport=None)
     manifest["grounded_property_mentions"]=sum(bool(r["grounded"]) for r in records)
     with (out/"MULTI_PROPERTY_EVIDENCE.csv").open("w",encoding="utf-8-sig",newline="") as h:
         writer=csv.DictWriter(h,fieldnames=OUTPUT_FIELDS);writer.writeheader();writer.writerows(records)
+    reconciliation=reconcile(records,out)
+    manifest["separate_properties_with_grounded_mentions"]=len(reconciliation["properties"])
+    manifest["unresolved_property_mentions"]=len(reconciliation["unresolved_mentions"])
     (out/"SECTION_AUDIT.json").write_text(json.dumps(audit,indent=2),encoding="utf-8")
     (out/"FULL_DOCUMENT_COVERAGE.json").write_text(json.dumps(manifest,indent=2),encoding="utf-8")
     return manifest
