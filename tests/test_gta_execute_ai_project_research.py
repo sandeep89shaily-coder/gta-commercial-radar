@@ -9,6 +9,22 @@ class ExecuteAITests(unittest.TestCase):
    w.writeheader()
    w.writerow({"project_id":"B-1","address":"175 Oak Street",
     "source_id":"toronto","source_keys":"A123","record_source_url":"https://www.toronto.ca/planning","description":"Warehouse"})
+ def test_autodetect_queue_in_existing_results(self):
+  from gta_execute_ai_project_research import locate_candidates
+  with tempfile.TemporaryDirectory() as td:
+   root=Path(td);path=root/"GTA_RADAR_V8_PENDING_QUEUE.csv";self.sample(path)
+   found,rows=locate_candidates(root)
+   self.assertEqual(found,path)
+   self.assertEqual(len(rows),1)
+ def test_autodetect_fallback_when_primary_invalid(self):
+  from gta_execute_ai_project_research import locate_candidates
+  with tempfile.TemporaryDirectory() as td:
+   root=Path(td)
+   (root/"GTA_RADAR_V8_PENDING_QUEUE.csv").write_text("wrong,columns\\n1,2\\n")
+   fallback=root/"GTA_RADAR_V8_PROJECTS.csv";self.sample(fallback)
+   found,rows=locate_candidates(root)
+   self.assertEqual(found,fallback)
+   self.assertEqual(len(rows),1)
  def test_no_paid_call_without_optin(self):
   with tempfile.TemporaryDirectory() as td:
    root=Path(td);p=root/"candidate.csv";self.sample(p)
