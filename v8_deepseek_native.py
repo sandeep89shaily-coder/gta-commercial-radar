@@ -173,8 +173,9 @@ def fetch_native(row, key, db, day, legacy, transport=None, *, daily_limit=None)
             source_host=urlparse(url).hostname or ''
             trustworthy=('toronto.ca','ontario.ca','urbantoronto.ca')
             known_source=any(source_host==d or source_host.endswith('.'+d) for d in trustworthy)
+            unrelated_directory=bool(re.search(r'(?:opencorpdata\\.com|corporationwiki\\.com)',source_host,re.I))
             explicit_project=bool(address and address in body and any(t in body for t in project_terms))
-            if not (known_source and explicit_project):
+            if not (explicit_project and not unrelated_directory):
                 calls['errors'].append('ADDRESS_ONLY_SOURCE_REJECTED')
                 return False
             page_identity='PROJECT_CONTEXT_NOT_APPLICATION_VERIFIED'
