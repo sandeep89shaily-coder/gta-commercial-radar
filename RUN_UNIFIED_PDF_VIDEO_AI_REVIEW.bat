@@ -37,6 +37,7 @@ if errorlevel 1 (echo Run: %PY% -m pip install faster-whisper & goto fail)
 if errorlevel 1 goto fail
 set "SOURCE_PATH=%~dp0UNIFIED_INTELLIGENCE_REVIEW\MEETING_TRANSCRIPT.csv"
 set "FLAG=--transcript"
+goto approval
 :scanned
 echo DeepSeek vision OCR is paid; no automatic PDF upload without your approval.
 echo First installing PyMuPDF if needed: %PY% -m pip install pymupdf
