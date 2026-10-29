@@ -15,11 +15,11 @@ def pipeline(city,out,*,recording_url=None,capture_authorized=False,address=None
              fetch=None,runner=None,research_fetch=None,discover_archive=False,deepseek_buyer=False,results=None,agenda_url=None,agenda_html=None,include_procurement=False,procurement_fetch=None):
  out=Path(out);out.mkdir(parents=True,exist_ok=True)
  meeting=discover(city,fetch=fetch)
- if discover_archive and city=="Toronto":
+ if discover_archive:
   try:
    from municipal_youtube_api import list_videos
    import os
-   api=list_videos("Toronto",os.environ.get("YOUTUBE_DATA_API_KEY",""))
+   api=list_videos(city,os.environ.get("YOUTUBE_DATA_API_KEY",""))
    archive=[{"recording_url":x["recording_url"],"meeting_title_unverified":x["title"],"discovery_source":"OFFICIAL_YOUTUBE_DATA_API"} for x in api["records"]]
    meeting["archive_discovery_status"]=api["status"]
    known={x["recording_url"] for x in meeting["meetings"]}
@@ -27,7 +27,7 @@ def pipeline(city,out,*,recording_url=None,capture_authorized=False,address=None
     if m["recording_url"] not in known:
      meeting["meetings"].append({"recording_url":m["recording_url"],
        "official_discovery_url":meeting["official_page"],
-       "agenda_directory_url":"https://www.toronto.ca/city-government/council/council-committee-meetings/",
+       "agenda_directory_url":meeting["official_page"],
        "agenda_match":"UNRESOLVED_NEEDS_OFFICIAL_MEETING_ID",
        "title_hint":m["meeting_title_unverified"],"city":city,
        "capture_status":"LINK_ONLY_NOT_DOWNLOADED",
