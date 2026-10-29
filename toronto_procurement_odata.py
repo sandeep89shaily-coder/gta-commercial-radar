@@ -92,7 +92,7 @@ def normalize(row,*,observed=None):
    "public_portal_url":PORTAL,"first_observed_utc":observed or dt.datetime.now(dt.timezone.utc).isoformat(),
    "verified_private_work_package":False,
    "official_feed_record_not_independently_rechecked":True}
-def collect(out,*,fetch=download_json,max_pages=2,page_size=50,recent_first=True):
+def collect(out,*,fetch=download_json,max_pages=2,page_size=50,recent_first=False):
  if not 1<=max_pages<=10:raise ValueError("Page cap 1-10")
  records=[];page_audit=[];seen=set()
  now=dt.datetime.now(dt.timezone.utc).isoformat()
