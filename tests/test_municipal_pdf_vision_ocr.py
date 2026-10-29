@@ -46,4 +46,7 @@ class VisionTests(unittest.TestCase):
    self.assertEqual(len(calls),2)
    with (root/"out"/"PDF_OCR_PAGES.csv").open(encoding="utf-8-sig") as h:
     self.assertEqual([int(r["page"]) for r in csv.DictReader(h)],[1,2])
+   chunks,metadata=source_chunks(ocr_csv=root/"out"/"PDF_OCR_PAGES.csv")
+   self.assertEqual(metadata["source_sha256"],"two_pages")
+   self.assertEqual([p["marker"] for p in chunks],[1,2])
 if __name__=="__main__":unittest.main()
