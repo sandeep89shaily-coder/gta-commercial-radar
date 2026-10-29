@@ -12,23 +12,16 @@ if not exist "%RESULTS%\" (
  exit /b 1
 )
 echo GTA RADAR - ACTUAL DEEPSEEK PROJECT RESEARCH
-echo Enter a sourced project CSV containing:
-echo project_id,address,source_id,source_keys,record_source_url,description
-set "CANDIDATES=%RESULTS%\GTA_RADAR_V8_PENDING_QUEUE.csv"
-if not exist "%CANDIDATES%" (
- echo CSV not found.
- pause
- exit /b 1
-)
+echo Automatically locating the V8 project queue in existing results folders.
 set "OUT=%~dp0AI_PROJECT_REVIEW"
-%PY% gta_execute_ai_project_research.py --candidates "%CANDIDATES%" --results "%RESULTS%" --out "%OUT%"
+%PY% gta_execute_ai_project_research.py --results "%RESULTS%" --out "%OUT%"
 if errorlevel 1 goto fail
 echo.
 echo The following is a PAID DeepSeek execution, not a preview.
-echo Existing shared US dollar daily budget maximum: 0.25.
+echo Existing shared US dollar daily budget maximum: 0.49.
 choice /C YN /N /M "Run DeepSeek research on up to three projects now? [Y/N]: "
 if errorlevel 2 goto done
-%PY% gta_execute_ai_project_research.py --candidates "%CANDIDATES%" --results "%RESULTS%" --out "%OUT%" --paid --max-projects 3
+%PY% gta_execute_ai_project_research.py --results "%RESULTS%" --out "%OUT%" --paid --max-projects 3
 if errorlevel 1 goto fail
 echo Results and source pages saved in "%OUT%".
 goto done
