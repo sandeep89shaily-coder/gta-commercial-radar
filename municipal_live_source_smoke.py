@@ -68,6 +68,16 @@ def main(out="LIVE_SOURCE_SMOKE"):
      "source_url":url})
   except Exception as exc:
    audit["results"].append({"source":label,"status":"UNAVAILABLE","error_type":type(exc).__name__})
+ try:
+  from gta_early_signal_feed_monitor import collect as early_monitor
+  early=early_monitor(root)
+  audit["results"].append({"source":"EARLY_PUBLIC_INDEXES","status":"COMPLETE",
+     "fetched":sum(x["status"]=="INDEX_FETCHED" for x in early["feeds"]),
+     "unavailable":[x["feed"] for x in early["feeds"] if x["status"]!="INDEX_FETCHED"],
+     "candidate_link_count":len(early["candidate_links"]),
+     "verified_new_private_opportunities":0})
+ except Exception as exc:
+  audit["results"].append({"source":"EARLY_PUBLIC_INDEXES","status":"FAILED","error_type":type(exc).__name__})
  (root/"LIVE_SOURCE_AUDIT.json").write_text(json.dumps(audit,indent=2),encoding="utf-8")
  print(json.dumps(audit,indent=2))
  return audit
