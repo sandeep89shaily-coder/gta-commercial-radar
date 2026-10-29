@@ -23,7 +23,11 @@ def render(folder):
  procurement=list(csv.DictReader(bids.open(encoding="utf-8-sig",newline=""))) if bids.is_file() else []
  index=root/(city.upper()+"_MEETINGS.json")
  meetings=json.loads(index.read_text(encoding="utf-8"))["meetings"] if index.is_file() else []
- open_bids=sum(x.get("status")=="OPEN" and x.get("temporal_review")=="FUTURE_CLOSING_DATE_REQUIRES_LIVE_CONFIRMATION" for x in procurement)
+ current_file=root/"TORONTO_CURRENT_OPEN_CKAN.json"
+ current=json.loads(current_file.read_text(encoding="utf-8")) if current_file.is_file() else {"records":[],"status":"NOT_CHECKED","complete":False}
+ current_rows=[x for x in current.get("records",[]) if x.get("temporal_review")=="FUTURE_CLOSING_DATE_REQUIRES_LIVE_CONFIRMATION"]
+ current_rows.sort(key=lambda x:str(x.get("closing_date") or ""))
+ open_bids=len(current_rows)
  stale_bids=sum(x.get("temporal_review")=="PAST_CLOSING_DATE_STALE_OPEN_STATUS" for x in procurement)
  buying=sum(bool(x.get("buyer_email")) for x in procurement)
  sections=[f"""<!doctype html><html><head><meta charset="utf-8">
@@ -32,9 +36,17 @@ def render(folder):
 <div class="tiles">
 <div class="tile"><b>{len(meetings)}</b><small>Recording references discovered</small></div>
 <div class="tile"><b>{len(procurement)}</b><small>City tender records sampled</small></div>
-<div class="tile"><b>{open_bids}</b><small>Future-closing OPEN candidates, unverified</small></div>
+<div class="tile"><b>{open_bids}</b><small>Future-closing candidates, unverified</small></div>
 <div class="tile"><b>{buying}</b><small>Published city buyer email fields</small></div></div>
-<div class="note">Source OPEN but already past closing: {stale_bids} archived or stale records. Published tender status is not a confirmed current offer. No verified private purchasing decision-makers, unawarded private contracts or sale-ready leads are claimed.</div>"""]
+<div class="note">Current-open source: {esc(current.get("status"))}; full coverage: {esc(current.get("complete"))}. Historical OPEN but already past closing: {stale_bids}. Published tender status is not a confirmed current offer. No verified private purchasing decision-makers, unawarded private contracts or sale-ready leads are claimed.</div>"""]
+ if current_rows:
+  sections.append("<section><h2>Future-closing bids from official open dataset</h2><p>Unverified for current availability. Recheck the official City portal and addenda.</p><table><thead><tr><th>Number</th><th>Description</th><th>City buyer</th><th>Closing</th></tr></thead><tbody>")
+  for item in current_rows[:250]:
+   sections.append("<tr><td>"+esc(item.get("document_number"))+"</td><td>"+esc(item.get("title"))+"</td><td>"+esc(item.get("buyer_name_official_publication"))+
+      "<p class='mini'>"+esc(item.get("buyer_email_official_publication"))+"</p></td><td>"+esc(item.get("closing_date"))+"</td></tr>")
+  sections.append("</tbody></table></section>")
+ if procurement:
+  sections.append("<h2>Historical procurement archive (not current bids)</h2>")
  if procurement:
   sections.append("<section><h2>Official procurement evidence</h2><table><thead><tr><th>Reference / status</th><th>Title / service indication</th><th>Published buyer contact</th><th>Closing / award</th></tr></thead><tbody>")
   for x in procurement[:150]:
