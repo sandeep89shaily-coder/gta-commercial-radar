@@ -5,7 +5,7 @@ contacts in this feed represent municipal bids, NOT private project buyers.
 No auth, no artificial pagination or made-up contract status.
 """
 from __future__ import annotations
-import argparse,csv,datetime as dt,json,re
+import argparse,csv,datetime as dt,json,re,ssl,subprocess
 from pathlib import Path
 from urllib.parse import urlencode
 from urllib.request import Request,urlopen
@@ -23,7 +23,7 @@ def endpoint(skip,top):
                        "$format":"application/json;odata.metadata=none"})
 def download_json(url):
  if not url.startswith(BASE+ENTITY+"?"):raise ValueError("Only approved OData endpoint")
- with urlopen(Request(url,headers={"User-Agent":"GTARadar/1.0 public municipal procurement review","Accept":"application/json"}),timeout=20) as f:
+ with urlopen(Request(url,headers={"User-Agent":"Mozilla/5.0 (compatible; GTARadarEvidenceReview/1.0)","Accept":"application/json"}),timeout=20) as f:
   if f.status!=200:raise RuntimeError("Official OData endpoint unavailable")
   body=f.read(1_500_001)
  if len(body)>1_500_000:raise ValueError("OData page too large")
@@ -75,7 +75,7 @@ def collect(out,*,fetch=download_json,max_pages=2,page_size=50):
    page_audit.append({"page":n+1,"status":"OK","received":len(items),"source_url":url})
    if len(items)<page_size:break
   except Exception as e:
-   page_audit.append({"page":n+1,"status":"FAILED","error_type":type(e).__name__,"source_url":url})
+   page_audit.append({"page":n+1,"status":"FAILED","error_type":type(e).__name__,"error_detail":str(e)[:220],"source_url":url})
    break
  result={"status":"REVIEW_ONLY_FETCHED" if records else "NO_RECORDS_OR_SOURCE_UNAVAILABLE",
    "official_source":BASE+ENTITY,"observed_at":now,"records":records,
