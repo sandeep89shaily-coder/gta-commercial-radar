@@ -12,7 +12,7 @@ from municipal_buyer_procurement import PORTALS
 from municipal_evidence_graph import graph
 from municipal_agenda_video_link import match_video
 def pipeline(city,out,*,recording_url=None,capture_authorized=False,address=None,
-             fetch=None,runner=None,research_fetch=None,discover_archive=False,deepseek_buyer=False,results=None,agenda_url=None,agenda_html=None):
+             fetch=None,runner=None,research_fetch=None,discover_archive=False,deepseek_buyer=False,results=None,agenda_url=None,agenda_html=None,include_procurement=False,procurement_fetch=None):
  out=Path(out);out.mkdir(parents=True,exist_ok=True)
  meeting=discover(city,fetch=fetch)
  if discover_archive and city=="Toronto":
@@ -76,7 +76,16 @@ def pipeline(city,out,*,recording_url=None,capture_authorized=False,address=None
   if source_rows:
    buyer_ai_file=out/"DEEPSEEK_BUYER_REVIEW.json"
    state["buyer_ai_result"]=propose(source_rows[:8],results,buyer_ai_file,paid=True)
- graph_data=graph(meeting=str(discovery),buyer_ai=str(buyer_ai_file) if buyer_ai_file and buyer_ai_file.is_file() else None,project_address=address)
+ procurement_file=None
+ if include_procurement and city=="Toronto":
+  from toronto_procurement_odata import collect
+  procurement_file=out/"TORONTO_OFFICIAL_PROCUREMENT.json"
+  result=collect(procurement_file,max_pages=2,page_size=50,
+    **({"fetch":procurement_fetch} if procurement_fetch else {}))
+  state["official_procurement_status"]=result["status"]
+  state["official_procurement_records"]=len(result["records"])
+ graph_data=graph(meeting=str(discovery),buyer_ai=str(buyer_ai_file) if buyer_ai_file and buyer_ai_file.is_file() else None,project_address=address,
+    procurement=str(procurement_file) if procurement_file and procurement_file.is_file() else None)
  (out/"PROJECT_EVIDENCE_GRAPH.json").write_text(json.dumps(graph_data,indent=2),encoding="utf-8")
  (out/"INTEGRATED_PILOT_AUDIT.json").write_text(json.dumps(state,indent=2),encoding="utf-8")
  return state
@@ -90,10 +99,11 @@ def main():
  p.add_argument("--discover-archive",action="store_true")
  p.add_argument("--deepseek-buyer",action="store_true")
  p.add_argument("--results")
+ p.add_argument("--include-procurement",action="store_true")
  p.add_argument("--agenda-url")
  p.add_argument("--agenda-html")
  a=p.parse_args()
  print(json.dumps(pipeline(a.city,a.out,recording_url=a.recording_url,
    capture_authorized=a.authorize_caption_capture,address=a.address,
-   discover_archive=a.discover_archive,deepseek_buyer=a.deepseek_buyer,results=a.results,agenda_url=a.agenda_url,agenda_html=a.agenda_html),indent=2))
+   discover_archive=a.discover_archive,deepseek_buyer=a.deepseek_buyer,results=a.results,agenda_url=a.agenda_url,agenda_html=a.agenda_html,include_procurement=a.include_procurement),indent=2))
 if __name__=="__main__":main()
