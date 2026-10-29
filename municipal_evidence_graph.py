@@ -4,7 +4,7 @@ import argparse,hashlib,json,re
 from pathlib import Path
 def key(address):
  return " ".join(re.findall(r"[a-z0-9]+",str(address).lower()))
-def graph(synthesis=None,buyer=None,meeting=None,buyer_ai=None,project_address=None):
+def graph(synthesis=None,buyer=None,meeting=None,buyer_ai=None,project_address=None,procurement=None):
  nodes={};edges=[];uncertain=[]
  if synthesis:
   source=json.loads(Path(synthesis).read_text(encoding="utf-8"))
@@ -47,6 +47,23 @@ def graph(synthesis=None,buyer=None,meeting=None,buyer_ai=None,project_address=N
     uncertain.append({"type":"POSSIBLE_BUYER_ROLE","organization_id":oid,"role":item.get("role"),"source_url":item.get("source_url"),"verified":False})
     if site_id:
      edges.append({"from":site_id,"to":oid,"role":item.get("role"),"source_url":item.get("source_url"),"verified":False,"match_basis":"PROJECT_ADDRESS_SUPPLIED_FOR_RESEARCH"})
+ if procurement:
+  data=json.loads(Path(procurement).read_text(encoding="utf-8"))
+  for item in data.get("records",[]):
+   doc=item.get("document_number")
+   if not doc:continue
+   pid="tender_toronto_"+str(doc)
+   nodes[pid]={"id":pid,"source_url":item.get("source_url"),
+     "document_number":doc,"status_source_published":item.get("status"),
+     "buyer_name_official_publication":item.get("buyer_name_official_publication"),
+     "buyer_email_official_publication":item.get("buyer_email_official_publication"),
+     "verified_for_private_project":False,"current_status_rechecked":False}
+   if site_id:
+    raw=" ".join(str(item.get(x) or "") for x in ("title","description"))
+    if key(project_address) and key(project_address) in key(raw):
+     edges.append({"from":site_id,"to":pid,"role":"POSSIBLE_TENDER_MATCH",
+       "match_basis":"EXACT_ADDRESS_IN_CITY_TENDER_TEXT",
+       "verified":False,"procurement_stage_needs_refresh":True})
  if meeting:
   records=json.loads(Path(meeting).read_text(encoding="utf-8"))
   for r in records.get("meetings",[]):
@@ -59,8 +76,8 @@ def graph(synthesis=None,buyer=None,meeting=None,buyer_ai=None,project_address=N
    "requires_human_review":True}
 def main():
  p=argparse.ArgumentParser();p.add_argument("--synthesis");p.add_argument("--buyer")
- p.add_argument("--meeting");p.add_argument("--buyer-ai");p.add_argument("--project-address");p.add_argument("--out",required=True);a=p.parse_args()
- result=graph(a.synthesis,a.buyer,a.meeting,a.buyer_ai,a.project_address)
+ p.add_argument("--meeting");p.add_argument("--buyer-ai");p.add_argument("--project-address");p.add_argument("--procurement");p.add_argument("--out",required=True);a=p.parse_args()
+ result=graph(a.synthesis,a.buyer,a.meeting,a.buyer_ai,a.project_address,a.procurement)
  target=Path(a.out);target.parent.mkdir(parents=True,exist_ok=True)
  target.write_text(json.dumps(result,indent=2),encoding="utf-8")
  print(json.dumps({"graph_nodes":len(result["nodes"]),"graph_edges":len(result["edges"]),
