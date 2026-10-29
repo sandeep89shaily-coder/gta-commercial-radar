@@ -45,7 +45,9 @@ def execute(candidate_file,shared_results,out,*,paid=False,max_projects=3,
     legacy=v5._legacy_reserved(root/"deepseek_budget.sqlite",day)
     audit=[]
     try:
-        for row in projects[:max(0,min(int(max_projects),10))]:
+        limit=max(0,min(int(max_projects),10))
+        for row in projects:
+            if state["attempted"]>=limit:break
             rid=row["project_id"]
             identity=hashlib.sha256(json.dumps(
                 {k:row.get(k) for k in sorted(row)},sort_keys=True).encode()).hexdigest()
