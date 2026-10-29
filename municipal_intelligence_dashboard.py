@@ -49,7 +49,7 @@ def render(folder):
   sections.append("<h2>Historical procurement archive (not current bids)</h2>")
  if procurement:
   sections.append("<section><h2>Official procurement evidence</h2><table><thead><tr><th>Reference / status</th><th>Title / service indication</th><th>Published buyer contact</th><th>Closing / award</th></tr></thead><tbody>")
-  for x in procurement[:150]:
+  for x in procurement[:25]:
    sections.append("<tr><td><b>"+esc(x.get("document_number"))+"</b><p>"+esc(x.get("status"))+"</p></td><td>"+esc(x.get("title"))+
     "<p class='mini'>"+esc(x.get("temporal_review") or "DATE_NOT_ASSESSED")+" · "+esc(x.get("potential_supplier_keywords"))+"</p></td><td>"+esc(x.get("buyer_name"))+
     "<p class='mini'>"+esc(x.get("buyer_email"))+"</p></td><td>"+esc(x.get("closing_date"))+
