@@ -31,7 +31,7 @@ def execute(candidate_file,shared_results,out,*,paid=False,max_projects=3,
     projects=read_candidates(candidate_file)
     dest=Path(out);dest.mkdir(parents=True,exist_ok=True)
     state={"status":"PREFLIGHT","candidates":len(projects),"attempted":0,
-           "completed":0,"verified_private_leads":0,"deepseek_budget_limit_usd":0.25}
+           "completed":0,"verified_private_leads":0,"deepseek_budget_limit_usd":0.49}
     manifest=dest/"AI_PROJECT_RESEARCH_MANIFEST.json"
     if not paid:
         manifest.write_text(json.dumps(state,indent=2),encoding="utf-8")
@@ -59,9 +59,9 @@ def execute(candidate_file,shared_results,out,*,paid=False,max_projects=3,
                 raise ValueError("Project changed; use a new output folder to preserve history")
             # Existing V8 implements conservative native search/fetch billing.
             state["attempted"]+=1
-            evidence,stats=native.fetch_native(row,key,db,day,legacy,transport,daily_limit=0.25)
+            evidence,stats=native.fetch_native(row,key,db,day,legacy,transport,daily_limit=0.49)
             reservation="project_ai_v1_"+hashlib.sha256((rid+identity).encode()).hexdigest()[:24]
-            if not native.ledger_claim(db,day,reservation,native.MODEL_RESERVE,legacy,daily_limit=0.25):
+            if not native.ledger_claim(db,day,reservation,native.MODEL_RESERVE,legacy,daily_limit=0.49):
                 audit.append({"project_id":rid,"status":"BUDGET_OR_PRIOR_REQUEST"});break
             try:
                 answer,cost=native.analyze(row,evidence,key,transport)
