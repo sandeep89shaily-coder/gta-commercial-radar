@@ -26,6 +26,8 @@ if errorlevel 2 goto report
 %PY% gta_execute_ai_project_research.py --results "%RESULTS%" --out "%OUT%" --paid --max-projects 3
 if errorlevel 1 goto fail
 :report
+%PY% gta_integrated_buyer_investigation.py --folder "%OUT%" --results "%RESULTS%"
+if errorlevel 1 goto fail
 %PY% gta_commercial_review_html.py --folder "%OUT%"
 if errorlevel 1 goto fail
 if exist "%~dp0AI_PROJECT_REVIEW\AI_PROJECT_RESEARCH_MANIFEST.json" (
