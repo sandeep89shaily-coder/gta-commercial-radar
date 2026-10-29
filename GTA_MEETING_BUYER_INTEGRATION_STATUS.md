@@ -30,9 +30,21 @@ The public visibility of a video does not authorize YouTube scraping/downloading
 
 Official procurement portals can load records via JavaScript. Checking only static HTML does NOT prove no tender exists. Merely naming an architect, site developer, or agent does not verify a purchasing decision-maker. AI-suggested roles and vendor status remain unverified.
 
+## Actual live-source validation — October 29, 2026 UTC
+- GitHub Actions live audit: https://github.com/sandeep89shaily-coder/gta-commercial-radar/actions/runs/40807989502
+- Official Toronto solicitation OData: SUCCESS, 10 real records in a bounded page.
+- Source-published status: 7 OPEN, 3 AWARDED (snapshot, not individually rechecked).
+- Published buyer name fields: 10/10; public buyer email fields: 10/10.
+- Awarded-supplier entries: 15 in the sample; individual award lines may repeat suppliers.
+- Toronto official meeting index HTML: fetched successfully, 0 direct individual video links exposed.
+- Brampton official meeting index HTML: fetched successfully, 0 direct individual video links exposed.
+- Brampton municipal site points to a verified council YouTube playlist; metadata discovery now supported via YouTube Data API with user-provided key, but no live API-key test.
+- DeepSeek calls for this public-source audit: 0.
+- This proves the structured municipal buying-record feed works. It does NOT prove a current unawarded private service package, earliest project discovery, or real meeting transcription.
+
 ## What is still NOT completed
 - No live full meeting transcription, real authorized caption capture, and timestamp/agenda matching audit has passed in this turn.
-- No live end-to-end demonstration of actual buyer/contact validation or specific unawarded commercial supplier contract.
+- Toronto municipal solicitation contact fields have passed the live source audit, but private project purchasing responsibility and current unawarded trade scope are NOT independently verified.
 - No verified first-publication discovery advantage or ten qualified leads.
 - No legal permission established for bulk YouTube video/caption capture.
 - No automatic connection to the existing V8 production schedule, deliberately.
