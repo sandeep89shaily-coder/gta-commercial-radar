@@ -16,11 +16,13 @@ def main(out="LIVE_SOURCE_SMOKE"):
    audit["results"].append({"source":city+"_MEETING_INDEX",
       "status":"UNAVAILABLE","error_type":type(e).__name__})
  try:
-  bids=collect(root/"TORONTO_OFFICIAL_PROCUREMENT.json",max_pages=1,page_size=50)
+  bids=collect(root/"TORONTO_OFFICIAL_PROCUREMENT.json",max_pages=1,page_size=50,recent_first=True)
   audit["results"].append({"source":"TORONTO_PUBLIC_PROCUREMENT_ODATA",
       "status":bids["status"],"records":len(bids["records"]),
       "page_audit":bids["page_audit"],
       "sample_statuses":{status:sum(r.get("status")==status for r in bids["records"]) for status in sorted({r.get("status") for r in bids["records"]})},
+      "first_five_closing_dates":[r.get("closing_date") for r in bids["records"][:5]],
+      "future_closing_open_candidates":sum(r.get("status")=="OPEN" and r.get("temporal_review")=="FUTURE_CLOSING_DATE_REQUIRES_LIVE_CONFIRMATION" for r in bids["records"]),
       "sample_public_buyer_names":sum(bool(r.get("buyer_name_official_publication")) for r in bids["records"]),
       "sample_public_buyer_emails":sum(bool(r.get("buyer_email_official_publication")) for r in bids["records"]),
       "sample_awarded_supplier_lines":sum(len(r.get("awarded_suppliers",[])) for r in bids["records"])})
