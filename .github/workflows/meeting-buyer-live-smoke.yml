@@ -1,0 +1,27 @@
+name: GTA Radar Live Municipal Source Audit
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - dev/municipal-document-registry-20261027
+    paths:
+      - municipal_live_source_smoke.py
+      - .github/workflows/meeting-buyer-live-smoke.yml
+permissions:
+  contents: read
+jobs:
+  official-source-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check real public sources (no model calls)
+        run: python municipal_live_source_smoke.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: municipal-live-source-audit
+          path: LIVE_SOURCE_SMOKE
+          if-no-files-found: error
