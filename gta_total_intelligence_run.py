@@ -10,7 +10,7 @@ def execute(workspace=None):
     results.mkdir(exist_ok=True)
     review=results/"TOTAL_INTELLIGENCE_REVIEW"
     review.mkdir(exist_ok=True)
-    record={"started":dt.datetime.now().astimezone().isoformat(),"stages":[],"completed":False}
+    record={"started":dt.datetime.now().astimezone().isoformat(),"stages":[],"completed":False,"production_accepted":False}
     target=review/"TOTAL_RUN_STATUS.json"
     def save():target.write_text(json.dumps(record,indent=2),encoding="utf-8")
     def run(name,arguments,critical=True):
@@ -42,11 +42,20 @@ def execute(workspace=None):
             "--out",str(review/"MEETING_DOCUMENTS"/"Toronto"),"--fetch",
             "--max-agendas","4","--max-pdfs","6"],False)
 
+        # Independently observed Toronto report links are a second bounded path.
+        # This does not assume the meeting video/index discovery yielded agenda PDFs.
+        run("verified_toronto_reports",["toronto_verified_report_queue.py",
+            "--queue",str(ROOT/"config"/"toronto_verified_report_queue.csv"),
+            "--out",str(review/"MEETING_DOCUMENTS"/"Toronto"),"--fetch",
+            "--max-files","4"],False)
         pdf_audit=review/"MEETING_DOCUMENTS"/"Toronto"/"TORONTO_PDF_FETCH_AUDIT.csv"
-        if pdf_audit.exists():
-            run("document_deepseek_analysis",["toronto_ai_document_batch.py",
-                "--audit",str(pdf_audit),"--out",str(review/"DOCUMENT_AI"),
-                "--results",str(results),"--limit","4","--paid"],False)
+        # Merge captured PDFs from both official paths into a single AI audit.
+        from gta_document_audit_union import union
+        combined = review/"MEETING_DOCUMENTS"/"Toronto"/"COMBINED_PDF_FETCH_AUDIT.csv"
+        union([pdf_audit,review/"MEETING_DOCUMENTS"/"Toronto"/"VERIFIED_REPORT_FETCH_AUDIT.csv"],combined)
+        run("document_deepseek_analysis",["toronto_ai_document_batch.py",
+            "--audit",str(combined),"--out",str(review/"DOCUMENT_AI"),
+            "--results",str(results),"--limit","4","--paid"],False)
         queue=results/"GTA_RADAR_V8_PENDING_QUEUE.csv"
         if queue.exists():
             run("first_seen_ledger",["gta_discovery_tracking.py","--queue",str(queue),
@@ -55,13 +64,24 @@ def execute(workspace=None):
             "--results",str(results),"--out",str(review),"--paid","--max-projects","10"],False)
         run("buyer_research",["gta_integrated_buyer_investigation.py","--folder",
                               str(review),"--results",str(results),"--paid"],False)
+        run("buyer_verification_worklist",["gta_buyer_verification_worklist.py","--folder",str(review)],False)
         run("commercial_review",["gta_commercial_review_html.py","--folder",str(review)],False)
         run("intelligence_graph",["gta_unified_intelligence.py","--results",str(results),
                                   "--review",str(review)],False)
         run("release_quality",["gta_release_acceptance.py","--folder",str(review)],False)
-        record["completed"]=True
-        record["status"]="COMPLETED_WITH_ERRORS" if any(s["exit_code"] for s in record["stages"]) else "COMPLETED"
-        return 0 if record["status"]=="COMPLETED" else 1
+        # Exit status is only execution health. Evidence gates are independent.
+        from gta_integrated_run_gates import evaluate, write_report
+        gates=evaluate(review,results)
+        write_report(review,gates)
+        record["execution_completed"]=not any(s["exit_code"] for s in record["stages"])
+        record["production_accepted"]=gates["production_accepted"] and record["execution_completed"]
+        record["completed"]=record["execution_completed"]
+        record["evidence_gate_report"]=str(review/"UNIFIED_EVIDENCE_GATES.json")
+        record["blockers"]=gates["blockers"]
+        record["status"]=("PRODUCTION_ACCEPTED" if record["production_accepted"] else
+                          "COMPLETED_WITH_EVIDENCE_BLOCKERS" if record["execution_completed"] else
+                          "COMPLETED_WITH_ERRORS")
+        return 0 if record["production_accepted"] else 2
     finally:
         record["finished"]=dt.datetime.now().astimezone().isoformat()
         save()

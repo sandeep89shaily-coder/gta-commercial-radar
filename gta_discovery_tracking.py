@@ -16,10 +16,20 @@ def track(queue,folder):
             db.execute("INSERT OR IGNORE INTO discovery VALUES (?,?,?)",
                        (pid,now,row.get("record_source_url","")))
     db.commit()
+    # Store provenance from source data, never substitute polling time for publication.
+    by_id={row.get("project_id"):row for row in rows if row.get("project_id")}
     matches=[]
     for pid,first,source in db.execute("SELECT project_id,first_seen_at,source_url FROM discovery"):
-        matches.append({"official_project_id":pid,"radar_first_seen_at":first,
-                        "first_public_url":source,"same_project_match_reviewed":False})
+        row=by_id.get(pid,{})
+        # A project_id in a queue is a candidate identity, not a confirmed same-site match.
+        reviewed=row.get("same_project_match_reviewed") is True or str(row.get("same_project_match_reviewed","")).lower()=="true"
+        matches.append({"official_project_id":row.get("official_project_id") or pid,
+                        "radar_first_seen_at":first,
+                        "first_public_url":row.get("first_public_url") or source,
+                        "first_public_at":row.get("first_public_at") or row.get("source_publication_at"),
+                        "later_permit_url":row.get("later_permit_url"),
+                        "later_permit_public_at":row.get("later_permit_public_at"),
+                        "same_project_match_reviewed":reviewed})
     result=audit(matches)
     (folder/"EARLY_DISCOVERY_PROOF.json").write_text(json.dumps(result,indent=2),encoding="utf-8")
     db.close()
