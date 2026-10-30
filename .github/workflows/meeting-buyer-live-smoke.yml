@@ -5,6 +5,7 @@ on:
     branches:
       - main
     paths:
+      - INSTALL_UNIFIED_GTA_RADAR.ps1
       - municipal_live_source_smoke.py
       - gta_official_arcgis_attributes.py
       - gta_execute_ai_project_research.py
@@ -21,6 +22,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Install public-source dependencies
+        run: python -m pip install -r requirements.txt
       - name: Check real public sources (no model calls)
         run: python municipal_live_source_smoke.py
       - uses: actions/upload-artifact@v4
