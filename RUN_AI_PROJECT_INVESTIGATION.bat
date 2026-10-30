@@ -12,6 +12,7 @@ if not exist "%RESULTS%\" (
  exit /b 1
 )
 set "OUT=%~dp0AI_PROJECT_REVIEW_V2"
+if not exist "%OUT%\" mkdir "%OUT%"
 echo Reviewing production evidence and collector status...\n%PY% gta_local_results_audit.py --results "%RESULTS%"\necho Inspecting the shared DeepSeek ledger...
 %PY% gta_deepseek_budget_diagnostic.py --results "%RESULTS%" --out "%OUT%\DEEPSEEK_BUDGET_DIAGNOSTIC.json"
 if errorlevel 1 goto fail
@@ -39,6 +40,8 @@ if errorlevel 1 goto fail
 if exist "%~dp0AI_PROJECT_REVIEW\AI_PROJECT_RESEARCH_MANIFEST.json" (
  %PY% gta_ai_quality_comparison.py --before "%~dp0AI_PROJECT_REVIEW" --after "%OUT%" --out "%OUT%\AI_QUALITY_COMPARISON.json"
 )
+%PY% gta_unified_intelligence.py --results "%RESULTS%" --review "%OUT%"
+if errorlevel 1 goto fail
 %PY% gta_release_acceptance.py --folder "%OUT%" --baseline "%~dp0AI_PROJECT_REVIEW"
 if errorlevel 1 goto fail
 start "" "%OUT%\COMMERCIAL_REVIEW.html"
