@@ -31,7 +31,7 @@ class NativeDeepseekTests(unittest.TestCase):
  def api(self,path,payload):self.calls.append((path,payload));return response(path)
  def test_official_api_payloads_and_verified_model(self):
   evidence,stat=mod.fetch_native(ROW,'key',self.db,self.day,0,self.api)
-  self.assertEqual(stat['search'],2)
+  self.assertEqual(stat['search'],len(mod.queries(ROW)))
   self.assertEqual(len(evidence),1)
   queries=[x for x in self.calls if x[0]=='/v1/tools/search']
   self.assertEqual(queries[0][1]['need_content'],True)
@@ -70,12 +70,12 @@ class NativeDeepseekTests(unittest.TestCase):
  def test_budget_enforced_before_search(self):
   self.db.execute('INSERT INTO spends VALUES(?,?,?,?,?)',(self.day,'old',0.9995,None,'DONE'));self.db.commit()
   self.assertFalse(mod.ledger_claim(self.db,self.day,'S8:another:0',mod.SEARCH_COST))
- def test_half_dollar_of_prior_reservations_does_not_block_one_dollar_limit(self):
-  self.assertEqual(mod.DAILY_LIMIT,1.00)
+ def test_new_daily_ceiling_blocks_prior_excess(self):
+  self.assertEqual(mod.DAILY_LIMIT,0.49)
   self.db.execute('INSERT INTO spends VALUES(?,?,?,?,?)',(self.day,'old',0.4995,None,'DONE'));self.db.commit()
-  self.assertTrue(mod.ledger_claim(self.db,self.day,'S8:another:0',mod.SEARCH_COST))
+  self.assertFalse(mod.ledger_claim(self.db,self.day,'S8:another:0',mod.SEARCH_COST))
   total=self.db.execute('SELECT SUM(reserved) FROM spends WHERE day=?',(self.day,)).fetchone()[0]
-  self.assertLessEqual(total,1.00)
+  self.assertLessEqual(total,0.50)
  def test_no_key_no_api(self):
   with tempfile.TemporaryDirectory() as tmp:
    path=Path(tmp);csvfile=path/'p.csv'

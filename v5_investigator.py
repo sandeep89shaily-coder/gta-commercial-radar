@@ -26,7 +26,7 @@ from urllib.error import HTTPError
 from urllib.robotparser import RobotFileParser
 from xml.etree import ElementTree
 
-DAILY_BUDGET = 1.00  # USD; local daily software limit, NOT an API-provider cap
+DAILY_BUDGET = 0.49  # USD; local daily software limit, NOT an API-provider cap
 MAX_PROJECTS = 8
 MODEL = 'deepseek-chat'
 API = 'https://api.deepseek.com/chat/completions'

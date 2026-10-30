@@ -1,0 +1,66 @@
+{
+  "case_id": "toronto_ookwemin_2026_cc41_supplementary",
+  "document_url": "https://www.toronto.ca/legdocs/mmis/2026/cc/bgrd/backgroundfile-287146.pdf",
+  "source_system": "Toronto TMMIS",
+  "validation_date": "2026-10-27",
+  "validation_method": "Public web PDF text extraction plus visual inspection of page 1",
+  "document_pages": 5,
+  "actual_pdf_direct_download_by_radar": "NOT_VERIFIED",
+  "actual_deepseek_paid_call": "NOT_RUN",
+  "real_world_claims": [
+    {
+      "field": "report_date",
+      "value": "May 19, 2026",
+      "page": 1,
+      "source_phrase": "Date: May 19, 2026"
+    },
+    {
+      "field": "application_id",
+      "value": "26 132130 STE 14 OZ",
+      "page": 1,
+      "source_phrase": "Planning Application Number: 26 132130 STE 14 OZ"
+    },
+    {
+      "field": "municipality",
+      "value": "Toronto",
+      "page": 1,
+      "source_phrase": "TORONTO REPORT FOR ACTION"
+    },
+    {
+      "field": "ward",
+      "value": "14 - Toronto - Danforth",
+      "page": 1,
+      "source_phrase": "Ward: 14 - Toronto - Danforth"
+    },
+    {
+      "field": "planning_context",
+      "value": "City-initiated Official Plan and Zoning By-law Amendment, precinct plan update",
+      "page": 1,
+      "source_phrase": "City-Initiated Official Plan and Zoning By-law Amendment"
+    },
+    {
+      "field": "report_type",
+      "value": "Supplementary decision report proposing minor amendments",
+      "page": 1,
+      "source_phrase": "Supplementary Report brings forward minor revisions"
+    },
+    {
+      "field": "related_prior_meeting",
+      "value": "Planning and Housing Committee May 7, 2026",
+      "page": 1,
+      "source_phrase": "May 7, 2026 Planning and Housing Committee meeting"
+    },
+    {
+      "field": "relevant_property",
+      "value": "65 Ookwemin Street",
+      "page": 2,
+      "source_phrase": "property owner of 65 Ookwemin Street"
+    }
+  ],
+  "source_date_not_publication_date": true,
+  "supplier_award_status": "UNKNOWN",
+  "commercial_buyer_identified": false,
+  "sale_ready": false,
+  "lead_label": "PLANNING_CONTEXT_ONLY_NOT_VALIDATED_OPPORTUNITY",
+  "constraints": "This is one externally retrieved real report manually checked; does not measure DeepSeek precision/recall, automated collection, matching against V8 database, or purchasing opportunity."
+}

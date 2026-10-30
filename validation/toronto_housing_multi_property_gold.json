@@ -1,0 +1,44 @@
+{
+  "source_url": "https://www.toronto.ca/legdocs/mmis/2026/ph/bgrd/backgroundfile-287454.pdf",
+  "report_date": "2026-05-28",
+  "document_type": "municipal_housing_tax_exemption_and_contribution_agreements",
+  "event_type": "tax_exemption",
+  "not_evidence_of_open_procurement": true,
+  "expected_properties": [
+    {
+      "address": "25 Eden Place",
+      "operator": "Alexandra Park Housing Co-operative",
+      "homes": 104,
+      "page": 2
+    },
+    {
+      "address": "2-14 Humber Boulevard and 15-23 Cordella Avenue",
+      "operator": "Beech Hall Housing Co-operative",
+      "homes": 127,
+      "page": 2
+    },
+    {
+      "address": "38 Orchard View Boulevard",
+      "operator": "Stanley Knowles Housing Co-operative",
+      "homes": 103,
+      "page": 2
+    },
+    {
+      "address": "175 Oak Street",
+      "operator": "Toronto Community Housing Corporation",
+      "homes": 213,
+      "page": 3
+    },
+    {
+      "address": "130 Augusta Avenue",
+      "owner": "Toronto Community Housing Corporation",
+      "operator": "Atkinson Housing Co-operative",
+      "homes_eligible_for_exemption": 99,
+      "page": 3
+    }
+  ],
+  "expected_unique_property_groups": 5,
+  "report_pages": 11,
+  "source_review": "Official Toronto PDF pages 2-5; some addresses represent grouped parcels",
+  "buyer_procurement_verified": false
+}

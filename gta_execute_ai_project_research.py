@@ -1,0 +1,157 @@
+"""Execute DeepSeek research on sourced GTA projects, not another task planner.
+
+Uses the existing native search/fetch/analyze implementation, the SAME shared
+V5 budget ledger, and review-only output files outside production V8 queues.
+"""
+from __future__ import annotations
+import argparse,csv,datetime as dt,hashlib,json
+from pathlib import Path
+import v5_investigator as v5
+import v8_deepseek_native as native
+
+def read_candidates(path):
+    with Path(path).open(encoding="utf-8-sig",newline="") as f:
+        rows=list(csv.DictReader(f))
+    required=("project_id","address","source_id","source_keys",
+              "record_source_url","description")
+    missing=[name for name in required if not rows or name not in rows[0]]
+    if missing:raise ValueError("Missing canonical project fields: "+", ".join(missing))
+    seen=set();valid=[]
+    for row in rows:
+        pid=str(row["project_id"]).strip()
+        if not pid or pid in seen:continue
+        seen.add(pid)
+        if not native.safe_url(row.get("record_source_url")):continue
+        if not str(row.get("address") or row.get("source_keys") or "").strip():continue
+        valid.append(row)
+    return valid
+
+def locate_candidates(results,explicit=None):
+    """Find V8 queue across normal and legacy result layouts; verify content."""
+    root=Path(results)
+    locations=[root,root/"results",root/"RESULTS",root.parent,root.parent/"GTA_RADAR_RESULTS"]
+    names=("GTA_RADAR_V8_PENDING_QUEUE.csv","GTA_RADAR_V8_PROJECTS.csv",
+           "GTA_RADAR_V8_AI_CANDIDATES.csv","GTA_RADAR_V4_PROJECTS_FOR_AI.csv")
+    checked=[]
+    paths=[Path(explicit)] if explicit else [folder/name for folder in locations for name in names]
+    for path in paths:
+        if not path.is_file():continue
+        try:
+            rows=read_candidates(path)
+        except (ValueError,OSError,UnicodeError) as exc:
+            checked.append({"path":str(path),"reason":type(exc).__name__})
+            continue
+        if rows:return path,rows
+        checked.append({"path":str(path),"reason":"NO_ELIGIBLE_SOURCED_PROJECTS"})
+    raise ValueError("No eligible V8 sourced project queue found; checked: "+json.dumps(checked)[:900])
+
+def execute(candidate_file,shared_results,out,*,paid=False,max_projects=3,
+            key=None,transport=None,today=None):
+    candidate_file,projects=locate_candidates(shared_results,candidate_file)
+    dest=Path(out);dest.mkdir(parents=True,exist_ok=True)
+    state={"status":"PREFLIGHT","candidates":len(projects),"attempted":0,
+           "completed":0,"candidate_source":str(candidate_file),
+           "verified_private_leads":0,"deepseek_budget_limit_usd":0.49}
+    manifest=dest/"AI_PROJECT_RESEARCH_MANIFEST.json"
+    if not paid:
+        preview=dest/"AI_PROJECT_PREFLIGHT.json"
+        preview.write_text(json.dumps(state,indent=2),encoding="utf-8")
+        return state
+    root=Path(shared_results)
+    if not root.is_dir():raise ValueError("Existing shared results folder required")
+    key=v5.key_from_windows() if key is None else key
+    if not key:
+        state["status"]="MISSING_API_KEY"
+        manifest.write_text(json.dumps(state,indent=2),encoding="utf-8")
+        return state
+    db=v5._ledger(root/"v5_ai_budget.sqlite")
+    day=(today or dt.date.today()).isoformat()
+    legacy=v5._legacy_reserved(root/"deepseek_budget.sqlite",day)
+    audit=[]
+    state["skipped_previous_requests"]=0
+    state["budget_remaining_usd"]=None
+    try:
+        limit=max(0,min(int(max_projects),10))
+        for row in projects:
+            if state["attempted"]>=limit:break
+            rid=row["project_id"]
+            identity=hashlib.sha256(json.dumps(
+                {k:row.get(k) for k in sorted(row)},sort_keys=True).encode()).hexdigest()
+            filename=dest/("AI_PROJECT_"+hashlib.sha256(rid.encode()).hexdigest()[:16]+".json")
+            if filename.exists():
+                previous=json.loads(filename.read_text(encoding="utf-8"))
+                if previous.get("input_hash")==identity:
+                    audit.append({"project_id":rid,"status":"ALREADY_REVIEWED"});continue
+                raise ValueError("Project changed; use a new output folder to preserve history")
+            reservation="project_ai_v1_"+hashlib.sha256((rid+identity).encode()).hexdigest()[:24]
+            prior=db.execute("SELECT status FROM spends WHERE day=? AND candidate=?",(day,reservation)).fetchone()
+            if prior:
+                state["skipped_previous_requests"]+=1
+                audit.append({"project_id":rid,"status":"ALREADY_ATTEMPTED_TODAY","ledger_status":prior[0]})
+                continue
+            used=native.effective_spend(db,day)[0]
+            remaining=max(0.0,0.49-used-legacy)
+            state["budget_remaining_usd"]=round(remaining,6)
+            # Reserve space for discovery and the model before paid discovery.
+            max_job=native.MODEL_RESERVE+native.MAX_SEARCHES*native.SEARCH_COST+native.MAX_FETCHES*native.FETCH_COST
+            if remaining+1e-9<max_job:
+                state["stop_reason"]="DAILY_BUDGET_EXHAUSTED_OR_HELD"
+                break
+            # Existing V8 implements conservative native search/fetch billing.
+            state["attempted"]+=1
+            from gta_adaptive_deepseek_planner import plan
+            investigation_plan=plan(row,key,db,day,legacy,transport,daily_limit=0.49)
+            planned_row={**row,"_adaptive_query_order":investigation_plan["queries"]}
+            evidence,stats=native.fetch_native(planned_row,key,db,day,legacy,transport,daily_limit=0.49)
+            rejected=[e for e in evidence if e.get("page_identity")=="ADDRESS_CONTEXT_UNCONFIRMED"]
+            evidence=[e for e in evidence if e.get("page_identity")!="ADDRESS_CONTEXT_UNCONFIRMED"]
+            if not native.ledger_claim(db,day,reservation,native.MODEL_RESERVE,legacy,daily_limit=0.49):
+                audit.append({"project_id":rid,"status":"MODEL_BUDGET_OR_CONCURRENT_REQUEST"})
+                state["stop_reason"]="BUDGET_OR_CONCURRENT_REQUEST"
+                break
+            try:
+                answer,cost=native.analyze(row,evidence,key,transport)
+                native.ledger_finish(db,day,reservation,"DONE",cost)
+                # Model claims stay review-only; roles and unawarded packages
+                # require independent confirmation before promotion.
+                output={"project_id":rid,"input_hash":identity,
+                    "source_url":row["record_source_url"],"address":row["address"],
+                    "research_status":"AI_REVIEW_ONLY","investigation_plan":investigation_plan,"native_searches":stats["search"],
+                    "native_fetches":stats["fetch"],"sources":evidence,
+                    "rejected_address_only_sources":[{"url":e.get("url"),"reason":"ADDRESS_CONTEXT_UNCONFIRMED"} for e in rejected],
+                    "model_suggestions":answer,"verified_buying_authority":False,
+                    "verified_supplier_unselected":False,"sale_ready":False,
+                    "qualification_status":"RESEARCH_ONLY",
+                    "missing_commercial_proof":["Purchasing authority linked to project",
+                        "Official unawarded work package confirmation",
+                        "Current procurement status"]}
+                filename.write_text(json.dumps(output,indent=2,ensure_ascii=False),encoding="utf-8")
+                state["completed"]+=1
+                audit.append({"project_id":rid,"status":"AI_REVIEW_SAVED",
+                              "fetched_sources":len(evidence)})
+            except Exception as exc:
+                native.ledger_finish(db,day,reservation,"UNKNOWN")
+                audit.append({"project_id":rid,"status":"MODEL_FAILURE",
+                              "error_type":type(exc).__name__})
+                break
+    finally:
+        state["budget_used_or_held_usd"]=round(native.effective_spend(db,day)[0]+legacy,6)
+        state["budget_remaining_usd"]=round(max(0,0.49-state["budget_used_or_held_usd"]),6)
+        db.close()
+    state["status"]=("REVIEW_ONLY_RESULTS" if state["completed"] else
+        "BUDGET_EXHAUSTED" if state.get("stop_reason")=="DAILY_BUDGET_EXHAUSTED_OR_HELD" else
+        "ALREADY_PROCESSED_TODAY" if state["skipped_previous_requests"] and not state["attempted"] else
+        "NO_COMPLETED_AI_REVIEWS")
+    state["audit"]=audit
+    manifest.write_text(json.dumps(state,indent=2),encoding="utf-8")
+    return state
+
+def main():
+    p=argparse.ArgumentParser()
+    p.add_argument("--candidates");p.add_argument("--results",required=True)
+    p.add_argument("--out",required=True);p.add_argument("--paid",action="store_true")
+    p.add_argument("--max-projects",type=int,default=3)
+    a=p.parse_args()
+    print(json.dumps(execute(a.candidates,a.results,a.out,paid=a.paid,
+                             max_projects=a.max_projects),indent=2))
+if __name__=="__main__":main()

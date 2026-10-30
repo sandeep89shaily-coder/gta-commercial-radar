@@ -1,0 +1,83 @@
+"""Readable static review dashboard, not a sales-ready publication."""
+from __future__ import annotations
+import csv,html,json
+from pathlib import Path
+
+STYLE="""body{font:15px system-ui,-apple-system,Segoe UI,Arial;background:#0c1220;color:#ecf1fa;
+margin:0 auto;max-width:1280px;padding:35px 26px}h1{font-size:30px;margin-bottom:5px}
+p{color:#a6b6d1;line-height:1.55}.tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:24px 0}
+.tile{border:1px solid #29374d;background:#141e30;border-radius:12px;padding:17px}
+.tile b{font-size:28px;display:block}.tile small{color:#a6b6d1}section{margin:25px 0}
+table{border-collapse:collapse;width:100%;background:#141e30;border-radius:12px;overflow:hidden}
+th,td{padding:13px 12px;vertical-align:top;border-bottom:1px solid #2a3851;text-align:left}
+th{color:#b9cbe7;background:#1b2940}td{overflow-wrap:anywhere}
+a{color:#9dc8ff;text-decoration:none}a:hover{text-decoration:underline}
+.note{border-left:3px solid #6ea2ea;padding:12px 16px;background:#141e30;color:#c8d5e7}
+.mini{font-size:12px;color:#b1c0d8}"""
+def esc(x):return html.escape(str(x or ""),quote=True)
+def render(folder):
+ root=Path(folder)
+ audit=json.loads((root/"INTEGRATED_PILOT_AUDIT.json").read_text(encoding="utf-8"))
+ city=audit["city"]
+ bids=root/"TORONTO_OFFICIAL_PROCUREMENT.csv"
+ procurement=list(csv.DictReader(bids.open(encoding="utf-8-sig",newline=""))) if bids.is_file() else []
+ index=root/(city.upper()+"_MEETINGS.json")
+ meetings=json.loads(index.read_text(encoding="utf-8"))["meetings"] if index.is_file() else []
+ current_file=root/"TORONTO_CURRENT_OPEN_CKAN.json"
+ current=json.loads(current_file.read_text(encoding="utf-8")) if current_file.is_file() else {"records":[],"status":"NOT_CHECKED","complete":False}
+ current_rows=[x for x in current.get("records",[]) if x.get("temporal_review")=="FUTURE_CLOSING_DATE_REQUIRES_LIVE_CONFIRMATION"]
+ current_rows.sort(key=lambda x:str(x.get("closing_date") or ""))
+ open_bids=len(current_rows)
+ stale_bids=sum(x.get("temporal_review")=="PAST_CLOSING_DATE_STALE_OPEN_STATUS" for x in procurement)
+ buying=sum(bool(x.get("buyer_email")) for x in procurement)
+ sections=[f"""<!doctype html><html><head><meta charset="utf-8">
+<title>GTA Radar | {esc(city)} Intelligence Review</title><style>{STYLE}</style></head><body>
+<h1>GTA Radar · {esc(city)}</h1><p>Official-source meeting and purchasing intelligence. Review-only report.</p>
+<div class="tiles">
+<div class="tile"><b>{len(meetings)}</b><small>Recording references discovered</small></div>
+<div class="tile"><b>{len(procurement)}</b><small>City tender records sampled</small></div>
+<div class="tile"><b>{open_bids}</b><small>Future-closing candidates, unverified</small></div>
+<div class="tile"><b>{buying}</b><small>Published city buyer email fields</small></div></div>
+<div class="note">Current-open source: {esc(current.get("status"))}; full coverage: {esc(current.get("complete"))}. Historical OPEN but already past closing: {stale_bids}. Published tender status is not a confirmed current offer. No verified private purchasing decision-makers, unawarded private contracts or sale-ready leads are claimed.</div>"""]
+ ranked_file=root/"RANKED_SUPPLIER_REVIEW.json"
+ ranked=json.loads(ranked_file.read_text(encoding="utf-8")) if ranked_file.is_file() else {"leads":[]}
+ relevant=[x for x in ranked.get("leads",[]) if x.get("service_categories")]
+ if relevant:
+  sections.append("<section><h2>Supplier-focused review queue · unverified</h2><p>Ranked by rough commercial fit and deadline; not private pre-procurement leads or confirmed active tenders.</p><table><tr><th>Reference</th><th>Trade</th><th>Closing</th><th>Public City buyer</th></tr>")
+  for x in relevant[:50]:
+   sections.append("<tr><td>"+esc(x.get("reference"))+"</td><td>"+esc(", ".join(x.get("service_categories",[])))+
+     "<p class='mini'>"+esc(str(x.get("description") or "")[:160])+"</p></td><td>"+esc(x.get("closing_date"))+
+     "</td><td>"+esc(x.get("published_buyer_name"))+"</td></tr>")
+  sections.append("</table></section>")
+ if current_rows:
+  sections.append("<section><h2>Future-closing bids from official open dataset</h2><p>Unverified for current availability. Recheck the official City portal and addenda.</p><table><thead><tr><th>Number</th><th>Description</th><th>City buyer</th><th>Closing</th></tr></thead><tbody>")
+  for item in current_rows[:250]:
+   sections.append("<tr><td>"+esc(item.get("document_number"))+"</td><td>"+esc(item.get("title"))+"</td><td>"+esc(item.get("buyer_name_official_publication"))+
+      "<p class='mini'>"+esc(item.get("buyer_email_official_publication"))+"</p></td><td>"+esc(item.get("closing_date"))+"</td></tr>")
+  sections.append("</tbody></table></section>")
+ if procurement:
+  sections.append("<h2>Historical procurement archive (not current bids)</h2>")
+ if procurement:
+  sections.append("<section><h2>Official procurement evidence</h2><table><thead><tr><th>Reference / status</th><th>Title / service indication</th><th>Published buyer contact</th><th>Closing / award</th></tr></thead><tbody>")
+  for x in procurement[:25]:
+   sections.append("<tr><td><b>"+esc(x.get("document_number"))+"</b><p>"+esc(x.get("status"))+"</p></td><td>"+esc(x.get("title"))+
+    "<p class='mini'>"+esc(x.get("temporal_review") or "DATE_NOT_ASSESSED")+" · "+esc(x.get("potential_supplier_keywords"))+"</p></td><td>"+esc(x.get("buyer_name"))+
+    "<p class='mini'>"+esc(x.get("buyer_email"))+"</p></td><td>"+esc(x.get("closing_date"))+
+    "<p class='mini'>"+esc(x.get("awarded_supplier_names"))+"</p></td></tr>")
+  sections.append("</tbody></table><p><a href='"+esc(procurement[0].get("public_portal_url"))+"'>Recheck current status at Toronto Bids</a></p></section>")
+ if meetings:
+  sections.append("<section><h2>Discovered recording references</h2><table><tr><th>Meeting title (unverified)</th><th>Recording</th><th>Agenda match</th></tr>")
+  for m in meetings[:100]:
+   u=esc(m.get("recording_url"))
+   sections.append("<tr><td>"+esc(m.get("title_hint"))+"</td><td><a href='"+u+"'>Officially referenced video</a></td><td>"+esc(m.get("agenda_match"))+"</td></tr>")
+  sections.append("</table></section>")
+ sections.append("<section><h2>Review state</h2><p>"+esc(audit.get("buyer_evidence_status"))+"</p><p>DeepSeek buyer review: "+
+   esc(audit.get("buyer_ai_result",{}).get("status","NOT_RUN"))+"</p><p>Caption input: "+
+   esc(audit.get("caption_status","NOT_RUN"))+"</p></section></body></html>")
+ dest=root/"MUNICIPAL_INTELLIGENCE_REVIEW.html"
+ dest.write_text("".join(sections),encoding="utf-8")
+ return dest
+if __name__=="__main__":
+ import argparse
+ p=argparse.ArgumentParser();p.add_argument("--folder",required=True);a=p.parse_args()
+ print(str(render(a.folder)))
