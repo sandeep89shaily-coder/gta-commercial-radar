@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - dev/municipal-document-registry-20261027
+      - main
     paths:
       - municipal_live_source_smoke.py
       - gta_official_arcgis_attributes.py
