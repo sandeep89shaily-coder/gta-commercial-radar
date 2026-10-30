@@ -42,11 +42,20 @@ def execute(workspace=None):
             "--out",str(review/"MEETING_DOCUMENTS"/"Toronto"),"--fetch",
             "--max-agendas","4","--max-pdfs","6"],False)
 
+        # Independently observed Toronto report links are a second bounded path.
+        # This does not assume the meeting video/index discovery yielded agenda PDFs.
+        run("verified_toronto_reports",["toronto_verified_report_queue.py",
+            "--queue",str(ROOT/"config"/"toronto_verified_report_queue.csv"),
+            "--out",str(review/"MEETING_DOCUMENTS"/"Toronto"),"--fetch",
+            "--max-files","4"],False)
         pdf_audit=review/"MEETING_DOCUMENTS"/"Toronto"/"TORONTO_PDF_FETCH_AUDIT.csv"
-        if pdf_audit.exists():
-            run("document_deepseek_analysis",["toronto_ai_document_batch.py",
-                "--audit",str(pdf_audit),"--out",str(review/"DOCUMENT_AI"),
-                "--results",str(results),"--limit","4","--paid"],False)
+        # Merge captured PDFs from both official paths into a single AI audit.
+        from gta_document_audit_union import union
+        combined = review/"MEETING_DOCUMENTS"/"Toronto"/"COMBINED_PDF_FETCH_AUDIT.csv"
+        union([pdf_audit,review/"MEETING_DOCUMENTS"/"Toronto"/"VERIFIED_REPORT_FETCH_AUDIT.csv"],combined)
+        run("document_deepseek_analysis",["toronto_ai_document_batch.py",
+            "--audit",str(combined),"--out",str(review/"DOCUMENT_AI"),
+            "--results",str(results),"--limit","4","--paid"],False)
         queue=results/"GTA_RADAR_V8_PENDING_QUEUE.csv"
         if queue.exists():
             run("first_seen_ledger",["gta_discovery_tracking.py","--queue",str(queue),
