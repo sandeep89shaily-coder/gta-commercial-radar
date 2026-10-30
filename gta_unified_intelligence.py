@@ -75,6 +75,11 @@ def build(results,review):
     feeds=_read(results/"EARLY_SIGNAL_FEED_AUDIT.json")
     timing=_read(results/"EARLY_DISCOVERY_PROOF.json")
     buyer=_read(review/"BUYER_RESEARCH_STATUS.json")
+    meeting_audits={city:_read(review/"MEETINGS"/city/"INTEGRATED_PILOT_AUDIT.json")
+                    for city in ("Toronto","Brampton")}
+    pdf_audit=_read(review/"MEETING_DOCUMENTS"/"Toronto"/"TORONTO_MEETING_PDF_SUMMARY.json")
+    doc_ai=_read(review/"DOCUMENT_AI"/"TORONTO_AI_DOCUMENT_BATCH_SUMMARY.json")
+
     summary={"generated_at_utc":dt.datetime.now(dt.timezone.utc).isoformat(),
              "project_dossiers":len(projects),"exact_id_project_dossiers":sum(p["exact_application_evidence_count"]>0 for p in projects),
              "verified_private_leads":0,"verified_buying_authorities":0,
@@ -85,6 +90,11 @@ def build(results,review):
              "early_feed_candidate_links":len(feeds.get("candidate_links",[])),
              "lead_time_measurable_projects":timing.get("measurable",0),
              "buyer_research_status":buyer.get("status","NOT_RUN"),
+             "meeting_discovery_cities_attempted":sum(bool(v) for v in meeting_audits.values()),
+             "toronto_meeting_agendas_fetched":pdf_audit.get("meetings_fetched",0),
+             "toronto_meeting_pdfs_downloaded":pdf_audit.get("pdf_downloaded",0),
+             "document_ai_reviews":doc_ai.get("review_outputs",0),
+             "document_ai_errors":doc_ai.get("errors",0),
              "production_ready":False}
     obj={"summary":summary,"projects":projects,"nodes":list(nodes.values()),
          "edges":list(edges.values())}
