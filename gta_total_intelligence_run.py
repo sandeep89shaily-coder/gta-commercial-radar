@@ -31,6 +31,17 @@ def execute(workspace=None):
                                       "--no-schedule","--unattended"],True):
             record["status"]="COLLECTION_FAILED";return 1
         run("early_source_monitor",["gta_early_signal_feed_monitor.py","--out",str(results)],False)
+        # Datum-style municipal meeting discovery, procurement and bounded
+        # policy-checked document retrieval are separate audited stages.
+        for city in ("Toronto","Brampton"):
+            run("meeting_"+city.lower(),["RUN_MEETING_BUYER_PIPELINE.py",
+                "--city",city,"--out",str(review/"MEETINGS"/city),
+                "--include-procurement"],False)
+        run("toronto_meeting_documents",["toronto_meeting_pdf_pipeline.py",
+            "--meetings",str(ROOT/"config"/"toronto_verified_meeting_seeds.csv"),
+            "--out",str(review/"MEETING_DOCUMENTS"/"Toronto"),"--fetch",
+            "--max-agendas","4","--max-pdfs","6"],False)
+
         queue=results/"GTA_RADAR_V8_PENDING_QUEUE.csv"
         if queue.exists():
             run("first_seen_ledger",["gta_discovery_tracking.py","--queue",str(queue),
