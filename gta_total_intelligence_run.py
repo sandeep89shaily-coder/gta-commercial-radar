@@ -42,6 +42,11 @@ def execute(workspace=None):
             "--out",str(review/"MEETING_DOCUMENTS"/"Toronto"),"--fetch",
             "--max-agendas","4","--max-pdfs","6"],False)
 
+        pdf_audit=review/"MEETING_DOCUMENTS"/"Toronto"/"TORONTO_PDF_FETCH_AUDIT.csv"
+        if pdf_audit.exists():
+            run("document_deepseek_analysis",["toronto_ai_document_batch.py",
+                "--audit",str(pdf_audit),"--out",str(review/"DOCUMENT_AI"),
+                "--results",str(results),"--limit","4","--paid"],False)
         queue=results/"GTA_RADAR_V8_PENDING_QUEUE.csv"
         if queue.exists():
             run("first_seen_ledger",["gta_discovery_tracking.py","--queue",str(queue),
