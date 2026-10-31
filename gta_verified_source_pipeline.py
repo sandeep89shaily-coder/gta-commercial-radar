@@ -145,5 +145,8 @@ def main():
     a=p.parse_args()
     with open(a.indexes,encoding="utf-8-sig",newline="") as h:
         indexes=list(csv.DictReader(h))
-    result=discover(indexes,a.out)\n    if a.fetch:\n        result["downloads"]=fetch_discovered(result["discovered_csv"],a.out)\n    print(json.dumps(result,indent=2))
+    result=discover(indexes,a.out)
+    if a.fetch:
+        result["downloads"]=fetch_discovered(result["discovered_csv"],a.out)
+    print(json.dumps(result,indent=2))
 if __name__=="__main__":main()
