@@ -37,6 +37,9 @@ def execute(workspace=None):
             run("meeting_"+city.lower(),["RUN_MEETING_BUYER_PIPELINE.py",
                 "--city",city,"--out",str(review/"MEETINGS"/city),
                 "--include-procurement"],False)
+        run("automatic_document_discovery",["gta_verified_source_pipeline.py",
+            "--indexes",str(ROOT/"config"/"official_document_indexes.csv"),
+            "--out",str(review/"MEETING_DOCUMENTS"/"Toronto"),"--fetch"],False)
         run("toronto_meeting_documents",["toronto_meeting_pdf_pipeline.py",
             "--meetings",str(ROOT/"config"/"toronto_verified_meeting_seeds.csv"),
             "--out",str(review/"MEETING_DOCUMENTS"/"Toronto"),"--fetch",
@@ -52,7 +55,7 @@ def execute(workspace=None):
         # Merge captured PDFs from both official paths into a single AI audit.
         from gta_document_audit_union import union
         combined = review/"MEETING_DOCUMENTS"/"Toronto"/"COMBINED_PDF_FETCH_AUDIT.csv"
-        union([pdf_audit,review/"MEETING_DOCUMENTS"/"Toronto"/"VERIFIED_REPORT_FETCH_AUDIT.csv"],combined)
+        union([pdf_audit,review/"MEETING_DOCUMENTS"/"Toronto"/"VERIFIED_REPORT_FETCH_AUDIT.csv",\n               review/"MEETING_DOCUMENTS"/"Toronto"/"AUTOMATIC_PDF_FETCH_AUDIT.csv"],combined)
         run("document_deepseek_analysis",["toronto_ai_document_batch.py",
             "--audit",str(combined),"--out",str(review/"DOCUMENT_AI"),
             "--results",str(results),"--limit","4","--paid"],False)
