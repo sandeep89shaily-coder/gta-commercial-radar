@@ -1,0 +1,24 @@
+{
+  "_how_to_use": "Copy this file to GTA_RADAR_RESULTS\\REVIEWED_EVIDENCE.json and fill one entry per project. Every value below is an EXAMPLE placeholder, not a real finding. A project is only 'verified' when every field has a real https official page, a verbatim excerpt, and reviewer_confirmed set to true by a named person. Run: python reviewed_evidence.py --folder GTA_RADAR_RESULTS",
+  "reviews": [
+    {
+      "project_id": "EXAMPLE-ONLY: copy the project_id from COMMERCIAL_REVIEW.csv",
+      "address": "EXAMPLE: street address",
+      "project_name": "EXAMPLE: plant expansion",
+      "reviewed_by": "Your full name",
+      "reviewed_at": "YYYY-MM-DD",
+      "supplier_status": "UPCOMING",
+      "service_categories": ["HVAC / refrigeration", "Security / fire protection"],
+      "evidence": {
+        "project_source": {"source_class": "OFFICIAL_GOVERNMENT", "official_url": "https://example.gov/record", "excerpt": "Verbatim text copied from the page that identifies the project.", "retrieved_at": "YYYY-MM-DD", "reviewer_confirmed": true},
+        "project_identity": {"source_class": "OFFICIAL_GOVERNMENT", "official_url": "https://example.gov/record", "excerpt": "Verbatim text linking this exact application or address to the project.", "retrieved_at": "YYYY-MM-DD", "reviewer_confirmed": true},
+        "scope_evidence": {"source_class": "COMPANY_OWNED", "official_url": "https://example.com/news", "excerpt": "Verbatim text describing the construction or equipment scope.", "retrieved_at": "YYYY-MM-DD", "reviewer_confirmed": true},
+        "buyer_org_evidence": {"source_class": "COMPANY_OWNED", "official_url": "https://example.com/news", "organization": "Example Company Ltd", "excerpt": "Verbatim text that names Example Company Ltd as owner or operator.", "retrieved_at": "YYYY-MM-DD", "reviewer_confirmed": true},
+        "buying_authority_evidence": {"source_class": "COMPANY_OWNED", "official_url": "https://example.com/news", "organization": "Example Company Ltd", "authority_basis": "OWNER_OPERATOR_OF_SITE", "person_or_role": "", "excerpt": "Verbatim text showing Example Company Ltd owns and operates the site and funds the work.", "retrieved_at": "YYYY-MM-DD", "reviewer_confirmed": true},
+        "contact_route_evidence": {"source_class": "COMPANY_OWNED", "official_url": "https://example.com/contact", "contact_url": "https://example.com/contact", "contact_kind": "PUBLIC_BUSINESS_PHONE", "contact_purpose": "GENERAL_BUSINESS", "excerpt": "Verbatim contact details published by the company for business enquiries.", "retrieved_at": "YYYY-MM-DD", "reviewer_confirmed": true},
+        "procurement_evidence": {"source_class": "COMPANY_OWNED", "official_url": "https://example.com/news", "procurement_basis": "PLANNING_STAGE_PRE_PROCUREMENT", "checked_at": "YYYY-MM-DD", "excerpt": "Verbatim text showing trade packages are not yet awarded, or an open tender notice.", "retrieved_at": "YYYY-MM-DD", "reviewer_confirmed": true},
+        "source_first_publication": {"source_class": "COMPANY_OWNED", "official_url": "https://example.com/news", "published_at": "YYYY-MM-DD", "excerpt": "Verbatim headline and publication date line from the page.", "retrieved_at": "YYYY-MM-DD", "reviewer_confirmed": true}
+      }
+    }
+  ]
+}

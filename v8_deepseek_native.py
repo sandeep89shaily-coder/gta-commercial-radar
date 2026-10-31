@@ -17,6 +17,7 @@ from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
 import v5_investigator as v5
+import source_dates
 from lead_qualification import grade
 from commercial_research_policy import project_evidence, directory_url, research_route, lead_sector
 import v8_ai_queue as queue
@@ -31,7 +32,7 @@ FETCH_COST=0.00075
 # Conservative peak-rate ceiling (official Flash $0.30 / $1.20 per million).
 # Reserve with a large safety factor; input is ASCII JSON bounded in bytes.
 MODEL_INPUT_BYTES=6500
-MODEL_OUTPUT_TOKENS=850
+MODEL_OUTPUT_TOKENS=1100
 MODEL_RESERVE=0.008
 DAILY_LIMIT=v5.DAILY_BUDGET  # One shared USD daily limit across active Radar investigators
 MAX_SEARCHES=3
@@ -292,6 +293,39 @@ def model_usage_cost(usage, when=None):
     return (hit*hit_price+miss*miss_price+out*output_price)/1_000_000
 
 
+class ModelResponseError(ValueError):
+    """A paid model call returned something unusable. Carries WHY, not just that.
+
+    failure_class: INPUT_TOO_LARGE, NO_CHOICES, TRUNCATED, EMPTY_CONTENT,
+    INVALID_JSON or NOT_AN_OBJECT. `raw` is a bounded excerpt of the reply and
+    `cost` the actual usage cost when the provider reported usage.
+    """
+    def __init__(self,failure_class,message,raw='',cost=None):
+        super().__init__(message)
+        self.failure_class=failure_class
+        self.raw=(raw or '')[:4000]
+        self.cost=cost
+
+_FENCE=re.compile(r'^\s*```(?:json)?\s*(.*?)\s*```\s*$',re.S|re.I)
+
+def parse_model_json(content):
+    """Parse a JSON object from model text; tolerate fences and a short preamble."""
+    text=(content or '').strip()
+    if not text:raise ModelResponseError('EMPTY_CONTENT','Model returned empty content',content)
+    fenced=_FENCE.match(text)
+    if fenced:text=fenced.group(1).strip()
+    candidates=[text]
+    start,end=text.find('{'),text.rfind('}')
+    if 0<=start<end:candidates.append(text[start:end+1])
+    for candidate in candidates:
+        try:
+            value=json.loads(candidate)
+        except ValueError:
+            continue
+        if isinstance(value,dict):return value
+        raise ModelResponseError('NOT_AN_OBJECT','Model JSON was not an object',content)
+    raise ModelResponseError('INVALID_JSON','Model content was not valid JSON',content)
+
 def analyze(row,evidence,key,transport=None):
     facts={k:str(row.get(k) or '')[:200] for k in
            ('address','city','source_id','source_keys','company_name','description',
@@ -324,21 +358,34 @@ def analyze(row,evidence,key,transport=None):
             'buyer_fit must say which sectors fit AND why availability remains unverified. '
             'If there are no relevant fetched pages, caveats must explicitly say SOURCE RECORD ONLY. '
             'Output JSON only. ')
+    dated=[{'field':d['field'],'date':d['date']} for d in source_dates.verified_dates(row,evidence)][:6]
+    allowed_dates={d['date'] for d in source_dates.verified_dates(row,evidence)}
+    system+=('Radar supplies verified_dates computed from raw timestamps. NEVER convert epoch values '
+             'or state any calendar date that is not in verified_dates. Keep each text field under 300 characters. ')
     payload={'model':MODEL,'thinking':{'type':'disabled'},'response_format':{'type':'json_object'},
              'max_tokens':MODEL_OUTPUT_TOKENS,'stream':False,'messages':[
                 {'role':'system','content':system},
-                {'role':'user','content':json.dumps({'source':facts,'pages':pages},ensure_ascii=True)}]}
+                {'role':'user','content':json.dumps({'source':facts,'verified_dates':dated,'pages':pages},ensure_ascii=True)}]}
     packed=json.dumps(payload,ensure_ascii=True).encode('ascii')
     if len(packed)>MODEL_INPUT_BYTES:
         facts['description']=facts['description'][:90];pages=pages[:1]
-        payload['messages'][1]['content']=json.dumps({'source':facts,'pages':pages},ensure_ascii=True)
+        payload['messages'][1]['content']=json.dumps({'source':facts,'verified_dates':dated,'pages':pages},ensure_ascii=True)
         packed=json.dumps(payload,ensure_ascii=True).encode('ascii')
-    if len(packed)>MODEL_INPUT_BYTES:raise ValueError('Model input exceeds budget bound')
+    if len(packed)>MODEL_INPUT_BYTES:
+        raise ModelResponseError('INPUT_TOO_LARGE','Model input exceeds budget bound (%d bytes)'%len(packed))
     answer=request('/chat/completions',payload,key,transport)
-    choice=answer['choices'][0]
-    if choice.get('finish_reason')=='length':raise ValueError('AI output truncated')
-    values=json.loads(choice['message']['content'])
-    if not isinstance(values,dict):raise ValueError('AI response not an object')
+    spent=model_usage_cost(answer.get('usage',{}))
+    choices=answer.get('choices') or []
+    if not choices:raise ModelResponseError('NO_CHOICES','Model reply had no choices',json.dumps(answer)[:4000],spent)
+    choice=choices[0]
+    reply=(choice.get('message') or {}).get('content') or ''
+    if choice.get('finish_reason')=='length':
+        raise ModelResponseError('TRUNCATED','AI output truncated at %d tokens'%MODEL_OUTPUT_TOKENS,reply,spent)
+    try:
+        values=parse_model_json(reply)
+    except ModelResponseError as exc:
+        exc.cost=spent
+        raise
     allowed={e['url'] for e in evidence}
     claimed=values.get('source_urls',[])
     # Source URLs come from matched Search page content/Fetch, not the model's
@@ -363,8 +410,12 @@ def analyze(row,evidence,key,transport=None):
         out['operator']=''
     val=str(values.get('contact') or '').strip()[:160]
     out['contact']=val if approved and val and val.casefold() in page_text.casefold() else ''
+    removed_dates=0
     for field in ('project_stage','buyer_fit','next_verification','caveats'):
-        out[field]=str(values.get(field) or '').strip()[:350]
+        cleaned,count=source_dates.sanitize_model_text(str(values.get(field) or '').strip()[:350],allowed_dates)
+        out[field]=cleaned;removed_dates+=count
+    out['source_dates']=source_dates.verified_dates(row,evidence)[:12]
+    out['model_dates_removed']=removed_dates
     # Do not turn a name from an unrelated old building story into a project
     # owner, tenant or awarded contractor. Require exact current permit ID.
     exact_pages=' '.join(e.get('text','') for e in evidence

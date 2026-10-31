@@ -13,9 +13,10 @@ CATEGORIES={
  "Electrical / power":("electrical","transformer","substation","switchgear","generator","electric power","wiring"),
  "Industrial equipment":("factory","industrial","compressor","manufactur","warehouse","machinery","conveyor"),
 }
-REQUIRED=("project_source","project_identity","scope_evidence","buyer_org_evidence",
-          "buying_authority_evidence","contact_route_evidence","procurement_evidence",
-          "source_first_publication","radar_first_observed")
+from reviewed_evidence import MILESTONE_FIELDS, evaluate_review
+# The eight milestone proofs. radar_first_observed is measured separately (early discovery)
+# and is not a condition of being sale-ready.
+REQUIRED=MILESTONE_FIELDS
 def classify(title):
  text=str(title or "").casefold()
  return [c for c,words in CATEGORIES.items() if any(re.search(r"(?<![a-z])"+re.escape(x),text) for x in words)]
@@ -40,13 +41,16 @@ def rank(record,as_of=None):
    "missing_verification":["current official portal/addenda status","trade eligibility and work package fit"]}
 def create(source,out,*,as_of=None):
  obj=json.loads(Path(source).read_text(encoding="utf-8"))
+ from reviewed_evidence import evaluate_folder
+ gate=list(evaluate_folder(Path(out).parent)["results"].values())
  board=[v for r in obj.get("records",[]) if (v:=rank(r,as_of=as_of)) is not None]
  board.sort(key=lambda x:(not bool(x["service_categories"]),-x["score_for_research_only"],x["closing_date"],str(x["reference"])))
  data={"source_status":obj.get("status"),"source_complete":obj.get("complete",False),
   "records_examined":len(obj.get("records",[])),"future_closing_candidates":len(board),
   "relevant_trade_candidates":sum(bool(x["service_categories"]) for x in board),
-  "verified_private_opportunities":0,"buyer_decision_makers_verified_for_private_projects":0,
-  "verified_unawarded_private_work_packages":0,"leads":board,
+  "verified_private_opportunities":sum(g["sale_ready"] for g in gate),
+  "buyer_decision_makers_verified_for_private_projects":sum(g["buyer_authority_verified"] for g in gate),
+  "verified_unawarded_private_work_packages":sum(g["supplier_selection_verified"] for g in gate),"leads":board,
   "limitations":["Source status not confirmed in live portal","Historical city tenders are not private-project early signals",
    "City procurement contact is not private purchasing authority",
    "Commercial project leads require independent source and buyer verification"]}
@@ -61,17 +65,21 @@ def create(source,out,*,as_of=None):
  return data
 
 def qualify_private(dossier):
- """Independent source IDs and positive confirmations required, never AI assertion alone."""
- checks={key:bool(dossier.get("verified",{}).get(key)) for key in REQUIRED}
- sources=dossier.get("source_evidence",{})
- for field in REQUIRED:
-  evidence_id=dossier.get("evidence_ids",{}).get(field)
-  proof=sources.get(evidence_id) if evidence_id else None
-  if not isinstance(proof,dict) or not proof.get("official_url") or not proof.get("excerpt") or not proof.get("reviewer_confirmed"):
-   checks[field]=False
- if dossier.get("supplier_status")!="INDEPENDENTLY_CHECKED_UNSELECTED":checks["procurement_evidence"]=False
- return {"sale_ready":all(checks.values()),"missing":[f for f,ok in checks.items() if not ok],
-         "status":"SALE_READY_VERIFIED" if all(checks.values()) else "RESEARCH_ONLY"}
+ """Legacy entry point. Booleans in dossier['verified'] are assertions and are IGNORED.
+
+ Only proof records count: each milestone field needs an evidence record (see
+ reviewed_evidence.evaluate_review) confirmed by a named human reviewer.
+ """
+ evidence={}
+ sources=dossier.get("source_evidence") or {}
+ for field,evidence_id in (dossier.get("evidence_ids") or {}).items():
+  proof=sources.get(evidence_id)
+  if isinstance(proof,dict):evidence[field]=proof
+ review={"project_id":dossier.get("project_id",""),"reviewed_by":dossier.get("reviewed_by",""),
+         "reviewed_at":dossier.get("reviewed_at",""),"supplier_status":dossier.get("supplier_status","UNKNOWN"),
+         "evidence":evidence}
+ result=evaluate_review(review)
+ return {"sale_ready":result["sale_ready"],"missing":result["missing"],"status":result["status"]}
 def main():
  p=argparse.ArgumentParser();p.add_argument("--source",required=True);p.add_argument("--out",required=True)
  a=p.parse_args();result=create(a.source,a.out)

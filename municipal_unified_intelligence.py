@@ -4,6 +4,7 @@ Inputs: saved PDF; saved transcript CSV; optional locally held recording.
 No web scraping, no production writes, no automatically sale-ready leads.
 """
 from __future__ import annotations
+from radar_config import DEEPSEEK_DAILY_LIMIT_USD as DAILY_CAP
 import argparse,csv,hashlib,json,datetime as dt
 from pathlib import Path
 import v5_investigator as v5
@@ -148,7 +149,7 @@ def run(source_url,results,out,*,pdf=None,transcript=None,ocr_csv=None,paid=Fals
             reservation="municipal_unified_"+hashlib.sha256((STAGE+meta["source_sha256"]+
                         source_url+str(idx)).encode()).hexdigest()[:24]
             legacy=v5._legacy_reserved(root/"deepseek_budget.sqlite",day)
-            if not native.ledger_claim(db,day,reservation,RESERVATION_USD,legacy,daily_limit=0.49):
+            if not native.ledger_claim(db,day,reservation,RESERVATION_USD,legacy,daily_limit=DAILY_CAP):
                 failures.append({"chunk":idx,"reason":"SHARED_BUDGET_OR_DUPLICATE"});break
             status["AI_paid_requests"]+=1
             try:

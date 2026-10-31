@@ -12,17 +12,21 @@ def acceptance(folder,baseline=None):
     evidence=sum(x["exact_identity_sources"]>0 for x in rows)
     buyer=sum(x["buyer_authority_verified"] is True for x in rows)
     supplier=sum(x["supplier_selection_verified"] is True for x in rows)
+    sale_ready=sum(x["sale_ready"] is True for x in rows)
     report={"generated_at_utc":dt.datetime.now(dt.timezone.utc).isoformat(),
             "investigated_projects":len(rows),"official_exact_id_projects":evidence,
             "verified_buying_authorities":buyer,"verified_unawarded_packages":supplier,
-            "sale_ready":sum(x["sale_ready"] for x in rows),
-            "production_acceptance":False,
+            "sale_ready":sale_ready,
+            "production_acceptance":False,   # decided below from the computed counts
             "failures":[],
             "claims":"Official evidence does not by itself prove an unawarded work package"}
     if not rows:report["failures"].append("NO_LIVE_AI_PROJECT_REVIEWS")
     if evidence==0:report["failures"].append("NO_EXACT_ID_SOURCE_EVIDENCE")
     if buyer==0:report["failures"].append("NO_VERIFIED_PRIVATE_BUYERS")
     if supplier==0:report["failures"].append("NO_VERIFIED_UNAWARDED_WORK_PACKAGES")
+    # Passes only when at least one reviewed opportunity cleared the verification gate
+    # and nothing above failed. The counts come from reviewed_evidence, never constants.
+    report["production_acceptance"]=bool(sale_ready>=1 and not report["failures"])
     if baseline and Path(baseline).is_dir():
         report["quality_comparison"]=compare(baseline,folder)
     else:report["quality_comparison_status"]="NO_PRIOR_RUN_SUPPLIED"

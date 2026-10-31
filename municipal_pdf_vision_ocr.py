@@ -4,6 +4,7 @@ Renders locally with PyMuPDF, no HTTP downloads, conservatively reserves
 against existing GTA Radar AI ledger, and never asserts OCR was verified.
 """
 from __future__ import annotations
+from radar_config import DEEPSEEK_DAILY_LIMIT_USD as DAILY_CAP
 import argparse,base64,csv,datetime as dt,hashlib,json
 from pathlib import Path
 import v5_investigator as v5
@@ -79,7 +80,7 @@ def run(pdf,source_url,results,out,*,paid=False,max_pages=2,key=None,
             claim="pdf_vision_"+hashlib.sha256((STAGE+document["sha256"]+
                     source_url+str(page)).encode()).hexdigest()[:24]
             legacy=v5._legacy_reserved(root/"deepseek_budget.sqlite",day)
-            if not native.ledger_claim(db,day,claim,RESERVE_USD,legacy,daily_limit=0.49):
+            if not native.ledger_claim(db,day,claim,RESERVE_USD,legacy,daily_limit=DAILY_CAP):
                 failures.append({"page":page,"status":"BUDGET_OR_DUPLICATE_BLOCKED"});break
             report["ocr_attempted"]+=1;report["paid_ai_requests"]+=1
             try:

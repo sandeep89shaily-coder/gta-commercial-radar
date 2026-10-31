@@ -33,7 +33,7 @@ class DownloaderTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as t:
             result=fetch_one(URL,Path(t)/"report.pdf",resolver=dns,
                 get_policy=lambda url:None,session=Session(Response(b"bad")))
-            self.assertEqual(result["reason"],"ROBOTS_UNAVAILABLE")
+            self.assertEqual(result["reason"],"ROBOTS_SERVER_ERROR")
             self.assertFalse((Path(t)/"report.pdf").exists())
     def test_html_disguised_pdf_rejected_and_not_saved(self):
         with tempfile.TemporaryDirectory() as t:

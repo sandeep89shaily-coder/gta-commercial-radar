@@ -14,6 +14,7 @@ from urllib.parse import urlparse
 from urllib.robotparser import RobotFileParser
 
 import requests
+import robots_policy
 from toronto_tmmis_documents import agenda_url, parse_agenda, FIELDS
 from toronto_pdf_download import AGENT, TIMEOUT, public_dns, fetch_one, AUDIT_FIELDS
 
@@ -29,19 +30,9 @@ def meeting_access(url, session, *, resolver=None, policy_reader=None):
     host=urlparse(url).hostname
     if not public_dns(host, resolver or __import__("socket").getaddrinfo):
         return False,"DNS_UNAVAILABLE_OR_NONPUBLIC"
-    robots_url="https://secure.toronto.ca/robots.txt"
-    try:
-        if policy_reader:
-            policy=policy_reader(robots_url)
-        else:
-            r=session.get(robots_url,timeout=TIMEOUT,allow_redirects=False)
-            policy=r.text if r.status_code==200 and r.url==robots_url and len(r.content)<=512000 else None
-        if policy is None:
-            return False,"ROBOTS_UNAVAILABLE"
-        robot=RobotFileParser();robot.parse(policy.splitlines())
-        return (True,"OK") if robot.can_fetch(AGENT,url) else (False,"ROBOTS_DISALLOWED")
-    except requests.RequestException:
-        return False,"ROBOTS_NETWORK_FAILURE"
+    allowed,reason=robots_policy.evaluate(session,url,AGENT,timeout=TIMEOUT,
+        robots_url="https://secure.toronto.ca/robots.txt",policy_reader=policy_reader)
+    return (True,"OK") if allowed and reason=="ALLOWED" else (allowed,reason)
 
 def run(seed_csv,output,*,fetch=False,max_agendas=4,max_pdfs=6,session=None,
         resolver=None,meeting_policy=None,pdf_policy=None):
