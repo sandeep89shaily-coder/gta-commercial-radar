@@ -140,7 +140,8 @@ def lead_pair(early,later):
 
 def main():
     p=argparse.ArgumentParser()
-    p.add_argument("--indexes",required=True);p.add_argument("--out",required=True)\n    p.add_argument("--fetch",action="store_true")
+    p.add_argument("--indexes",required=True);p.add_argument("--out",required=True)
+    p.add_argument("--fetch",action="store_true")
     a=p.parse_args()
     with open(a.indexes,encoding="utf-8-sig",newline="") as h:
         indexes=list(csv.DictReader(h))
