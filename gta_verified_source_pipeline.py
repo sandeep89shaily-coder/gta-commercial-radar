@@ -109,9 +109,9 @@ def classify_buyer(item):
            bool(authority) and authority in exact and source.startswith("https://"))
     supplier="UNKNOWN"
     if award and award in exact and source.startswith("https://"):
-        if re.search(r"\\b(?:awarded to|contract awarded|successful bidder)\\b",award,re.I):
+        if any(term in award.lower() for term in ("awarded to","contract awarded","successful bidder")):
             supplier="AWARDED_CLAIM_REQUIRES_CORROBORATION"
-        elif re.search(r"\\b(?:request for proposals|invitation to tender|bids close)\\b",award,re.I):
+        elif any(term in award.lower() for term in ("request for proposals","invitation to tender","bids close")):
             supplier="TENDER_PUBLISHED_STATUS_REQUIRES_LIVE_CHECK"
     return {"buyer_authority": "SOURCE_SUPPORTED_REVIEW_REQUIRED" if buyer else "NOT_VERIFIED",
             "supplier_status":supplier,"verification":"MANUAL_OR_INDEPENDENT_SOURCE_REVIEW_REQUIRED"}
