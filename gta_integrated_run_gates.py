@@ -32,6 +32,11 @@ def evaluate(review, results=None):
         combined = meeting + [{**row, "url":row.get("attachment_url") or row.get("url")} for row in verified]
     unique = {row.get("url"):row for row in combined if row.get("url")}
     documents = sum(row.get("status")=="CAPTURED" for row in unique.values())
+    if not unique:
+        # Legacy isolated test audits can omit URLs; retain their diagnostic count.
+        legacy = read_rows(review/"MEETING_DOCUMENTS"/"Toronto"/"VERIFIED_REPORT_FETCH_AUDIT.csv")
+        summary = read_json(review/"MEETING_DOCUMENTS"/"Toronto"/"VERIFIED_REPORT_FETCH_SUMMARY.json")
+        documents = min(sum(row.get("status")=="CAPTURED" for row in legacy), int(summary.get("captured") or 0))
     analyzed = read_rows(review/"DOCUMENT_AI"/"TORONTO_AI_DOCUMENT_BATCH_AUDIT.csv")
     completed_urls = {row.get("source_url") for row in analyzed
                       if row.get("source_url") and row.get("result_file")
