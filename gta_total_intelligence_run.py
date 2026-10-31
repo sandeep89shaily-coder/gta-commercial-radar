@@ -37,6 +37,9 @@ def execute(workspace=None):
             run("meeting_"+city.lower(),["RUN_MEETING_BUYER_PIPELINE.py",
                 "--city",city,"--out",str(review/"MEETINGS"/city),
                 "--include-procurement"],False)
+        run("automatic_document_discovery",["gta_verified_source_pipeline.py",
+            "--indexes",str(ROOT/"config"/"official_document_indexes.csv"),
+            "--out",str(review/"MEETING_DOCUMENTS"/"Toronto")],False)
         run("toronto_meeting_documents",["toronto_meeting_pdf_pipeline.py",
             "--meetings",str(ROOT/"config"/"toronto_verified_meeting_seeds.csv"),
             "--out",str(review/"MEETING_DOCUMENTS"/"Toronto"),"--fetch",
