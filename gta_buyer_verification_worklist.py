@@ -1,6 +1,7 @@
 """Prioritized follow-up queue for evidence-backed, not-yet-verified buyer relationships."""
 from __future__ import annotations
 import csv,json
+from gta_verified_source_pipeline import classify_buyer
 from pathlib import Path
 
 FIELDS=("organization","role","project_id","source_url","exact_quote","buyer_authority_status",
@@ -27,11 +28,12 @@ def build(folder):
                 "official contact route; supplier/contract award status")
         if role in ("architect","agent"):
             needed="Establish owner/developer/operator and purchasing authority; agent is not buyer"
+        evidence=classify_buyer(item)
         rows.append(dict(organization=item.get("organization",""),role=role,
                          project_id=projects.get(item["source_url"],""),
                          source_url=item["source_url"],exact_quote=item["exact_quote"],
-                         buyer_authority_status="NOT_VERIFIED",
-                         supplier_selection_status="UNKNOWN",
+                         buyer_authority_status=evidence["buyer_authority"],
+                         supplier_selection_status=evidence["supplier_status"],
                          contact_route_status="NOT_VERIFIED",
                          next_evidence_required=needed))
     with (folder/"BUYER_VERIFICATION_WORKLIST.csv").open("w",newline="",encoding="utf-8-sig") as out:
