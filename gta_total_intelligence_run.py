@@ -69,6 +69,7 @@ def execute(workspace=None):
         run("intelligence_graph",["gta_unified_intelligence.py","--results",str(results),
                                   "--review",str(review)],False)
         run("release_quality",["gta_release_acceptance.py","--folder",str(review)],False)
+        run("evidence_continuation",["gta_evidence_continuation.py","--review",str(review),"--results",str(results)],False)
         # Exit status is only execution health. Evidence gates are independent.
         from gta_integrated_run_gates import evaluate, write_report
         gates=evaluate(review,results)
