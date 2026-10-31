@@ -55,7 +55,8 @@ def execute(workspace=None):
         # Merge captured PDFs from both official paths into a single AI audit.
         from gta_document_audit_union import union
         combined = review/"MEETING_DOCUMENTS"/"Toronto"/"COMBINED_PDF_FETCH_AUDIT.csv"
-        union([pdf_audit,review/"MEETING_DOCUMENTS"/"Toronto"/"VERIFIED_REPORT_FETCH_AUDIT.csv",\n               review/"MEETING_DOCUMENTS"/"Toronto"/"AUTOMATIC_PDF_FETCH_AUDIT.csv"],combined)
+        union([pdf_audit,review/"MEETING_DOCUMENTS"/"Toronto"/"VERIFIED_REPORT_FETCH_AUDIT.csv",
+               review/"MEETING_DOCUMENTS"/"Toronto"/"AUTOMATIC_PDF_FETCH_AUDIT.csv"],combined)
         run("document_deepseek_analysis",["toronto_ai_document_batch.py",
             "--audit",str(combined),"--out",str(review/"DOCUMENT_AI"),
             "--results",str(results),"--limit","4","--paid"],False)
