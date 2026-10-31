@@ -78,6 +78,26 @@ def discover(indexes,out,*,session=None,max_indexes=12,max_documents=30):
     (out/"AUTOMATIC_DOCUMENT_DISCOVERY.json").write_text(json.dumps(result,indent=2),encoding="utf-8")
     return result
 
+def fetch_discovered(csv_path,out,*,limit=6,downloader=fetch_one):
+    """Download only URLs discovered from permitted official indexes."""
+    out=Path(out);out.mkdir(parents=True,exist_ok=True)
+    with Path(csv_path).open(encoding="utf-8-sig",newline="") as h:
+        items=list(csv.DictReader(h))
+    records=[]
+    for item in items[:max(0,min(limit,20))]:
+        url=item.get("document_url","")
+        if not valid_url(url):
+            continue
+        filename=hashlib.sha256(url.encode()).hexdigest()[:24]+".pdf"
+        data=downloader(url,out/"pdfs"/filename)
+        records.append({"url":url,**{key:data.get(key,"") for key in
+                            ("status","reason","http_status","bytes","sha256","saved_path")}})
+    target=out/"AUTOMATIC_PDF_FETCH_AUDIT.csv"
+    fields=("url","status","reason","http_status","bytes","sha256","saved_path")
+    with target.open("w",encoding="utf-8-sig",newline="") as h:
+        w=csv.DictWriter(h,fieldnames=fields);w.writeheader();w.writerows(records)
+    return {"attempted":len(records),"captured":sum(x["status"]=="CAPTURED" for x in records)}
+
 def classify_buyer(item):
     """AI observations are candidates; authority/awards only from explicit sourced statements."""
     role=str(item.get("role") or "").lower()
@@ -120,9 +140,9 @@ def lead_pair(early,later):
 
 def main():
     p=argparse.ArgumentParser()
-    p.add_argument("--indexes",required=True);p.add_argument("--out",required=True)
+    p.add_argument("--indexes",required=True);p.add_argument("--out",required=True)\n    p.add_argument("--fetch",action="store_true")
     a=p.parse_args()
     with open(a.indexes,encoding="utf-8-sig",newline="") as h:
         indexes=list(csv.DictReader(h))
-    print(json.dumps(discover(indexes,a.out),indent=2))
+    result=discover(indexes,a.out)\n    if a.fetch:\n        result["downloads"]=fetch_discovered(result["discovered_csv"],a.out)\n    print(json.dumps(result,indent=2))
 if __name__=="__main__":main()
