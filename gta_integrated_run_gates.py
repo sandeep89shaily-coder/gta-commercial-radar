@@ -25,6 +25,11 @@ def evaluate(review, results=None):
     results = Path(results) if results else review.parent
     # Count actual unique captured source records, not separate overlapping queue totals.
     combined = read_rows(review/"MEETING_DOCUMENTS"/"Toronto"/"COMBINED_PDF_FETCH_AUDIT.csv")
+    if not combined:
+        # Standalone/legacy audit acceptance where the union stage was not run.
+        meeting = read_rows(review/"MEETING_DOCUMENTS"/"Toronto"/"TORONTO_PDF_FETCH_AUDIT.csv")
+        verified = read_rows(review/"MEETING_DOCUMENTS"/"Toronto"/"VERIFIED_REPORT_FETCH_AUDIT.csv")
+        combined = meeting + [{**row, "url":row.get("attachment_url") or row.get("url")} for row in verified]
     unique = {row.get("url"):row for row in combined if row.get("url")}
     documents = sum(row.get("status")=="CAPTURED" for row in unique.values())
     analyzed = read_rows(review/"DOCUMENT_AI"/"TORONTO_AI_DOCUMENT_BATCH_AUDIT.csv")
