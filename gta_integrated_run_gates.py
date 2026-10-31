@@ -23,16 +23,25 @@ def read_rows(path):
 def evaluate(review, results=None):
     review = Path(review)
     results = Path(results) if results else review.parent
-    doc = read_json(review/"MEETING_DOCUMENTS"/"Toronto"/"TORONTO_MEETING_PDF_SUMMARY.json")
-    audit = read_rows(review/"MEETING_DOCUMENTS"/"Toronto"/"TORONTO_PDF_FETCH_AUDIT.csv")
-    captured = sum(row.get("status") == "CAPTURED" for row in audit)
-    # Cross-check CSV against summary rather than trusting a completed exit code.
-    verified = read_json(review/"MEETING_DOCUMENTS"/"Toronto"/"VERIFIED_REPORT_FETCH_SUMMARY.json")
-    verified_audit = read_rows(review/"MEETING_DOCUMENTS"/"Toronto"/"VERIFIED_REPORT_FETCH_AUDIT.csv")
-    valid_verified = min(sum(row.get("status")=="CAPTURED" for row in verified_audit), int(verified.get("captured") or 0))
-    documents = min(captured, int(doc.get("pdf_downloaded") or 0)) + valid_verified
-    ai = read_json(review/"DOCUMENT_AI"/"TORONTO_AI_DOCUMENT_BATCH_SUMMARY.json")
-    ai_completed = int(ai.get("review_outputs") or 0)
+    # Count actual unique captured source records, not separate overlapping queue totals.
+    combined = read_rows(review/"MEETING_DOCUMENTS"/"Toronto"/"COMBINED_PDF_FETCH_AUDIT.csv")
+    if not combined:
+        # Standalone/legacy audit acceptance where the union stage was not run.
+        meeting = read_rows(review/"MEETING_DOCUMENTS"/"Toronto"/"TORONTO_PDF_FETCH_AUDIT.csv")
+        verified = read_rows(review/"MEETING_DOCUMENTS"/"Toronto"/"VERIFIED_REPORT_FETCH_AUDIT.csv")
+        combined = meeting + [{**row, "url":row.get("attachment_url") or row.get("url")} for row in verified]
+    unique = {row.get("url"):row for row in combined if row.get("url")}
+    documents = sum(row.get("status")=="CAPTURED" for row in unique.values())
+    if not unique:
+        # Legacy isolated test audits can omit URLs; retain their diagnostic count.
+        legacy = read_rows(review/"MEETING_DOCUMENTS"/"Toronto"/"VERIFIED_REPORT_FETCH_AUDIT.csv")
+        summary = read_json(review/"MEETING_DOCUMENTS"/"Toronto"/"VERIFIED_REPORT_FETCH_SUMMARY.json")
+        documents = min(sum(row.get("status")=="CAPTURED" for row in legacy), int(summary.get("captured") or 0))
+    analyzed = read_rows(review/"DOCUMENT_AI"/"TORONTO_AI_DOCUMENT_BATCH_AUDIT.csv")
+    completed_urls = {row.get("source_url") for row in analyzed
+                      if row.get("source_url") and row.get("result_file")
+                      and row.get("status") not in ("ERROR","MISSING_PDF","CHECKSUM_MISMATCH","READY_NOT_SENT")}
+    ai_completed = len(completed_urls)
     buyers = read_json(review/"BUYER_RESEARCH_STATUS.json")
     buyer_count = int(buyers.get("verified_buyers") or buyers.get("buying_decision_makers_verified") or 0)
     releases = read_json(review/"RELEASE_ACCEPTANCE.json")
