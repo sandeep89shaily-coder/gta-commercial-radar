@@ -140,8 +140,9 @@ def execute(candidate_file,shared_results,out,*,paid=False,max_projects=3,
             except Exception as exc:
                 native.ledger_finish(db,day,reservation,"UNKNOWN")
                 audit.append({"project_id":rid,"status":"MODEL_FAILURE",
-                              "error_type":type(exc).__name__})
-                break
+                              "error_type":type(exc).__name__,
+                              "error_reason":str(exc)[:200] if isinstance(exc,ValueError) else "MODEL_REQUEST_FAILED"})
+                continue
     finally:
         state["budget_used_or_held_usd"]=round(native.effective_spend(db,day)[0]+legacy,6)
         state["budget_remaining_usd"]=round(max(0,0.49-state["budget_used_or_held_usd"]),6)
