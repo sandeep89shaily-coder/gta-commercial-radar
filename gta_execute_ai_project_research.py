@@ -82,7 +82,15 @@ def execute(candidate_file,shared_results,out,*,paid=False,max_projects=3,
                 previous=json.loads(filename.read_text(encoding="utf-8"))
                 if previous.get("input_hash")==identity:
                     audit.append({"project_id":rid,"status":"ALREADY_REVIEWED"});continue
-                raise ValueError("Project changed; use a new output folder to preserve history")
+                # Keep the original immutable; store changed inputs under a versioned name.
+                filename=dest/("AI_PROJECT_"+hashlib.sha256(rid.encode()).hexdigest()[:16]+
+                               "_"+identity[:12]+".json")
+                if filename.exists():
+                    version=json.loads(filename.read_text(encoding="utf-8"))
+                    if version.get("input_hash")==identity:
+                        audit.append({"project_id":rid,"status":"ALREADY_REVIEWED_VERSION"});continue
+                    raise ValueError("Version filename collision; refusing overwrite")
+                audit.append({"project_id":rid,"status":"CHANGED_PROJECT_VERSION_PRESERVED"})
             reservation="project_ai_v1_"+hashlib.sha256((rid+identity).encode()).hexdigest()[:24]
             prior=db.execute("SELECT status FROM spends WHERE day=? AND candidate=?",(day,reservation)).fetchone()
             if prior:
