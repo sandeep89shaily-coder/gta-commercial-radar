@@ -89,6 +89,41 @@ class GoogleGroundingPilotTests(unittest.TestCase):
         self.assertEqual(data["queries"],["warehouse Toronto"])
         self.assertEqual(data["sources"],["https://www.toronto.ca/project"])
         self.assertGreaterEqual(data["estimated_usd"],3*pilot.GROUNDING_PER_QUERY_USD)
+    def test_diagnostic_is_read_only_and_does_not_generate(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d)
+            called=[]
+            result=pilot.diagnose_key("test-only",transport=lambda url,key:
+                (called.append((url,key)) or {"name":"models/gemini-3.1-flash-lite"}))
+            self.assertEqual(result["status"],"MODEL_LOOKUP_OK")
+            self.assertTrue(result["no_paid_calls"])
+            self.assertEqual(len(called),1)
+            self.assertIn("/models/gemini-3.1-flash-lite",called[0][0])
+            self.assertFalse((root/pilot.LEDGER).exists())
+    def test_ten_project_paid_batch_stops_after_one_failed_request(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d);self.seed(root,10)
+            attempted=[]
+            def fail(_payload):
+                attempted.append(True)
+                raise TimeoutError("Unknown charge; stop further requests")
+            result=pilot.run(root,paid=True,key="test-only",limit=10,
+                today=dt.date(2026,11,1),transport=fail)
+            self.assertEqual(len(attempted),1)
+            self.assertEqual(result["status"],"GOOGLE_FAILED_STOPPED_SAFELY")
+            self.assertEqual(result["failed_requests"],1)
+            self.assertEqual(result["skipped_after_failure"],9)
+            self.assertEqual(result["monthly_estimated_or_reserved_usd"],0.50)
+    def test_http_error_details_hide_key(self):
+        from io import BytesIO
+        from urllib.error import HTTPError
+        raw=b'{"error":{"status":"PERMISSION_DENIED","message":"Bad key PRIVATEKEY: check billing"}}'
+        error=HTTPError("https://example.com",403,"Forbidden",None,BytesIO(raw))
+        details=pilot.google_error_details(error,"PRIVATEKEY")
+        self.assertEqual(details["http_status"],403)
+        self.assertEqual(details["google_error_status"],"PERMISSION_DENIED")
+        self.assertNotIn("PRIVATEKEY",details["google_message"])
+        self.assertIn("[REDACTED]",details["google_message"])
     def test_missing_key_does_not_touch_ledger(self):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d);self.seed(root,1)

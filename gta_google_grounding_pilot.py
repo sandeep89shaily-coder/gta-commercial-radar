@@ -8,6 +8,7 @@ from __future__ import annotations
 import argparse,csv,datetime as dt,html,json,os,sqlite3
 from pathlib import Path
 from urllib.request import Request,urlopen
+from urllib.error import HTTPError,URLError
 from urllib.parse import urlparse
 from v6_daily_pipeline import find_workspace
 
@@ -75,6 +76,50 @@ def request_google(prompt,key,transport=None):
         if len(data)>512_000:
             raise ValueError("Google response too large")
         return json.loads(data.decode("utf-8"))
+
+def google_error_details(exc,key=""):
+    """Expose only status and a redacted, bounded Google error; never the key."""
+    details={"exception_type":type(exc).__name__}
+    if isinstance(exc,HTTPError):
+        details["http_status"]=exc.code
+        try:
+            error=json.loads(exc.read(8192).decode("utf-8","replace")).get("error",{})
+            if isinstance(error,dict):
+                details["google_error_status"]=str(error.get("status") or error.get("code") or "")[:64]
+                details["google_message"]=str(error.get("message") or "")[:280]
+        except (ValueError,OSError,UnicodeError):
+            pass
+    if isinstance(exc,URLError):
+        details["network_error"]="Network, proxy, or DNS failure"
+    for field in ("google_message",):
+        value=details.get(field,"")
+        if key:
+            details[field]=value.replace(key,"[REDACTED]")
+    return details
+
+def diagnose_key(key=None,*,transport=None):
+    """No generation, no grounding, and no project budget reservation.
+
+    A successful model GET proves API-key/model lookup access, but does NOT
+    prove that paid search grounding is enabled or billing is active.
+    """
+    secret=key if key is not None else os.environ.get("GEMINI_API_KEY","")
+    if not secret:
+        return {"status":"GOOGLE_KEY_MISSING","no_paid_calls":True}
+    try:
+        url="https://generativelanguage.googleapis.com/v1beta/models/"+MODEL
+        if transport is not None:
+            info=transport(url,secret)
+        else:
+            req=Request(url,method="GET",headers={"x-goog-api-key":secret})
+            with urlopen(req,timeout=20) as response:
+                info=json.loads(response.read(16384).decode("utf-8"))
+        return {"status":"MODEL_LOOKUP_OK","model":info.get("name") or MODEL,
+                "no_paid_calls":True,
+                "warning":"Model lookup is not a test of paid Google Search grounding or billing."}
+    except (HTTPError,URLError,ValueError,OSError) as exc:
+        return {"status":"MODEL_LOOKUP_FAILED","no_paid_calls":True,
+                **google_error_details(exc,secret)}
 
 def valid_url(url):
     try:
@@ -219,6 +264,8 @@ def run(results,*,paid=False,limit=MAX_PROJECTS,source=None,transport=None,key=N
                 "warning":"Pilot only. --paid required; external API charges not enforced by Radar."}
     db=open_ledger(out)
     records=[]
+    halted=False
+    failure_details=[]
     try:
         for row in selected:
             pid=row["project_id"]
@@ -234,6 +281,10 @@ def run(results,*,paid=False,limit=MAX_PROJECTS,source=None,transport=None,key=N
                     "google_source_urls":"","google_search_queries":"",
                     "google_model_tokens_in":0,"google_model_tokens_out":0,
                     "google_usage_estimate_usd":"","manual_notes":""}
+            if halted:
+                result["google_status"]="SKIPPED_AFTER_GOOGLE_FAILURE"
+                records.append(result)
+                continue
             gate=reserve(db,month,pid)
             if gate!="RESERVED":
                 result["google_status"]=gate
@@ -254,11 +305,14 @@ def run(results,*,paid=False,limit=MAX_PROJECTS,source=None,transport=None,key=N
                         google_usage_estimate_usd=found["estimated_usd"])
                     finish(db,month,pid,True,found["estimated_usd"])
                 except Exception as exc:
-                    # A timeout or API error may still be billable; hold the full
-                    # $0.50 reservation instead of treating an unknown cost as zero.
+                    # An error may still be billable; keep its $0.50 reservation
+                    # and STOP. Never burn through the other nine attempts.
                     finish(db,month,pid,False)
+                    reason=google_error_details(exc,api_key)
+                    failure_details.append({"project_id":pid,**reason})
                     result["google_status"]="GOOGLE_REQUEST_FAILED_UNKNOWN_CHARGE"
-                    result["google_analysis_unverified"]=type(exc).__name__
+                    result["google_analysis_unverified"]=json.dumps(reason,ensure_ascii=True)
+                    halted=True
             records.append(result)
         spent=db.execute("""SELECT COALESCE(SUM(CASE WHEN status='DONE' AND estimated_usd IS NOT NULL
                         THEN MAX(estimated_usd,0) ELSE reserved_usd END),0)
@@ -287,8 +341,13 @@ def run(results,*,paid=False,limit=MAX_PROJECTS,source=None,transport=None,key=N
         page.append("</article>")
     page.append("</body></html>")
     html_path.write_text("".join(page),encoding="utf-8")
-    report={"status":"REVIEW_READY","projects_selected":len(selected),
-            "projects_queried":sum(x["google_status"].startswith("RESEARCH_HINTS") for x in records),
+    succeeded=sum(x["google_status"].startswith("RESEARCH_HINTS") for x in records)
+    report={"status":("REVIEW_READY" if not failure_details else "GOOGLE_FAILED_STOPPED_SAFELY"),
+            "projects_selected":len(selected),
+            "projects_queried":succeeded,
+            "failed_requests":len(failure_details),
+            "skipped_after_failure":sum(x["google_status"]=="SKIPPED_AFTER_GOOGLE_FAILURE" for x in records),
+            "first_failure":failure_details[0] if failure_details else None,
             "month":month,"monthly_local_budget_usd":MONTHLY_MAX_USD,
             "monthly_estimated_or_reserved_usd":round(spent,6),
             "csv":str(csv_path),"html":str(html_path),
@@ -303,15 +362,21 @@ def main():
     p.add_argument("--source-csv",help="Explicit project CSV with project_id, observation, address, city")
     p.add_argument("--limit",type=int,default=MAX_PROJECTS)
     p.add_argument("--paid",action="store_true",help="Opt in to at most ten Google API requests")
+    p.add_argument("--diagnose-key",action="store_true",
+                   help="Check Gemini model metadata with GET; no generation, charges or ledger writes")
     p.add_argument("--reviewed-top10",action="store_true",
                    help="Use exact Nov 1 ten projects reviewed with the owner")
     args=p.parse_args()
     root=Path(args.results) if args.results else find_workspace(args.workspace)/"GTA_RADAR_RESULTS"
     try:
+        if args.diagnose_key:
+            result=diagnose_key()
+            print(json.dumps(result,indent=2))
+            return 0 if result["status"]=="MODEL_LOOKUP_OK" else 2
         result=run(root,paid=args.paid,source=args.source_csv,limit=args.limit,
                    reviewed_top10=args.reviewed_top10)
         print(json.dumps(result,indent=2))
-        return 0 if result["status"] not in ("GOOGLE_KEY_MISSING",) else 2
+        return 2 if result["status"] in ("GOOGLE_KEY_MISSING","GOOGLE_FAILED_STOPPED_SAFELY") else 0
     except (OSError,ValueError,sqlite3.Error) as exc:
         print(type(exc).__name__+": "+str(exc))
         return 1
