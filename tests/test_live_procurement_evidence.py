@@ -11,7 +11,7 @@ class PurchasingEvidenceTests(unittest.TestCase):
   self.assertFalse(r[0]["unawarded_package_verified"])
   self.assertFalse(r[0]["purchasing_authority_verified"])
  def test_fabricated_quote_and_network_failure_fail_closed(self):
-  rows=[{"project_id":"p","kind":"BUYING_AUTHORITY","source_url":"https://www.toronto.ca/projects","excerpt":"Chief procurement officer has approved this current project and all contracts"}]
+  rows=[{"project_id":"p","kind":"BUYING_AUTHORITY","organization":"Example Corporation","source_url":"https://www.toronto.ca/projects","excerpt":"Chief procurement officer has approved this current project and all contracts"}]
   wrong=live.inspect(rows,lambda u:{"ok":True,"text":"Unrelated Toronto municipal announcement","url":u})
   self.assertEqual(wrong[0]["proof_status"],"REJECTED")
   blocked=live.inspect(rows,lambda u:{"ok":False,"reason":"ROBOTS_DISALLOWED"})
@@ -53,8 +53,8 @@ class PurchasingEvidenceTests(unittest.TestCase):
   self.assertEqual(result[0]["reason"],"ADDRESS_NOT_ORGANIZATION")
   self.assertFalse(result[0]["source_match"])
   self.assertEqual(fetched,["https://services6.arcgis.com/issued/permits/query"])
-  self.assertTrue(result[1]["source_match"])
   self.assertEqual(result[1]["reason"],"ADDRESS_NOT_ORGANIZATION")
+  self.assertTrue(result[2]["source_match"])
   self.assertFalse(result[1]["source_match"])
   self.assertEqual(result[2]["proof_status"],"SOURCE_TEXT_MATCHED")
   self.assertEqual(result[2]["kind"],"ORGANIZATION_MENTION")
