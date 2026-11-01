@@ -43,6 +43,7 @@ class BuyerLineageIntegrationTests(unittest.TestCase):
             root=Path(folder);review=self.setup_records(root)
             rows=live.source_rows(root,review)
             self.assertEqual(rows[0]["project_id"],PID)
+            self.assertEqual(rows[0]["kind"],"ORGANIZATION_MENTION")
             self.assertEqual(rows[0]["lineage"],"UNIQUE_EXACT_SOURCE_URL_RECONCILIATION")
             seen=[]
             def fetch(url):
