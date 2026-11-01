@@ -8,19 +8,26 @@ from __future__ import annotations
 import argparse,csv,datetime as dt,html,json
 from pathlib import Path
 from urllib.parse import urlparse,quote_plus
+from gta_supplier_scope import classify
 
 SOURCE="GTA_RADAR_DAILY_NEW_DEVELOPMENTS.csv"
 AI_SOURCE="GTA_RADAR_V8_INVESTIGATIONS.csv"
 OUTPUT="GTA_RADAR_PROJECTS_TO_VERIFY.csv"
 HTML="GTA_RADAR_PROJECTS_TO_VERIFY.html"
 SUMMARY="GTA_RADAR_PROJECTS_TO_VERIFY_STATUS.json"
+SUPPLIER_MATCH_FIELDS=("observation","project_id","city","address",
+                       "source_description","source_url","local_source_status",
+                       "supplier_family","supplier_category","match_tier",
+                       "likely_service_phase","scope_phrase","qualification")
 FIELDS=("observation","project_id","city","address","source_description",
         "source_record_date","date_basis","radar_first_seen","local_source_status",
         "source_url","deepseek_initial_status","deepseek_initial_queries",
         "deepseek_checked_on","deepseek_project_stage_hint",
         "deepseek_corroborating_urls","organization_hint_unverified",
         "public_business_contact_hint_unverified","public_contact_source_url",
-        "contact_hint_status","manual_project_verification","manual_notes")
+        "contact_hint_status","supplier_scope_linked","supplier_possible_project_services",
+        "supplier_possible_operations_services","supplier_match_status",
+        "manual_project_verification","manual_notes")
 
 def rows_of(file):
     if not Path(file).is_file():
@@ -76,6 +83,9 @@ def build(results,*,today=None):
             contact=""  # Never display an unsupported AI-guessed contact.
         contact_status=("PUBLIC_SOURCE_CONTACT_HINT_REVIEW_REQUIRED" if contact else
                         "NO_SOURCE_BACKED_BUSINESS_CONTACT")
+        supplier_matches=classify(source.get("description",""))
+        tiers=lambda tier: " | ".join(x["supplier_category"] for x in supplier_matches
+                                      if x["match_tier"]==tier)
         selected.append({
             "observation":source["observation"],"project_id":pid,
             "city":source.get("city",""),"address":source.get("address",""),
@@ -94,6 +104,10 @@ def build(results,*,today=None):
             "public_business_contact_hint_unverified":contact,
             "public_contact_source_url":contact_source,
             "contact_hint_status":contact_status,
+            "supplier_scope_linked":tiers("SCOPE_LINKED"),
+            "supplier_possible_project_services":tiers("POSSIBLE_PROJECT_SERVICE"),
+            "supplier_possible_operations_services":tiers("POSSIBLE_OPERATIONS_SERVICE"),
+            "supplier_match_status":"UNVERIFIED_SUGGESTIONS" if supplier_matches else "INSUFFICIENT_SCOPE",
             "manual_project_verification":"","manual_notes":"",
         })
     selected.sort(key=lambda x:(0 if x["observation"]=="FIRST_OBSERVED" else 1,x["city"],x["address"],x["project_id"]))
@@ -102,14 +116,26 @@ def build(results,*,today=None):
     suffix=dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     csv_name="GTA_RADAR_PROJECTS_TO_VERIFY_"+suffix+".csv"
     html_name="GTA_RADAR_PROJECTS_TO_VERIFY_"+suffix+".html"
+    supplier_name="GTA_RADAR_SUPPLIER_MATCHES_"+suffix+".csv"
+    supplier_rows=[]
+    for item in selected:
+        for match in classify(item["source_description"]):
+            supplier_rows.append({
+                **{field:item.get(field,"") for field in
+                   ("observation","project_id","city","address","source_description",
+                    "source_url","local_source_status")},**match})
+    with (root/supplier_name).open("w",encoding="utf-8-sig",newline="") as output:
+        writer=csv.DictWriter(output,fieldnames=SUPPLIER_MATCH_FIELDS)
+        writer.writeheader()
+        writer.writerows(supplier_rows)
     with (root/csv_name).open("w",encoding="utf-8-sig",newline="") as f:
         w=csv.DictWriter(f,fieldnames=FIELDS);w.writeheader();w.writerows(selected)
     esc=lambda value:html.escape(str(value or ""),quote=True)
     page=["<!doctype html><html><head><meta charset='utf-8'><title>GTA Radar manual project list</title>",
           "<style>body{font:15px Segoe UI,Arial,sans-serif;max-width:1100px;margin:28px auto;padding:0 20px;background:#fafafa;color:#222}article{background:white;border:1px solid #ddd;border-radius:8px;margin:12px 0;padding:15px}small{color:#555}a{color:#175ba2}</style></head><body>",
           "<h1>GTA Radar — new projects to verify yourself</h1>",
-          "<p>Source records first observed or changed by Radar. Not proven new construction, confirmed projects, buyers or available contracts.</p>",
-          "<p><a href='"+csv_name+"'>Download review list (CSV)</a> · "+str(len(selected))+" records this run</p>"]
+          "<p>Source records first observed or changed by Radar. Supplier categories are unverified fits derived from original description, NOT confirmed bid packages, buyers, suppliers, needs or available contracts.</p>",
+          "<p><a href='"+csv_name+"'>Download review list (CSV)</a> · <a href='"+supplier_name+"'>Download supplier-sector matches (CSV)</a> · "+str(len(selected))+" records this run</p>"]
     for item in selected:
         page.extend(["<article><h3>"+esc(item["address"] or item["project_id"])+"</h3>",
                      "<p>"+esc(item["source_description"])+"</p>",
@@ -120,7 +146,13 @@ def build(results,*,today=None):
                      " | project stage (AI hint): "+esc(item["deepseek_project_stage_hint"] or "not assessed")+"</p>",
                      "<p>Possible organization (unverified): "+esc(item["organization_hint_unverified"] or "not identified")+"</p>",
                      "<p>Public business contact hint (unverified): "+esc(item["public_business_contact_hint_unverified"] or "not found")+"</p>",
-                     "<p>Manual verification: Confirm the project and any contact independently. No purchasing authority or supplier status is claimed.</p>"])
+                     "<p><b>Scope-linked supplier sectors (not awarded or buyer-verified):</b> "+
+                        esc(item["supplier_scope_linked"] or "Not enough scope detail")+"</p>",
+                     "<p><b>Other possible project services:</b> "+
+                        esc(item["supplier_possible_project_services"] or "None inferred")+"</p>",
+                     "<p><b>Possible occupancy/operations services:</b> "+
+                        esc(item["supplier_possible_operations_services"] or "None inferred")+"</p>",
+                     "<p>Manual verification: Confirm the project, any contact, scope, timing, and supplier availability independently. No purchasing authority or supplier status is claimed.</p>"])
         if item["source_url"]:
             page.append("<a href='"+esc(item["source_url"])+"' rel='noopener noreferrer'>Open source record (verify yourself)</a>")
         if item["public_contact_source_url"]:
@@ -144,6 +176,9 @@ def build(results,*,today=None):
              "deepseek_initial_review_records":sum(x["deepseek_initial_status"]!="NOT_QUERIED_THIS_RUN" for x in selected),
              "initial_public_contact_hints":sum(bool(x["public_business_contact_hint_unverified"]) for x in selected),
              "verified_buyers_claimed":0,"supplier_packages_claimed":0,
+             "supplier_sector_suggestions":len(supplier_rows),
+             "supplier_projects_with_scope_matches":sum(bool(x["supplier_scope_linked"]) for x in selected),
+             "supplier_matches_csv":str(root/supplier_name),
              "manual_review_csv":str(root/csv_name),"manual_review_html":str(root/html_name),
              "limitations":"New/changed means first observed/changed by Radar, not freshly announced or independently verified."}
     (root/SUMMARY).write_text(json.dumps(summary,indent=2),encoding="utf-8")
