@@ -115,7 +115,7 @@ class DesktopUpdateTests(unittest.TestCase):
         moved = self.r.origin.with_name("gone.git")
         self.r.origin.rename(moved)
         info = self.r.run()
-        self.assertEqual(info["status"], "OK_UPDATE_CHECK_FAILED")
+        self.assertEqual(info["status"], "REFUSED_UPDATE_CHECK_FAILED")
         self.assertTrue(info["ok"])
         self.assertIn("NOT verified", info["message"])
 
@@ -141,7 +141,7 @@ class DesktopUpdateTests(unittest.TestCase):
         old = self.r.head()
         self.r.publish("app.py", "VERSION = 2\n", "second")
         info = self.r.run(apply_update=False)
-        self.assertEqual(info["status"], "OK_BEHIND_NOT_APPLIED")
+        self.assertEqual(info["status"], "REFUSED_OUTDATED_RELEASE")
         self.assertEqual(self.r.head(), old)
 
     def test_override_is_explicit_and_recorded(self):
