@@ -53,7 +53,7 @@ MAX_PROCUREMENT_AGE_DAYS = 60
 MIN_EXCERPT_CHARS = 25
 _AI_REVIEWER = re.compile(r"\b(ai|a\.i\.|llm|gpt|claude|deepseek|model|assistant|bot|automated|auto)\b", re.I)
 _ADDRESS_LIKE = re.compile(r"^\s*\d+[A-Za-z]?\s+[\w .'-]+\b(st|street|ave|avenue|rd|road|dr|drive|blvd|boulevard|"
-                           r"crt|court|way|lane|ln|cres|crescent|pkwy|parkway|hwy|highway|line)\b\.?", re.I)
+                           r"crt|court|cir|circle|ct|way|lane|ln|cres|crescent|pkwy|parkway|hwy|highway|line)\b\.?", re.I)
 
 
 def looks_like_street_address(text):

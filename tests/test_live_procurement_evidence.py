@@ -11,7 +11,7 @@ class PurchasingEvidenceTests(unittest.TestCase):
   self.assertFalse(r[0]["unawarded_package_verified"])
   self.assertFalse(r[0]["purchasing_authority_verified"])
  def test_fabricated_quote_and_network_failure_fail_closed(self):
-  rows=[{"project_id":"p","kind":"BUYING_AUTHORITY","source_url":"https://www.toronto.ca/projects","excerpt":"Chief procurement officer has approved this current project and all contracts"}]
+  rows=[{"project_id":"p","kind":"BUYING_AUTHORITY","organization":"Example Corporation","source_url":"https://www.toronto.ca/projects","excerpt":"Chief procurement officer has approved this current project and all contracts"}]
   wrong=live.inspect(rows,lambda u:{"ok":True,"text":"Unrelated Toronto municipal announcement","url":u})
   self.assertEqual(wrong[0]["proof_status"],"REJECTED")
   blocked=live.inspect(rows,lambda u:{"ok":False,"reason":"ROBOTS_DISALLOWED"})
@@ -33,4 +33,30 @@ class PurchasingEvidenceTests(unittest.TestCase):
    self.assertEqual(result["records"][1]["reason"],"MISSING_PROJECT_ID")
    self.assertEqual(result["verified_buying_authorities"],0)
    self.assertEqual(result["verified_unawarded_packages"],0)
+ def test_archive_style_address_is_not_a_buyer_and_valid_tenant_is_only_mention(self):
+  rows=[
+   {"project_id":"brampton:1","kind":"ORGANIZATION_MENTION","organization":"318 Example Rd, Brampton, ON",
+    "source_url":"https://maps1.brampton.ca/arcgis/query",
+    "excerpt":"ADDRESS: 318 Example Rd, Brampton, ON"},
+   {"project_id":"brampton:3","kind":"ORGANIZATION_MENTION","organization":"1867 INNER CIR",
+    "source_url":"https://services6.arcgis.com/issued/permits/query",
+    "excerpt":"ADDRESS: 1867 INNER CIR"},
+   {"project_id":"toronto:2","kind":"ORGANIZATION_MENTION","organization":"EXAMPLE FOOD SERVICES",
+    "source_url":"https://services6.arcgis.com/issued/permits/query",
+    "excerpt":"INTERIOR ALTERATIONS - EXAMPLE FOOD SERVICES"},
+  ]
+  fetched=[]
+  def fetch(url):
+   fetched.append(url)
+   return {"ok":True,"url":url,"text":"INTERIOR ALTERATIONS - EXAMPLE FOOD SERVICES"}
+  result=live.inspect(rows,fetch)
+  self.assertEqual(result[0]["reason"],"ADDRESS_NOT_ORGANIZATION")
+  self.assertFalse(result[0]["source_match"])
+  self.assertEqual(fetched,["https://services6.arcgis.com/issued/permits/query"])
+  self.assertEqual(result[1]["reason"],"ADDRESS_NOT_ORGANIZATION")
+  self.assertTrue(result[2]["source_match"])
+  self.assertFalse(result[1]["source_match"])
+  self.assertEqual(result[2]["proof_status"],"SOURCE_TEXT_MATCHED")
+  self.assertEqual(result[2]["kind"],"ORGANIZATION_MENTION")
+  self.assertFalse(result[2]["purchasing_authority_verified"])
 if __name__=="__main__":unittest.main()

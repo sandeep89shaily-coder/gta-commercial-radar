@@ -7,7 +7,7 @@ from gta_live_procurement_evidence import _source_project_index
 import reviewed_evidence
 
 FIELDS=("organization","role","project_id","source_url","exact_quote","buyer_authority_status",
-        "supplier_selection_status","contact_route_status","next_evidence_required")
+        "supplier_selection_status","contact_route_status","organization_quality_status","next_evidence_required")
 
 def build(folder):
     folder=Path(folder); source=folder/"BUYER_RELATIONSHIPS_REVIEW.json"
@@ -23,7 +23,11 @@ def build(folder):
                 "official contact route; supplier/contract award status")
         if role in ("architect","agent"):
             needed="Establish owner/developer/operator and purchasing authority; agent is not buyer"
-        evidence=classify_buyer(item)
+        org=str(item.get("organization") or "").strip()
+        valid_org=bool(org) and not reviewed_evidence.looks_like_street_address(org)
+        evidence=classify_buyer(item) if valid_org else {"buyer_authority":"NOT_VERIFIED","supplier_status":"UNKNOWN"}
+        if not valid_org:
+            needed="REJECTED: organization is blank or a street address, not a business"
         rows.append(dict(organization=item.get("organization",""),role=role,
                          project_id=(str(item.get("project_id") or "").strip() or
                            (next(iter(projects[item["source_url"]]))
@@ -32,14 +36,17 @@ def build(folder):
                          buyer_authority_status=evidence["buyer_authority"],
                          supplier_selection_status=evidence["supplier_status"],
                          contact_route_status="NOT_VERIFIED",
+                         organization_quality_status="VALID_CANDIDATE_NAME_UNVERIFIED" if valid_org else "REJECTED_INVALID_ORGANIZATION",
                          next_evidence_required=needed))
     with (folder/"BUYER_VERIFICATION_WORKLIST.csv").open("w",newline="",encoding="utf-8-sig") as out:
         writer=csv.DictWriter(out,fieldnames=FIELDS);writer.writeheader();writer.writerows(rows)
     gate=reviewed_evidence.evaluate_folder(folder)["results"].values()
-    result={"candidates_for_human_or_official_source_verification":len(rows),
+    result={"total_sourced_observations":len(rows),
+            "rejected_invalid_organizations":sum(r["organization_quality_status"]=="REJECTED_INVALID_ORGANIZATION" for r in rows),
+            "candidates_for_human_or_official_source_verification":sum(r["organization_quality_status"]=="VALID_CANDIDATE_NAME_UNVERIFIED" for r in rows),
             "verified_buyers":sum(g["buyer_authority_verified"] for g in gate),
             "unawarded_supplier_packages_verified":sum(g["supplier_selection_verified"] for g in gate),
-            "status":"REVIEW_REQUIRED" if rows else "NO_SOURCE_BACKED_BUYER_CANDIDATES"}
+            "status":"REVIEW_REQUIRED" if any(r["organization_quality_status"]=="VALID_CANDIDATE_NAME_UNVERIFIED" for r in rows) else "NO_VALID_BUYER_CANDIDATES"}
     (folder/"BUYER_VERIFICATION_WORKLIST_STATUS.json").write_text(json.dumps(result,indent=2),encoding="utf-8")
     return result
 if __name__=="__main__":
