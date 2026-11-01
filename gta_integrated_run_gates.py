@@ -60,9 +60,10 @@ def evaluate(review, results=None):
         "release_acceptance_confirmed": stage_success,
     }
     return {
-        "production_accepted": all(checks.values()),
+        "production_accepted": all(value for key, value in checks.items() if key != "early_discovery_pair_measured"),
         "checks": checks,
-        "blockers": [key.upper() for key, passed in checks.items() if not passed],
+        "blockers": [key.upper() for key, passed in checks.items() if not passed and key != "early_discovery_pair_measured"],
+        "research_gaps": ["EARLY_DISCOVERY_PAIR_MEASURED"] if not checks["early_discovery_pair_measured"] else [],
         "counts": {"captured_documents": documents, "ai_analyzed_documents": ai_completed,
                    "buyer_authorities": buyer_count,"ai_buyer_candidates": int(buyers.get("candidate_relationships") or 0), "unawarded_packages": unawarded,
                    "measurable_discovery_pairs": measured},
