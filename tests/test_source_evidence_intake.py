@@ -38,4 +38,24 @@ class EvidenceIntakeTests(unittest.TestCase):
    self.assertEqual(result["verified_claims"],0)
    gate=evidence.evaluate_folder(root)
    self.assertFalse(next(iter(gate["results"].values()))["sale_ready"])
+ def test_official_page_recovery_requires_matching_id(self):
+  with tempfile.TemporaryDirectory() as d:
+   root=Path(d)
+   self.write(root/'GTA_RADAR_PROJECT_OPPORTUNITIES.csv',[{
+     'project_id':'toronto_active_building_permits:26 219504',
+     'address':'100 Clayson Rd','opportunity_strength':'IDENTIFIED_PROJECT_OPERATOR',
+     'operator':'Unverified Operator','record_source_url':'https://www.toronto.ca/record/26-219504','description':''}])
+   def unrelated(url):
+    return {'ok':True,'url':url,'text':'<html><body>Nearby site at 100 Clayson Road only</body></html>',
+            'sha256':'a'*64,'fetched_at':'2026-11-01'}
+   summary=intake.run(root,root/'out',fetcher=unrelated)
+   self.assertEqual(summary['source_records_recovered_live'],0)
+   self.assertEqual(summary['verified_claims'],0)
+   def official(url):
+    return {'ok':True,'url':url,'text':'<html><body>Building permit 26 219504: new refrigerated factory plant extension</body></html>',
+            'sha256':'a'*64,'fetched_at':'2026-11-01'}
+   recovered=intake.run(root,root/'out2',fetcher=official)
+   self.assertEqual(recovered['source_records_recovered_live'],1)
+   self.assertEqual(recovered['verified_claims'],2)
+   self.assertFalse(evidence.evaluate_folder(root)['results']['toronto_active_building_permits:26 219504']['sale_ready'])
 if __name__=="__main__":unittest.main()
