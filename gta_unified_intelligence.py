@@ -7,6 +7,7 @@ from __future__ import annotations
 import argparse,datetime as dt,json,hashlib
 from pathlib import Path
 from urllib.parse import urlparse
+import reviewed_evidence
 
 def _read(path):
     try:return json.loads(path.read_text(encoding="utf-8"))
@@ -18,6 +19,8 @@ def _id(kind,value):
 def build(results,review):
     results=Path(results);review=Path(review)
     review.mkdir(parents=True,exist_ok=True)
+    gate=reviewed_evidence.evaluate_folder(review)["results"]
+    if not gate and results.is_dir():gate=reviewed_evidence.evaluate_folder(results)["results"]
     nodes={};edges={};projects=[]
     def node(kind,key,**fields):
         nid=_id(kind,key)
@@ -63,10 +66,10 @@ def build(results,review):
         projects.append({"project_id":pid,"address":r.get("address",""),
                          "exact_application_evidence_count":exact,
                          "candidate_roles":roles,
-                         "buyer_authority_verified":False,
-                         "supplier_unawarded_verified":False,
-                         "commercial_status":"RESEARCH_ONLY",
-                         "missing":["verified purchasing authority","supplier selection evidence"]})
+                         "buyer_authority_verified":bool(gate.get(pid,{}).get("buyer_authority_verified")),
+                         "supplier_unawarded_verified":bool(gate.get(pid,{}).get("supplier_selection_verified")),
+                         "commercial_status":gate.get(pid,{}).get("status","RESEARCH_ONLY"),
+                         "missing":gate.get(pid,{}).get("missing",["verified purchasing authority","supplier selection evidence"])})
     try:
         from municipal_document_registry import report
         doc=report(Path(__file__).parent/"config"/"municipal_document_sources.csv",review)
@@ -82,7 +85,8 @@ def build(results,review):
 
     summary={"generated_at_utc":dt.datetime.now(dt.timezone.utc).isoformat(),
              "project_dossiers":len(projects),"exact_id_project_dossiers":sum(p["exact_application_evidence_count"]>0 for p in projects),
-             "verified_private_leads":0,"verified_buying_authorities":0,
+             "verified_private_leads":sum(g["sale_ready"] for g in gate.values()),
+             "verified_buying_authorities":sum(g["buyer_authority_verified"] for g in gate.values()),
              "graph_nodes":len(nodes),"graph_relationships":len(edges),
              "document_registry_sources":doc.get("registered_sources",0),
              "document_retrieval_confirmed":doc.get("documents_retrieved",0),
@@ -95,7 +99,8 @@ def build(results,review):
              "toronto_meeting_pdfs_downloaded":pdf_audit.get("pdf_downloaded",0),
              "document_ai_reviews":doc_ai.get("review_outputs",0),
              "document_ai_errors":doc_ai.get("errors",0),
-             "production_ready":False}
+             "production_ready":bool(any(g["sale_ready"] for g in gate.values())
+                                     and _read(review/"RELEASE_ACCEPTANCE.json").get("production_acceptance") is True)}
     obj={"summary":summary,"projects":projects,"nodes":list(nodes.values()),
          "edges":list(edges.values())}
     (review/"GTA_RADAR_INTELLIGENCE_GRAPH.json").write_text(

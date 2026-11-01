@@ -71,11 +71,12 @@ class NativeDeepseekTests(unittest.TestCase):
   self.db.execute('INSERT INTO spends VALUES(?,?,?,?,?)',(self.day,'old',0.9995,None,'DONE'));self.db.commit()
   self.assertFalse(mod.ledger_claim(self.db,self.day,'S8:another:0',mod.SEARCH_COST))
  def test_new_daily_ceiling_blocks_prior_excess(self):
-  self.assertEqual(mod.DAILY_LIMIT,0.49)
-  self.db.execute('INSERT INTO spends VALUES(?,?,?,?,?)',(self.day,'old',0.4995,None,'DONE'));self.db.commit()
+  from radar_config import DEEPSEEK_DAILY_LIMIT_USD as CAP
+  self.assertEqual(mod.DAILY_LIMIT,CAP)
+  self.db.execute('INSERT INTO spends VALUES(?,?,?,?,?)',(self.day,'old',CAP-0.0005,None,'DONE'));self.db.commit()
   self.assertFalse(mod.ledger_claim(self.db,self.day,'S8:another:0',mod.SEARCH_COST))
   total=self.db.execute('SELECT SUM(reserved) FROM spends WHERE day=?',(self.day,)).fetchone()[0]
-  self.assertLessEqual(total,0.50)
+  self.assertLessEqual(total,CAP+0.0005)
  def test_no_key_no_api(self):
   with tempfile.TemporaryDirectory() as tmp:
    path=Path(tmp);csvfile=path/'p.csv'

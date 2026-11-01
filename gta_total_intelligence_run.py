@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse,json,subprocess,sys,datetime as dt
 from pathlib import Path
 from v6_daily_pipeline import find_workspace
+import desktop_update
 ROOT=Path(__file__).resolve().parent
 def execute(workspace=None):
     ws=find_workspace(workspace)
@@ -13,6 +14,13 @@ def execute(workspace=None):
     record={"started":dt.datetime.now().astimezone().isoformat(),"stages":[],"completed":False,"production_accepted":False}
     target=review/"TOTAL_RUN_STATUS.json"
     def save():target.write_text(json.dumps(record,indent=2),encoding="utf-8")
+    # Verify (and, only if safe, fast-forward) the installed code BEFORE any stage runs.
+    update=desktop_update.preflight(ROOT,results,apply_update=False)
+    record["installed_commit"]={k:update.get(k) for k in ("status","installed_commit","remote_commit","updated_from","overridden")}
+    print("Code check: "+update["status"]+" ("+(update["installed_commit"] or "unknown")[:10]+") "+update["message"],flush=True)
+    if not update["ok"]:
+        record["status"]="CODE_VERIFICATION_REFUSED";record["finished"]=dt.datetime.now().astimezone().isoformat()
+        save();return 3
     def run(name,arguments,critical=True):
         print("\n=== "+name+" ===",flush=True)
         cmd=[sys.executable,str(ROOT/arguments[0]),*arguments[1:]]

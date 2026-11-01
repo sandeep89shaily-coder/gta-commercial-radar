@@ -17,6 +17,7 @@ import urllib.robotparser
 from pathlib import Path
 from urllib.parse import urlparse
 import requests
+import robots_policy
 
 from toronto_tmmis_documents import ATTACHMENT, PDF_HOST
 
@@ -42,20 +43,8 @@ def public_dns(host, resolver=socket.getaddrinfo):
         return False
 
 def robots_allowed(url,session,*,get_policy=None):
-    if get_policy is None:
-        def get_policy(u):
-            r=session.get(u,timeout=TIMEOUT,allow_redirects=False)
-            if r.status_code!=200 or r.url!=u or len(r.content)>512_000:
-                return None
-            return r.text
-    policy=get_policy("https://www.toronto.ca/robots.txt")
-    if policy is None:
-        return False,"ROBOTS_UNAVAILABLE"
-    parser=urllib.robotparser.RobotFileParser()
-    parser.parse(policy.splitlines())
-    if not parser.can_fetch(AGENT,url):
-        return False,"ROBOTS_DISALLOWED"
-    return True,"ALLOWED"
+    return robots_policy.evaluate(session,url,AGENT,timeout=TIMEOUT,
+        robots_url="https://www.toronto.ca/robots.txt",policy_reader=get_policy)
 
 def fetch_one(url,destination,*,session=None,resolver=socket.getaddrinfo,get_policy=None):
     outcome={"url":url,"status":"FAILED","reason":"","http_status":"","bytes":0,"sha256":"","saved_path":""}

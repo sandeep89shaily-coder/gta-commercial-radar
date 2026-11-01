@@ -11,6 +11,7 @@ from urllib.parse import urljoin,urlparse
 from urllib.robotparser import RobotFileParser
 from collections import Counter
 import requests
+import robots_policy
 from toronto_pdf_download import AGENT, valid_url, fetch_one
 
 MAX_HTML=2_000_000
@@ -24,14 +25,7 @@ class Anchors(HTMLParser):
             if value:self.hrefs.append(value)
 
 def robots_allowed(session,url):
-    parsed=urlparse(url)
-    robots=parsed.scheme+"://"+parsed.netloc+"/robots.txt"
-    try:
-        r=session.get(robots,timeout=12,allow_redirects=False)
-        if r.status_code!=200 or r.url!=robots or len(r.content)>500_000:return False,"ROBOTS_UNAVAILABLE"
-        p=RobotFileParser();p.parse(r.text.splitlines())
-        return (True,"ALLOWED") if p.can_fetch(AGENT,url) else (False,"ROBOTS_DISALLOWED")
-    except requests.RequestException:return False,"ROBOTS_NETWORK_ERROR"
+    return robots_policy.evaluate(session,url,AGENT,timeout=12)
 
 def discover(indexes,out,*,session=None,max_indexes=12,max_documents=30):
     """Discover official Toronto report URLs; no manual PDF seed is required."""

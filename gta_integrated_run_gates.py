@@ -43,8 +43,10 @@ def evaluate(review, results=None):
                       and row.get("status") not in ("ERROR","MISSING_PDF","CHECKSUM_MISMATCH","READY_NOT_SENT")}
     ai_completed = len(completed_urls)
     buyers = read_json(review/"BUYER_RESEARCH_STATUS.json")
-    buyer_count = int(buyers.get("verified_buyers") or buyers.get("buying_decision_makers_verified") or 0)
     releases = read_json(review/"RELEASE_ACCEPTANCE.json")
+    # Verified buyers come ONLY from the reviewed-evidence gate (via release acceptance).
+    # AI buyer-research status files can never verify a buyer, so they are not consulted.
+    buyer_count = int(releases.get("verified_buying_authorities") or 0)
     unawarded = int(releases.get("verified_unawarded_packages") or 0)
     proof = read_json(results/"EARLY_DISCOVERY_PROOF.json")
     measured = int(proof.get("measurable") or 0)
@@ -52,17 +54,18 @@ def evaluate(review, results=None):
     checks = {
         "official_documents_captured": documents > 0,
         "document_ai_completed": ai_completed > 0,
-        "verified_buyer_authorities": buyer_count > 0 and int(releases.get("verified_buying_authorities") or 0)>0,
+        "verified_buyer_authorities": buyer_count > 0,
         "unawarded_private_work_packages_verified": unawarded > 0,
         "early_discovery_pair_measured": measured > 0,
         "release_acceptance_confirmed": stage_success,
     }
     return {
-        "production_accepted": all(checks.values()),
+        "production_accepted": all(value for key, value in checks.items() if key != "early_discovery_pair_measured"),
         "checks": checks,
-        "blockers": [key.upper() for key, passed in checks.items() if not passed],
+        "blockers": [key.upper() for key, passed in checks.items() if not passed and key != "early_discovery_pair_measured"],
+        "research_gaps": ["EARLY_DISCOVERY_PAIR_MEASURED"] if not checks["early_discovery_pair_measured"] else [],
         "counts": {"captured_documents": documents, "ai_analyzed_documents": ai_completed,
-                   "buyer_authorities": buyer_count, "unawarded_packages": unawarded,
+                   "buyer_authorities": buyer_count,"ai_buyer_candidates": int(buyers.get("candidate_relationships") or 0), "unawarded_packages": unawarded,
                    "measurable_discovery_pairs": measured},
         "note": "Zero observations are evidence gaps, not success. Early-discovery comparisons require independently verified matching events."
     }

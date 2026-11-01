@@ -168,7 +168,8 @@ class SelectiveDailyTests(unittest.TestCase):
             fake_ai.assert_called_once()
             self.assertTrue((dest/"GTA_RADAR_DAILY_NEW_DEVELOPMENTS.html").exists())
             dash=(dest/"GTA_RADAR_V6_DASHBOARD.html").read_text(encoding="utf-8")
-            self.assertIn("Selective DeepSeek (US$0.49/day maximum)",dash)
+            from radar_config import DEEPSEEK_DAILY_LIMIT_USD as CAP
+            self.assertIn(f"Selective DeepSeek (US${CAP:.2f}/day maximum)",dash)
             self.assertIn("Newly observed and changed",dash)
 
 if __name__=="__main__":

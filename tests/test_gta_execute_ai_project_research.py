@@ -5,10 +5,10 @@ from gta_execute_ai_project_research import read_candidates,execute
 class ExecuteAITests(unittest.TestCase):
  def sample(self,path):
   with path.open("w",newline="",encoding="utf-8") as h:
-   w=csv.DictWriter(h,fieldnames=["project_id","address","source_id","source_keys","record_source_url","description"])
+   w=csv.DictWriter(h,fieldnames=["project_id","address","source_id","source_keys","record_source_url","description","current_source_status"])
    w.writeheader()
    w.writerow({"project_id":"B-1","address":"175 Oak Street",
-    "source_id":"toronto","source_keys":"A123","record_source_url":"https://www.toronto.ca/planning","description":"Warehouse"})
+    "source_id":"toronto","source_keys":"A123","record_source_url":"https://www.toronto.ca/planning","description":"Construct a new one-storey 40,000 sq ft warehouse with rooftop HVAC","current_source_status":"Under Review"})
  def test_autodetect_queue_in_existing_results(self):
   from gta_execute_ai_project_research import locate_candidates
   with tempfile.TemporaryDirectory() as td:

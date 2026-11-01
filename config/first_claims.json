@@ -1,0 +1,37 @@
+{
+  "_note": "Claims proposed for AUTOMATIC verification. auto_verify.py fetches each page and confirms the quote is really there. Only what was read from the live release on 2026-11-01 is included. Missing proofs (permit link, purchasing authority, contact route, supplier status) are deliberately absent: they are not established yet.",
+  "projects": [
+    {
+      "project_id": "gay-lea-clayson-road-expansion",
+      "address": "100 Clayson Rd, Toronto",
+      "project_name": "Gay Lea Foods Clayson Road dairy plant expansion (announced 2026-08-11, completion 2028)",
+      "organization": "Gay Lea Foods Co-operative Limited",
+      "supplier_status": "UNKNOWN",
+      "service_categories": ["HVAC / refrigeration", "Fire protection / security", "Commercial insurance"],
+      "claims": {
+        "project_source": {
+          "official_url": "https://www.newswire.ca/news-releases/gay-lea-foods-invests-more-than-200-million-to-help-shape-the-future-of-canadian-dairy-854282607.html",
+          "excerpt": "today announced an investment of more than $200 million to significantly expand its Clayson Road dairy manufacturing facility in Toronto"
+        },
+        "scope_evidence": {
+          "official_url": "https://www.newswire.ca/news-releases/gay-lea-foods-invests-more-than-200-million-to-help-shape-the-future-of-canadian-dairy-854282607.html",
+          "excerpt": "The expansion will introduce advanced processing technology and modern manufacturing capabilities designed to increase production capacity"
+        },
+        "buyer_org_evidence": {
+          "official_url": "https://www.newswire.ca/news-releases/gay-lea-foods-invests-more-than-200-million-to-help-shape-the-future-of-canadian-dairy-854282607.html",
+          "excerpt": "Gay Lea Foods Co-operative Limited (\"Gay Lea Foods\") today announced an investment of more than $200 million"
+        },
+        "buying_authority_evidence": {
+          "official_url": "https://www.newswire.ca/news-releases/gay-lea-foods-invests-more-than-200-million-to-help-shape-the-future-of-canadian-dairy-854282607.html",
+          "authority_basis": "OWNER_OPERATOR_OF_SITE",
+          "excerpt": "Gay Lea Foods Co-operative Limited (\"Gay Lea Foods\") today announced an investment of more than $200 million to significantly expand its Clayson Road dairy manufacturing facility in Toronto."
+        },
+        "source_first_publication": {
+          "official_url": "https://www.newswire.ca/news-releases/gay-lea-foods-invests-more-than-200-million-to-help-shape-the-future-of-canadian-dairy-854282607.html",
+          "excerpt": "Gay Lea Foods Co-operative Limited (\"Gay Lea Foods\") today announced an investment",
+          "published_at": "2026-08-11"
+        }
+      }
+    }
+  ]
+}
