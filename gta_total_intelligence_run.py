@@ -5,7 +5,12 @@ from pathlib import Path
 from v6_daily_pipeline import find_workspace
 import desktop_update
 ROOT=Path(__file__).resolve().parent
-def execute(workspace=None):
+def execute(workspace=None,*,full_intelligence=False):
+    # Discovery + initial DeepSeek is the default while the owner manually
+    # verifies project participants, buyers and supplier opportunities.
+    if not full_intelligence:
+        from gta_discovery_run import execute as run_discovery
+        return run_discovery(workspace)
     ws=find_workspace(workspace)
     results=ws/"GTA_RADAR_RESULTS"
     results.mkdir(exist_ok=True)
@@ -108,5 +113,9 @@ def execute(workspace=None):
         print("\nRUN MANIFEST: "+str(target),flush=True)
         print("REVIEW: "+str(review/"COMMERCIAL_REVIEW.html"),flush=True)
 if __name__=="__main__":
-    p=argparse.ArgumentParser();p.add_argument("--workspace")
-    args=p.parse_args();raise SystemExit(execute(args.workspace))
+    p=argparse.ArgumentParser()
+    p.add_argument("--workspace")
+    p.add_argument("--full-intelligence",action="store_true",
+                   help="Explicitly opt in to legacy buyer/procurement AI stages")
+    args=p.parse_args()
+    raise SystemExit(execute(args.workspace,full_intelligence=args.full_intelligence))
