@@ -116,7 +116,7 @@ class DesktopUpdateTests(unittest.TestCase):
         self.r.origin.rename(moved)
         info = self.r.run()
         self.assertEqual(info["status"], "REFUSED_UPDATE_CHECK_FAILED")
-        self.assertTrue(info["ok"])
+        self.assertFalse(info["ok"])
         self.assertIn("NOT verified", info["message"])
 
     def test_broken_update_is_rolled_back(self):
