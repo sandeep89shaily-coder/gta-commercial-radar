@@ -1,6 +1,8 @@
 """Produce a human project-verification list from genuine new/changed Radar records.
 
-This is NOT a lead/supplier list. No network, AI or contact enrichment.
+This is NOT a verified buyer/supplier list. It displays source-linked DeepSeek
+public contact hints alongside original project information. This module
+makes no network, AI or contact enrichment calls of its own.
 """
 from __future__ import annotations
 import argparse,csv,datetime as dt,html,json
@@ -16,7 +18,9 @@ FIELDS=("observation","project_id","city","address","source_description",
         "source_record_date","date_basis","radar_first_seen","local_source_status",
         "source_url","deepseek_initial_status","deepseek_initial_queries",
         "deepseek_checked_on","deepseek_project_stage_hint",
-        "deepseek_corroborating_urls","manual_project_verification","manual_notes")
+        "deepseek_corroborating_urls","organization_hint_unverified",
+        "public_business_contact_hint_unverified","public_contact_source_url",
+        "contact_hint_status","manual_project_verification","manual_notes")
 
 def rows_of(file):
     if not Path(file).is_file():
@@ -58,7 +62,20 @@ def build(results,*,today=None):
         source_url=str(source.get("record_source_url") or "").strip()
         if not _https(source_url):source_url=""
         corroboration=str(ai.get("source_urls") or "") if fresh else ""
-        # Do not expose contact/owner/supplier fields; the user verifies them.
+        # Preserve initial DeepSeek public business contact research as hints.
+        # A candidate contact does NOT establish buying authority or award status.
+        name=(str(ai.get("operator") or ai.get("related_company") or
+                  ai.get("official_company") or "").strip() if fresh else "")
+        contact=(str(ai.get("contact") or ai.get("related_company_contact") or "").strip()
+                 if fresh else "")
+        contact_source=(str(ai.get("contact_source_url") or ai.get("related_company_contact_url") or "").strip()
+                        if fresh else "")
+        if not _https(contact_source):
+            contact_source=""
+        if not contact_source:
+            contact=""  # Never display an unsupported AI-guessed contact.
+        contact_status=("PUBLIC_SOURCE_CONTACT_HINT_REVIEW_REQUIRED" if contact else
+                        "NO_SOURCE_BACKED_BUSINESS_CONTACT")
         selected.append({
             "observation":source["observation"],"project_id":pid,
             "city":source.get("city",""),"address":source.get("address",""),
@@ -73,6 +90,10 @@ def build(results,*,today=None):
             "deepseek_checked_on":checked if fresh else "",
             "deepseek_project_stage_hint":str(ai.get("project_stage") or "") if fresh else "",
             "deepseek_corroborating_urls":corroboration,
+            "organization_hint_unverified":name,
+            "public_business_contact_hint_unverified":contact,
+            "public_contact_source_url":contact_source,
+            "contact_hint_status":contact_status,
             "manual_project_verification":"","manual_notes":"",
         })
     selected.sort(key=lambda x:(0 if x["observation"]=="FIRST_OBSERVED" else 1,x["city"],x["address"],x["project_id"]))
@@ -93,9 +114,13 @@ def build(results,*,today=None):
                      " | local status: "+esc(item["local_source_status"] or "unknown")+"</small>",
                      "<p>DeepSeek initial screening: "+esc(item["deepseek_initial_status"])+
                      " | project stage (AI hint): "+esc(item["deepseek_project_stage_hint"] or "not assessed")+"</p>",
-                     "<p>Manual verification: ☐ Check project identity, construction status and dates. Find contacts separately.</p>"])
+                     "<p>Possible organization (unverified): "+esc(item["organization_hint_unverified"] or "not identified")+"</p>",
+                     "<p>Public business contact hint (unverified): "+esc(item["public_business_contact_hint_unverified"] or "not found")+"</p>",
+                     "<p>Manual verification: Confirm the project and any contact independently. No purchasing authority or supplier status is claimed.</p>"])
         if item["source_url"]:
             page.append("<a href='"+esc(item["source_url"])+"' rel='noopener noreferrer'>Open source record (verify yourself)</a>")
+        if item["public_contact_source_url"]:
+            page.append(" · <a href='"+esc(item["public_contact_source_url"])+"' rel='noopener noreferrer'>Public business contact source</a>")
         page.append("</article>")
     if not selected:
         page.append("<p>No first-observed or changed source records in this run. No projects invented.</p>")
@@ -107,6 +132,7 @@ def build(results,*,today=None):
              "first_observed":sum(x["observation"]=="FIRST_OBSERVED" for x in selected),
              "changed":sum(x["observation"]=="RECORD_CHANGED" for x in selected),
              "deepseek_initial_review_records":sum(x["deepseek_initial_status"]!="NOT_QUERIED_THIS_RUN" for x in selected),
+             "initial_public_contact_hints":sum(bool(x["public_business_contact_hint_unverified"]) for x in selected),
              "verified_buyers_claimed":0,"supplier_packages_claimed":0,
              "manual_review_csv":str(root/OUTPUT),"manual_review_html":str(root/HTML),
              "limitations":"New/changed means first observed/changed by Radar, not freshly announced or independently verified."}
