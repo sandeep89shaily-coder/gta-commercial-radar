@@ -12,7 +12,7 @@ import reviewed_evidence as gate
 
 FIELDS=("rank","project_id","address","operator_hint","operator_status",
         "buyer_authority_status","contact_route_status","supplier_status",
-        "general_contractor_status","open_package_verified",
+        "general_contractor_status","open_package_verified","live_sourced_observations",
         "sale_ready","priority","source_url","next_action")
 
 def choose(results,top=10):
@@ -29,6 +29,18 @@ def evaluate(results,review,top=10):
     # Human-reviewed evidence is authoritative; never trust legacy "verified"
     # booleans or unreviewed company / contractor names.
     proofs=gate.evaluate_folder(review)["results"]
+    # Live matches are research observations, never authority or contract proofs.
+    live={}
+    reports=sorted(Path(review).glob("LIVE_PROCUREMENT_EVIDENCE_*.json"))
+    if reports:
+        try:
+            observations=json.loads(reports[-1].read_text(encoding="utf-8")).get("records",[])
+            for observation in observations:
+                pid=observation.get("project_id")
+                if pid and observation.get("proof_status")=="SOURCE_TEXT_MATCHED":
+                    live.setdefault(pid,[]).append(observation)
+        except (OSError,ValueError,TypeError):
+            live={}
     records=[]
     for n,item in enumerate(chosen,1):
         pid=item["project_id"]
@@ -46,9 +58,11 @@ def evaluate(results,review,top=10):
           "supplier_status":p.get("supplier_status","UNKNOWN") if supplier else "UNKNOWN",
           "general_contractor_status":"UNKNOWN",
           "open_package_verified":supplier,"sale_ready":ready,
+          "live_sourced_observations":len(live.get(pid,[])),
           "priority":item.get("score",""),
           "source_url":item.get("record_source_url",""),
           "next_action":("REVALIDATE_EVIDENCE" if ready else
+            "HUMAN_REVIEW_MATCHED_PURCHASING_EVIDENCE" if live.get(pid) else
             "VERIFY_PURCHASING_AUTHORITY_CONTACT_AND_CURRENT_PACKAGE_AWARD_STATUS")
         })
     return {"created_utc":dt.datetime.now(dt.timezone.utc).isoformat(),
