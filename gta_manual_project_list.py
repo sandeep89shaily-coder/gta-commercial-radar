@@ -7,7 +7,7 @@ makes no network, AI or contact enrichment calls of its own.
 from __future__ import annotations
 import argparse,csv,datetime as dt,html,json
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import urlparse,quote_plus
 
 SOURCE="GTA_RADAR_DAILY_NEW_DEVELOPMENTS.csv"
 AI_SOURCE="GTA_RADAR_V8_INVESTIGATIONS.csv"
@@ -125,6 +125,12 @@ def build(results,*,today=None):
             page.append("<a href='"+esc(item["source_url"])+"' rel='noopener noreferrer'>Open source record (verify yourself)</a>")
         if item["public_contact_source_url"]:
             page.append(" · <a href='"+esc(item["public_contact_source_url"])+"' rel='noopener noreferrer'>Public business contact source</a>")
+        if item["address"] and item["city"]:
+            lookup=quote_plus(item["address"]+", "+item["city"]+", Ontario")
+            page.append(" · <a href='https://www.google.com/maps/search/?api=1&amp;query="+lookup+
+                        "' rel='noopener noreferrer'>Open Google Maps</a>")
+            page.append(" · <a href='https://www.google.com/search?q="+lookup+
+                        "' rel='noopener noreferrer'>Google project search</a>")
         page.append("</article>")
     if not selected:
         page.append("<p>No first-observed or changed source records in this run. No projects invented.</p>")
