@@ -9,8 +9,9 @@ import argparse,csv,datetime as dt,json
 from pathlib import Path
 from urllib.parse import urlparse
 import auto_verify
+import reviewed_evidence
 
-KINDS={"BUYER_ORGANIZATION","BUYING_AUTHORITY","PUBLIC_CONTACT_ROUTE",
+KINDS={"ORGANIZATION_MENTION","BUYER_ORGANIZATION","BUYING_AUTHORITY","PUBLIC_CONTACT_ROUTE",
        "CURRENT_CONTRACTOR","PROCUREMENT_PACKAGE","SUPPLIER_AWARD"}
 VALID_STATES={"TENDER_OPEN","FUTURE_PROCUREMENT_CONFIRMED","AWARDED","NOT_AWARDED_AFFIRMATIVE","UNKNOWN"}
 COLUMNS=("project_id","kind","organization","source_url","excerpt","observed_date",
@@ -18,6 +19,10 @@ COLUMNS=("project_id","kind","organization","source_url","excerpt","observed_dat
 def valid_row(row):
     if not row.get("project_id"):return row.get("lineage") or "MISSING_PROJECT_ID"
     if row.get("kind") not in KINDS:return "INVALID_KIND"
+    if row.get("kind") in ("ORGANIZATION_MENTION","BUYER_ORGANIZATION","BUYING_AUTHORITY"):
+        org=str(row.get("organization") or "").strip()
+        if not org:return "MISSING_ORGANIZATION"
+        if reviewed_evidence.looks_like_street_address(org):return "ADDRESS_NOT_ORGANIZATION"
     if not str(row.get("source_url") or "").startswith("https://"):return "NO_HTTPS_SOURCE"
     if len(str(row.get("excerpt") or "").strip())<25:return "NO_QUOTED_EVIDENCE"
     if row.get("kind") in ("PROCUREMENT_PACKAGE","SUPPLIER_AWARD") and row.get("status","UNKNOWN") not in VALID_STATES:
@@ -105,7 +110,10 @@ def source_rows(results=None,review=None):
                     lineage="UNIQUE_EXACT_SOURCE_URL_RECONCILIATION"
                 elif len(matches)>1:
                     lineage="AMBIGUOUS_SOURCE_URL_PROJECT"
-            rows.append({"project_id":pid,"kind":"BUYING_AUTHORITY",
+            role=str(item.get("role") or "").strip().lower()
+            kind=("BUYING_AUTHORITY" if role in ("purchasing_organization","procurement_contact")
+                  else "ORGANIZATION_MENTION")
+            rows.append({"project_id":pid,"kind":kind,
                 "organization":item.get("organization",""),
                 "source_url":url,"excerpt":quote,
                 "role":item.get("role",""),"status":"UNKNOWN",
@@ -124,9 +132,14 @@ def execute(infile,out,limit=30,fetcher=auto_verify.fetch_page,review=None,resul
             "input_observations":len(rows),
             "unlinked_observations":sum(not r.get("project_id") for r in rows),
             "reconciled_unique_source_urls":sum(r.get("lineage")=="UNIQUE_EXACT_SOURCE_URL_RECONCILIATION" for r in rows),
+            "invalid_organization_observations":sum(x.get("reason") in ("ADDRESS_NOT_ORGANIZATION","MISSING_ORGANIZATION") for x in records),
+            "input_rejection_reasons":{reason:sum(x.get("reason")==reason for x in records)
+                for reason in sorted({str(x["reason"]) for x in records if x.get("proof_status")=="UNVERIFIED" and x.get("reason")})},
             "status":("NO_BUYER_EVIDENCE_INPUT" if not rows else
-                "NO_SOURCE_TEXT_MATCH" if not any(x["source_match"] for x in records) else
-                "SOURCE_EVIDENCE_FOR_REVIEW"),
+                "SOURCE_EVIDENCE_FOR_REVIEW" if any(x["source_match"] for x in records) else
+                "INPUTS_REJECTED_OR_UNLINKED" if all(x["proof_status"]=="UNVERIFIED" for x in records) else
+                "SOURCE_FETCH_INCONCLUSIVE" if any(x["proof_status"]=="INCONCLUSIVE" for x in records) else
+                "SOURCE_QUOTES_NOT_FOUND"),
             "source_text_matches":sum(x["source_match"] for x in records),
             "inconclusive":sum(x["proof_status"]=="INCONCLUSIVE" for x in records),
             "verified_buying_authorities":0,"verified_unawarded_packages":0,
