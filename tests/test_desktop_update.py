@@ -176,7 +176,7 @@ class OrchestratorGateTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as t, \
              patch.object(total.desktop_update, "preflight", return_value=refusal), \
              patch.object(total.subprocess, "run", side_effect=AssertionError("no stage may run")):
-            code = total.execute(t)
+            code = total.execute(t,full_intelligence=True)
             status = json.loads((Path(t) / "GTA_RADAR_RESULTS" / "TOTAL_INTELLIGENCE_REVIEW"
                                  / "TOTAL_RUN_STATUS.json").read_text())
         self.assertEqual(code, 3)
