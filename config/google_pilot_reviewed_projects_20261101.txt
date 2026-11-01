@@ -1,0 +1,13 @@
+# Ten previously researched Toronto project permit IDs in review priority order.
+# Source: GTA_RADAR_DAILY_NEW_DEVELOPMENTS.csv, Nov 1 2026.
+# Do not substitute another record at the same address without owner review.
+toronto_active_building_permits:26 237699
+toronto_active_building_permits:26 257023
+toronto_active_building_permits:25 137753
+toronto_active_building_permits:26 197250
+toronto_active_building_permits:26 246851
+toronto_active_building_permits:26 228848
+toronto_active_building_permits:26 256544
+toronto_active_building_permits:26 230774
+toronto_active_building_permits:26 246134
+toronto_active_building_permits:26 132998
