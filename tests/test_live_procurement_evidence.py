@@ -33,4 +33,25 @@ class PurchasingEvidenceTests(unittest.TestCase):
    self.assertEqual(result["records"][1]["reason"],"MISSING_PROJECT_ID")
    self.assertEqual(result["verified_buying_authorities"],0)
    self.assertEqual(result["verified_unawarded_packages"],0)
+ def test_archive_style_address_is_not_a_buyer_and_valid_tenant_is_only_mention(self):
+  rows=[
+   {"project_id":"brampton:1","kind":"ORGANIZATION_MENTION","organization":"318 Example Rd, Brampton, ON",
+    "source_url":"https://maps1.brampton.ca/arcgis/query",
+    "excerpt":"ADDRESS: 318 Example Rd, Brampton, ON"},
+   {"project_id":"toronto:2","kind":"ORGANIZATION_MENTION","organization":"EXAMPLE FOOD SERVICES",
+    "source_url":"https://services6.arcgis.com/issued/permits/query",
+    "excerpt":"INTERIOR ALTERATIONS - EXAMPLE FOOD SERVICES"},
+  ]
+  fetched=[]
+  def fetch(url):
+   fetched.append(url)
+   return {"ok":True,"url":url,"text":"INTERIOR ALTERATIONS - EXAMPLE FOOD SERVICES"}
+  result=live.inspect(rows,fetch)
+  self.assertEqual(result[0]["reason"],"ADDRESS_NOT_ORGANIZATION")
+  self.assertFalse(result[0]["source_match"])
+  self.assertEqual(fetched,["https://services6.arcgis.com/issued/permits/query"])
+  self.assertTrue(result[1]["source_match"])
+  self.assertEqual(result[1]["proof_status"],"SOURCE_TEXT_MATCHED")
+  self.assertEqual(result[1]["kind"],"ORGANIZATION_MENTION")
+  self.assertFalse(result[1]["purchasing_authority_verified"])
 if __name__=="__main__":unittest.main()
