@@ -108,9 +108,13 @@ class GatePassesLegitimateReviewTests(unittest.TestCase):
         self.ws.write_reviews([good_review()])
         self.assertEqual(acceptance(self.ws.review)["sale_ready"], 1)     # no ledger at all
         db = self.ws.root / "RADAR_DISCOVERY_LEDGER.sqlite"
-        with sqlite3.connect(db) as con:
+        con = sqlite3.connect(db)
+        try:
             con.execute("CREATE TABLE discovery(project_id TEXT, first_seen_at TEXT, source_url TEXT)")
             con.execute("INSERT INTO discovery VALUES(?,?,?)", (PID, D(3) + "T12:00:00+00:00", "u"))
+            con.commit()
+        finally:
+            con.close()
         build(self.ws.review)
         row = json.loads((self.ws.review / "COMMERCIAL_REVIEW.json").read_text())["projects"][0]
         self.assertEqual(row["radar_first_seen_at"][:10], D(3))
