@@ -1,5 +1,6 @@
 """Offline-only tests: the Google pilot never contacts Google during CI."""
 import csv,datetime as dt,json,sqlite3,tempfile,unittest
+from contextlib import closing
 from pathlib import Path
 import gta_google_grounding_pilot as pilot
 
@@ -63,7 +64,7 @@ class GoogleGroundingPilotTests(unittest.TestCase):
                 transport=lambda _:(_ for _ in ()).throw(TimeoutError("unknown charge")))
             self.assertEqual(fail["projects_queried"],0)
             self.assertEqual(fail["monthly_estimated_or_reserved_usd"],0.5)
-            with sqlite3.connect(root/pilot.LEDGER) as db:
+            with closing(sqlite3.connect(root/pilot.LEDGER)) as db:
                 self.assertEqual(db.execute("SELECT status FROM google_pilot").fetchone()[0],
                                  "UNKNOWN_PROVIDER_CHARGE")
             safe=pilot.run(root,paid=True,key="test",today=dt.date(2026,11,1),
