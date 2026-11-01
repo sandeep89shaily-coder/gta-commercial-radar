@@ -5,7 +5,7 @@ class BuyerAITests(unittest.TestCase):
  def test_exact_evidence_and_no_buyer_verification(self):
   with tempfile.TemporaryDirectory() as td:
    root=Path(td)
-   rows=[{"source_url":"https://www.toronto.ca/notice",
+   rows=[{"project_id":"toronto:175-oak","source_url":"https://www.toronto.ca/notice",
           "quote":"Owner Example Development Inc. Project on 175 Oak Street."}]
    def fake(path,payload):
     self.assertEqual(payload["thinking"],{"type":"disabled"})
@@ -20,5 +20,6 @@ class BuyerAITests(unittest.TestCase):
    self.assertEqual(state["invalid_evidence"],1)
    obj=json.loads((root/"buyer.json").read_text())
    self.assertFalse(obj["observations"][0]["purchasing_responsibility_verified"])
+   self.assertEqual(obj["observations"][0]["project_id"],"toronto:175-oak")
    self.assertEqual(obj["verified_unawarded_contracts"],0)
 if __name__=="__main__":unittest.main()

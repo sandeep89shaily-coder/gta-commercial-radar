@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv,json
 from gta_verified_source_pipeline import classify_buyer
 from pathlib import Path
+from gta_live_procurement_evidence import _source_project_index
 import reviewed_evidence
 
 FIELDS=("organization","role","project_id","source_url","exact_quote","buyer_authority_status",
@@ -12,14 +13,7 @@ def build(folder):
     folder=Path(folder); source=folder/"BUYER_RELATIONSHIPS_REVIEW.json"
     try:data=json.loads(source.read_text(encoding="utf-8"))
     except (OSError,ValueError):data={}
-    projects={}
-    for f in folder.glob("AI_PROJECT_????????????????.json"):
-        try:
-            obj=json.loads(f.read_text(encoding="utf-8"))
-            for item in obj.get("sources",[]):
-                url=item.get("url")
-                if url:projects[url]=obj.get("project_id","")
-        except (OSError,ValueError):pass
+    projects=_source_project_index(folder)
     rows=[]
     for item in data.get("observations",[]):
         if not item.get("source_url") or not item.get("exact_quote"):
@@ -31,7 +25,9 @@ def build(folder):
             needed="Establish owner/developer/operator and purchasing authority; agent is not buyer"
         evidence=classify_buyer(item)
         rows.append(dict(organization=item.get("organization",""),role=role,
-                         project_id=projects.get(item["source_url"],""),
+                         project_id=(str(item.get("project_id") or "").strip() or
+                           (next(iter(projects[item["source_url"]]))
+                            if len(projects.get(item["source_url"],set()))==1 else "")),
                          source_url=item["source_url"],exact_quote=item["exact_quote"],
                          buyer_authority_status=evidence["buyer_authority"],
                          supplier_selection_status=evidence["supplier_status"],

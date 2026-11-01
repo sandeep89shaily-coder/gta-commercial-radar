@@ -16,7 +16,8 @@ VALID_STATES={"TENDER_OPEN","FUTURE_PROCUREMENT_CONFIRMED","AWARDED","NOT_AWARDE
 COLUMNS=("project_id","kind","organization","source_url","excerpt","observed_date",
          "package","status","contact_url","role")
 def valid_row(row):
-    if not row.get("project_id") or row.get("kind") not in KINDS:return "INVALID_ID_OR_KIND"
+    if not row.get("project_id"):return row.get("lineage") or "MISSING_PROJECT_ID"
+    if row.get("kind") not in KINDS:return "INVALID_KIND"
     if not str(row.get("source_url") or "").startswith("https://"):return "NO_HTTPS_SOURCE"
     if len(str(row.get("excerpt") or "").strip())<25:return "NO_QUOTED_EVIDENCE"
     if row.get("kind") in ("PROCUREMENT_PACKAGE","SUPPLIER_AWARD") and row.get("status","UNKNOWN") not in VALID_STATES:
@@ -26,6 +27,8 @@ def inspect(rows,fetcher=auto_verify.fetch_page,limit=30):
     results=[];cache={}
     for row in rows[:limit]:
         item={k:row.get(k,"") for k in COLUMNS}
+        item["lineage"]=row.get("lineage","")
+        item["input_origin"]=row.get("input_origin","")
         item.update(proof_status="UNVERIFIED",purchasing_authority_verified=False,
                     unawarded_package_verified=False,source_match=False)
         issue=valid_row(row)
@@ -50,27 +53,63 @@ def inspect(rows,fetcher=auto_verify.fetch_page,limit=30):
                 item["reason"]="SOURCE_QUOTE_MATCHED_AUTHORITY_REQUIRES_HUMAN_REVIEW"
         results.append(item)
     return results
+def _source_project_index(review):
+    """Exact URLs map to sets of project IDs; shared URLs cannot resolve identity."""
+    index={}
+    if not review:
+        return index
+    for path in sorted(Path(review).glob("AI_PROJECT_*.json")):
+        try:
+            data=json.loads(path.read_text(encoding="utf-8"))
+        except (OSError,ValueError,TypeError):
+            continue
+        pid=str(data.get("project_id") or "").strip()
+        if not pid:
+            continue
+        for source in data.get("sources",[]):
+            if not isinstance(source,dict):
+                continue
+            url=str(source.get("url") or "").strip()
+            if url:
+                index.setdefault(url,set()).add(pid)
+    return index
+
 def source_rows(results=None,review=None):
-    """Only project-linked sourced quotes. AI hints are never proof."""
+    """Retain missing project IDs for diagnostic output, never discard silently."""
     rows=[]
     if results:
         candidate=Path(results)/"PURCHASING_EVIDENCE_CANDIDATES.csv"
         if candidate.is_file():
             with candidate.open(encoding="utf-8-sig",newline="") as f:
-                rows.extend(csv.DictReader(f))
+                rows.extend({**row,"input_origin":"PURCHASING_EVIDENCE_CANDIDATES"} for row in csv.DictReader(f))
     if review:
         path=Path(review)/"BUYER_RELATIONSHIPS_REVIEW.json"
         try:
             observations=json.loads(path.read_text(encoding="utf-8")).get("observations",[])
-        except (OSError,ValueError,TypeError):
+        except (OSError,ValueError,TypeError,AttributeError):
             observations=[]
+        index=_source_project_index(review)
         for item in observations:
-            if not isinstance(item,dict):continue
-            if item.get("project_id") and item.get("source_url") and item.get("exact_quote"):
-                rows.append({"project_id":item["project_id"],"kind":"BUYING_AUTHORITY",
-                    "organization":item.get("organization",""),
-                    "source_url":item["source_url"],"excerpt":item["exact_quote"],
-                    "role":item.get("role",""),"status":"UNKNOWN"})
+            if not isinstance(item,dict):
+                continue
+            url=str(item.get("source_url") or "").strip()
+            quote=str(item.get("exact_quote") or "").strip()
+            if not url and not quote:
+                continue
+            pid=str(item.get("project_id") or "").strip()
+            lineage="PROJECT_ID_FROM_EXTRACTOR" if pid else "MISSING_PROJECT_ID"
+            if not pid and url:
+                matches=index.get(url,set())
+                if len(matches)==1:
+                    pid=next(iter(matches))
+                    lineage="UNIQUE_EXACT_SOURCE_URL_RECONCILIATION"
+                elif len(matches)>1:
+                    lineage="AMBIGUOUS_SOURCE_URL_PROJECT"
+            rows.append({"project_id":pid,"kind":"BUYING_AUTHORITY",
+                "organization":item.get("organization",""),
+                "source_url":url,"excerpt":quote,
+                "role":item.get("role",""),"status":"UNKNOWN",
+                "lineage":lineage,"input_origin":"BUYER_RELATIONSHIPS_REVIEW"})
     return rows
 
 def execute(infile,out,limit=30,fetcher=auto_verify.fetch_page,review=None,results=None):
@@ -82,6 +121,12 @@ def execute(infile,out,limit=30,fetcher=auto_verify.fetch_page,review=None,resul
     records=inspect(rows,fetcher,limit)
     report={"checked_at_utc":dt.datetime.now(dt.timezone.utc).isoformat(),
             "records_checked":len(records),
+            "input_observations":len(rows),
+            "unlinked_observations":sum(not r.get("project_id") for r in rows),
+            "reconciled_unique_source_urls":sum(r.get("lineage")=="UNIQUE_EXACT_SOURCE_URL_RECONCILIATION" for r in rows),
+            "status":("NO_BUYER_EVIDENCE_INPUT" if not rows else
+                "NO_SOURCE_TEXT_MATCH" if not any(x["source_match"] for x in records) else
+                "SOURCE_EVIDENCE_FOR_REVIEW"),
             "source_text_matches":sum(x["source_match"] for x in records),
             "inconclusive":sum(x["proof_status"]=="INCONCLUSIVE" for x in records),
             "verified_buying_authorities":0,"verified_unawarded_packages":0,

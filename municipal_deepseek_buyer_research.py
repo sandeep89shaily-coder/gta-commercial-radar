@@ -25,6 +25,7 @@ def propose(source_items,results,out,*,paid=False,key=None,transport=None):
   if not row.get("source_url") or not row.get("quote"):
    raise ValueError("Each source must have citation and excerpt")
  inputs=[{"source_index":n+1,"source_url":r["source_url"],
+          "project_id":str(r.get("project_id") or "").strip(),
           "quote":str(r["quote"])[:400]} for n,r in enumerate(source_items)]
  data=json.dumps(inputs,ensure_ascii=True)
  root=Path(results);out=Path(out);out.parent.mkdir(parents=True,exist_ok=True)
@@ -71,6 +72,7 @@ def propose(source_items,results,out,*,paid=False,key=None,transport=None):
   if not good:
    rejected.append({"reason":"QUOTE_OR_SOURCE_MISMATCH","claim":claim});continue
   accepted.append({**claim,"source_url":inputs[idx]["source_url"],
+      "project_id":inputs[idx]["project_id"],
       "quote_validation":"EXACT_TEXT_ONLY","role_verified":False,
       "purchasing_responsibility_verified":False,
       "supplier_selection":"UNKNOWN"})

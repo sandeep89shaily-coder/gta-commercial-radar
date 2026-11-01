@@ -31,16 +31,31 @@ def evaluate(results,review,top=10):
     proofs=gate.evaluate_folder(review)["results"]
     # Live matches are research observations, never authority or contract proofs.
     live={}
+    live_stage_status="NO_LIVE_EVIDENCE_REPORT"
+    live_unlinked=0
+    live_input=0
     reports=sorted(Path(review).glob("LIVE_PROCUREMENT_EVIDENCE_*.json"))
     if reports:
         try:
-            observations=json.loads(reports[-1].read_text(encoding="utf-8")).get("records",[])
+            audit=json.loads(reports[-1].read_text(encoding="utf-8"))
+            observations=audit.get("records",[])
+            live_stage_status=audit.get("status","UNKNOWN_LIVE_STAGE")
+            live_unlinked=int(audit.get("unlinked_observations") or 0)
+            live_input=int(audit.get("input_observations") or 0)
             for observation in observations:
                 pid=observation.get("project_id")
                 if pid and observation.get("proof_status")=="SOURCE_TEXT_MATCHED":
                     live.setdefault(pid,[]).append(observation)
         except (OSError,ValueError,TypeError):
             live={}
+    research_status="NO_BUYER_RESEARCH_STATUS_FILE"
+    eligible_excerpts=0
+    try:
+        upstream=json.loads((Path(review)/"BUYER_RESEARCH_STATUS.json").read_text(encoding="utf-8"))
+        research_status=str(upstream.get("status") or "UNKNOWN")
+        eligible_excerpts=int(upstream.get("eligible_excerpts") or 0)
+    except (OSError,ValueError,TypeError,AttributeError):
+        pass
     records=[]
     for n,item in enumerate(chosen,1):
         pid=item["project_id"]
@@ -67,7 +82,13 @@ def evaluate(results,review,top=10):
         })
     return {"created_utc":dt.datetime.now(dt.timezone.utc).isoformat(),
             "selection":"UP_TO_TEN_EXISTING_OPERATOR_ASSOCIATED_RECORDS",
-            "projects_checked":len(records),"verified_buyers":sum(x["buyer_authority_status"]=="VERIFIED_REVIEW" for x in records),
+            "projects_checked":len(records),
+            "live_stage_status":live_stage_status,
+            "upstream_buyer_research_status":research_status,
+            "upstream_eligible_source_excerpts":eligible_excerpts,
+            "live_input_observations":live_input,
+            "live_unlinked_observations":live_unlinked,
+            "verified_buyers":sum(x["buyer_authority_status"]=="VERIFIED_REVIEW" for x in records),
             "verified_open_packages":sum(x["open_package_verified"] for x in records),
             "sale_ready":sum(x["sale_ready"] for x in records),
             "ai_calls":0,"source_databases_modified":False,"records":records,
