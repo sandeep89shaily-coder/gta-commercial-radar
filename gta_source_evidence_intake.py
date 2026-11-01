@@ -106,8 +106,9 @@ def run(results,out,*,top=10,fetcher=None):
     chosen=selection["top"]
     specs=[spec for item in chosen
            if (spec:=propose(recovered.get(item["project_id"],{}))) is not None]
+    outstanding=[x for x in missing+selection["needs_source_refresh"] if x.get("project_id") not in recovered]
     summary={"candidate_count":len(chosen),"claim_specs":len(specs),
-             "source_refresh_required":missing+selection["needs_source_refresh"],
+             "source_refresh_required":outstanding,
              "source_records_recovered_live":refreshed,"live_refresh_audit":refresh_audit,
              "verified_claims":0,"human_confirmations_created":0}
     if fetcher is not None and specs:
