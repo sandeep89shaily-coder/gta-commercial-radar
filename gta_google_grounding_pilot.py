@@ -89,7 +89,16 @@ def extract(response):
     chunks,urls,queries=[],[],[]
     for step in steps:
         if step.get("type")=="google_search_call":
-            queries.extend(str(q)[:180] for q in (step.get("arguments") or {}).get("queries",[]) if q)
+            arguments=step.get("arguments") or {}
+            # Interactions API may return a single "query" (documented example)
+            # or a "queries" array. Preserve both for auditing.
+            searches=arguments.get("queries")
+            if searches is None:
+                searches=[arguments.get("query")] if arguments.get("query") else []
+            if isinstance(searches,str):
+                searches=[searches]
+            if isinstance(searches,list):
+                queries.extend(str(q)[:180] for q in searches if q)
         if step.get("type")=="model_output":
             for block in step.get("content") or []:
                 if block.get("type")!="text":
@@ -105,7 +114,18 @@ def extract(response):
     # Query quota is shared across Google projects; assume none is free for
     # conservative local budget accounting. Actual provider charges can vary.
     estimate=(inbound*INPUT_PER_MILLION_USD+outbound*OUTPUT_PER_MILLION_USD)/1e6
-    estimate+=len([q for q in queries if q.strip()])*GROUNDING_PER_QUERY_USD
+    # Prefer provider's actual grounding count, if available. This may exceed
+    # the number of query strings surfaced by the API. Preserve conservative
+    # estimation when the usage field is absent. Provider billing is authoritative.
+    reported=0
+    for item in usage.get("grounding_tool_count") or []:
+        if isinstance(item,dict) and item.get("type")=="google_search":
+            try:
+                reported+=max(0,int(item.get("count") or 0))
+            except (ValueError,TypeError):
+                pass
+    chargeable_searches=max(reported,len([q for q in queries if q.strip()]))
+    estimate+=chargeable_searches*GROUNDING_PER_QUERY_USD
     return {
         "text":"\n".join(chunks)[:4000],
         "sources":list(dict.fromkeys(urls))[:12],

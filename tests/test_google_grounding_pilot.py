@@ -78,6 +78,17 @@ class GoogleGroundingPilotTests(unittest.TestCase):
                       transport=lambda payload:(calls.append(payload) or self.response()))
             self.assertEqual(len(calls),10)
             self.assertEqual(len(pilot.candidates(root/pilot.SOURCE)),10)
+    def test_interactions_api_single_query_and_provider_grounding_count(self):
+        response={"status":"completed","steps":[
+            {"type":"google_search_call","arguments":{"query":"warehouse Toronto"}},
+            {"type":"model_output","content":[{"type":"text","text":"New warehouse",
+                "annotations":[{"type":"url_citation","url":"https://www.toronto.ca/project"}]}]}],
+            "usage":{"total_input_tokens":1000,"total_output_tokens":250,
+                     "grounding_tool_count":[{"type":"google_search","count":3}]}}
+        data=pilot.extract(response)
+        self.assertEqual(data["queries"],["warehouse Toronto"])
+        self.assertEqual(data["sources"],["https://www.toronto.ca/project"])
+        self.assertGreaterEqual(data["estimated_usd"],3*pilot.GROUNDING_PER_QUERY_USD)
     def test_missing_key_does_not_touch_ledger(self):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d);self.seed(root,1)
