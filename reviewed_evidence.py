@@ -268,9 +268,12 @@ def radar_first_seen(folder, project_id):
         db = base / LEDGER_FILE
         if db.is_file():
             try:
-                with sqlite3.connect(f"file:{db.as_posix()}?mode=ro", uri=True) as con:
+                con = sqlite3.connect(f"file:{db.as_posix()}?mode=ro", uri=True)
+                try:
                     row = con.execute("SELECT first_seen_at FROM discovery WHERE project_id=?",
                                       (project_id,)).fetchone()
+                finally:
+                    con.close()
                 return row[0] if row else ""
             except sqlite3.Error:
                 return ""
