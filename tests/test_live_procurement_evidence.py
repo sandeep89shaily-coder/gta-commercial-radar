@@ -27,7 +27,7 @@ class PurchasingEvidenceTests(unittest.TestCase):
    self.assertEqual(len(source),2)
    self.assertEqual(source[1]["lineage"],"MISSING_PROJECT_ID")
    self.assertEqual(source[0]["project_id"],"p1")
-   result=live.execute(None,review,fetcher=lambda u:{"ok":True,"url":u,"text":"Company owns site but award unknown"})
+   result=live.execute(None,review,review=review,results=root,fetcher=lambda u:{"ok":True,"url":u,"text":"Company owns site but award unknown"})
    self.assertEqual(result["records_checked"],2)
    self.assertEqual(result["unlinked_observations"],1)
    self.assertEqual(result["records"][1]["reason"],"MISSING_PROJECT_ID")
