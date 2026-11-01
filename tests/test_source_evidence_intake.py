@@ -58,4 +58,6 @@ class EvidenceIntakeTests(unittest.TestCase):
    self.assertEqual(recovered['source_records_recovered_live'],1)
    self.assertEqual(recovered['verified_claims'],2)
    self.assertFalse(evidence.evaluate_folder(root)['results']['toronto_active_building_permits:26 219504']['sale_ready'])
+   intake.run(root,root/'out3',fetcher=official)
+   self.assertTrue(list((root/'AUTO_VERIFIED_EVIDENCE_HISTORY').glob('*.json')))
 if __name__=="__main__":unittest.main()
