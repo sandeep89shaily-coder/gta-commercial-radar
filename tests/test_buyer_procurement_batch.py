@@ -1,4 +1,4 @@
-import csv,tempfile,unittest
+import csv,tempfile,unittest,json
 from pathlib import Path
 import gta_buyer_procurement_batch as batch
 
@@ -30,4 +30,21 @@ class BuyerProcurementBatchTests(unittest.TestCase):
    prefix=batch.write(result,p/"out")
    self.assertTrue(Path(prefix+".csv").exists())
    self.assertTrue(Path(prefix+".json").exists())
+ def test_live_quote_is_review_queue_only_never_supplier_confirmation(self):
+  with tempfile.TemporaryDirectory() as d:
+   p=Path(d)
+   rows=[{"project_id":"toronto:12345","address":"100 Sample Rd","operator":"Suggested Co",
+       "opportunity_strength":"IDENTIFIED_PROJECT_OPERATOR",
+       "description":"New industrial warehouse with mechanical equipment expansion",
+       "record_source_url":"https://www.toronto.ca/record/12345"}]
+   with (p/"GTA_RADAR_PROJECT_OPPORTUNITIES.csv").open("w",newline="") as f:
+    w=csv.DictWriter(f,fieldnames=rows[0]);w.writeheader();w.writerows(rows)
+   report={"records":[{"project_id":"toronto:12345","proof_status":"SOURCE_TEXT_MATCHED","kind":"PROCUREMENT_PACKAGE"}]}
+   (p/"LIVE_PROCUREMENT_EVIDENCE_20261101T150000.json").write_text(json.dumps(report))
+   result=batch.evaluate(p,p,top=10)
+   self.assertEqual(result["records"][0]["live_sourced_observations"],1)
+   self.assertEqual(result["records"][0]["next_action"],"HUMAN_REVIEW_MATCHED_PURCHASING_EVIDENCE")
+   self.assertEqual(result["verified_open_packages"],0)
+   self.assertEqual(result["verified_buyers"],0)
+   self.assertEqual(result["sale_ready"],0)
 if __name__=="__main__":unittest.main()
