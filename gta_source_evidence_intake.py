@@ -46,12 +46,17 @@ def recover(results,top=10):
     selection=first.prioritize(recovered,top)
     return selection,needs,{r.get("project_id"):r for r in recovered}
 
+def official_url(url):
+    host=(urlparse(str(url)).hostname or "").lower()
+    return str(url).startswith("https://") and any(host==name or host.endswith("."+name)
+        for name in ("toronto.ca","brampton.ca","mississauga.ca","ontario.ca"))
+
 def propose(row):
     """Use exact source description, without inventing missing milestones."""
     url=(row.get("record_source_url") or "").strip()
     desc=(row.get("official_description") or row.get("description") or "").strip()
     pid=(row.get("project_id") or "").strip()
-    if not pid or not url.startswith("https://") or len(desc)<25:return None
+    if not pid or not official_url(url) or len(desc)<25:return None
     # A quoted source record can support scope, but cannot establish company
     # ownership, a direct government page identity, or historical publication.
     claim={"official_url":url,"excerpt":desc[:450]}
