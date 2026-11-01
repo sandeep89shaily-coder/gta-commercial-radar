@@ -364,15 +364,23 @@ def main():
     p.add_argument("--paid",action="store_true",help="Opt in to at most ten Google API requests")
     p.add_argument("--diagnose-key",action="store_true",
                    help="Check Gemini model metadata with GET; no generation, charges or ledger writes")
+    p.add_argument("--prompt-key",action="store_true",
+                   help="Prompt privately for an API key if not in the environment (diagnostic only)")
     p.add_argument("--reviewed-top10",action="store_true",
                    help="Use exact Nov 1 ten projects reviewed with the owner")
     args=p.parse_args()
-    root=Path(args.results) if args.results else find_workspace(args.workspace)/"GTA_RADAR_RESULTS"
     try:
+        # A free model-access check must work even when Radar's data folder
+        # is missing or on a different computer. It never opens the ledger.
         if args.diagnose_key:
-            result=diagnose_key()
+            secret=os.environ.get("GEMINI_API_KEY","")
+            if args.prompt_key and not secret:
+                from getpass import getpass
+                secret=getpass("Gemini API key (hidden, not saved): ").strip()
+            result=diagnose_key(secret)
             print(json.dumps(result,indent=2))
             return 0 if result["status"]=="MODEL_LOOKUP_OK" else 2
+        root=Path(args.results) if args.results else find_workspace(args.workspace)/"GTA_RADAR_RESULTS"
         result=run(root,paid=args.paid,source=args.source_csv,limit=args.limit,
                    reviewed_top10=args.reviewed_top10)
         print(json.dumps(result,indent=2))
