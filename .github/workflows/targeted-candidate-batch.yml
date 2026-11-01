@@ -1,0 +1,28 @@
+name: Targeted candidate live validation
+on:
+  pull_request:
+    paths:
+      - 'gta_targeted_candidate_batch.py'
+      - '.github/workflows/targeted-candidate-batch.yml'
+  workflow_dispatch:
+jobs:
+  bounded-live-candidates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r requirements.txt
+      - name: Check two tracked projects, real sources, negative controls
+        run: python gta_targeted_candidate_batch.py --out targeted_candidate_batch.json
+      - name: Archive exact findings
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: targeted-candidate-batch
+          path: targeted_candidate_batch.json
+          if-no-files-found: warn
