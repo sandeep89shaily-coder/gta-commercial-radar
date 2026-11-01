@@ -44,7 +44,7 @@ class GoogleGroundingPilotTests(unittest.TestCase):
             self.assertEqual(result["projects_queried"],2)
             self.assertEqual(len(sent),2)
             self.assertEqual(sent[0]["tools"],[{"type":"google_search"}])
-            self.assertIn("project identity",sent[0]["input"].lower() if "project identity" in sent[0]["input"].lower() else "project identity")
+            self.assertIn("construction",sent[0]["input"].lower())
             with Path(result["csv"]).open(encoding="utf-8-sig",newline="") as f:
                 records=list(csv.DictReader(f))
             self.assertEqual(records[0]["google_source_urls"],"https://www.brampton.ca/project")
