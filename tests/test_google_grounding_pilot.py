@@ -124,6 +124,19 @@ class GoogleGroundingPilotTests(unittest.TestCase):
         self.assertEqual(details["google_error_status"],"PERMISSION_DENIED")
         self.assertNotIn("PRIVATEKEY",details["google_message"])
         self.assertIn("[REDACTED]",details["google_message"])
+        self.assertNotIn("network_error",details)
+
+    def test_invalid_api_key_401_is_not_misreported_as_network_error(self):
+        from io import BytesIO
+        from urllib.error import HTTPError,URLError
+        invalid=b'{"error":{"code":401,"status":"UNAUTHENTICATED","message":"API key not valid"}}'
+        response=HTTPError("https://example.com",401,"Unauthorized",None,BytesIO(invalid))
+        details=pilot.google_error_details(response,"PRIVATEKEY")
+        self.assertEqual(details["http_status"],401)
+        self.assertEqual(details["google_error_status"],"UNAUTHENTICATED")
+        self.assertNotIn("network_error",details)
+        real_network=pilot.google_error_details(URLError("DNS failure"))
+        self.assertEqual(real_network["network_error"],"Network, proxy, or DNS failure")
     def test_diagnostic_cli_does_not_need_desktop_workspace(self):
         """GET-only check should run even when no Desktop/new data folder exists."""
         import io,sys
