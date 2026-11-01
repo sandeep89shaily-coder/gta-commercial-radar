@@ -89,7 +89,9 @@ def google_error_details(exc,key=""):
                 details["google_message"]=str(error.get("message") or "")[:280]
         except (ValueError,OSError,UnicodeError):
             pass
-    if isinstance(exc,URLError):
+    elif isinstance(exc,URLError):
+        # HTTPError subclasses URLError; a 401/403 is an authentication
+        # or authorization response, not evidence of a network failure.
         details["network_error"]="Network, proxy, or DNS failure"
     for field in ("google_message",):
         value=details.get(field,"")
