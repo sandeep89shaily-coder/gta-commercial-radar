@@ -41,6 +41,8 @@ MESSAGES = {
     "REFUSED_DIVERGED": "Local history and GitHub main have diverged. Nothing was changed.",
     "REFUSED_AHEAD_OF_MAIN": "This install has commits that are not on GitHub main, so it is not a verified release.",
     "REFUSED_NO_REMOTE_MAIN": "GitHub main could not be resolved after fetching.",
+    "REFUSED_UPDATE_CHECK_FAILED": "Could not verify the current GitHub main; run is blocked to prevent using an unverified release.",
+    "REFUSED_OUTDATED_RELEASE": "A newer GitHub main exists. Run desktop_update.py separately before starting the pipeline.",
     "REFUSED_SYNTAX_ERROR": "Some code files do not compile; the previous commit was restored if an update caused it.",
 }
 
@@ -120,9 +122,9 @@ def preflight(code_dir, results_dir=None, *, apply_update=True, fetch=True,
     remote_head = remote_head if code == 0 else ""
     info["remote_commit"] = remote_head
     if fetch and not reached:
-        status = "OK_UPDATE_CHECK_FAILED"
+        return finish("REFUSED_UPDATE_CHECK_FAILED")
     elif not remote_head:
-        return finish("REFUSED_NO_REMOTE_MAIN" if fetch else "OK_UPDATE_CHECK_FAILED")
+        return finish("REFUSED_NO_REMOTE_MAIN")
     elif head == remote_head:
         status = "OK_UP_TO_DATE"
     else:
@@ -130,7 +132,7 @@ def preflight(code_dir, results_dir=None, *, apply_update=True, fetch=True,
         ahead = _git(["merge-base", "--is-ancestor", remote_head, head], code_dir)[0] == 0
         if behind:
             if not apply_update:
-                status = "OK_BEHIND_NOT_APPLIED"
+                return finish("REFUSED_OUTDATED_RELEASE")
             else:
                 code, _ = _git(["merge", "--ff-only", f"{remote}/{branch}"], code_dir)
                 if code != 0 or installed_commit(code_dir) != remote_head:
