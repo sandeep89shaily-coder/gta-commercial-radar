@@ -1,0 +1,64 @@
+{
+  "project_id": "gay-lea-clayson-road-expansion",
+  "checked_on": "2026-11-01",
+  "status": "RESEARCH_ONLY_NOT_SALE_READY",
+  "investment_cad_lower_bound": 200000000,
+  "construction_status": "Started August 2026, company/source reporting; trade package status unverified",
+  "source_evidence": [
+    {
+      "finding": "Company announcement identifies project, owner, investment and completion by 2028",
+      "url": "https://www.gaylea.com/news/about-us/gay-lea-foods-invests-more-than-200-million-to-help-shape-the-future-of-canadian-dairy",
+      "source_type": "COMPANY_OWNED"
+    },
+    {
+      "finding": "New Indirect Procurement Manager position reports to Director, Procurement; remit includes facilities, MRO, capital-related services and equipment support; role does not establish project-specific award authority",
+      "url": "https://builtin.com/job/manager-indirect-procurement/11642157",
+      "source_type": "PUBLIC_JOB_AD"
+    },
+    {
+      "finding": "Published head office switchboard 905-283-5300; not project-specific procurement line",
+      "url": "https://www.gaylea.com/pages/contact-us",
+      "source_type": "COMPANY_OWNED"
+    },
+    {
+      "finding": "Independent permit mirror lists 26 154673 BLD at 100 Clayson Rd, scope building shell and exterior, applied 2026-05-04; verify municipality directly before marking identity",
+      "url": "https://www.civicbeam.com/permits/26%20154673%20BLD",
+      "source_type": "SECONDARY_NOT_OFFICIAL"
+    },
+    {
+      "finding": "GCL Builds references an earlier first phase of a multi-phase Clayson expansion; not proof it was awarded the August 2026 scope",
+      "url": "https://gclbuilds.com/experience/gaylea-clayson/",
+      "source_type": "VENDOR_OWNED_AMBIGUOUS_PHASE"
+    },
+    {
+      "finding": "TAES Architects describes Gay Lea food expansion and scope; may represent an earlier phase; cannot assume same contract",
+      "url": "https://taesarchitects.com/portfolio/gay-lea-food-expansion/",
+      "source_type": "DESIGNER_OWNED_AMBIGUOUS_PHASE"
+    }
+  ],
+  "procurement": {
+    "authority": "UNVERIFIED_PROJECT_SPECIFIC",
+    "supplier_award_status": "UNKNOWN",
+    "general_contractor_current_phase": "UNKNOWN",
+    "contacts": [
+      {
+        "kind": "GENERAL_CORPORATE_SWITCHBOARD",
+        "value": "905-283-5300",
+        "verified_on_company_site": true,
+        "procurement_contact_verified": false
+      }
+    ],
+    "next_questions": [
+      "Who manages procurement for the current 2026 Clayson Road expansion?",
+      "Is there an appointed general contractor/construction manager for the current phase?",
+      "Which refrigeration, HVAC, process equipment, electrical and security packages have not been awarded?",
+      "What is the authorized vendor registration or tender submission process?"
+    ]
+  },
+  "do_not_count_as_verified": [
+    "job listing is evidence of procurement organization, not that an identified individual has contract award authority",
+    "GCL and TAES project portfolios may refer to earlier project phases",
+    "permit mirror not authoritative municipality",
+    "absence of publicly visible tender is not affirmative proof of an unawarded package"
+  ]
+}
