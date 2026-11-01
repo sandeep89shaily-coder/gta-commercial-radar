@@ -4,7 +4,9 @@ Only direct record excerpts are proposed, never AI summaries. Missing official
 identity, publication dates, purchasing authority and supplier status remain unknown.
 """
 from __future__ import annotations
-import argparse,csv,json,datetime as dt
+import argparse,csv,json,datetime as dt,re
+from urllib.parse import urlparse
+from html.parser import HTMLParser
 from pathlib import Path
 import auto_verify
 import gta_select_first_investigations as first
@@ -57,14 +59,56 @@ def propose(row):
             "supplier_status":"UNKNOWN","claims":{"scope_evidence":claim,
                                                           "project_source":claim}}
 
+class Visible(HTMLParser):
+    def __init__(self):
+        super().__init__();self.parts=[];self.skip=0
+    def handle_starttag(self,tag,attrs):
+        if tag in ('script','style'):self.skip+=1
+    def handle_endtag(self,tag):
+        if tag in ('script','style'):self.skip=max(0,self.skip-1)
+    def handle_data(self,data):
+        if not self.skip:self.parts.append(data)
+
+def refresh_official(rows,recovered,fetcher,limit=8):
+    audits=[];updated=0
+    for item in rows:
+        if len(audits)>=limit:break
+        pid=str(item.get('project_id') or '')
+        url=str(item.get('source_url') or item.get('record_source_url') or '')
+        host=(urlparse(url).hostname or '').lower()
+        ident=pid.split(':',1)[-1].strip()
+        audit={'project_id':pid,'source_url':url}
+        if not url.startswith('https://') or not any(host==h or host.endswith('.'+h) for h in ('toronto.ca','brampton.ca','mississauga.ca','ontario.ca')):
+            audit['status']='UNSUPPORTED_OFFICIAL_SOURCE';audits.append(audit);continue
+        if len(ident)<6:
+            audit['status']='IDENTITY_TOO_SHORT';audits.append(audit);continue
+        response=fetcher(url)
+        if not response.get('ok'):
+            audit['status']='FETCH_FAILED';audit['reason']=response.get('reason','');audits.append(audit);continue
+        html=Visible();html.feed(str(response.get('text') or '')[:2000000])
+        visible=' '.join(' '.join(html.parts).split())
+        match=re.search(re.escape(ident),visible,re.I)
+        if not match:
+            audit['status']='EXACT_ID_NOT_IN_PAGE';audits.append(audit);continue
+        excerpt=visible[max(0,match.start()-180):min(len(visible),match.end()+450)]
+        if len(excerpt)<25:
+            audit['status']='INSUFFICIENT_TEXT';audits.append(audit);continue
+        recovered[pid]={'project_id':pid,'address':item.get('address',''),'description':excerpt,'record_source_url':url,'source_recovery_basis':'LIVE_OFFICIAL_EXACT_ID_MATCH'}
+        audit['status']='RECOVERED_EXACT_ID_SOURCE_TEXT';audits.append(audit);updated+=1
+    return audits,updated
 def run(results,out,*,top=10,fetcher=None):
     results=Path(results);out=Path(out);out.mkdir(parents=True,exist_ok=True)
     selection,missing,recovered=recover(results,top)
+    refresh_audit=[];refreshed=0
+    if fetcher is not None:
+        refresh_audit,refreshed=refresh_official(missing+selection["needs_source_refresh"],recovered,fetcher)
+        selection=first.prioritize(list(recovered.values()),top)
     chosen=selection["top"]
     specs=[spec for item in chosen
            if (spec:=propose(recovered.get(item["project_id"],{}))) is not None]
     summary={"candidate_count":len(chosen),"claim_specs":len(specs),
              "source_refresh_required":missing+selection["needs_source_refresh"],
+             "source_records_recovered_live":refreshed,"live_refresh_audit":refresh_audit,
              "verified_claims":0,"human_confirmations_created":0}
     if fetcher is not None and specs:
         reviews=[];status=[]
