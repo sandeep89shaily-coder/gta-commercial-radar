@@ -124,6 +124,36 @@ class GoogleGroundingPilotTests(unittest.TestCase):
         self.assertEqual(details["google_error_status"],"PERMISSION_DENIED")
         self.assertNotIn("PRIVATEKEY",details["google_message"])
         self.assertIn("[REDACTED]",details["google_message"])
+    def test_diagnostic_cli_does_not_need_desktop_workspace(self):
+        """GET-only check should run even when no Desktop/new data folder exists."""
+        import io,sys
+        from unittest.mock import patch
+        from contextlib import redirect_stdout
+        fake={"status":"MODEL_LOOKUP_OK","model":pilot.MODEL,"no_paid_calls":True}
+        with patch.object(sys,"argv",["gta_google_grounding_pilot.py","--diagnose-key"]), \
+             patch.object(pilot,"find_workspace",side_effect=AssertionError("workspace must not be used")), \
+             patch.object(pilot,"diagnose_key",return_value=fake) as diag, \
+             redirect_stdout(io.StringIO()) as output:
+            self.assertEqual(pilot.main(),0)
+        self.assertTrue(diag.called)
+        self.assertIn("MODEL_LOOKUP_OK",output.getvalue())
+
+    def test_diagnostic_prompt_keeps_key_out_of_output(self):
+        """A hidden private prompt is used only when GEMINI_API_KEY is unset."""
+        import io,os,sys
+        from unittest.mock import patch
+        from contextlib import redirect_stdout
+        fake={"status":"MODEL_LOOKUP_OK","model":pilot.MODEL,"no_paid_calls":True}
+        with patch.dict(os.environ,{"GEMINI_API_KEY":""}), \
+             patch.object(sys,"argv",["gta_google_grounding_pilot.py","--diagnose-key","--prompt-key"]), \
+             patch("getpass.getpass",return_value="PRIVATE_PROMPT_KEY") as private_prompt, \
+             patch.object(pilot,"diagnose_key",return_value=fake) as diag, \
+             redirect_stdout(io.StringIO()) as output:
+            self.assertEqual(pilot.main(),0)
+        private_prompt.assert_called_once()
+        diag.assert_called_once_with("PRIVATE_PROMPT_KEY")
+        self.assertNotIn("PRIVATE_PROMPT_KEY",output.getvalue())
+
     def test_missing_key_does_not_touch_ledger(self):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d);self.seed(root,1)
