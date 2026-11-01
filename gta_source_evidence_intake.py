@@ -20,7 +20,8 @@ def load_csv(path):
     except (OSError,UnicodeError,ValueError):return []
 def recover(results,top=10):
     results=Path(results)
-    candidates=first.load_records(results/first.DEFAULT_FILE)
+    source=results/first.DEFAULT_FILE
+    candidates=first.load_records(source) if source.is_file() else []
     by_id={}
     for filename in SOURCE_FILES:
         for item in load_csv(results/filename):
