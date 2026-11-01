@@ -17,10 +17,10 @@
 ## Setup
 1. Open [Google AI Studio](https://aistudio.google.com/apikey) and create a Gemini API key for an appropriate billed project, checking the account's billing and Google API quota settings. Do not commit the key or paste it into chat.
 2. In **PowerShell** for the current terminal session, set `$env:GEMINI_API_KEY = "YOUR_API_KEY"` (use a private terminal; protect your key). The tool reads `GEMINI_API_KEY` from the environment only.
-3. Run `py -3 gta_google_grounding_pilot.py` to **preview** which ten projects are selected (no external API).
-4. After checking the selection, run `py -3 gta_google_grounding_pilot.py --paid`. This is the only command that authorizes Google API requests.
+3. Run `py -3 gta_google_grounding_pilot.py --reviewed-top10` to **preview** the exact November 1 ten-project cohort (no external API). Or double-click `RUN_GTA_RADAR_GOOGLE_PILOT.bat`, which previews this same cohort.
+4. After checking the selection, run `py -3 gta_google_grounding_pilot.py --reviewed-top10 --paid`. Only `--paid` authorizes Google API requests. The original ten exact permit IDs are frozen at `config/google_pilot_reviewed_projects_20261101.txt`; if an ID is absent from the source CSV, the pilot refuses to silently substitute an unrelated project.
 5. Output is dated `GTA_GOOGLE_PILOT_*.csv` and `GTA_GOOGLE_PILOT_*.html` plus a cost/status summary in `GTA_RADAR_RESULTS`.
-6. To use an explicit short list, pass `--source-csv "C:\\path\\to\\projects.csv"` with fields `project_id`, `observation` (FIRST_OBSERVED or RECORD_CHANGED), `address`, `city`, and optionally `description` and `record_source_url`. Pilot still limits to ten.
+6. For a different future cohort, omit `--reviewed-top10`; the default ranks the latest first-observed and changed records. You can also pass `--source-csv "C:\\path\\to\\projects.csv"` with fields `project_id`, `observation` (FIRST_OBSERVED or RECORD_CHANGED), `address`, `city`, and optionally `description` and `record_source_url`. Pilot still limits to ten.
 
 ## Quality check
 For each project, review: (a) whether Google found a distinct current primary source beyond DeepSeek; (b) whether project use, work scope and dates match the official record; (c) whether any business contact is corroborated on a company-owned website; and (d) whether the research is new enough to justify future API spending. Count independently confirmed corrections, not only more model output.
