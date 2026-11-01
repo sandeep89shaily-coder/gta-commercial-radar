@@ -81,5 +81,24 @@ class BuyerLineageIntegrationTests(unittest.TestCase):
                 work=list(csv.DictReader(stream))
             self.assertEqual(work[0]["project_id"],"")
 
+    def test_buyer_worklist_rejects_address_as_company(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);review=self.setup_records(root)
+            source=review/"BUYER_RELATIONSHIPS_REVIEW.json"
+            obs=json.loads(source.read_text())
+            obs["observations"].append({
+                "organization":"318 Example Rd, Brampton, ON","role":"owner",
+                "source_url":"https://maps1.brampton.ca/arcgis/query",
+                "exact_quote":"ADDRESS 318 Example Rd, Brampton, ON",
+                "project_id":"brampton:99"})
+            source.write_text(json.dumps(obs))
+            result=build_worklist(review)
+            self.assertEqual(result["total_sourced_observations"],2)
+            self.assertEqual(result["rejected_invalid_organizations"],1)
+            self.assertEqual(result["candidates_for_human_or_official_source_verification"],1)
+            with (review/"BUYER_VERIFICATION_WORKLIST.csv").open(encoding="utf-8-sig") as stream:
+                rows=list(csv.DictReader(stream))
+            self.assertEqual(rows[1]["organization_quality_status"],"REJECTED_INVALID_ORGANIZATION")
+
 if __name__=="__main__":
     unittest.main()
