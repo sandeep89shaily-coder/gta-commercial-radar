@@ -190,7 +190,7 @@ class UnsupportedClaimsCannotPassTests(unittest.TestCase):
             with self.subTest(defect=name):
                 result = self.run_with(mutate(fn))
                 self.assertFalse(result["sale_ready"], name)
-                self.assertEqual(result["status"], "RESEARCH_ONLY")
+                self.assertNotEqual(result["status"], "SALE_READY_VERIFIED")
                 self.assertTrue(result["reasons"], "a plain-English reason must be given")
 
     def test_each_missing_milestone_field_blocks_sale_ready(self):

@@ -23,6 +23,7 @@ from urllib.parse import urlparse
 from commercial_research_policy import directory_url
 
 REVIEW_FILE = "REVIEWED_EVIDENCE.json"
+AUTO_FILE = "AUTO_VERIFIED_EVIDENCE.json"       # written only by auto_verify.py
 LEDGER_FILE = "RADAR_DISCOVERY_LEDGER.sqlite"
 
 # The eight things a buyer of a lead needs. radar_first_observed is deliberately absent.
@@ -30,6 +31,13 @@ MILESTONE_FIELDS = ("project_source", "project_identity", "scope_evidence", "buy
                     "buying_authority_evidence", "contact_route_evidence", "procurement_evidence",
                     "source_first_publication")
 
+# Proofs that code can establish by fetching the official page and matching the quoted text.
+# Buying authority and supplier availability are judgments, never accepted from automation.
+AUTOMATABLE_FIELDS = ("project_source", "project_identity", "scope_evidence", "buyer_org_evidence",
+                      "contact_route_evidence", "source_first_publication")
+HUMAN_ONLY_FIELDS = ("buying_authority_evidence", "procurement_evidence")
+AUTOMATED_METHOD = "AUTOMATED_SOURCE_MATCH"
+MAX_AUTOMATED_AGE_DAYS = 60
 SOURCE_CLASSES = ("OFFICIAL_GOVERNMENT", "COMPANY_OWNED", "REGULATORY_FILING", "PRESS_RELEASE_BY_PARTY")
 AUTHORITY_BASES = ("OWNER_OPERATOR_OF_SITE", "DOCUMENTED_PROCUREMENT_ROLE",
                    "PUBLISHED_TENDER_CONTACT", "SIGNING_AUTHORITY_DOCUMENTED")
@@ -87,7 +95,21 @@ def _common(entry, field, as_of, reasons):
         reasons.append("official_url must be an https page on a real site (not a directory)"); ok = False
     if len(str(entry.get("excerpt") or "").strip()) < MIN_EXCERPT_CHARS:
         reasons.append(f"excerpt must quote at least {MIN_EXCERPT_CHARS} characters from the source"); ok = False
-    if entry.get("reviewer_confirmed") is not True:
+    if entry.get("verification_method") == AUTOMATED_METHOD:
+        # Deterministic fetch-and-match done by auto_verify.py; no AI, no human tick needed,
+        # but only for proofs a machine can honestly establish.
+        if field not in AUTOMATABLE_FIELDS:
+            reasons.append("this proof needs a human; automated matching is not accepted for it"); ok = False
+        if entry.get("match_confirmed") is not True or not entry.get("verifier_version"):
+            reasons.append("automated entry lacks a confirmed source match"); ok = False
+        if not re.fullmatch(r"[0-9a-f]{64}", str(entry.get("content_sha256") or "")):
+            reasons.append("automated entry lacks the fetched page fingerprint (content_sha256)"); ok = False
+        fetched = _date(entry.get("fetched_at"))
+        if fetched is None or fetched > as_of:
+            reasons.append("fetched_at must be a real date not in the future"); ok = False
+        elif (as_of - fetched).days > MAX_AUTOMATED_AGE_DAYS:
+            reasons.append(f"automated check is older than {MAX_AUTOMATED_AGE_DAYS} days; fetch again"); ok = False
+    elif entry.get("reviewer_confirmed") is not True:
         reasons.append("reviewer_confirmed must be true"); ok = False
     retrieved = _date(entry.get("retrieved_at"))
     if retrieved is None or retrieved > as_of:
@@ -149,6 +171,7 @@ def evaluate_review(review, *, as_of=None):
         ok_fields[field] = ok
         if problems:
             reasons[field] = problems
+    auto_ready = all(ok_fields[f] for f in AUTOMATABLE_FIELDS)
     header = []
     reviewer = str(review.get("reviewed_by") or "").strip()
     if not reviewer or _AI_REVIEWER.search(reviewer):
@@ -169,6 +192,13 @@ def evaluate_review(review, *, as_of=None):
     supplier_ok = header_ok and ok_fields["procurement_evidence"]
     missing = [f for f in MILESTONE_FIELDS if not ok_fields[f]]
     sale_ready = header_ok and not missing
+    human_pending = [f for f in HUMAN_ONLY_FIELDS if not ok_fields[f]]
+    if sale_ready:
+        status_name = "SALE_READY_VERIFIED"
+    elif auto_ready and human_pending and status not in ("AWARDED", "ALREADY_CONTRACTED"):
+        status_name = "NEEDS_HUMAN_CONFIRMATION"      # machine-checkable proofs done; judgment items remain
+    else:
+        status_name = "RESEARCH_ONLY"
     return {"project_id": review.get("project_id", ""), "address": review.get("address", ""),
             "project_name": review.get("project_name", ""), "supplier_status": status,
             "buyer_authority_verified": buyer_ok, "supplier_selection_verified": supplier_ok,
@@ -179,19 +209,38 @@ def evaluate_review(review, *, as_of=None):
                             if ok_fields["contact_route_evidence"] else "",
             "service_categories": [str(x) for x in (review.get("service_categories") or [])][:8],
             "sale_ready": sale_ready,
-            "status": "SALE_READY_VERIFIED" if sale_ready else "RESEARCH_ONLY",
+            "status": status_name,
+            "automated_proofs_complete": auto_ready,
+            "needs_human": human_pending if auto_ready else [],
             "missing": missing, "reasons": reasons,
             "reviewed_by": reviewer, "reviewed_at": str(review.get("reviewed_at") or ""),
             "buyer_organization": str((evidence.get("buyer_org_evidence") or {}).get("organization") or ""),
             "source_first_publication": str((evidence.get("source_first_publication") or {}).get("published_at") or "")}
 
 
-def find_review_file(folder):
+def find_review_file(folder, name=REVIEW_FILE):
     folder = Path(folder)
-    for candidate in (folder / REVIEW_FILE, folder.parent / REVIEW_FILE):
+    for candidate in (folder / name, folder.parent / name):
         if candidate.is_file():
             return candidate
     return None
+
+
+def merge_reviews(human, auto):
+    """Overlay the machine file and the human file per project. Neither file is modified.
+
+    Evidence: automated proofs fill what they can; a human entry for the same field wins.
+    Header facts (reviewer, dates, supplier status) come from the human review when present.
+    """
+    merged = {}
+    for review in auto:
+        merged[review["project_id"]] = {**review, "evidence": dict(review.get("evidence") or {})}
+    for review in human:
+        pid = review["project_id"]
+        base = merged.get(pid, {"project_id": pid, "evidence": {}})
+        evidence = {**base.get("evidence", {}), **(review.get("evidence") or {})}
+        merged[pid] = {**base, **{k: v for k, v in review.items() if k != "evidence"}, "evidence": evidence}
+    return list(merged.values())
 
 
 def load_reviews(path):
@@ -231,9 +280,14 @@ def radar_first_seen(folder, project_id):
 def evaluate_folder(folder, as_of=None):
     """Evaluate every reviewed project found next to the results. Pure read."""
     path = find_review_file(folder)
-    if path is None:
+    auto_path = find_review_file(folder, AUTO_FILE)
+    if path is None and auto_path is None:
         return {"review_file": "", "problems": [], "results": {}}
-    reviews, problems = load_reviews(path)
+    human, problems = load_reviews(path) if path else ([], [])
+    auto, auto_problems = load_reviews(auto_path) if auto_path else ([], [])
+    reviews = merge_reviews(human, auto)
+    problems = problems + auto_problems
+    path = path or auto_path
     results = {}
     for review in reviews:                       # later entries for a project replace earlier ones
         result = evaluate_review(review, as_of=as_of)
