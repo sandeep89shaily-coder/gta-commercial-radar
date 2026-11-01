@@ -15,7 +15,7 @@ if not exist "%RESULTS%" (
 )
 if not exist "%REVIEW%" mkdir "%REVIEW%"
 echo Checking installed GitHub release before running...
-%PY% "%CODE%desktop_update.py" --code-dir "%CODE%" --results-dir "%RESULTS%"
+%PY% "%CODE%desktop_update.py" --code-dir "%CODE%." --results-dir "%RESULTS%"
 if errorlevel 1 (
   echo RELEASE CHECK FAILED. No live source check ran.
   pause
