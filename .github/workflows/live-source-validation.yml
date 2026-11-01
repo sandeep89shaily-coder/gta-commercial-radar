@@ -1,7 +1,5 @@
 name: Real public source verification (no AI)
 on:
-  push:
-    branches: ['feature/live-source-validation-*']
   workflow_dispatch:
 jobs:
   real-source:
