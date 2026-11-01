@@ -19,6 +19,7 @@ LEDGER="GTA_RADAR_GOOGLE_PILOT_LEDGER.sqlite"
 MONTHLY_MAX_USD=5.0
 PER_REQUEST_RESERVATION_USD=0.50
 MAX_PROJECTS=10
+REVIEWED_IDS=Path(__file__).resolve().parent/"config"/"google_pilot_reviewed_projects_20261101.txt"
 INPUT_PER_MILLION_USD=0.25
 OUTPUT_PER_MILLION_USD=1.50
 GROUNDING_PER_QUERY_USD=0.014  # conservative: assumes 0 free quota remains
@@ -34,7 +35,7 @@ def read_csv(path):
     with Path(path).open(encoding="utf-8-sig",newline="") as stream:
         return list(csv.DictReader(stream))
 
-def candidates(source,limit=MAX_PROJECTS):
+def candidates(source,limit=MAX_PROJECTS,project_ids=None):
     """Rank initial observations above changes, then favor source priority.
     Never invent an event from an archived/unchanged baseline.
     """
@@ -50,6 +51,12 @@ def candidates(source,limit=MAX_PROJECTS):
     def priority(row):
         try:return int(row.get("review_priority") or 0)
         except ValueError:return 0
+    if project_ids is not None:
+        missing=[pid for pid in project_ids if pid not in chosen]
+        if missing:
+            raise ValueError("Missing reviewed project IDs in source CSV; pass the saved Nov 1 source file: "+
+                             ", ".join(missing))
+        return [chosen[pid] for pid in project_ids][:min(MAX_PROJECTS,max(0,limit))]
     return sorted(chosen.values(),key=lambda r:(
         0 if r.get("observation")=="FIRST_OBSERVED" else 1,
         -priority(r),r.get("project_id","")))[:min(MAX_PROJECTS,max(0,limit))]
@@ -164,14 +171,22 @@ def finish(db,month,pid,done,estimate=None):
     db.commit()
 
 def run(results,*,paid=False,limit=MAX_PROJECTS,source=None,transport=None,key=None,
-        today=None):
+        today=None,reviewed_top10=False):
     """Returns one report. Default previews project selection without any API."""
     out=Path(results)
     out.mkdir(parents=True,exist_ok=True)
     current=(today or dt.date.today())
     month=current.strftime("%Y-%m")
     source=Path(source) if source else out/SOURCE
-    selected=candidates(source,limit)
+    ids=None
+    if reviewed_top10:
+        if not REVIEWED_IDS.is_file():
+            raise FileNotFoundError(str(REVIEWED_IDS))
+        ids=[line.strip() for line in REVIEWED_IDS.read_text(encoding="utf-8").splitlines()
+             if line.strip() and not line.lstrip().startswith("#")]
+        if len(ids)!=10 or len(set(ids))!=10:
+            raise ValueError("Reviewed ten-project list is incomplete or duplicated")
+    selected=candidates(source,limit,project_ids=ids)
     history={x.get("project_id"):x for x in read_csv(out/AI_SOURCE)}
     api_key=key if key is not None else os.environ.get("GEMINI_API_KEY","")
     if paid and not api_key and transport is None:
@@ -268,10 +283,13 @@ def main():
     p.add_argument("--source-csv",help="Explicit project CSV with project_id, observation, address, city")
     p.add_argument("--limit",type=int,default=MAX_PROJECTS)
     p.add_argument("--paid",action="store_true",help="Opt in to at most ten Google API requests")
+    p.add_argument("--reviewed-top10",action="store_true",
+                   help="Use exact Nov 1 ten projects reviewed with the owner")
     args=p.parse_args()
     root=Path(args.results) if args.results else find_workspace(args.workspace)/"GTA_RADAR_RESULTS"
     try:
-        result=run(root,paid=args.paid,source=args.source_csv,limit=args.limit)
+        result=run(root,paid=args.paid,source=args.source_csv,limit=args.limit,
+                   reviewed_top10=args.reviewed_top10)
         print(json.dumps(result,indent=2))
         return 0 if result["status"] not in ("GOOGLE_KEY_MISSING",) else 2
     except (OSError,ValueError,sqlite3.Error) as exc:
