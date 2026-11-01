@@ -76,6 +76,8 @@ def execute(workspace=None):
             "--results",str(results),"--out",str(review),"--paid","--max-projects","10"],False)
         run("buyer_research",["gta_integrated_buyer_investigation.py","--folder",
                               str(review),"--results",str(results),"--paid"],False)
+        run("source_evidence_intake",["gta_source_evidence_intake.py",
+            "--results",str(results),"--out",str(review),"--top","10","--verify"],False)
         run("buyer_verification_worklist",["gta_buyer_verification_worklist.py","--folder",str(review)],False)
         run("commercial_review",["gta_commercial_review_html.py","--folder",str(review)],False)
         run("intelligence_graph",["gta_unified_intelligence.py","--results",str(results),

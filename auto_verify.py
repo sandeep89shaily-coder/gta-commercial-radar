@@ -22,6 +22,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -222,9 +223,16 @@ def write_auto_file(folder, reviews, today=None):
         except (OSError, ValueError, KeyError, TypeError):
             existing = {}
     for review in reviews:
-        existing[review["project_id"]] = review
+        prior=existing.get(review["project_id"],{})
+        existing[review["project_id"]] = {**prior,**review,
+            "evidence":{**prior.get("evidence",{}),**review.get("evidence",{})}}
     tmp = path.with_suffix(".tmp")
     tmp.write_text(json.dumps({"written_by": VERSION, "reviews": list(existing.values())}, indent=2), encoding="utf-8")
+    if path.exists():
+        history=Path(folder)/'AUTO_VERIFIED_EVIDENCE_HISTORY'
+        history.mkdir(parents=True,exist_ok=True)
+        stamp=dt.datetime.now(dt.timezone.utc).strftime('%Y%m%dT%H%M%S%fZ')
+        shutil.copy2(path,history/(stamp+'.json'))
     os.replace(tmp, path)
     return path
 
