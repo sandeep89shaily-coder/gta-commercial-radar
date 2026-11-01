@@ -78,6 +78,9 @@ def execute(workspace=None):
                               str(review),"--results",str(results),"--paid"],False)
         run("source_evidence_intake",["gta_source_evidence_intake.py",
             "--results",str(results),"--out",str(review),"--top","10","--verify"],False)
+        run("live_procurement_evidence",["gta_live_procurement_evidence.py",
+            "--results",str(results),"--review",str(review),
+            "--out",str(review),"--limit","30"],False)
         run("buyer_procurement_batch",["gta_buyer_procurement_batch.py",
             "--results",str(results),"--review",str(review),"--out",str(review),"--top","10"],False)
         run("buyer_verification_worklist",["gta_buyer_verification_worklist.py","--folder",str(review)],False)
