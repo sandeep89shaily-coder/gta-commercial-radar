@@ -50,8 +50,35 @@ def inspect(rows,fetcher=auto_verify.fetch_page,limit=30):
                 item["reason"]="SOURCE_QUOTE_MATCHED_AUTHORITY_REQUIRES_HUMAN_REVIEW"
         results.append(item)
     return results
-def execute(infile,out,limit=30,fetcher=auto_verify.fetch_page):
-    with Path(infile).open(encoding="utf-8-sig",newline="") as f:rows=list(csv.DictReader(f))
+def source_rows(results=None,review=None):
+    """Only project-linked sourced quotes. AI hints are never proof."""
+    rows=[]
+    if results:
+        candidate=Path(results)/"PURCHASING_EVIDENCE_CANDIDATES.csv"
+        if candidate.is_file():
+            with candidate.open(encoding="utf-8-sig",newline="") as f:
+                rows.extend(csv.DictReader(f))
+    if review:
+        path=Path(review)/"BUYER_RELATIONSHIPS_REVIEW.json"
+        try:
+            observations=json.loads(path.read_text(encoding="utf-8")).get("observations",[])
+        except (OSError,ValueError,TypeError):
+            observations=[]
+        for item in observations:
+            if not isinstance(item,dict):continue
+            if item.get("project_id") and item.get("source_url") and item.get("exact_quote"):
+                rows.append({"project_id":item["project_id"],"kind":"BUYING_AUTHORITY",
+                    "organization":item.get("organization",""),
+                    "source_url":item["source_url"],"excerpt":item["exact_quote"],
+                    "role":item.get("role",""),"status":"UNKNOWN"})
+    return rows
+
+def execute(infile,out,limit=30,fetcher=auto_verify.fetch_page,review=None,results=None):
+    if infile:
+        with Path(infile).open(encoding="utf-8-sig",newline="") as f:
+            rows=list(csv.DictReader(f))
+    else:
+        rows=source_rows(results,review)
     records=inspect(rows,fetcher,limit)
     report={"checked_at_utc":dt.datetime.now(dt.timezone.utc).isoformat(),
             "records_checked":len(records),
@@ -68,9 +95,9 @@ def execute(infile,out,limit=30,fetcher=auto_verify.fetch_page):
     return report
 def main():
     p=argparse.ArgumentParser()
-    p.add_argument("--input",required=True);p.add_argument("--out",required=True)
+    p.add_argument("--input");p.add_argument("--results");p.add_argument("--review");p.add_argument("--out",required=True)
     p.add_argument("--limit",type=int,default=30)
     a=p.parse_args()
     if not 1<=a.limit<=30:p.error("limit must be 1..30")
-    print(json.dumps({k:v for k,v in execute(a.input,a.out,a.limit).items() if k!="records"},indent=2))
+    print(json.dumps({k:v for k,v in execute(a.input,a.out,a.limit,review=a.review,results=a.results).items() if k!="records"},indent=2))
 if __name__=="__main__":main()
