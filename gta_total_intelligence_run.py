@@ -15,7 +15,7 @@ def execute(workspace=None):
     target=review/"TOTAL_RUN_STATUS.json"
     def save():target.write_text(json.dumps(record,indent=2),encoding="utf-8")
     # Verify (and, only if safe, fast-forward) the installed code BEFORE any stage runs.
-    update=desktop_update.preflight(ROOT,results)
+    update=desktop_update.preflight(ROOT,results,apply_update=False)
     record["installed_commit"]={k:update.get(k) for k in ("status","installed_commit","remote_commit","updated_from","overridden")}
     print("Code check: "+update["status"]+" ("+(update["installed_commit"] or "unknown")[:10]+") "+update["message"],flush=True)
     if not update["ok"]:
