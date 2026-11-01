@@ -15,17 +15,86 @@ FIELDS=("rank","project_id","address","operator_hint","operator_status",
         "general_contractor_status","open_package_verified","live_sourced_observations",
         "sale_ready","priority","source_url","next_action")
 
-def choose(results,top=10):
+def recent_researched_projects(results,review,top=10):
+    """Follow the saved AI research audit, not an unrelated operator shortlist.
+
+    No AI claims are promoted: identity, operator, and award fields remain
+    unverified. The manifest is input metadata, not purchasing evidence.
+    """
+    if not review:
+        return []
+    try:
+        manifest=json.loads((Path(review)/"AI_PROJECT_RESEARCH_MANIFEST.json").read_text(encoding="utf-8"))
+    except (OSError,ValueError,TypeError):
+        return []
+    if not isinstance(manifest,dict):
+        return []
+    # Only projects actually processed in that batch. "ALREADY_REVIEWED"
+    # alone must not count as a new AI investigation.
+    audited=[r for r in manifest.get("audit",[])
+             if isinstance(r,dict) and r.get("status")=="AI_REVIEW_SAVED" and r.get("project_id")]
+    if not audited:
+        return []
+    by_id={}
+    for filename in ("GTA_RADAR_V8_PENDING_QUEUE.csv","GTA_RADAR_V8_PROJECTS.csv",
+                     "GTA_RADAR_V4_PROJECTS_FOR_AI.csv"):
+        source=Path(results)/filename
+        if not source.is_file():
+            continue
+        try:
+            with source.open(encoding="utf-8-sig",newline="") as handle:
+                for row in csv.DictReader(handle):
+                    pid=str(row.get("project_id") or "").strip()
+                    if pid and pid not in by_id:
+                        by_id[pid]=row
+        except (OSError,UnicodeError,ValueError):
+            continue
+    ranked={x.get("project_id"):x for x in manifest.get("selection",{}).get("top",[])
+            if isinstance(x,dict)}
+    chosen=[]
+    seen=set()
+    for record in audited:
+        pid=str(record["project_id"]).strip()
+        if pid in seen:
+            continue
+        seen.add(pid)
+        row=by_id.get(pid,{})
+        preview=ranked.get(pid,{})
+        chosen.append({
+            "project_id":pid,
+            "address":row.get("address") or preview.get("address",""),
+            "operator_name":row.get("operator") or row.get("official_company") or "",
+            "record_source_url":row.get("record_source_url",""),
+            "score":record.get("selection_score",preview.get("score","")),
+            "selection_basis":"CURRENT_AI_PROJECT_RESEARCH_AUDIT",
+        })
+        if len(chosen)>=top:
+            break
+    return chosen
+
+def choose(results,top=10,review=None):
+    researched=recent_researched_projects(results,review,top)
+    if len(researched)>=top:
+        return researched
     source=Path(results)/first.DEFAULT_FILE
-    if not source.exists():return []
+    if not source.exists():
+        return researched
     rows=first.load_records(source)
     selection=first.prioritize(rows,top=max(top,1))
-    # Keep the batch bounded, prefer source-ranked rows. Unscorable items are
-    # visible separately in the report, not converted into verified projects.
-    return selection["top"][:top]
+    # Fill only empty slots with separate operator-associated records.
+    # Never silently pretend these records were researched by DeepSeek.
+    chosen=list(researched)
+    used={x["project_id"] for x in chosen}
+    for item in selection["top"]:
+        if item["project_id"] not in used:
+            chosen.append(item)
+            used.add(item["project_id"])
+        if len(chosen)>=top:
+            break
+    return chosen
 
 def evaluate(results,review,top=10):
-    chosen=choose(results,top)
+    chosen=choose(results,top,review=review)
     # Human-reviewed evidence is authoritative; never trust legacy "verified"
     # booleans or unreviewed company / contractor names.
     proofs=gate.evaluate_folder(review)["results"]
@@ -56,6 +125,7 @@ def evaluate(results,review,top=10):
         eligible_excerpts=int(upstream.get("eligible_excerpts") or 0)
     except (OSError,ValueError,TypeError,AttributeError):
         pass
+    researched_selected=sum(x.get("selection_basis")=="CURRENT_AI_PROJECT_RESEARCH_AUDIT" for x in chosen)
     records=[]
     for n,item in enumerate(chosen,1):
         pid=item["project_id"]
@@ -81,7 +151,10 @@ def evaluate(results,review,top=10):
             "VERIFY_PURCHASING_AUTHORITY_CONTACT_AND_CURRENT_PACKAGE_AWARD_STATUS")
         })
     return {"created_utc":dt.datetime.now(dt.timezone.utc).isoformat(),
-            "selection":"UP_TO_TEN_EXISTING_OPERATOR_ASSOCIATED_RECORDS",
+            "selection":"RECENT_AI_RESEARCH_FIRST" if researched_selected else "UP_TO_TEN_EXISTING_OPERATOR_ASSOCIATED_RECORDS",
+            "recent_ai_researched_projects_selected":researched_selected,
+            "live_sourced_observations_on_selected":sum(len(live.get(x["project_id"],[])) for x in chosen),
+            "live_sourced_observations_outside_selected":sum(len(obs) for pid,obs in live.items() if pid not in {x["project_id"] for x in chosen}),
             "projects_checked":len(records),
             "live_stage_status":live_stage_status,
             "upstream_buyer_research_status":research_status,
