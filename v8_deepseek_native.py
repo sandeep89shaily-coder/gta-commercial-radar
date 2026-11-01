@@ -326,7 +326,7 @@ def parse_model_json(content):
         raise ModelResponseError('NOT_AN_OBJECT','Model JSON was not an object',content)
     raise ModelResponseError('INVALID_JSON','Model content was not valid JSON',content)
 
-def analyze(row,evidence,key,transport=None):
+def analyze(row,evidence,key,transport=None,*,project_discovery_only=False):
     facts={k:str(row.get(k) or '')[:200] for k in
            ('address','city','source_id','source_keys','company_name','description',
             'current_source_status','event_date','source_record_date','date_basis','lane',
@@ -358,6 +358,12 @@ def analyze(row,evidence,key,transport=None):
             'buyer_fit must say which sectors fit AND why availability remains unverified. '
             'If there are no relevant fetched pages, caveats must explicitly say SOURCE RECORD ONLY. '
             'Output JSON only. ')
+    if project_discovery_only:
+        system+=('DISCOVERY SCREENING ONLY: Focus on exact project identity, construction scope, '
+                 'source-date meaning, status and evidence-backed next manual verification. '
+                 'Do not identify, search for, or recommend purchasing contacts, suppliers, '
+                 'contract awards, procurement authorities or tender packages. '
+                 'Return contact as an empty string; owner/developer roles are unverified hints. ')
     dated=[{'field':d['field'],'date':d['date']} for d in source_dates.verified_dates(row,evidence)][:6]
     allowed_dates={d['date'] for d in source_dates.verified_dates(row,evidence)}
     system+=('Radar supplies verified_dates computed from raw timestamps. NEVER convert epoch values '
@@ -409,7 +415,7 @@ def analyze(row,evidence,key,transport=None):
                               page_text,re.I)):
         out['operator']=''
     val=str(values.get('contact') or '').strip()[:160]
-    out['contact']=val if approved and val and val.casefold() in page_text.casefold() else ''
+    out['contact']='' if project_discovery_only else (val if approved and val and val.casefold() in page_text.casefold() else '')
     removed_dates=0
     for field in ('project_stage','buyer_fit','next_verification','caveats'):
         cleaned,count=source_dates.sanitize_model_text(str(values.get(field) or '').strip()[:350],allowed_dates)
@@ -479,7 +485,7 @@ def read_csv(path):
 def run(projects_file,results_dir,legacy_data_dir=None,*,key=None,transport=None,
         max_projects=0,today=None,max_runtime_seconds=1800,
         official_transport=None,max_official_checks=60,
-        budget_cap_usd=None,eligible_project_ids=None):
+        budget_cap_usd=None,eligible_project_ids=None,project_discovery_only=False):
     """Investigate ALL queued candidates over consecutive runs, under $1/day.
 
     The old V8 discarded everything past the first 25 and lost records after the
@@ -599,7 +605,8 @@ def run(projects_file,results_dir,legacy_data_dir=None,*,key=None,transport=None
                     break
                 item['api_attempted']='YES';counts['ai_calls_attempted']+=1
                 try:
-                    answer,actual=analyze(research_row,evidence,key,transport)
+                    answer,actual=analyze(research_row,evidence,key,transport,
+                                          **({'project_discovery_only':True} if project_discovery_only else {}))
                     item.update(answer)
                     item.update(status='AI_EVIDENCE_REVIEW' if evidence else 'AI_SOURCE_RECORD_REVIEW',ai_used='YES')
                     ledger_finish(db,day,name,'DONE',actual)
@@ -616,7 +623,7 @@ def run(projects_file,results_dir,legacy_data_dir=None,*,key=None,transport=None
             contact_target=item.get('operator') or item.get('related_company') or ''
             official_verified=official.get('official_verification_level')=='OFFICIAL_ID_AND_STATUS_MATCH'
             if (item.get('status') in ('AI_EVIDENCE_REVIEW','AI_SOURCE_RECORD_REVIEW')
-                    and contact_target and (evidence or official_verified)
+                    and not project_discovery_only and contact_target and (evidence or official_verified)
                     and not item.get('contact')):
                 extra,ns=find_public_business_contact(research_row,contact_target,key,db,day,legacy,transport,
                                                        daily_limit=ceiling)
