@@ -114,8 +114,7 @@ def run(candidates_path,observations_path,results_dir,data_dir,*,today=None,
     r=ai.run(candidates_path,results_dir,legacy_data_dir=data_dir,
              today=today,transport=transport,official_transport=official_transport,
              max_runtime_seconds=max_runtime_seconds,key=key,
-             budget_cap_usd=CAP_USD,eligible_project_ids=eligible,
-             project_discovery_only=True)
+             budget_cap_usd=CAP_USD,eligible_project_ids=eligible)
     result.update(status=r.get("queue_stop_reason","UNKNOWN"),
                   paid_research_attempts=r.get("ai_calls_attempted",0),
                   native_searches=r.get("native_searches",0),
