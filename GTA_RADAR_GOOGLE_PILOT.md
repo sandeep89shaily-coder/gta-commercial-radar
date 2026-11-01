@@ -22,6 +22,14 @@
 5. Output is dated `GTA_GOOGLE_PILOT_*.csv` and `GTA_GOOGLE_PILOT_*.html` plus a cost/status summary in `GTA_RADAR_RESULTS`.
 6. For a different future cohort, omit `--reviewed-top10`; the default ranks the latest first-observed and changed records. You can also pass `--source-csv "C:\\path\\to\\projects.csv"` with fields `project_id`, `observation` (FIRST_OBSERVED or RECORD_CHANGED), `address`, `city`, and optionally `description` and `record_source_url`. Pilot still limits to ten.
 
+## Safe first test on Windows (no generation or grounding)
+1. Update your existing Radar code folder from GitHub **without replacing** `GTA_RADAR_RESULTS`, databases or review notes.
+2. Double-click `RUN_GEMINI_KEY_CHECK_NO_COST.bat`. If the key is not already available in your environment, the launcher asks for it in a hidden console prompt. It is used in memory only and is not saved to disk or printed.
+3. The diagnostic makes **one model-metadata GET request** to Google. `MODEL_LOOKUP_OK` means the key can access the model metadata; it **does not** prove that a paid Google Search request will work. `MODEL_LOOKUP_FAILED` includes a bounded, redacted HTTP error and status to diagnose access or billing settings. No project is sent and no local budget reservation is made.
+4. Only after the key lookup passes, preview `RUN_GTA_RADAR_GOOGLE_PILOT.bat`. A subsequent `--paid` run remains a **separate deliberate step**, never triggered by this key checker or by normal daily Radar.
+
+If you need to share the diagnostic, share only the status and error fields, **never the API key**. No GitHub Actions secret or Google Places configuration is required for this local key check.
+
 ## Quality check
 For each project, review: (a) whether Google found a distinct current primary source beyond DeepSeek; (b) whether project use, work scope and dates match the official record; (c) whether any business contact is corroborated on a company-owned website; and (d) whether the research is new enough to justify future API spending. Count independently confirmed corrections, not only more model output.
 
