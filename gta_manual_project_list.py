@@ -98,14 +98,18 @@ def build(results,*,today=None):
         })
     selected.sort(key=lambda x:(0 if x["observation"]=="FIRST_OBSERVED" else 1,x["city"],x["address"],x["project_id"]))
     root.mkdir(parents=True,exist_ok=True)
-    with (root/OUTPUT).open("w",encoding="utf-8-sig",newline="") as f:
+    # Unique dated files preserve any notes the owner adds to previous lists.
+    suffix=dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+    csv_name="GTA_RADAR_PROJECTS_TO_VERIFY_"+suffix+".csv"
+    html_name="GTA_RADAR_PROJECTS_TO_VERIFY_"+suffix+".html"
+    with (root/csv_name).open("w",encoding="utf-8-sig",newline="") as f:
         w=csv.DictWriter(f,fieldnames=FIELDS);w.writeheader();w.writerows(selected)
     esc=lambda value:html.escape(str(value or ""),quote=True)
     page=["<!doctype html><html><head><meta charset='utf-8'><title>GTA Radar manual project list</title>",
           "<style>body{font:15px Segoe UI,Arial,sans-serif;max-width:1100px;margin:28px auto;padding:0 20px;background:#fafafa;color:#222}article{background:white;border:1px solid #ddd;border-radius:8px;margin:12px 0;padding:15px}small{color:#555}a{color:#175ba2}</style></head><body>",
           "<h1>GTA Radar — new projects to verify yourself</h1>",
           "<p>Source records first observed or changed by Radar. Not proven new construction, confirmed projects, buyers or available contracts.</p>",
-          "<p><a href='"+OUTPUT+"'>Download review list (CSV)</a> · "+str(len(selected))+" records this run</p>"]
+          "<p><a href='"+csv_name+"'>Download review list (CSV)</a> · "+str(len(selected))+" records this run</p>"]
     for item in selected:
         page.extend(["<article><h3>"+esc(item["address"] or item["project_id"])+"</h3>",
                      "<p>"+esc(item["source_description"])+"</p>",
@@ -125,7 +129,7 @@ def build(results,*,today=None):
     if not selected:
         page.append("<p>No first-observed or changed source records in this run. No projects invented.</p>")
     page.append("</body></html>")
-    (root/HTML).write_text("".join(page),encoding="utf-8")
+    (root/html_name).write_text("".join(page),encoding="utf-8")
     summary={"generated_utc":dt.datetime.now(dt.timezone.utc).isoformat(),
              "mode":"DISCOVERY_ONLY_MANUAL_VERIFICATION",
              "new_or_changed_source_records":len(selected),
@@ -134,7 +138,7 @@ def build(results,*,today=None):
              "deepseek_initial_review_records":sum(x["deepseek_initial_status"]!="NOT_QUERIED_THIS_RUN" for x in selected),
              "initial_public_contact_hints":sum(bool(x["public_business_contact_hint_unverified"]) for x in selected),
              "verified_buyers_claimed":0,"supplier_packages_claimed":0,
-             "manual_review_csv":str(root/OUTPUT),"manual_review_html":str(root/HTML),
+             "manual_review_csv":str(root/csv_name),"manual_review_html":str(root/html_name),
              "limitations":"New/changed means first observed/changed by Radar, not freshly announced or independently verified."}
     (root/SUMMARY).write_text(json.dumps(summary,indent=2),encoding="utf-8")
     return summary
