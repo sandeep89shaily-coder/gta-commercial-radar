@@ -48,6 +48,14 @@ def evaluate(results,review,top=10):
                     live.setdefault(pid,[]).append(observation)
         except (OSError,ValueError,TypeError):
             live={}
+    research_status="NO_BUYER_RESEARCH_STATUS_FILE"
+    eligible_excerpts=0
+    try:
+        upstream=json.loads((Path(review)/"BUYER_RESEARCH_STATUS.json").read_text(encoding="utf-8"))
+        research_status=str(upstream.get("status") or "UNKNOWN")
+        eligible_excerpts=int(upstream.get("eligible_excerpts") or 0)
+    except (OSError,ValueError,TypeError,AttributeError):
+        pass
     records=[]
     for n,item in enumerate(chosen,1):
         pid=item["project_id"]
@@ -76,6 +84,8 @@ def evaluate(results,review,top=10):
             "selection":"UP_TO_TEN_EXISTING_OPERATOR_ASSOCIATED_RECORDS",
             "projects_checked":len(records),
             "live_stage_status":live_stage_status,
+            "upstream_buyer_research_status":research_status,
+            "upstream_eligible_source_excerpts":eligible_excerpts,
             "live_input_observations":live_input,
             "live_unlinked_observations":live_unlinked,
             "verified_buyers":sum(x["buyer_authority_status"]=="VERIFIED_REVIEW" for x in records),
