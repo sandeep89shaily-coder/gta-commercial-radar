@@ -41,7 +41,7 @@ def recover(results,top=10):
                           "source_url":item.get("record_source_url",""),
                           "reason":"NO_MATCHING_SOURCED_RECORD_IN_LOCAL_FILES"})
     selection=first.prioritize(recovered,top)
-    return selection,needs
+    return selection,needs,{r.get("project_id"):r for r in recovered}
 
 def propose(row):
     """Use exact source description, without inventing missing milestones."""
@@ -59,15 +59,10 @@ def propose(row):
 
 def run(results,out,*,top=10,fetcher=None):
     results=Path(results);out=Path(out);out.mkdir(parents=True,exist_ok=True)
-    selection,missing=recover(results,top)
+    selection,missing,recovered=recover(results,top)
     chosen=selection["top"]
-    specs=[spec for row in chosen if (spec:=propose(next(
-        (r for r in first.load_records(results/first.DEFAULT_FILE) if r.get("project_id")==row["project_id"]),row))) ]
-    # Recovered descriptions are also eligible for verification.
-    for row in chosen:
-        if any(s["project_id"]==row["project_id"] for s in specs):continue
-        spec=propose(row)
-        if spec:specs.append(spec)
+    specs=[spec for item in chosen
+           if (spec:=propose(recovered.get(item["project_id"],{}))) is not None]
     summary={"candidate_count":len(chosen),"claim_specs":len(specs),
              "source_refresh_required":missing+selection["needs_source_refresh"],
              "verified_claims":0,"human_confirmations_created":0}
