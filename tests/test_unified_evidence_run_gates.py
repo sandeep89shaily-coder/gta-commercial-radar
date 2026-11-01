@@ -15,7 +15,7 @@ class UnifiedEvidenceTests(unittest.TestCase):
             self.assertFalse(report["production_accepted"])
             self.assertIn("OFFICIAL_DOCUMENTS_CAPTURED",report["blockers"])
             self.assertIn("VERIFIED_BUYER_AUTHORITIES",report["blockers"])
-            self.assertIn("EARLY_DISCOVERY_PAIR_MEASURED",report["blockers"])
+            self.assertIn("EARLY_DISCOVERY_PAIR_MEASURED",report["research_gaps"])
 
     def test_verified_report_audit_merges_by_url(self):
         with tempfile.TemporaryDirectory() as directory:
