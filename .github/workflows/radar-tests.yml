@@ -21,3 +21,22 @@ jobs:
         run: python -m compileall -q .
       - name: Unit and integration tests
         run: python -m unittest discover -s tests
+
+  live-official-validation:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r requirements.txt
+      - name: Real source positive and fabricated claim negative controls
+        run: python gta_live_source_validation.py --out live_source_validation.json
+      - name: Publish exact observed outcome
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verified-source-probe
+          path: live_source_validation.json
