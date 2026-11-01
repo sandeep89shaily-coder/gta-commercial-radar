@@ -85,7 +85,7 @@ def google_error_details(exc,key=""):
         try:
             error=json.loads(exc.read(8192).decode("utf-8","replace")).get("error",{})
             if isinstance(error,dict):
-                details["google_error_status"]=str(error.get("status") or "")[:64]
+                details["google_error_status"]=str(error.get("status") or error.get("code") or "")[:64]
                 details["google_message"]=str(error.get("message") or "")[:280]
         except (ValueError,OSError,UnicodeError):
             pass
