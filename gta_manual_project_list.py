@@ -10,6 +10,7 @@ from pathlib import Path
 from urllib.parse import urlparse,quote_plus
 from gta_supplier_scope import classify
 from gta_freshness import assess as freshness_assess
+from gta_competitor_matchup import build as build_competitor_matchup
 
 SOURCE="GTA_RADAR_DAILY_NEW_DEVELOPMENTS.csv"
 AI_SOURCE="GTA_RADAR_V8_INVESTIGATIONS.csv"
@@ -141,6 +142,8 @@ def build(results,*,today=None):
         writer.writerows(supplier_rows)
     with (root/csv_name).open("w",encoding="utf-8-sig",newline="") as f:
         w=csv.DictWriter(f,fieldnames=FIELDS);w.writeheader();w.writerows(selected)
+    matchup=build_competitor_matchup(root,selected,today=dt.date.fromisoformat(today))
+    matchup_html=Path(matchup["comparison_html"]).name
     esc=lambda value:html.escape(str(value or ""),quote=True)
     page=["<!doctype html><html><head><meta charset='utf-8'><title>GTA Radar manual project list</title>",
           "<style>body{font:15px Segoe UI,Arial,sans-serif;max-width:1100px;margin:28px auto;padding:0 20px;background:#fafafa;color:#222}article{background:white;border:1px solid #ddd;border-radius:8px;margin:12px 0;padding:15px}small{color:#555}a{color:#175ba2}</style></head><body>",
@@ -150,6 +153,7 @@ def build(results,*,today=None):
           "Old or undated projects remain visible for manual verification. "
           "Supplier categories are unverified fits, NOT confirmed bid packages, buyers, suppliers, needs or available contracts.</p>",
           "<p><a href='"+csv_name+"'>Download review list (CSV)</a> · <a href='"+supplier_name+"'>Download supplier-sector matches (CSV)</a> · "+str(len(selected))+" records this run</p>"]
+    page.append("<p><a href='"+matchup_html+"'>Review GROUND / Datum same-project coverage (manual comparison)</a></p>")
     for item in selected:
         page.extend(["<article><h3>"+esc(item["address"] or item["project_id"])+"</h3>",
                      "<p>"+esc(item["source_description"])+"</p>",
@@ -198,6 +202,10 @@ def build(results,*,today=None):
              "supplier_sector_suggestions":len(supplier_rows),
              "supplier_projects_with_scope_matches":sum(bool(x["supplier_scope_linked"]) for x in selected),
              "supplier_matches_csv":str(root/supplier_name),
+             "ground_datum_comparison_csv":matchup["comparison_csv"],
+             "ground_datum_comparison_html":matchup["comparison_html"],
+             "ground_datum_persistent_manual_reviews":matchup["persistent_manual_reviews_csv"],
+             "ground_datum_comparable_pairs":matchup["comparable_first_detection_pairs"],
              "manual_review_csv":str(root/csv_name),"manual_review_html":str(root/html_name),
              "limitations":"New/changed means first observed/changed by Radar, not freshly announced or independently verified."}
     (root/SUMMARY).write_text(json.dumps(summary,indent=2),encoding="utf-8")
