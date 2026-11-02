@@ -25,11 +25,12 @@ AUDIT = "GTA_RADAR_INTEGRATED_INTELLIGENCE_STATUS.json"
 DETAIL = "GTA_RADAR_INTEGRATED_INTELLIGENCE.csv"
 DASHBOARD = "GTA_RADAR_INTEGRATED_INTELLIGENCE.html"
 DOC_LEDGER = "GTA_RADAR_DOCUMENT_AI_SEEN.json"
-REPORT_CATEGORIES = ("PROJECT", "SOURCE_INDEX_LINK_REVIEW", "MUNICIPAL_DOCUMENT_REVIEW")
+MEETING_LINK_LEDGER = "GTA_RADAR_MEETING_LINK_FIRST_SEEN.json"
+REPORT_CATEGORIES = ("PROJECT", "SOURCE_INDEX_LINK_REVIEW", "MUNICIPAL_AGENDA_LINK_REVIEW", "MUNICIPAL_DOCUMENT_REVIEW")
 FIELDS = ("kind", "project_id", "address", "city", "description", "source_url",
           "freshness", "source_date", "date_basis", "observed_at",
           "research_status", "organization_hint", "public_contact_hint",
-          "verification_required")
+          "ai_next_step", "verification_required")
 COMMERCIAL = re.compile(
     r"\b(industrial|warehouse|manufactur\w*|factory|commercial|office|retail|"
     r"development|redevelop\w*|construct\w*|site.plan|planning.application|"
@@ -132,6 +133,7 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
     Injectable functions make offline and Windows CI fully network/AI-free.
     """
     from RUN_MEETING_BUYER_PIPELINE import pipeline as meeting_default
+    from municipal_meeting_capture import OFFICIAL as municipal_official
     from gta_verified_source_pipeline import discover as discover_default, fetch_discovered
     from toronto_meeting_pdf_pipeline import run as agenda_default
     from toronto_verified_report_queue import run as report_default
@@ -187,10 +189,31 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
                         "required":required})
             return {}
 
-    for city in ("Toronto","Brampton"):
-        step("meeting_"+city.lower(),
-             lambda city=city: meeting_pipeline(city, review / "MEETINGS" / city,
-                                               include_procurement=False))
+    meeting_results={}
+    for city in municipal_official:
+        meeting_results[city]=step("meeting_"+city.lower(),
+            lambda city=city:meeting_pipeline(city,review/"MEETINGS"/city,
+                                              include_procurement=False))
+    # The index link is not evidence of a new project, nor a posting date.
+    # Keep separate first-observed URL ledger; never reissue unchanged URLs
+    # as new municipal discoveries on every daily report.
+    meeting_seen=_json(root/MEETING_LINK_LEDGER)
+    new_agenda_links=[]
+    for city,stage in meeting_results.items():
+        manifest=stage.get("meeting_index") if isinstance(stage,dict) else ""
+        record=_json(manifest) if manifest else {}
+        for item in record.get("agenda_candidates",[]):
+            if not isinstance(item,dict):continue
+            url=item.get("url","")
+            if not _url(url) or url in meeting_seen:continue
+            seen_at=dt.datetime.now(dt.timezone.utc).isoformat()
+            meeting_seen[url]={"city":city,"first_seen_utc":seen_at}
+            new_agenda_links.append({"city":city,"url":url,
+                                     "title":item.get("title",""),
+                                     "first_seen_utc":seen_at})
+    temp=root/(MEETING_LINK_LEDGER+".tmp")
+    temp.write_text(json.dumps(meeting_seen,indent=2),encoding="utf-8")
+    temp.replace(root/MEETING_LINK_LEDGER)
 
     docdir = review / "TORONTO_DOCUMENTS"
     docdir.mkdir(parents=True, exist_ok=True)
@@ -282,7 +305,23 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
             "research_status":current.get("status","NOT_RESEARCHED_THIS_RUN"),
             "organization_hint":current.get("operator") or current.get("related_company") or "",
             "public_contact_hint":current.get("contact") or current.get("related_company_contact") or "",
+            "ai_next_step":"PROJECT_AND_ROLE_RESEARCH_IF_SOURCE_DATED_AND_RELEVANT",
             "verification_required":"Exact project, buyer role, current supplier/award status",
+        })
+    # Expose newly noticed agenda links even if they are not yet dated,
+    # extracted or connected to permit identities.
+    for agenda_link in new_agenda_links:
+        combined.append({
+            "kind":"MUNICIPAL_AGENDA_LINK_REVIEW","project_id":"",
+            "city":agenda_link["city"],"address":"",
+            "description":str(agenda_link["title"] or "Municipal meeting or agenda link")[:240],
+            "source_url":agenda_link["url"],
+            "freshness":"NEW_TO_RADAR_INDEX_NOT_VERIFIED_PUBLICATION",
+            "source_date":"","date_basis":"RADAR_OBSERVED_NOT_PUBLISHER_DATE",
+            "observed_at":agenda_link["first_seen_utc"],
+            "research_status":"LINK_ONLY_DOCUMENT_NOT_YET_PARSED",
+            "ai_next_step":"RETRIEVE_ORIGINAL_REPORT_THEN_AI_EXTRACT_IF_MATERIAL",
+            "verification_required":"Verify this is a substantive new commercial project and determine posting date",
         })
     feed = _json(root / "EARLY_SIGNAL_FEED_AUDIT.json")
     for signal in feed.get("candidate_links",[])[:250]:
@@ -300,6 +339,7 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
             "source_date":"","date_basis":"OBSERVATION_TIMESTAMP_ONLY",
             "observed_at":signal.get("first_seen_utc",""),
             "research_status":"OFFICIAL_LINK_PROJECT_IDENTITY_UNVERIFIED",
+            "ai_next_step":"NO_PAID_AI_FOR_LINK_ONLY_FETCH_ORIGINAL_DOCUMENT_FIRST",
             "verification_required":"Read original agenda, establish actual project and posting date",
         })
     ai_reviews=_csv(review/"DOCUMENT_AI"/"TORONTO_AI_DOCUMENT_BATCH_AUDIT.csv")
@@ -321,6 +361,7 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
             "research_status":analysis.get("status","DOCUMENT_CAPTURED_AI_NOT_ATTEMPTED"),
             "organization_hint":str(model.get("developer") or model.get("owner") or "")[:160],
             "public_contact_hint":"",
+            "ai_next_step":"EVIDENCE_BOUND_DOCUMENT_AI_THEN_PROJECT_IDENTITY_REVIEW",
             "verification_required":"Check PDF page and claim quotations, project identity, publishing date and roles",
         })
     _write_csv(root / DETAIL, combined)
@@ -352,13 +393,18 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
     state.update({
         "status":"PARTIAL_REVIEW_REQUIRED" if failed else "INTEGRATED_REVIEW_READY",
         "failed_stages":failed,
-        "meeting_sources_attempted":["Toronto","Brampton"],
+        "meeting_sources_attempted":list(municipal_official),
+        "municipal_official_index_count":len(municipal_official),
+        "municipal_agenda_links_new_to_radar":len(new_agenda_links),
+        "meeting_documents_fetched_outside_toronto":0,
+        "ai_policy":"Use no model for URL checking/structured parsing; AI for actual readable documents, ambiguous identity and source-backed projects; authorized captions only; shared budget",
         "source_indexes_checked":discovered.get("indexes_checked",0),
         "pdfs_captured_in_union":union_result.get("captured",0),
         "combined_records":len(combined),
         "permit_planning_events":sum(r["kind"]=="PROJECT" for r in combined),
         "municipal_documents_for_review":sum(r["kind"]=="MUNICIPAL_DOCUMENT_REVIEW" for r in combined),
         "new_source_index_links_for_review":sum(r["kind"]=="SOURCE_INDEX_LINK_REVIEW" for r in combined),
+        "new_municipal_agenda_links_for_review":sum(r["kind"]=="MUNICIPAL_AGENDA_LINK_REVIEW" for r in combined),
         "combined_csv":str(root / DETAIL),
         "combined_html":str(root / DASHBOARD),
         "ended_utc":dt.datetime.now(dt.timezone.utc).isoformat(),

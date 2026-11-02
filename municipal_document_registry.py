@@ -12,7 +12,7 @@ from urllib.parse import urlparse
 
 ROOT = Path(__file__).resolve().parent
 REQUIRED = ("id","city","url","system","source_type","priority","evidence","status","publish")
-ALLOWED = {"Toronto","Brampton","Mississauga","Hamilton"}
+ALLOWED = {"Toronto","Brampton","Mississauga","Hamilton","Burlington","Oakville","Vaughan","Kitchener"}
 PREFIX = "OFFICIAL_INDEX_CONFIRMED_"
 
 
