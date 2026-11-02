@@ -121,7 +121,7 @@ def build(candidates_path,results_dir,*,today=None):
     full=[]
     active=[]
     count={"FIRST_OBSERVED":0,"RECORD_CHANGED":0,"INITIAL_BASELINE":0,
-           "ARCHIVE_CONTEXT":0,"UNCHANGED":0}
+           "ARCHIVE_CONTEXT":0,"UNCHANGED":0,"AGGREGATED_SOURCE_NOT_PROJECT":0}
     for raw in source:
         pid=str(raw.get("project_id") or "").strip()
         if not pid:continue
@@ -159,7 +159,15 @@ def build(candidates_path,results_dir,*,today=None):
         full.append(row)
         count[observation]+=1
         if observation in ("FIRST_OBSERVED","RECORD_CHANGED"):
-            active.append(row)
+            # November 2: one environmental registry collector packaged a
+            # 12,241-character digest of unrelated provincial notices into a
+            # single row. Keep it in the audit, not the commercial project list.
+            is_aggregate=(str(row.get("source_id") or "")=="ero_gta_environmental_instruments"
+                          and len(desc)>2000)
+            if is_aggregate:
+                count["AGGREGATED_SOURCE_NOT_PROJECT"]+=1
+            else:
+                active.append(row)
     active.sort(key=lambda row:_priority(row, today=dt.date.fromisoformat(day)))
     full.sort(key=lambda row:_priority(row, today=dt.date.fromisoformat(day)))
     _write(out/CSV_NAME,active)
