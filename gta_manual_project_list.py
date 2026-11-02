@@ -148,7 +148,7 @@ def build(results,*,today=None):
           "<p>Ranked by source-date freshness, NOT the date Radar noticed the record. "
           "A source date may be a filing or status date rather than first publication. "
           "Old or undated projects remain visible for manual verification. "
-          "Supplier categories are unverified fits, NOT confirmed bids or buyers.</p>",
+          "Supplier categories are unverified fits, NOT confirmed bid packages, buyers, suppliers, needs or available contracts.</p>",
           "<p><a href='"+csv_name+"'>Download review list (CSV)</a> · <a href='"+supplier_name+"'>Download supplier-sector matches (CSV)</a> · "+str(len(selected))+" records this run</p>"]
     for item in selected:
         page.extend(["<article><h3>"+esc(item["address"] or item["project_id"])+"</h3>",
