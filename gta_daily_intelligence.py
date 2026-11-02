@@ -104,10 +104,15 @@ def _build_document_worklist(union_csv, out, seen, *, paid, ai_processor):
               and r.get("sha256") and _url(r.get("url"))
               and Path(r.get("saved_path") or "").is_file()]
     queued = [r for r in source if r["sha256"] not in seen]
-    selected = queued[:2]
+    # Share the two-document DeepSeek cap across all cities; an eligible
+    # non-Toronto report can be researched before another Toronto report.
+    from_other = next((r for r in queued if r.get("city") and r["city"]!="Toronto"),None)
+    selected = ([from_other] if from_other else [])
+    selected.extend(r for r in queued if r is not from_other)
+    selected = selected[:2]
     to_analyze = Path(out) / "NEW_DOCUMENTS_FOR_REVIEW.csv"
     _write_csv(to_analyze, selected,
-               ("url", "status", "reason", "http_status", "bytes", "sha256", "saved_path"))
+               ("url", "status", "reason", "http_status", "bytes", "sha256", "saved_path", "city", "source_page"))
     if selected:
         summary = ai_processor(to_analyze, Path(out) / "DOCUMENT_AI", Path(out).parent,
                                paid=paid, limit=2)
@@ -126,6 +131,7 @@ def _build_document_worklist(union_csv, out, seen, *, paid, ai_processor):
 
 def integrate(results, *, today=None, meeting_pipeline=None, document_discover=None,
               agenda_pipeline=None, verified_reports=None, document_ai=None,
+              multicity_capture=None,
               project_ai=None, buyer_ai=None, procurement=None, buyer_batch=None,
               graph=None, api_key_check=None, allow_paid=True):
     """Run integrated bounded stages and expose individual failure provenance.
@@ -138,6 +144,7 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
     from toronto_meeting_pdf_pipeline import run as agenda_default
     from toronto_verified_report_queue import run as report_default
     from toronto_ai_document_batch import process as document_default
+    from municipal_document_capture import run as multicity_capture_default
     from gta_execute_ai_project_research import execute as project_default
     from gta_integrated_buyer_investigation import run as buyer_default
     from gta_live_procurement_evidence import execute as procurement_default
@@ -157,6 +164,7 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
     agenda_pipeline = agenda_pipeline or agenda_default
     verified_reports = verified_reports or report_default
     document_ai = document_ai or document_default
+    multicity_capture = multicity_capture or multicity_capture_default
     project_ai = project_ai or project_default
     buyer_ai = buyer_ai or buyer_default
     procurement = procurement or procurement_default
@@ -235,11 +243,17 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
         lambda:verified_reports(Path(__file__).parent / "config" / "toronto_verified_report_queue.csv",
                                 docdir,fetch=True,max_files=2))
 
+    # Seven additional official-host municipal pages; eSCRIBE and Laserfiche
+    # third-party documents require a separately verified adapter.
+    other_docdir=review/"OTHER_CITY_DOCUMENTS"
+    multicity=step("other_city_official_pdf_capture",
+        lambda:multicity_capture(meeting_results,other_docdir))
     pdf_union = docdir / "COMBINED_PDF_FETCH_AUDIT.csv"
     union_result = step("deduplicate_pdf_evidence",
         lambda:union([docdir / "AUTOMATIC_PDF_FETCH_AUDIT.csv",
                       docdir / "TORONTO_PDF_FETCH_AUDIT.csv",
-                      docdir / "VERIFIED_REPORT_FETCH_AUDIT.csv"],pdf_union),
+                      docdir / "VERIFIED_REPORT_FETCH_AUDIT.csv",
+                      other_docdir / "MULTICITY_PDF_FETCH_AUDIT.csv"],pdf_union),
         required=True)
 
     done = _json(root / DOC_LEDGER)
@@ -352,7 +366,7 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
         combined.append({
             "kind":"MUNICIPAL_DOCUMENT_REVIEW","project_id":"",
             "address":str(model.get("address") or "")[:140],
-            "city":"Toronto",
+            "city":d.get("city") or "Toronto",
             "description":str(model.get("proposed_scope") or "Official municipal PDF — review new project and procurement content")[:350],
             "source_url":d.get("url",""),
             "freshness":"DOCUMENT_CAPTURED_PUBLICATION_DATE_UNKNOWN",
@@ -362,7 +376,7 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
             "organization_hint":str(model.get("developer") or model.get("owner") or "")[:160],
             "public_contact_hint":"",
             "ai_next_step":"EVIDENCE_BOUND_DOCUMENT_AI_THEN_PROJECT_IDENTITY_REVIEW",
-            "verification_required":"Check PDF page and claim quotations, project identity, publishing date and roles",
+            "verification_required":"Check source page, PDF page and quotes, project identity, publication date and roles",
         })
     _write_csv(root / DETAIL, combined)
     dated = root / ("GTA_RADAR_INTEGRATED_INTELLIGENCE_"+today.strftime("%Y%m%d")+".csv")
@@ -396,7 +410,11 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
         "meeting_sources_attempted":list(municipal_official),
         "municipal_official_index_count":len(municipal_official),
         "municipal_agenda_links_new_to_radar":len(new_agenda_links),
-        "meeting_documents_fetched_outside_toronto":0,
+        "meeting_documents_fetched_outside_toronto":multicity.get("direct_pdf_captured",0),
+        "other_city_document_capture":{k:multicity.get(k) for k in
+            ("cities_configured","cities_attempted","successful_document_cities",
+             "direct_pdf_attempted","direct_pdf_captured","audit_csv","coverage_warning")},
+        "municipal_document_capture_city_status":multicity.get("city_audit",[]),
         "ai_policy":"Use no model for URL checking/structured parsing; AI for actual readable documents, ambiguous identity and source-backed projects; authorized captions only; shared budget",
         "source_indexes_checked":discovered.get("indexes_checked",0),
         "pdfs_captured_in_union":union_result.get("captured",0),
