@@ -59,7 +59,7 @@ class Session:
 
 class MultiCityPDFTests(unittest.TestCase):
     def test_city_host_allowlist_stops_external_urls_and_query_redirects(self):
-        self.assertEqual(len(CITY_PAGES),7)
+        self.assertEqual(len(CITY_PAGES),15)
         self.assertTrue(_valid_city_url("Mississauga",PAGE))
         self.assertTrue(_valid_city_url("Mississauga",PDF,pdf=True))
         self.assertFalse(_valid_city_url("Mississauga",OUTSIDE,pdf=True))
@@ -111,7 +111,7 @@ class MultiCityPDFTests(unittest.TestCase):
             manifest.write_text(json.dumps({"agenda_candidates":[{"url":PAGE}]}))
             result=run({"Mississauga":{"meeting_index":str(manifest)}},root/"docs",
                        session=session,resolver=dns,policy_reader=lambda _:"User-agent: *\nAllow: /")
-            self.assertEqual(result["cities_attempted"],7)
+            self.assertEqual(result["cities_attempted"],15)
             self.assertEqual(result["direct_pdf_captured"],1)
             self.assertEqual(result["successful_document_cities"],["Mississauga"])
             row=integrated._csv(result["audit_csv"])[0]
