@@ -2,7 +2,15 @@
 
 > **Durable master copy on the default branch.** All researched public sources, including deferred and exploratory ideas, are recorded in [GTA_RADAR_RESEARCH_REGISTER.md](GTA_RADAR_RESEARCH_REGISTER.md). Do not narrow this roadmap to only the latest two or three sources. Future reminders should read both files. The early-signals pilot remains on a separate unmerged branch, not V8 production.
 
-_Last reviewed: 2026-10-24. Durable decision log for future AI work; keep this file visible in every major Radar review._
+_Last foundational review: 2026-10-24. Strategic ambition and benchmark initiated 2026-11-01. Durable decision log for future AI work; keep this file visible in every major Radar review._
+
+## November 1, 2026 — fixed long-term ambition (owner-confirmed)
+
+**Build GTA Radar into a top-tier Canadian commercial construction and development intelligence company, beginning in Southern Ontario.** Serve ALL relevant suppliers and service providers: construction, specialty trades, engineering, equipment, insurance, security, facility services and others. Different customer segments can value different project lifecycle phases.
+
+This *long-term destination* does not replace the immediate hard gates below: independently validated projects, actual buyer/role evidence, two paying pilot customers, and measured early detection. **Do not publicly assert "Canada's #1," "first to discover," an open supplier bid, or a verified purchasing authority without comparative proof.** A curated paid pilot is the first product/market test, not a cap on future services, dashboards, alerts, enterprise intelligence or geographic expansion.
+
+For the first controlled evidence baseline, see [GTA_RADAR_COMPETITIVE_BENCHMARK_20261101.md](GTA_RADAR_COMPETITIVE_BENCHMARK_20261101.md). It documents the exact ten selected projects, known earlier public disclosures and competitor overlap, and explicitly marks unavailable first-detection timestamps **UNKNOWN**. No source-record date is a substitute for an actual Radar ingestion/publication timestamp. Keep development priorities bounded to verified gaps and customer needs.
 
 ## ONE business objective — do not lose sight of this
 
