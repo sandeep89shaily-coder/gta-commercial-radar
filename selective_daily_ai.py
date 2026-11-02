@@ -78,7 +78,8 @@ def enqueue(candidates_path,observations_path,results_dir,*,today=None):
         if not status["paid_freshness_eligible"]:
             continue
         previous=earlier.get(pid)
-        if previous and queue.fingerprint(previous)==queue.fingerprint(row):
+        if (previous and queue.fingerprint(previous)==queue.fingerprint(row)
+                and previous.get("_radar_freshness_approved")=="YES"):
             continue
         candidate["_radar_freshness_approved"]="YES"
         earlier[pid]=candidate
@@ -112,8 +113,9 @@ def run(candidates_path,observations_path,results_dir,data_dir,*,today=None,
     # Old backlog is NOT eligible. This selection is *only* first-seen or
     # materially changed commercial records preserved in our small pending file.
     # Legacy pending files may contain old, never-approved observations; retain
-    # them unchanged for audit but do not authorize new paid calls on that basis.
-    eligible_rows=[r for r in queued if r.get("_radar_freshness_approved")=="YES"]
+    # them for audit, but only source-recent records may enter paid work.
+    eligible_rows=[r for r in queued if (r.get("_radar_freshness_approved")=="YES"
+                   or freshness_assess(r,today)["paid_freshness_eligible"])]
     eligible={r["project_id"] for r in eligible_rows}
     priority_buckets={r["project_id"]:freshness_assess(r,today)["freshness_sort_bucket"]
                       for r in eligible_rows}
