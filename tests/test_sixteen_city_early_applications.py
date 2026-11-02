@@ -75,6 +75,20 @@ class SixteenEarlyApplicationsTests(unittest.TestCase):
             self.assertEqual(result["project_filing_or_first_publication_dates_verified"],0)
             self.assertEqual(result["automatically_promoted_to_canonical_projects"],0)
 
+    def test_city_that_first_blocks_and_later_succeeds_starts_with_baseline(self):
+        with tempfile.TemporaryDirectory() as td:
+            city="Vaughan";url=ea.SOURCES[city]
+            denied=ea.run(td,today=DAY,fetcher=lambda _:(_ for _ in ()).throw(
+                PermissionError("HTTP 403")),sources={city:url})
+            self.assertEqual(denied["indexes_failed"],1)
+            allowed=ea.run(td,today=DAY+dt.timedelta(days=1),
+                           fetcher=lambda _:"<li>OZ 26-17 W1 new industrial warehouse</li>",
+                           sources={city:url})
+            self.assertEqual(allowed["application_candidate_rows"],1)
+            self.assertEqual(allowed["new_or_changed_application_records"],0)
+            self.assertEqual(daily._csv(Path(td)/ea.CANDIDATES)[0]["observation"],
+                             "INITIAL_BASELINE")
+
     def test_external_links_not_promoted_as_official_citations(self):
         url=ea.SOURCES["Mississauga"]
         html="""<li><a href='https://evil.example/OZ-26-4'>OZ 26-4 W9 new industrial warehouse</a></li>"""
