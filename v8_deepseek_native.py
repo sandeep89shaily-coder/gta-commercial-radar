@@ -479,7 +479,8 @@ def read_csv(path):
 def run(projects_file,results_dir,legacy_data_dir=None,*,key=None,transport=None,
         max_projects=0,today=None,max_runtime_seconds=1800,
         official_transport=None,max_official_checks=60,
-        budget_cap_usd=None,eligible_project_ids=None):
+        budget_cap_usd=None,eligible_project_ids=None,
+        freshness_priority_buckets=None):
     """Investigate ALL queued candidates over consecutive runs, under $1/day.
 
     The old V8 discarded everything past the first 25 and lost records after the
@@ -513,6 +514,12 @@ def run(projects_file,results_dir,legacy_data_dir=None,*,key=None,transport=None
     if eligible_project_ids is not None:
         allowed=set(eligible_project_ids)
         due=[row for row in due if row.get('project_id') in allowed]
+        if freshness_priority_buckets is not None:
+            # Stable ordering retains pre-existing regional and lifecycle
+            # balancing *within* each freshness band while a genuinely recent
+            # source event outranks an old project newly seen by Radar.
+            due.sort(key=lambda row:int(freshness_priority_buckets.get(
+                row.get('project_id'),5)))
     counts=dict(native_searches=0,native_fetches=0,ai_calls_attempted=0,
                 ai_calls_succeeded=0,with_public_pages=0,ai_budget_deferred=0,
                 errors=0,source_only_ai_calls=0,duplicate_model_skipped=0,
