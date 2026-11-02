@@ -9,6 +9,7 @@ import argparse,csv,datetime as dt,html,json
 from pathlib import Path
 from urllib.parse import urlparse,quote_plus
 from gta_supplier_scope import classify
+from gta_freshness import assess as freshness_assess
 
 SOURCE="GTA_RADAR_DAILY_NEW_DEVELOPMENTS.csv"
 AI_SOURCE="GTA_RADAR_V8_INVESTIGATIONS.csv"
@@ -20,7 +21,8 @@ SUPPLIER_MATCH_FIELDS=("observation","project_id","city","address",
                        "supplier_family","supplier_category","match_tier",
                        "likely_service_phase","scope_phrase","qualification")
 FIELDS=("observation","project_id","city","address","source_description",
-        "source_record_date","date_basis","radar_first_seen","local_source_status",
+        "source_record_date","date_basis","radar_first_seen","freshness_band",
+        "source_age_days","freshness_date_basis","changed_fields","local_source_status",
         "source_url","deepseek_initial_status","deepseek_initial_queries",
         "deepseek_checked_on","deepseek_project_stage_hint",
         "deepseek_corroborating_urls","organization_hint_unverified",
@@ -86,6 +88,7 @@ def build(results,*,today=None):
         supplier_matches=classify(source.get("description",""))
         tiers=lambda tier: " | ".join(x["supplier_category"] for x in supplier_matches
                                       if x["match_tier"]==tier)
+        freshness=freshness_assess(source,today)
         selected.append({
             "observation":source["observation"],"project_id":pid,
             "city":source.get("city",""),"address":source.get("address",""),
@@ -93,6 +96,10 @@ def build(results,*,today=None):
             "source_record_date":source.get("source_record_date",""),
             "date_basis":source.get("date_basis",""),
             "radar_first_seen":source.get("first_seen_local",""),
+            "freshness_band":freshness["freshness_band"],
+            "source_age_days":freshness["source_age_days"],
+            "freshness_date_basis":freshness["freshness_date_basis"],
+            "changed_fields":source.get("changed_fields",""),
             "local_source_status":source.get("current_source_status",""),
             "source_url":source_url,
             "deepseek_initial_status":status,
@@ -110,7 +117,11 @@ def build(results,*,today=None):
             "supplier_match_status":"UNVERIFIED_SUGGESTIONS" if supplier_matches else "INSUFFICIENT_SCOPE",
             "manual_project_verification":"","manual_notes":"",
         })
-    selected.sort(key=lambda x:(0 if x["observation"]=="FIRST_OBSERVED" else 1,x["city"],x["address"],x["project_id"]))
+    bands={"SOURCE_DATED_0_7_DAYS":0,"SOURCE_DATED_8_30_DAYS":1,
+           "SOURCE_DATED_31_90_DAYS":2,"OLDER_PROJECT_SCOPE_CHANGED_REVIEW":3,
+           "HISTORICAL_SOURCE_DATE":4,"SOURCE_DATE_UNKNOWN":5}
+    selected.sort(key=lambda x:(bands.get(x["freshness_band"],6),
+         x["city"],x["address"],x["project_id"]))
     root.mkdir(parents=True,exist_ok=True)
     # Unique dated files preserve any notes the owner adds to previous lists.
     suffix=dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
@@ -133,14 +144,19 @@ def build(results,*,today=None):
     esc=lambda value:html.escape(str(value or ""),quote=True)
     page=["<!doctype html><html><head><meta charset='utf-8'><title>GTA Radar manual project list</title>",
           "<style>body{font:15px Segoe UI,Arial,sans-serif;max-width:1100px;margin:28px auto;padding:0 20px;background:#fafafa;color:#222}article{background:white;border:1px solid #ddd;border-radius:8px;margin:12px 0;padding:15px}small{color:#555}a{color:#175ba2}</style></head><body>",
-          "<h1>GTA Radar — new projects to verify yourself</h1>",
-          "<p>Source records first observed or changed by Radar. Supplier categories are unverified fits derived from original description, NOT confirmed bid packages, buyers, suppliers, needs or available contracts.</p>",
+          "<h1>GTA Radar — projects to verify (freshness-first)</h1>",
+          "<p>Ranked by source-date freshness, NOT the date Radar noticed the record. "
+          "A source date may be a filing or status date rather than first publication. "
+          "Old or undated projects remain visible for manual verification. "
+          "Supplier categories are unverified fits, NOT confirmed bid packages, buyers, suppliers, needs or available contracts.</p>",
           "<p><a href='"+csv_name+"'>Download review list (CSV)</a> · <a href='"+supplier_name+"'>Download supplier-sector matches (CSV)</a> · "+str(len(selected))+" records this run</p>"]
     for item in selected:
         page.extend(["<article><h3>"+esc(item["address"] or item["project_id"])+"</h3>",
                      "<p>"+esc(item["source_description"])+"</p>",
                      "<small>"+esc(item["observation"])+" | "+esc(item["city"])+
                      " | source date: "+esc(item["source_record_date"] or "unknown")+
+                     " | freshness: "+esc(item["freshness_band"])+
+                     " | basis: "+esc(item["freshness_date_basis"])+
                      " | local status: "+esc(item["local_source_status"] or "unknown")+"</small>",
                      "<p>DeepSeek initial screening: "+esc(item["deepseek_initial_status"])+
                      " | project stage (AI hint): "+esc(item["deepseek_project_stage_hint"] or "not assessed")+"</p>",
@@ -171,6 +187,9 @@ def build(results,*,today=None):
     summary={"generated_utc":dt.datetime.now(dt.timezone.utc).isoformat(),
              "mode":"DISCOVERY_ONLY_MANUAL_VERIFICATION",
              "new_or_changed_source_records":len(selected),
+             "source_dated_0_7_days":sum(x["freshness_band"]=="SOURCE_DATED_0_7_DAYS" for x in selected),
+             "source_dated_8_30_days":sum(x["freshness_band"]=="SOURCE_DATED_8_30_DAYS" for x in selected),
+             "historical_or_undated":sum(x["freshness_band"] in ("HISTORICAL_SOURCE_DATE","SOURCE_DATE_UNKNOWN") for x in selected),
              "first_observed":sum(x["observation"]=="FIRST_OBSERVED" for x in selected),
              "changed":sum(x["observation"]=="RECORD_CHANGED" for x in selected),
              "deepseek_initial_review_records":sum(x["deepseek_initial_status"]!="NOT_QUERIED_THIS_RUN" for x in selected),

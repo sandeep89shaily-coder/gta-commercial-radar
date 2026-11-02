@@ -15,12 +15,15 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from commercial_selector_v4 import ACTION
+from gta_freshness import assess as freshness_assess, rank as freshness_rank
 from opportunity_lifecycle import classify_status
 
 FIELDS=[
     "observation","first_seen_local","last_seen_local","project_id","address",
     "city","source_id","source_keys","lane","description","event_date",
-    "date_basis","source_record_date","current_source_status",
+    "date_basis","source_record_date","changed_fields","freshness_band",
+    "freshness_date","freshness_date_basis","source_age_days",
+    "paid_freshness_eligible","current_source_status",
     "stage_from_local_status","record_source_url","record_source_url_basis",
     "service_hypotheses","source_group","review_priority",
     "follow_up","warning"
@@ -49,7 +52,7 @@ def _sig(row):
     clean=[" ".join(str(v).casefold().split()) for v in values]
     return hashlib.sha256(json.dumps(clean,ensure_ascii=True).encode()).hexdigest()
 
-def _record(row,observation,first,day):
+def _record(row,observation,first,day,changed_fields=""):
     status=row.get("current_source_status") or ""
     stage=classify_status(status)
     desc=row.get("description") or ""
@@ -64,7 +67,12 @@ def _record(row,observation,first,day):
         next_action="Check if this record contains specific new commercial work before pursuing."
     if observation=="ARCHIVE_CONTEXT":
         next_action="Historical source-dated regional record; not a new municipal event. "+next_action
+    current=dict(row, observation=observation, changed_fields=changed_fields)
+    freshness=freshness_assess(current, day)
     return {
+        **{field:freshness[field] for field in ("freshness_band","freshness_date",
+           "freshness_date_basis","source_age_days","paid_freshness_eligible")},
+        "changed_fields":changed_fields,
         "observation":observation,"first_seen_local":first,"last_seen_local":day,
         "project_id":row.get("project_id",""),"address":row.get("address",""),
         "city":row.get("city",""),"source_id":row.get("source_id",""),
@@ -83,16 +91,11 @@ def _record(row,observation,first,day):
                    "a newly issued permit, or evidence of a supplier contract.")
     }
 
-def _priority(row):
-    # Prioritize substantive early-stage changes without claiming live stage.
-    kind={"FIRST_OBSERVED":0,"RECORD_CHANGED":1,"INITIAL_BASELINE":2,
-          "ARCHIVE_CONTEXT":3,"UNCHANGED":4}.get(row["observation"],5)
-    stage={"PRE_APPROVAL":0,"PRE_ISSUANCE":1,"APPROVED_NOT_ISSUED":2,
-           "PERMIT_ISSUED":3,"UNKNOWN":4,"INSPECTION_STAGE":5,
-           "BLOCKED_OR_INACTIVE":9,"COMPLETED":9}.get(row["stage_from_local_status"],5)
-    try:base=-int(row["review_priority"])
-    except (ValueError,TypeError):base=0
-    return (kind,stage,base,row["project_id"])
+def _priority(row, today=None):
+    # A newly imported historical record must not outrank a source-dated
+    # opportunity, even when both were first seen by Radar today.
+    return freshness_rank(row, today or dt.date.today())
+
 
 def build(candidates_path,results_dir,*,today=None):
     """Update persistent first-seen index only after parsing the latest V4 file.
@@ -137,15 +140,20 @@ def build(candidates_path,results_dir,*,today=None):
         else:
             observation="UNCHANGED"
         first=old.get("first_seen_local") or day
+        keys=("source_id","source_keys","description","current_source_status","company_name")
+        snapshot={k:" ".join(str(raw.get(k) or "").casefold().split()) for k in keys}
+        prior_snapshot=old.get("signal_values") if isinstance(old.get("signal_values"),dict) else None
+        changed_fields=" | ".join(k for k in keys if prior_snapshot is not None
+                                   and prior_snapshot.get(k,"")!=snapshot[k]) if observation=="RECORD_CHANGED" else ""
         updated[pid]={"fingerprint":fp,"first_seen_local":first,
-                      "last_seen_local":day}
-        row=_record(raw,observation,first,day)
+                      "last_seen_local":day,"signal_values":snapshot}
+        row=_record(raw,observation,first,day,changed_fields)
         full.append(row)
         count[observation]+=1
         if observation in ("FIRST_OBSERVED","RECORD_CHANGED"):
             active.append(row)
-    active.sort(key=_priority)
-    full.sort(key=_priority)
+    active.sort(key=lambda row:_priority(row, today=dt.date.fromisoformat(day)))
+    full.sort(key=lambda row:_priority(row, today=dt.date.fromisoformat(day)))
     _write(out/CSV_NAME,active)
     _write(out/ALL_NAME,full)
     state_tmp=state_path.with_suffix(".tmp")
@@ -168,6 +176,7 @@ def build(candidates_path,results_dir,*,today=None):
           '<p><b>DeepSeek calls: 0. Estimated DeepSeek cost: $0.</b> '
           'First seen is first observed by Radar, NOT municipal permit issue date. '
           'Status is a saved local source observation, NOT a current live verification. '
+          'Sorted by source-date freshness, NOT first-market discovery; source dates may be filing or status dates. '
           'No supplier availability established.</p>',
           '<p><a href="'+CSV_NAME+'">Open only first-seen or changed records (CSV)</a> · '+
           '<a href="'+ALL_NAME+'">All public-source candidates for this run (CSV)</a></p>']
@@ -181,6 +190,8 @@ def build(candidates_path,results_dir,*,today=None):
                     '<p><b>Local status:</b> '+esc(row['current_source_status'] or "Not recorded")+
                     ' · <b>Stage:</b> '+esc(row['stage_from_local_status'])+
                     ' · <b>Source date:</b> '+esc(row['source_record_date'] or "Unknown")+
+                    '</p><p><b>Source-date freshness:</b> '+esc(row['freshness_band'])+
+                    ' · <b>Date basis:</b> '+esc(row['freshness_date_basis'])+
                     '</p><p><b>Possible services:</b> '+esc(row['service_hypotheses'])+
                     '</p><p>'+esc(row['follow_up'])+'</p>')
         url=row['record_source_url']

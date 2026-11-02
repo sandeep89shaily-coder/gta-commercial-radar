@@ -14,6 +14,7 @@ from commercial_selector_v4 import (ACTION, COMMERCIAL, SMALL_RESIDENTIAL,
                                     RESIDENTIAL_LED, INDEPENDENT_COMMERCIAL,
                                     NO_WORK)
 from opportunity_lifecycle import classify_status
+from gta_freshness import assess as freshness_assess
 import v8_ai_queue as queue
 
 CAP_USD=0.25
@@ -55,23 +56,33 @@ def permitted(row):
     except ValueError:priority=0
     return priority>=MIN_PRIORITY
 
-def enqueue(candidates_path,observations_path,results_dir):
+def enqueue(candidates_path,observations_path,results_dir,*,today=None):
     """Persist only fresh/changed commercial triggers, not the historic backlog."""
     root=Path(results_dir);root.mkdir(parents=True,exist_ok=True)
-    observations={r.get("project_id"):r.get("observation")
+    observations={r.get("project_id"):r
                   for r in read(observations_path)
                   if r.get("observation") in ("FIRST_OBSERVED","RECORD_CHANGED")}
     fresh={r.get("project_id"):r for r in read(candidates_path) if r.get("project_id")}
     earlier={r["project_id"]:r for r in read(root/PENDING) if r.get("project_id")}
     newly=[]
-    for pid,kind in observations.items():
+    for pid,observation in observations.items():
         row=fresh.get(pid)
         if row is None or not permitted(row):
             continue
-        previous=earlier.get(pid)
-        if previous and queue.fingerprint(previous)==queue.fingerprint(row):
+        candidate=dict(row, observation=observation.get("observation",""),
+                       changed_fields=observation.get("changed_fields",""))
+        status=freshness_assess(candidate,today)
+        # First-seen old permits, undated records and status-only changes are
+        # still in the FREE project-review CSV. Do not pay to investigate them
+        # merely because Radar noticed them today.
+        if not status["paid_freshness_eligible"]:
             continue
-        earlier[pid]=row
+        previous=earlier.get(pid)
+        if (previous and queue.fingerprint(previous)==queue.fingerprint(row)
+                and previous.get("_radar_freshness_approved")=="YES"):
+            continue
+        candidate["_radar_freshness_approved"]="YES"
+        earlier[pid]=candidate
         newly.append(pid)
     queue.save(root/PENDING,list(earlier.values()))
     return list(earlier.values()),newly
@@ -98,11 +109,18 @@ def prune(results_dir):
 def run(candidates_path,observations_path,results_dir,data_dir,*,today=None,
         transport=None,official_transport=None,max_runtime_seconds=600,key=None):
     root=Path(results_dir)
-    queued,new_ids=enqueue(candidates_path,observations_path,root)
+    queued,new_ids=enqueue(candidates_path,observations_path,root,today=today)
     # Old backlog is NOT eligible. This selection is *only* first-seen or
     # materially changed commercial records preserved in our small pending file.
-    eligible={r["project_id"] for r in queued}
+    # Legacy pending files may contain old, never-approved observations; retain
+    # them for audit, but only source-recent records may enter paid work.
+    eligible_rows=[r for r in queued if (r.get("_radar_freshness_approved")=="YES"
+                   or freshness_assess(r,today)["paid_freshness_eligible"])]
+    eligible={r["project_id"] for r in eligible_rows}
+    priority_buckets={r["project_id"]:freshness_assess(r,today)["freshness_sort_bucket"]
+                      for r in eligible_rows}
     result={"daily_ceiling_usd":CAP_USD,"new_eligible":len(new_ids),
+            "pending_excluded_unapproved":len(queued)-len(eligible_rows),
             "pending_before":len(queued),"eligible_for_ai":len(eligible),
             "paid_research_attempts":0,"native_searches":0,
             "actual_daily_ledger_estimate_usd":0,"status":"NO_ELIGIBLE_NEW_PROJECTS"}
@@ -114,7 +132,8 @@ def run(candidates_path,observations_path,results_dir,data_dir,*,today=None,
     r=ai.run(candidates_path,results_dir,legacy_data_dir=data_dir,
              today=today,transport=transport,official_transport=official_transport,
              max_runtime_seconds=max_runtime_seconds,key=key,
-             budget_cap_usd=CAP_USD,eligible_project_ids=eligible)
+             budget_cap_usd=CAP_USD,eligible_project_ids=eligible,
+             freshness_priority_buckets=priority_buckets)
     result.update(status=r.get("queue_stop_reason","UNKNOWN"),
                   paid_research_attempts=r.get("ai_calls_attempted",0),
                   native_searches=r.get("native_searches",0),
