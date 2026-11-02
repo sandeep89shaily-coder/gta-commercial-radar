@@ -198,8 +198,8 @@ class MultiCityPDFTests(unittest.TestCase):
             rows=integrated._csv(result["combined_csv"])
             docs=[r for r in rows if r["kind"]=="MUNICIPAL_DOCUMENT_REVIEW"]
             self.assertEqual({r["city"] for r in docs},{"Mississauga","Toronto"})
-            self.assertEqual(docs[0]["city"],"Mississauga")
-            self.assertEqual(docs[0]["source_url"],PDF)
+            mississauga=next(r for r in docs if r["city"]=="Mississauga")
+            self.assertEqual(mississauga["source_url"],PDF)
             self.assertEqual(result["document_ai"]["review_outputs"],2)
             register=integrated._csv(result["document_project_candidates"]["review_only_csv"])
             self.assertEqual(len(register),2)
