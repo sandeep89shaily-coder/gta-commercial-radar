@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import csv
+from contextlib import closing
 import datetime as dt
 import sqlite3
 import tempfile
@@ -94,11 +95,12 @@ class CompetitorMatchupTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             db = root / "RADAR_DISCOVERY_LEDGER.sqlite"
-            with sqlite3.connect(db) as conn:
+            with closing(sqlite3.connect(db)) as conn:
                 conn.execute("CREATE TABLE discovery(project_id TEXT PRIMARY KEY, first_seen_at TEXT NOT NULL, source_url TEXT)")
                 conn.execute("INSERT INTO discovery VALUES(?,?,?)",
                              (PROJECT["project_id"], "2026-11-01T14:30:00+00:00",
                               "https://www.toronto.ca/official-application"))
+                conn.commit()
             pack = matchup.build(root, [PROJECT])
             rows = matchup._read(pack["comparison_csv"])
             self.assertEqual(rows[0]["radar_first_seen_precise_utc"],
