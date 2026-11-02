@@ -473,6 +473,8 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
         "Source dates are not necessarily first publication dates. AI findings and named companies are UNVERIFIED. "
         "No purchasing authority, open supplier contract, award or competitive first detection is claimed.</p>",
         "<p><a href='"+DETAIL+"'>Download combined CSV</a> · "
+        "<a href='GTA_RADAR_EARLY_APPLICATION_CANDIDATES.csv'>16-city application baseline</a> · "
+        "<a href='GTA_RADAR_EARLY_APPLICATION_SOURCE_STATUS.json'>Per-city planning coverage audit</a> · "
         "<a href='GTA_RADAR_DOCUMENT_PROJECT_CANDIDATES.csv'>AI municipal report candidates (review only)</a> · "
         "<a href='GTA_RADAR_DOCUMENT_AI_PENDING.csv'>Unprocessed PDF research backlog</a> · "
         "<a href='GTA_RADAR_DISCOVERY_RUN_STATUS.json'>Read run status / missing sources</a></p>",
@@ -511,6 +513,9 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
         "early_applications_new_or_changed_for_review":sum(
             r["kind"]=="EARLY_PLANNING_APPLICATION_REVIEW" for r in combined),
         "early_application_city_status":early_apps.get("city_status",[]),
+        "early_application_baseline_count":early_apps.get("application_candidate_rows",0),
+        "early_application_index_fetch_succeeded":early_apps.get("indexes_fetched",0),
+        "early_application_index_fetch_failed":early_apps.get("indexes_failed",0),
         "municipal_documents_for_review":sum(r["kind"]=="MUNICIPAL_DOCUMENT_REVIEW" for r in combined),
         "new_source_index_links_for_review":sum(r["kind"]=="SOURCE_INDEX_LINK_REVIEW" for r in combined),
         "new_municipal_agenda_links_for_review":sum(r["kind"]=="MUNICIPAL_AGENDA_LINK_REVIEW" for r in combined),
