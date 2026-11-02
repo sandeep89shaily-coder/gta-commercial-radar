@@ -7,6 +7,7 @@ exactly why they were not sent to paid AI.  No OCR or external model requests.
 from __future__ import annotations
 import re
 from pathlib import Path
+from urllib.parse import urlparse
 
 from pypdf import PdfReader
 
@@ -14,7 +15,13 @@ BAD = (
     (re.compile(r"expression of condolence|deeply saddened to learn|in memoriam",re.I),-100,"CONDOLENCE"),
     (re.compile(r"\b(?:meeting calendar|at.a.glance|annual calendar|meeting schedule)\b",re.I),-90,"MEETING_CALENDAR"),
     (re.compile(r"by.law to govern the proceedings|consolidated procedure by.law|rules of procedure",re.I),-90,"PROCEDURAL_BYLAW"),
-    (re.compile(r"development activity 20\d\d bulletin|annual development activity|statistical bulletin",re.I),-20,"AGGREGATE_HISTORICAL_REPORT"),
+    (re.compile(r"development activity 20\\d\\d bulletin|annual development activity|statistical bulletin",re.I),-20,"AGGREGATE_HISTORICAL_REPORT"),
+    (re.compile(r"(?:application.for.site.plan.approval|site.plan.application.form|"
+       r"planning.application.form|application.form.(?:accessible|fillable)|"
+       r"development.application.fees|20\\d{2}.development.application.fees|"
+       r"electronic.submission.requirements|application.submission.checklist|"
+       r"fee.schedule|schedule.of.fees|submission.requirements.for.planning)",re.I),
+       -95,"BLANK_APPLICATION_FORM_FEES_OR_SUBMISSION_GUIDE"),
 )
 GOOD = (
     (re.compile(r"\b(?:site.plan.application|zoning.by.law.amendment|official.plan.amendment|"
@@ -38,6 +45,18 @@ def assess(row):
     except Exception as err:
         return {"score":-1,"class":"NEEDS_TEXT_EXTRACTION_REVIEW",
                 "reason":type(err).__name__,"eligible_for_paid_ai":False}
+    # Municipal form templates, fee schedules and submission manuals can
+    # contain all the usual planning keywords without describing any project.
+    # Check document title/path plus extracted first pages, before scoring.
+    document_name=urlparse(url).path.rsplit("/",1)[-1].replace("%20"," ")
+    template_pattern=re.compile(
+        r"(?:application[-_ ]form|form[-_ ]accessible|application[-_ ]fees|"
+        r"submission[-_ ]requirements|fee[-_ ]schedule|submission[-_ ]checklist)",
+        re.I)
+    if template_pattern.search(document_name):
+        return {"score":-95,"class":"UNRELATED_NONPROJECT_DOCUMENT",
+                "reason":"BLANK_APPLICATION_FORM_FEES_OR_SUBMISSION_GUIDE",
+                "eligible_for_paid_ai":False}
     text=(url+" "+text[:24000])
     for pattern,score,reason in BAD:
         if pattern.search(text):

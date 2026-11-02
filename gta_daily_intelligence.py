@@ -192,6 +192,7 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
     from gta_buyer_procurement_batch import evaluate as batch_default, write as write_batch
     from gta_unified_intelligence import build as graph_default
     from gta_early_applications import run as applications_default
+    from gta_markham_circulations import run as markham_default
 
     root = Path(results)
     if not root.is_dir():
@@ -307,6 +308,11 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
                       other_docdir / "MULTICITY_PDF_FETCH_AUDIT.csv"],pdf_union),
         required=True)
 
+    markham=step("markham_circulated_application_pdf_records",
+        lambda:markham_default(pdf_union,root,today=today))
+    state["markham_circulation"]={k:markham.get(k) for k in (
+        "source_pdfs_parsed","rows_extracted","first_run_baseline",
+        "new_or_changed","pdfs_unreadable_or_invalid","warning")}
     done = _json(root / DOC_LEDGER)
     selected_docs = []
     if pdf_union.is_file():
@@ -441,6 +447,22 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
             "ai_next_step":"RETRIEVE_APPLICATION_REPORT_AND_SOURCE_QUOTES_BEFORE_AI",
             "verification_required":app.get("verification_required",""),
         })
+    for app in _csv(root/"GTA_RADAR_MARKHAM_CIRCULATION_CHANGES.csv"):
+        combined.append({
+            "kind":"MARKHAM_CIRCULATED_APPLICATION_REVIEW",
+            "project_id":app.get("project_id",""),"city":"Markham",
+            "address":app.get("address",""),
+            "description":"Markham circulated application "+app.get("application_id","")+
+                          ": "+app.get("proposed_use",""),
+            "source_url":app.get("pdf_url",""),
+            "freshness":"FIRST_OBSERVED_OR_CHANGED_NOT_FIRST_PUBLICATION",
+            "source_date":app.get("circulation_date",""),
+            "date_basis":"OFFICIAL_APPLICATION_CIRCULATION_DATE_NOT_PUBLICATION",
+            "observed_at":app.get("first_seen_local",""),
+            "research_status":"OFFICIAL_PDF_TABLE_EXTRACTED_NEEDS_PROJECT_VERIFICATION",
+            "ai_next_step":"OPEN_MAPPIT_EXACT_APPLICATION_ID_AND_VERIFY_PROJECT_SCOPE",
+            "verification_required":"Match Markham MappiT application ID, verify owner and actual publication and procurement stage",
+        })
     ai_reviews=_csv(review/"DOCUMENT_AI"/"TORONTO_AI_DOCUMENT_BATCH_AUDIT.csv")
     docs_by_url={r.get("source_url"):r for r in ai_reviews}
     for d in selected_docs:
@@ -475,7 +497,8 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
         "Source dates are not necessarily first publication dates. AI findings and named companies are UNVERIFIED. "
         "No purchasing authority, open supplier contract, award or competitive first detection is claimed.</p>",
         "<p><a href='"+DETAIL+"'>Download combined CSV</a> · "
-        "<a href='GTA_RADAR_EARLY_APPLICATION_CANDIDATES.csv'>16-city application baseline</a> · "
+        "<a href='GTA_RADAR_EARLY_APPLICATION_CANDIDATES.csv'>16-city HTML application baseline</a> · "
+        "<a href='GTA_RADAR_MARKHAM_CIRCULATED_APPLICATIONS.csv'>Markham dated circulation applications</a> · "
         "<a href='GTA_RADAR_EARLY_APPLICATION_SOURCE_STATUS.json'>Per-city planning coverage audit</a> · "
         "<a href='GTA_RADAR_DOCUMENT_PROJECT_CANDIDATES.csv'>AI municipal report candidates (review only)</a> · "
         "<a href='GTA_RADAR_DOCUMENT_AI_PENDING.csv'>Unprocessed PDF research backlog</a> · "
@@ -520,6 +543,8 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
             r["kind"]=="EARLY_PLANNING_APPLICATION_REVIEW" for r in combined),
         "early_application_city_status":early_apps.get("city_status",[]),
         "early_application_baseline_count":early_apps.get("application_candidate_rows",0),
+        "markham_circulation_pdf_application_count":markham.get("rows_extracted",0),
+        "markham_circulation_new_or_changed":markham.get("new_or_changed",0),
         "early_application_index_fetch_succeeded":early_apps.get("indexes_fetched",0),
         "early_application_index_fetch_failed":early_apps.get("indexes_failed",0),
         "municipal_documents_for_review":sum(r["kind"]=="MUNICIPAL_DOCUMENT_REVIEW" for r in combined),
