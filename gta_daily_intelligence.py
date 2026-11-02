@@ -293,7 +293,7 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
         lambda:verified_reports(Path(__file__).parent / "config" / "toronto_verified_report_queue.csv",
                                 docdir,fetch=True,max_files=2))
 
-    # Seven additional official-host municipal pages; eSCRIBE and Laserfiche
+    # Fifteen non-Toronto official-host meeting and early-application pages; eSCRIBE and Laserfiche
     # third-party documents require a separately verified adapter.
     other_docdir=review/"OTHER_CITY_DOCUMENTS"
     multicity=step("other_city_official_pdf_capture",
@@ -496,6 +496,7 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
         "municipal_official_index_count":len(municipal_official),
         "municipal_agenda_links_new_to_radar":len(new_agenda_links),
         "meeting_documents_fetched_outside_toronto":multicity.get("direct_pdf_captured",0),
+        "non_toronto_pdf_cities_configured":multicity.get("cities_configured",0),
         "new_pdf_document_candidates":doc_candidates.get("added_this_run",0),
         "persistent_document_project_candidates":doc_candidates.get("document_candidates_total",0),
         "other_city_document_capture":{k:multicity.get(k) for k in
