@@ -143,8 +143,16 @@ def build(candidates_path,results_dir,*,today=None):
         keys=("source_id","source_keys","description","current_source_status","company_name")
         snapshot={k:" ".join(str(raw.get(k) or "").casefold().split()) for k in keys}
         prior_snapshot=old.get("signal_values") if isinstance(old.get("signal_values"),dict) else None
-        changed_fields=" | ".join(k for k in keys if prior_snapshot is not None
-                                   and prior_snapshot.get(k,"")!=snapshot[k]) if observation=="RECORD_CHANGED" else ""
+        if observation=="RECORD_CHANGED" and prior_snapshot is None:
+            # Legacy snapshots only stored an aggregate fingerprint. The
+            # earlier field values cannot be reconstructed; do not pretend
+            # we know which project attribute changed.
+            changed_fields="UNDETERMINED_LEGACY_FINGERPRINT_CHANGE"
+        elif observation=="RECORD_CHANGED":
+            changed_fields=" | ".join(
+                k for k in keys if prior_snapshot.get(k,"")!=snapshot[k])
+        else:
+            changed_fields=""
         updated[pid]={"fingerprint":fp,"first_seen_local":first,
                       "last_seen_local":day,"signal_values":snapshot}
         row=_record(raw,observation,first,day,changed_fields)
