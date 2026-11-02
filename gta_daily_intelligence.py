@@ -126,7 +126,7 @@ def _build_document_worklist(union_csv, out, seen, *, paid, ai_processor):
 def integrate(results, *, today=None, meeting_pipeline=None, document_discover=None,
               agenda_pipeline=None, verified_reports=None, document_ai=None,
               project_ai=None, buyer_ai=None, procurement=None, buyer_batch=None,
-              graph=None, api_key_check=None):
+              graph=None, api_key_check=None, allow_paid=True):
     """Run integrated bounded stages and expose individual failure provenance.
 
     Injectable functions make offline and Windows CI fully network/AI-free.
@@ -161,7 +161,7 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
     buyer_batch = buyer_batch or batch_default
     graph = graph or graph_default
     api_key_check = api_key_check or _paid_key_exists
-    has_paid_key = bool(api_key_check())
+    has_paid_key = bool(api_key_check()) if allow_paid else False
     log = []
     state = {
         "mode":"AUTOMATIC_DAILY_MEETING_DOCUMENT_PROJECT_BUYER_RESEARCH",
@@ -169,6 +169,7 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
         "started_utc":dt.datetime.now(dt.timezone.utc).isoformat(),
         "deepseek_shared_ceiling_usd":DEEPSEEK_DAILY_LIMIT_USD,
         "deepseek_document_project_buyer_stages_authorized":has_paid_key,
+        "additional_paid_research_permitted":allow_paid,
         "manual_purchaser_and_supplier_verification_required":True,
         "official_meeting_dates_verified":False,
         "automated_sales_outreach":False,
