@@ -174,6 +174,23 @@ class MultiCityPDFTests(unittest.TestCase):
             self.assertEqual(len(set(attempted)),3)
             self.assertEqual(len(attempted),3)
 
+    def test_markham_early_circulation_pdf_uses_exact_official_host_and_shared_collector(self):
+        markham=CITY_PAGES["Markham"]
+        pdf=markham.rsplit("/",1)[0]+"/2026-early-planning-circulation.pdf"
+        markup=b"<a href='2026-early-planning-circulation.pdf'>Circulated planning development applications</a>"
+        session=Session({
+            markham:Response(markham,markup),
+            pdf:Response(pdf,pdf_bytes(),"application/pdf")
+        })
+        with tempfile.TemporaryDirectory() as d:
+            result=run({},Path(d)/"docs",session=session,
+                       resolver=dns,policy_reader=lambda _:"User-agent: *\\nAllow: /")
+            self.assertIn("Markham",result["successful_document_cities"])
+            rows=integrated._csv(result["audit_csv"])
+            markham_record=next(r for r in rows if r["city"]=="Markham")
+            self.assertEqual(markham_record["url"],pdf)
+            self.assertTrue(Path(markham_record["saved_path"]).exists())
+
     def test_city_pdf_consumed_by_same_budgeted_document_ai_and_combined_review(self):
         from tests.test_daily_integrated_intelligence import DailyIntegrationTests, write_csv
         test=DailyIntegrationTests("test_daily_integrates_municipal_sources_doc_research_and_buyer_worklist")
