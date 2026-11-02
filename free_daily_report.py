@@ -172,7 +172,7 @@ def build(candidates_path,results_dir,*,today=None):
             # 12,241-character digest of unrelated provincial notices into a
             # single row. Keep it in the audit, not the commercial project list.
             is_aggregate=(str(row.get("source_id") or "")=="ero_gta_environmental_instruments"
-                          and len(desc)>2000)
+                          and len(str(row.get("description") or ""))>2000)
             if is_aggregate:
                 count["AGGREGATED_SOURCE_NOT_PROJECT"]+=1
             else:
