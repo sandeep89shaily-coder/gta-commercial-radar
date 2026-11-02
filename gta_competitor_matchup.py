@@ -8,6 +8,7 @@ compared. The file is a research worklist, not a sales-ready claim.
 from __future__ import annotations
 
 import csv
+from contextlib import closing
 import datetime as dt
 import html
 import json
@@ -82,7 +83,7 @@ def _radar_first_seen(root):
     if not file.is_file():
         return {}
     try:
-        with sqlite3.connect(f"{file.resolve().as_uri()}?mode=ro", uri=True) as db:
+        with closing(sqlite3.connect(f"{file.resolve().as_uri()}?mode=ro", uri=True)) as db:
             return {pid:stamp for pid,stamp in
                     db.execute("SELECT project_id, first_seen_at FROM discovery")
                     if pid and _precise(stamp)}
