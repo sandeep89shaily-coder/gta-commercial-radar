@@ -74,7 +74,7 @@ def update(results, selections, document_ai_audit, *, today=None):
             "city":source.get("city") or old.get("city") or "Toronto",
             "source_page":source.get("source_page") or old.get("source_page",""),
             "pdf_url":url,"pdf_sha256":digest,
-            "first_observed_date":old.get("first_observed_date") or today,
+            "first_observed_date":old.get("first_observed_date") or source.get("first_captured_at") or today,
             "last_observed_date":today,
             "ai_review_status":state,
             "address_hint_unverified":str(model.get("address") or "")[:240],
