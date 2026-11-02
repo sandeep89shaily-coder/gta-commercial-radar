@@ -101,7 +101,7 @@ def _build_document_worklist(union_csv, out, seen, *, paid, ai_processor):
     publication timestamp is inferred from downloading a PDF today.
     """
     fields=("url", "status", "reason", "http_status", "bytes", "sha256",
-            "saved_path", "city", "source_page")
+            "saved_path", "city", "source_page", "first_captured_at")
     backlog=Path(out).parent/DOC_BACKLOG
     # Persist captured but not-yet-processed documents, including documents
     # that vanish from the city's index before a later research run.
@@ -111,7 +111,15 @@ def _build_document_worklist(union_csv, out, seen, *, paid, ai_processor):
                 or not _url(r.get("url")) or
                 not Path(r.get("saved_path") or "").is_file()):
             continue
-        candidates[(r["url"],r["sha256"])]=r
+        key=(r["url"],r["sha256"])
+        # Preserve first Radar capture date even when the PDF waits several
+        # days for its AI budget. A research date is NOT a publication date.
+        prior=candidates.get(key,{})
+        r=dict(r)
+        r["first_captured_at"]=(prior.get("first_captured_at")
+             or r.get("first_captured_at") or
+             dt.date.today().isoformat())
+        candidates[key]=r
     queued=[r for r in candidates.values() if r["sha256"] not in seen]
     _write_csv(backlog, queued, fields)
     # Share the two-document DeepSeek cap across all cities; an eligible
@@ -122,7 +130,7 @@ def _build_document_worklist(union_csv, out, seen, *, paid, ai_processor):
     selected=selected[:2]
     to_analyze = Path(out) / "NEW_DOCUMENTS_FOR_REVIEW.csv"
     _write_csv(to_analyze, selected,
-               ("url", "status", "reason", "http_status", "bytes", "sha256", "saved_path", "city", "source_page"))
+               ("url", "status", "reason", "http_status", "bytes", "sha256", "saved_path", "city", "source_page", "first_captured_at"))
     if selected:
         summary = ai_processor(to_analyze, Path(out) / "DOCUMENT_AI", Path(out).parent,
                                paid=paid, limit=2)
