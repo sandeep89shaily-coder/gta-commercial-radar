@@ -11,6 +11,7 @@ from unittest.mock import patch
 
 import gta_early_applications as ea
 import gta_document_priority as triage
+import gta_markham_circulations as markham
 import gta_daily_intelligence as daily
 import free_daily_report as free
 
@@ -170,6 +171,28 @@ class PdfPriorityTests(unittest.TestCase):
                                            "saved_path":str(fake)})
                     self.assertFalse(got["eligible_for_paid_ai"])
                     self.assertEqual(got["class"],"UNRELATED_NONPROJECT_DOCUMENT")
+    def test_live_november_2_template_pdfs_do_not_spend_deepseek(self):
+        templates=(
+            ("https://www.caledon.ca/Site-Plan-Application-Form-ACCESSIBLE.pdf",
+             "Application for Site Plan Approval. Municipal Address. "
+             "Applicant name. Proposed commercial development site plan application."),
+            ("https://www.burlington.ca/Development-Application-Fees.pdf",
+             "2026 DEVELOPMENT APPLICATION FEES. Site Plan. "
+             "Official Plan Amendment. Proposed commercial application."),
+            ("https://www.caledon.ca/Electronic-Submission-Requirements---Planning.pdf",
+             "Electronic Submission Requirements Planning Applications. "
+             "New Site Plan Application Process."),
+        )
+        with tempfile.TemporaryDirectory() as td:
+            fake=Path(td)/"report.pdf";fake.write_bytes(b"%PDF-TEST")
+            for url,content in templates:
+                with self.subTest(url=url):
+                    with patch.object(triage,"PdfReader",return_value=self.fake_pdf(content)):
+                        result=triage.assess({"url":url,"saved_path":str(fake)})
+                    self.assertEqual(result["class"],"UNRELATED_NONPROJECT_DOCUMENT")
+                    self.assertEqual(result["reason"],"BLANK_APPLICATION_FORM_FEES_OR_SUBMISSION_GUIDE")
+                    self.assertFalse(result["eligible_for_paid_ai"])
+
     def test_new_industrial_site_plan_report_is_priority(self):
         with tempfile.TemporaryDirectory() as td:
             fake=Path(td)/"report.pdf";fake.write_bytes(b"%PDF-TEST")
@@ -184,6 +207,40 @@ class PdfPriorityTests(unittest.TestCase):
             status=triage.assess({"url":"https://example.com/a.pdf","saved_path":str(bad)})
             self.assertFalse(status["eligible_for_paid_ai"])
             self.assertEqual(status["class"],"NEEDS_TEXT_EXTRACTION_REVIEW")
+
+
+
+class MarkhamCirculationTests(unittest.TestCase):
+    def test_november_2_official_table_extracts_commercial_file_ids_and_circulation(self):
+        layout=""" Applicant            File Number   Circulation     Non-Decision     Address                 Ward   Uses
+ Orca Communities Inc.    SPC 26-       7-Oct-26        4-Dec-26       5500 19th Ave           6      Industrial
+                          134020
+ Cadillac Fairview Corp   SPC 26-      28-Sep-26        5-Dec-26       5000 7 Highway E        3      Commercial
+                          135992
+ Residential Corp         SPC 26-       8-Oct-26        7-Dec-26       46 Main Street N        4      Residential
+                          109957
+ """
+        results=markham.extract(layout,"https://www.markham.ca/report.pdf","a"*64)
+        self.assertEqual({r["application_id"] for r in results},
+                         {"SPC 26-134020","SPC 26-135992"})
+        industrial=next(r for r in results if r["proposed_use"]=="Industrial")
+        self.assertEqual(industrial["address"],"5500 19th Ave")
+        self.assertEqual(industrial["circulation_date"],"2026-10-07")
+        self.assertFalse(industrial["verified_first_publication"])
+        self.assertFalse(industrial["company_role_verified"])
+
+    def test_deduplicated_baseline_does_not_fabricate_new_publications(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            audit=root/"union.csv"
+            with audit.open("w",newline="",encoding="utf-8-sig") as fh:
+                w=csv.DictWriter(fh,fieldnames=["city","status","url","saved_path","sha256"])
+                w.writeheader()
+            a=markham.run(audit,root,today=DAY)
+            b=markham.run(audit,root,today=DAY+dt.timedelta(days=1))
+            self.assertTrue(a["first_run_baseline"])
+            self.assertFalse(b["first_run_baseline"])
+            self.assertEqual(b["new_or_changed"],0)
 
 
 if __name__=="__main__":
