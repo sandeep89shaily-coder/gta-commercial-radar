@@ -83,6 +83,37 @@ class SixteenEarlyApplicationsTests(unittest.TestCase):
         self.assertEqual(projects[0]["record_source_url"],url)
         self.assertFalse(ea._safe("https://www.mississauga.ca.evil.com/x",url))
 
+    def test_aggregated_environmental_notices_not_miscounted_as_one_project(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            source=root/"v4.csv"
+            samples=[
+                {"project_id":"toronto:permit","source_id":"toronto_active_building_permits",
+                 "source_keys":"26 255555 BLD|00","description":"New industrial warehouse building",
+                 "source_record_date":"2026-11-01","lane":"PERMIT_REVIEW",
+                 "source_group":"MUNICIPAL_CHANGE"},
+                {"project_id":"ero:provincewide","source_id":"ero_gta_environmental_instruments",
+                 "source_keys":"provincial notices","description":("Unrelated environmental notice "+
+                   "Windsor, Ottawa and other Ontario municipalities. ")*100,
+                 "source_record_date":"2026-10-31","lane":"ENVIRONMENT_WATCH",
+                 "source_group":"MUNICIPAL_CHANGE"},
+            ]
+            with source.open("w",newline="",encoding="utf-8-sig") as h:
+                w=csv.DictWriter(h,fieldnames=list(samples[0]))
+                w.writeheader();w.writerows(samples)
+            free.build(source,root,today=DAY)
+            # Subsequent source change makes both records first-observed.
+            (root/free.STATE_NAME).write_text(
+                json.dumps({"schema":1,"seen":{}}),encoding="utf-8")
+            result=free.build(source,root,today=DAY+dt.timedelta(days=1))
+            rows=free._read(root/free.CSV_NAME)
+            self.assertEqual([r["project_id"] for r in rows],["toronto:permit"])
+            self.assertEqual(result["new_or_changed"],1)
+            full=free._read(root/free.ALL_NAME)
+            self.assertEqual(len(full),2)
+            self.assertTrue(rows[0].get("official_source_portal_url","").startswith("https://"))
+            self.assertFalse(rows[0].get("record_source_url"))
+
     def test_legacy_change_without_original_field_values_not_manufactured(self):
         with tempfile.TemporaryDirectory() as td:
             root=Path(td);p=root/"input.csv"
