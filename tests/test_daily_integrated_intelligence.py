@@ -86,6 +86,16 @@ class DailyIntegrationTests(unittest.TestCase):
                   ["attachment_url","status","reason","http_status","bytes","sha256","saved_path"])
         return {"captured":0}
 
+    def multicity(self,meeting_results,out,**kwargs):
+        self.calls.append(("multicity",len(meeting_results)))
+        target=Path(out)
+        target.mkdir(parents=True,exist_ok=True)
+        write_csv(target/"MULTICITY_PDF_FETCH_AUDIT.csv",[],
+                  ["city","source_page","url","status","reason","http_status",
+                   "bytes","sha256","saved_path"])
+        return {"cities_attempted":7,"direct_pdf_captured":0,
+                "city_audit":[],"coverage_warning":"MOCK_NO_DOCS"}
+
     def document_ai(self,audit,out,results,**kwargs):
         self.calls.append(("document_ai",kwargs.get("paid")))
         assert kwargs.get("limit")==2
@@ -133,7 +143,8 @@ class DailyIntegrationTests(unittest.TestCase):
     def execute(self,*,paid=True,**change):
         kw={"meeting_pipeline":self.meeting,"document_discover":self.discovered,
             "agenda_pipeline":self.agenda,"verified_reports":self.reports,
-            "document_ai":self.document_ai,"project_ai":self.project_ai,
+            "document_ai":self.document_ai,"multicity_capture":self.multicity,
+            "project_ai":self.project_ai,
             "buyer_ai":self.buyer_ai,"procurement":self.procurement,
             "buyer_batch":self.buyer_batch,"graph":self.graph,
             "api_key_check":lambda:paid,"today":TODAY}
@@ -146,6 +157,7 @@ class DailyIntegrationTests(unittest.TestCase):
         self.assertEqual(state["deepseek_shared_ceiling_usd"],0.25)
         self.assertEqual(state["new_source_dated_project_candidates"],1)
         self.assertEqual(state["pdfs_captured_in_union"],1)
+        self.assertEqual(state["meeting_documents_fetched_outside_toronto"],0)
         self.assertEqual(state["permit_planning_events"],1)
         self.assertEqual(state["municipal_documents_for_review"],1)
         self.assertEqual(state["new_source_index_links_for_review"],1)
