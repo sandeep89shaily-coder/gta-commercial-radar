@@ -29,6 +29,7 @@ DOC_BACKLOG = "GTA_RADAR_DOCUMENT_AI_PENDING.csv"
 MEETING_LINK_LEDGER = "GTA_RADAR_MEETING_LINK_FIRST_SEEN.json"
 REPORT_CATEGORIES = ("PROJECT", "SOURCE_INDEX_LINK_REVIEW", "MUNICIPAL_AGENDA_LINK_REVIEW", "MUNICIPAL_DOCUMENT_REVIEW")
 FIELDS = ("kind", "project_id", "address", "city", "description", "source_url",
+          "official_source_portal_url",
           "freshness", "source_date", "date_basis", "observed_at",
           "research_status", "organization_hint", "public_contact_hint",
           "ai_next_step", "verification_required")
@@ -381,6 +382,7 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
             "address":p.get("address",""),"city":p.get("city",""),
             "description":p.get("description",""),
             "source_url":p.get("record_source_url",""),
+            "official_source_portal_url":p.get("official_source_portal_url",""),
             "freshness":p.get("freshness_band",""),
             "source_date":p.get("source_record_date",""),
             "date_basis":p.get("freshness_date_basis") or p.get("date_basis",""),
@@ -487,6 +489,10 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
                       "<p>Verification required: "+esc(row["verification_required"])+"</p>"])
         if _url(row["source_url"]):
             lines.append("<a rel='noopener noreferrer' href='"+esc(row["source_url"])+"'>Original source</a>")
+        elif _url(row.get("official_source_portal_url","")):
+            lines.append("<a rel='noopener noreferrer' href='"+
+                         esc(row["official_source_portal_url"])+
+                         "'>Official source catalogue (not an exact project record)</a>")
         lines.append("</article>")
     lines.append("</body></html>")
     (root / DASHBOARD).write_text("".join(lines),encoding="utf-8")
