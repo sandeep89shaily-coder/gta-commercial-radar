@@ -17,6 +17,7 @@ from urllib.parse import urlparse
 from commercial_selector_v4 import ACTION
 from gta_freshness import assess as freshness_assess, rank as freshness_rank
 from opportunity_lifecycle import classify_status
+from official_record_verifier import BY_ID
 
 FIELDS=[
     "observation","first_seen_local","last_seen_local","project_id","address",
@@ -25,6 +26,7 @@ FIELDS=[
     "freshness_date","freshness_date_basis","source_age_days",
     "paid_freshness_eligible","current_source_status",
     "stage_from_local_status","record_source_url","record_source_url_basis",
+    "official_source_portal_url","official_source_portal_basis","manual_research_url",
     "service_hypotheses","source_group","review_priority",
     "follow_up","warning"
 ]
@@ -68,6 +70,10 @@ def _record(row,observation,first,day,changed_fields=""):
     if observation=="ARCHIVE_CONTEXT":
         next_action="Historical source-dated regional record; not a new municipal event. "+next_action
     current=dict(row, observation=observation, changed_fields=changed_fields)
+    source=BY_ID.get(str(row.get("source_id") or ""),{})
+    portal=str(source.get("official_page") or "")
+    if not portal.startswith("https://") or not urlparse(portal).hostname:
+        portal=""
     freshness=freshness_assess(current, day)
     return {
         **{field:freshness[field] for field in ("freshness_band","freshness_date",
@@ -83,6 +89,9 @@ def _record(row,observation,first,day,changed_fields=""):
         "current_source_status":status,"stage_from_local_status":stage,
         "record_source_url":row.get("record_source_url",""),
         "record_source_url_basis":row.get("record_source_url_basis",""),
+        "official_source_portal_url":portal,
+        "official_source_portal_basis":"OFFICIAL_SOURCE_LANDING_PAGE_NOT_PROJECT_PROOF" if portal else "",
+        "manual_research_url":row.get("manual_research_url",""),
         "service_hypotheses":row.get("service_hypotheses",""),
         "source_group":row.get("source_group",""),
         "review_priority":row.get("review_priority",""),
@@ -121,7 +130,7 @@ def build(candidates_path,results_dir,*,today=None):
     full=[]
     active=[]
     count={"FIRST_OBSERVED":0,"RECORD_CHANGED":0,"INITIAL_BASELINE":0,
-           "ARCHIVE_CONTEXT":0,"UNCHANGED":0}
+           "ARCHIVE_CONTEXT":0,"UNCHANGED":0,"AGGREGATED_SOURCE_NOT_PROJECT":0}
     for raw in source:
         pid=str(raw.get("project_id") or "").strip()
         if not pid:continue
@@ -143,15 +152,31 @@ def build(candidates_path,results_dir,*,today=None):
         keys=("source_id","source_keys","description","current_source_status","company_name")
         snapshot={k:" ".join(str(raw.get(k) or "").casefold().split()) for k in keys}
         prior_snapshot=old.get("signal_values") if isinstance(old.get("signal_values"),dict) else None
-        changed_fields=" | ".join(k for k in keys if prior_snapshot is not None
-                                   and prior_snapshot.get(k,"")!=snapshot[k]) if observation=="RECORD_CHANGED" else ""
+        if observation=="RECORD_CHANGED" and prior_snapshot is None:
+            # Legacy snapshots only stored an aggregate fingerprint. The
+            # earlier field values cannot be reconstructed; do not pretend
+            # we know which project attribute changed.
+            changed_fields="UNDETERMINED_LEGACY_FINGERPRINT_CHANGE"
+        elif observation=="RECORD_CHANGED":
+            changed_fields=" | ".join(
+                k for k in keys if prior_snapshot.get(k,"")!=snapshot[k])
+        else:
+            changed_fields=""
         updated[pid]={"fingerprint":fp,"first_seen_local":first,
                       "last_seen_local":day,"signal_values":snapshot}
         row=_record(raw,observation,first,day,changed_fields)
         full.append(row)
         count[observation]+=1
         if observation in ("FIRST_OBSERVED","RECORD_CHANGED"):
-            active.append(row)
+            # November 2: one environmental registry collector packaged a
+            # 12,241-character digest of unrelated provincial notices into a
+            # single row. Keep it in the audit, not the commercial project list.
+            is_aggregate=(str(row.get("source_id") or "")=="ero_gta_environmental_instruments"
+                          and len(str(row.get("description") or ""))>2000)
+            if is_aggregate:
+                count["AGGREGATED_SOURCE_NOT_PROJECT"]+=1
+            else:
+                active.append(row)
     active.sort(key=lambda row:_priority(row, today=dt.date.fromisoformat(day)))
     full.sort(key=lambda row:_priority(row, today=dt.date.fromisoformat(day)))
     _write(out/CSV_NAME,active)
@@ -196,7 +221,9 @@ def build(candidates_path,results_dir,*,today=None):
                     '</p><p>'+esc(row['follow_up'])+'</p>')
         url=row['record_source_url']
         if url and urlparse(url).scheme=="https" and urlparse(url).hostname:
-            page.append('<a href="'+esc(url)+'" rel="noopener noreferrer">Official/source record lookup (verify current status)</a>')
+            page.append('<a href="'+esc(url)+'" rel="noopener noreferrer">Exact source record lookup (verify current status)</a>')
+        elif row.get("official_source_portal_url"):
+            page.append('<a href="'+esc(row["official_source_portal_url"])+'" rel="noopener noreferrer">Official source catalogue — NOT a project-specific record</a>')
         page.append('</article>')
     page.append('</body></html>')
     (out/HTML_NAME).write_text(''.join(page),encoding="utf-8")

@@ -59,7 +59,7 @@ class Session:
 
 class MultiCityPDFTests(unittest.TestCase):
     def test_city_host_allowlist_stops_external_urls_and_query_redirects(self):
-        self.assertEqual(len(CITY_PAGES),7)
+        self.assertEqual(len(CITY_PAGES),15)
         self.assertTrue(_valid_city_url("Mississauga",PAGE))
         self.assertTrue(_valid_city_url("Mississauga",PDF,pdf=True))
         self.assertFalse(_valid_city_url("Mississauga",OUTSIDE,pdf=True))
@@ -111,7 +111,7 @@ class MultiCityPDFTests(unittest.TestCase):
             manifest.write_text(json.dumps({"agenda_candidates":[{"url":PAGE}]}))
             result=run({"Mississauga":{"meeting_index":str(manifest)}},root/"docs",
                        session=session,resolver=dns,policy_reader=lambda _:"User-agent: *\nAllow: /")
-            self.assertEqual(result["cities_attempted"],7)
+            self.assertEqual(result["cities_attempted"],15)
             self.assertEqual(result["direct_pdf_captured"],1)
             self.assertEqual(result["successful_document_cities"],["Mississauga"])
             row=integrated._csv(result["audit_csv"])[0]
@@ -158,7 +158,8 @@ class MultiCityPDFTests(unittest.TestCase):
                                     "result_file":""})
                 return {"review_outputs":len(selected)}
             first,summary,seen=integrated._build_document_worklist(
-                union,review,seen,paid=True,ai_processor=fake_ai)
+                union,review,seen,paid=True,ai_processor=fake_ai,
+                ranker=lambda _:{"score":18,"eligible_for_paid_ai":True})
             self.assertEqual(len(first),2)
             self.assertEqual(summary["document_ai_backlog_pending"],1)
             # The pending source disappears from the next daily index: keep
@@ -166,11 +167,29 @@ class MultiCityPDFTests(unittest.TestCase):
             with union.open("w",newline="",encoding="utf-8-sig") as h:
                 w=csv.DictWriter(h,fieldnames=cols);w.writeheader()
             second,summary,seen=integrated._build_document_worklist(
-                union,review,seen,paid=True,ai_processor=fake_ai)
+                union,review,seen,paid=True,ai_processor=fake_ai,
+                ranker=lambda _:{"score":18,"eligible_for_paid_ai":True})
             self.assertEqual(len(second),1)
             self.assertEqual(summary["document_ai_backlog_pending"],0)
             self.assertEqual(len(set(attempted)),3)
             self.assertEqual(len(attempted),3)
+
+    def test_markham_early_circulation_pdf_uses_exact_official_host_and_shared_collector(self):
+        markham=CITY_PAGES["Markham"]
+        pdf=markham.rsplit("/",1)[0]+"/2026-early-planning-circulation.pdf"
+        markup=b"<a href='2026-early-planning-circulation.pdf'>Circulated planning development applications</a>"
+        session=Session({
+            markham:Response(markham,markup),
+            pdf:Response(pdf,pdf_bytes(),"application/pdf")
+        })
+        with tempfile.TemporaryDirectory() as d:
+            result=run({},Path(d)/"docs",session=session,
+                       resolver=dns,policy_reader=lambda _:"User-agent: *\\nAllow: /")
+            self.assertIn("Markham",result["successful_document_cities"])
+            rows=integrated._csv(result["audit_csv"])
+            markham_record=next(r for r in rows if r["city"]=="Markham")
+            self.assertEqual(markham_record["url"],pdf)
+            self.assertTrue(Path(markham_record["saved_path"]).exists())
 
     def test_city_pdf_consumed_by_same_budgeted_document_ai_and_combined_review(self):
         from tests.test_daily_integrated_intelligence import DailyIntegrationTests, write_csv
@@ -196,8 +215,8 @@ class MultiCityPDFTests(unittest.TestCase):
             rows=integrated._csv(result["combined_csv"])
             docs=[r for r in rows if r["kind"]=="MUNICIPAL_DOCUMENT_REVIEW"]
             self.assertEqual({r["city"] for r in docs},{"Mississauga","Toronto"})
-            self.assertEqual(docs[0]["city"],"Mississauga")
-            self.assertEqual(docs[0]["source_url"],PDF)
+            mississauga=next(r for r in docs if r["city"]=="Mississauga")
+            self.assertEqual(mississauga["source_url"],PDF)
             self.assertEqual(result["document_ai"]["review_outputs"],2)
             register=integrated._csv(result["document_project_candidates"]["review_only_csv"])
             self.assertEqual(len(register),2)

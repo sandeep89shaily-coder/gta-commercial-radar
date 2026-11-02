@@ -42,6 +42,8 @@ class Links(HTMLParser):
    if tag in ("a","iframe","video","source") and d.get(a):
     self.values.append((tag,d[a],d.get("title","")))
 AGENDA_WORDS=re.compile(r"\b(?:agenda|minutes|report|meeting|planning|committee|application|council)\b",re.I)
+NAVIGATION_NOISE=re.compile(r"^(?:skip to (?:main )?content|home|search|about|contact|accessibility|privacy|council|meeting|agenda|minutes|committees?|back to top)$",re.I)
+REAL_ITEM=re.compile(r"(?:\.pdf(?:$|\?)|agenda[-_/ ]?(?:package|item|\d{2,})|minutes[-_/ ]?\d{2,}|meeting[-_/ ]?\d{2,}|\b20\d{2}\b|planning report|staff report|development application)",re.I)
 class AgendaAnchors(HTMLParser):
  def __init__(self):
   super().__init__();self.href=None;self.label=[];self.links=[]
@@ -67,7 +69,9 @@ def _agenda_candidates(markup,city,source):
   if not (host==expected or host=="pub-"+city.lower()+".escribemeetings.com"
           or host=="escribemeetings.com" or host=="www.escribemeetings.com"):
    continue
+  if NAVIGATION_NOISE.fullmatch(label.strip()) or len(label.strip())<8:continue
   if not AGENDA_WORDS.search(label+" "+urlparse(uri).path):continue
+  if not REAL_ITEM.search(label+" "+urlparse(uri).path):continue
   if uri in seen:continue
   seen.add(uri)
   found.append({"url":uri,"title":label[:180],
@@ -118,8 +122,8 @@ def fetch_html(url):
  req=Request(url,headers={"User-Agent":"GTARadarResearch/1.0 (public source verification)"})
  with urlopen(req,timeout=15) as f:
   if f.status!=200:raise ValueError("Municipal index unavailable")
-  body=f.read(1_000_001)
- if len(body)>1_000_000:raise ValueError("Index too large")
+  body=f.read(4_000_001)
+ if len(body)>4_000_000:raise ValueError("Index too large (4 MB bounded limit)")
  return body.decode("utf-8","replace")
 
 def capture(url,out,*,authorized=False,runner=None):

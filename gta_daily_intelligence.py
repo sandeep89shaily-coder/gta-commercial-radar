@@ -29,6 +29,7 @@ DOC_BACKLOG = "GTA_RADAR_DOCUMENT_AI_PENDING.csv"
 MEETING_LINK_LEDGER = "GTA_RADAR_MEETING_LINK_FIRST_SEEN.json"
 REPORT_CATEGORIES = ("PROJECT", "SOURCE_INDEX_LINK_REVIEW", "MUNICIPAL_AGENDA_LINK_REVIEW", "MUNICIPAL_DOCUMENT_REVIEW")
 FIELDS = ("kind", "project_id", "address", "city", "description", "source_url",
+          "official_source_portal_url",
           "freshness", "source_date", "date_basis", "observed_at",
           "research_status", "organization_hint", "public_contact_hint",
           "ai_next_step", "verification_required")
@@ -93,7 +94,7 @@ def _valid_new_projects(results, today):
             and _url(r.get("record_source_url"))]
 
 
-def _build_document_worklist(union_csv, out, seen, *, paid, ai_processor):
+def _build_document_worklist(union_csv, out, seen, *, paid, ai_processor, ranker=None):
     """Analyze changed PDF bytes at most once after a recorded successful AI result.
 
     Same bytes at same URL do not get paid AI again on future days. Earlier
@@ -122,12 +123,26 @@ def _build_document_worklist(union_csv, out, seen, *, paid, ai_processor):
         candidates[key]=r
     queued=[r for r in candidates.values() if r["sha256"] not in seen]
     _write_csv(backlog, queued, fields)
-    # Share the two-document DeepSeek cap across all cities; an eligible
-    # non-Toronto report can be researched before another Toronto report.
-    from_other=next((r for r in queued if r.get("city") and r["city"]!="Toronto"),None)
-    selected=([from_other] if from_other else [])
-    selected.extend(r for r in queued if r is not from_other)
-    selected=selected[:2]
+    from gta_document_priority import assess as standard_ranker
+    ranker=ranker or standard_ranker
+    rated=[]
+    for r in queued:
+        evaluation=ranker(r)
+        rated.append((r,evaluation))
+    _write_csv(Path(out)/"DOCUMENT_RELEVANCE_TRIAGE.csv",[
+        {**row,"relevance_score":quality.get("score",0),
+         "relevance_class":quality.get("class",""),
+         "relevance_reason":quality.get("reason",""),
+         "eligible_for_paid_ai":quality.get("eligible_for_paid_ai",False)}
+        for row,quality in rated],
+        (*fields,"relevance_score","relevance_class","relevance_reason","eligible_for_paid_ai"))
+    eligible=[(r,q) for r,q in rated if q.get("eligible_for_paid_ai")]
+    eligible.sort(key=lambda pair:(-int(pair[1].get("score") or 0),
+                                  pair[0].get("first_captured_at",""),
+                                  pair[0].get("url","")))
+    # Rank content relevance before spending; keep a small city-diversity
+    # tie break only *within* equal relevance, not ahead of relevance.
+    selected=[r for r,q in eligible[:2]]
     to_analyze = Path(out) / "NEW_DOCUMENTS_FOR_REVIEW.csv"
     _write_csv(to_analyze, selected,
                ("url", "status", "reason", "http_status", "bytes", "sha256", "saved_path", "city", "source_page", "first_captured_at"))
@@ -147,14 +162,17 @@ def _build_document_worklist(union_csv, out, seen, *, paid, ai_processor):
     remaining=[r for r in queued if r["sha256"] not in seen]
     _write_csv(backlog, remaining, fields)
     summary["document_ai_backlog_pending"]=len(remaining)
+    summary["document_ai_relevance_eligible"]=len(eligible)
+    summary["document_ai_irrelevant_or_text_unavailable"]=len(rated)-len(eligible)
+    summary["document_relevance_audit"]=str(Path(out)/"DOCUMENT_RELEVANCE_TRIAGE.csv")
     summary["document_ai_backlog_csv"]=str(backlog)
     return selected, summary, seen
 
 
 def integrate(results, *, today=None, meeting_pipeline=None, document_discover=None,
               agenda_pipeline=None, verified_reports=None, document_ai=None,
-              multicity_capture=None,
-              project_ai=None, buyer_ai=None, procurement=None, buyer_batch=None,
+              multicity_capture=None, document_ranker=None,
+              application_monitor=None, project_ai=None, buyer_ai=None, procurement=None, buyer_batch=None,
               graph=None, api_key_check=None, allow_paid=True):
     """Run integrated bounded stages and expose individual failure provenance.
 
@@ -173,6 +191,7 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
     from gta_live_procurement_evidence import execute as procurement_default
     from gta_buyer_procurement_batch import evaluate as batch_default, write as write_batch
     from gta_unified_intelligence import build as graph_default
+    from gta_early_applications import run as applications_default
 
     root = Path(results)
     if not root.is_dir():
@@ -188,6 +207,7 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
     verified_reports = verified_reports or report_default
     document_ai = document_ai or document_default
     multicity_capture = multicity_capture or multicity_capture_default
+    application_monitor = application_monitor or applications_default
     project_ai = project_ai or project_default
     buyer_ai = buyer_ai or buyer_default
     procurement = procurement or procurement_default
@@ -246,6 +266,14 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
     temp.write_text(json.dumps(meeting_seen,indent=2),encoding="utf-8")
     temp.replace(root/MEETING_LINK_LEDGER)
 
+    early_apps=step("sixteen_city_early_planning_applications",
+        lambda:application_monitor(root,today=today))
+    state["early_applications"]={k:early_apps.get(k) for k in
+        ("cities_configured","indexes_fetched","indexes_failed",
+         "cities_with_parsed_ids","application_candidate_rows",
+         "new_or_changed_application_records","new_links","baseline_only",
+         "new_or_changed_csv","warning")}
+
     docdir = review / "TORONTO_DOCUMENTS"
     docdir.mkdir(parents=True, exist_ok=True)
     indexes = _csv(Path(__file__).parent / "config" / "official_document_indexes.csv")
@@ -266,7 +294,7 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
         lambda:verified_reports(Path(__file__).parent / "config" / "toronto_verified_report_queue.csv",
                                 docdir,fetch=True,max_files=2))
 
-    # Seven additional official-host municipal pages; eSCRIBE and Laserfiche
+    # Fifteen non-Toronto official-host meeting and early-application pages; eSCRIBE and Laserfiche
     # third-party documents require a separately verified adapter.
     other_docdir=review/"OTHER_CITY_DOCUMENTS"
     multicity=step("other_city_official_pdf_capture",
@@ -284,7 +312,8 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
     if pdf_union.is_file():
         doc_result = step("document_deepseek_review",
             lambda:_build_document_worklist(pdf_union,review,done,
-                                            paid=has_paid_key,ai_processor=document_ai))
+                                            paid=has_paid_key,ai_processor=document_ai,
+                                            ranker=document_ranker))
         if doc_result:
             selected_docs, summary, done = doc_result
             state["document_ai"] = summary
@@ -308,6 +337,18 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
         _write_csv(candidate_file,[],("project_id","address","source_id",
                                       "source_keys","record_source_url","description"))
     state["new_source_dated_project_candidates"]=len(fresh)
+    all_daily=_csv(root/PROJECT_INPUT)
+    no_link=[r for r in all_daily if r.get("observation") in
+        ("FIRST_OBSERVED","RECORD_CHANGED")
+        and freshness_assess(r,today)["paid_freshness_eligible"]
+        and not _url(r.get("record_source_url"))]
+    state["project_source_link_audit"]={
+        "recent_or_material_events_without_official_record_link":len(no_link),
+        "not_researched_second_pass_without_direct_evidence":len(no_link),
+        "source_link_policy":"No generic municipal landing URL promoted as exact project record. Initial native DeepSeek pass may research by file ID; second pass requires direct source evidence."}
+    _write_csv(review/"PROJECTS_AWAITING_OFFICIAL_SOURCE_LINK.csv",no_link,
+        ("project_id","city","source_id","source_keys","address","description",
+         "source_record_date","record_source_url","record_source_url_basis"))
     if fresh and has_paid_key:
         project_result = step("deeper_project_deepseek",
             lambda:project_ai(candidate_file,root,review,paid=True,max_projects=2))
@@ -341,6 +382,7 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
             "address":p.get("address",""),"city":p.get("city",""),
             "description":p.get("description",""),
             "source_url":p.get("record_source_url",""),
+            "official_source_portal_url":p.get("official_source_portal_url",""),
             "freshness":p.get("freshness_band",""),
             "source_date":p.get("source_record_date",""),
             "date_basis":p.get("freshness_date_basis") or p.get("date_basis",""),
@@ -385,6 +427,20 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
             "ai_next_step":"NO_PAID_AI_FOR_LINK_ONLY_FETCH_ORIGINAL_DOCUMENT_FIRST",
             "verification_required":"Read original agenda, establish actual project and posting date",
         })
+    for app in _csv(root/"GTA_RADAR_EARLY_APPLICATION_NEW_OR_CHANGED.csv"):
+        combined.append({
+            "kind":"EARLY_PLANNING_APPLICATION_REVIEW",
+            "project_id":app.get("project_id",""),"city":app.get("city",""),
+            "address":"","description":app.get("description",""),
+            "source_url":app.get("record_source_url") or app.get("source_url",""),
+            "freshness":"NEW_TO_RADAR_APPLICATION_ID_OR_CONTENT_NOT_PUBLICATION_PROOF",
+            "source_date":app.get("source_record_date",""),
+            "date_basis":app.get("source_record_date_basis","DATE_UNKNOWN"),
+            "observed_at":app.get("first_seen_local",""),
+            "research_status":"EXACT_APPLICATION_ID_FROM_OFFICIAL_INDEX_UNVERIFIED_MATCH",
+            "ai_next_step":"RETRIEVE_APPLICATION_REPORT_AND_SOURCE_QUOTES_BEFORE_AI",
+            "verification_required":app.get("verification_required",""),
+        })
     ai_reviews=_csv(review/"DOCUMENT_AI"/"TORONTO_AI_DOCUMENT_BATCH_AUDIT.csv")
     docs_by_url={r.get("source_url"):r for r in ai_reviews}
     for d in selected_docs:
@@ -419,6 +475,8 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
         "Source dates are not necessarily first publication dates. AI findings and named companies are UNVERIFIED. "
         "No purchasing authority, open supplier contract, award or competitive first detection is claimed.</p>",
         "<p><a href='"+DETAIL+"'>Download combined CSV</a> · "
+        "<a href='GTA_RADAR_EARLY_APPLICATION_CANDIDATES.csv'>16-city application baseline</a> · "
+        "<a href='GTA_RADAR_EARLY_APPLICATION_SOURCE_STATUS.json'>Per-city planning coverage audit</a> · "
         "<a href='GTA_RADAR_DOCUMENT_PROJECT_CANDIDATES.csv'>AI municipal report candidates (review only)</a> · "
         "<a href='GTA_RADAR_DOCUMENT_AI_PENDING.csv'>Unprocessed PDF research backlog</a> · "
         "<a href='GTA_RADAR_DISCOVERY_RUN_STATUS.json'>Read run status / missing sources</a></p>",
@@ -431,6 +489,10 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
                       "<p>Verification required: "+esc(row["verification_required"])+"</p>"])
         if _url(row["source_url"]):
             lines.append("<a rel='noopener noreferrer' href='"+esc(row["source_url"])+"'>Original source</a>")
+        elif _url(row.get("official_source_portal_url","")):
+            lines.append("<a rel='noopener noreferrer' href='"+
+                         esc(row["official_source_portal_url"])+
+                         "'>Official source catalogue (not an exact project record)</a>")
         lines.append("</article>")
     lines.append("</body></html>")
     (root / DASHBOARD).write_text("".join(lines),encoding="utf-8")
@@ -442,6 +504,7 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
         "municipal_official_index_count":len(municipal_official),
         "municipal_agenda_links_new_to_radar":len(new_agenda_links),
         "meeting_documents_fetched_outside_toronto":multicity.get("direct_pdf_captured",0),
+        "non_toronto_pdf_cities_configured":multicity.get("cities_configured",0),
         "new_pdf_document_candidates":doc_candidates.get("added_this_run",0),
         "persistent_document_project_candidates":doc_candidates.get("document_candidates_total",0),
         "other_city_document_capture":{k:multicity.get(k) for k in
@@ -453,6 +516,12 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
         "pdfs_captured_in_union":union_result.get("captured",0),
         "combined_records":len(combined),
         "permit_planning_events":sum(r["kind"]=="PROJECT" for r in combined),
+        "early_applications_new_or_changed_for_review":sum(
+            r["kind"]=="EARLY_PLANNING_APPLICATION_REVIEW" for r in combined),
+        "early_application_city_status":early_apps.get("city_status",[]),
+        "early_application_baseline_count":early_apps.get("application_candidate_rows",0),
+        "early_application_index_fetch_succeeded":early_apps.get("indexes_fetched",0),
+        "early_application_index_fetch_failed":early_apps.get("indexes_failed",0),
         "municipal_documents_for_review":sum(r["kind"]=="MUNICIPAL_DOCUMENT_REVIEW" for r in combined),
         "new_source_index_links_for_review":sum(r["kind"]=="SOURCE_INDEX_LINK_REVIEW" for r in combined),
         "new_municipal_agenda_links_for_review":sum(r["kind"]=="MUNICIPAL_AGENDA_LINK_REVIEW" for r in combined),

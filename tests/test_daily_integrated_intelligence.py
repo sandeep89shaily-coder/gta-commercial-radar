@@ -146,6 +146,13 @@ class DailyIntegrationTests(unittest.TestCase):
         kw={"meeting_pipeline":self.meeting,"document_discover":self.discovered,
             "agenda_pipeline":self.agenda,"verified_reports":self.reports,
             "document_ai":self.document_ai,"multicity_capture":self.multicity,
+            "document_ranker":lambda _:{"score":18,"eligible_for_paid_ai":True,
+                                      "class":"TEST_RELEVANT","reason":"FIXTURE"},
+            "application_monitor":lambda root,**kw:{
+                "cities_configured":16,"indexes_fetched":16,
+                "indexes_failed":0,"application_candidate_rows":0,
+                "new_or_changed_application_records":0,
+                "city_status":[]},
             "project_ai":self.project_ai,
             "buyer_ai":self.buyer_ai,"procurement":self.procurement,
             "buyer_batch":self.buyer_batch,"graph":self.graph,
