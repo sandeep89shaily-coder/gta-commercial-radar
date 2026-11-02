@@ -124,6 +124,54 @@ class MultiCityPDFTests(unittest.TestCase):
             city=next(x for x in result["city_audit"] if x["city"]=="Mississauga")
             self.assertEqual(city["pdf_captured"],1)
 
+    def test_deepseek_doc_backlog_survives_source_disappearance_and_spending_limit(self):
+        import hashlib
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder)
+            review=root/"DAILY_INTEGRATED_REVIEW"
+            review.mkdir()
+            all_docs=[]
+            for i,city in enumerate(("Mississauga","Toronto","Hamilton")):
+                doc=root/("document_"+str(i)+".pdf")
+                doc.write_bytes(("document"+str(i)).encode())
+                all_docs.append({"url":"https://www.mississauga.ca/council/doc"+str(i)+".pdf",
+                                 "status":"CAPTURED","sha256":hashlib.sha256(doc.read_bytes()).hexdigest(),
+                                 "saved_path":str(doc),"city":city,
+                                 "source_page":PAGE})
+            union=root/"union.csv"
+            cols=["url","status","sha256","saved_path","city","source_page"]
+            with union.open("w",newline="",encoding="utf-8-sig") as h:
+                w=csv.DictWriter(h,fieldnames=cols);w.writeheader();w.writerows(all_docs)
+            seen={}
+            attempted=[]
+            def fake_ai(audit,out,results,**kw):
+                out=Path(out);out.mkdir(exist_ok=True)
+                selected=integrated._csv(audit)
+                attempted.extend(row["sha256"] for row in selected)
+                with (out/"TORONTO_AI_DOCUMENT_BATCH_AUDIT.csv").open("w",newline="") as h:
+                    w=csv.DictWriter(h,fieldnames=["source_url","sha256_download","status","result_file"])
+                    w.writeheader()
+                    for doc in selected:
+                        w.writerow({"source_url":doc["url"],
+                                    "sha256_download":doc["sha256"],
+                                    "status":"AI_REVIEW_ONLY_NOT_SALE_READY",
+                                    "result_file":""})
+                return {"review_outputs":len(selected)}
+            first,summary,seen=integrated._build_document_worklist(
+                union,review,seen,paid=True,ai_processor=fake_ai)
+            self.assertEqual(len(first),2)
+            self.assertEqual(summary["document_ai_backlog_pending"],1)
+            # The pending source disappears from the next daily index: keep
+            # the downloaded document and complete its research regardless.
+            with union.open("w",newline="",encoding="utf-8-sig") as h:
+                w=csv.DictWriter(h,fieldnames=cols);w.writeheader()
+            second,summary,seen=integrated._build_document_worklist(
+                union,review,seen,paid=True,ai_processor=fake_ai)
+            self.assertEqual(len(second),1)
+            self.assertEqual(summary["document_ai_backlog_pending"],0)
+            self.assertEqual(len(set(attempted)),3)
+            self.assertEqual(len(attempted),3)
+
     def test_city_pdf_consumed_by_same_budgeted_document_ai_and_combined_review(self):
         from tests.test_daily_integrated_intelligence import DailyIntegrationTests, write_csv
         test=DailyIntegrationTests("test_daily_integrates_municipal_sources_doc_research_and_buyer_worklist")
