@@ -41,7 +41,7 @@ class Links(HTMLParser):
   for a in ("href","src","data-src"):
    if tag in ("a","iframe","video","source") and d.get(a):
     self.values.append((tag,d[a],d.get("title","")))
-AGENDA_WORDS=re.compile(r"\\b(?:agenda|minutes|report|meeting|planning|committee|application|council)\\b",re.I)
+AGENDA_WORDS=re.compile(r"\b(?:agenda|minutes|report|meeting|planning|committee|application|council)\b",re.I)
 class AgendaAnchors(HTMLParser):
  def __init__(self):
   super().__init__();self.href=None;self.label=[];self.links=[]
