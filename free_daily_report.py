@@ -176,6 +176,7 @@ def build(candidates_path,results_dir,*,today=None):
           '<p><b>DeepSeek calls: 0. Estimated DeepSeek cost: $0.</b> '
           'First seen is first observed by Radar, NOT municipal permit issue date. '
           'Status is a saved local source observation, NOT a current live verification. '
+          'Sorted by source-date freshness, NOT first-market discovery; source dates may be filing or status dates. '
           'No supplier availability established.</p>',
           '<p><a href="'+CSV_NAME+'">Open only first-seen or changed records (CSV)</a> · '+
           '<a href="'+ALL_NAME+'">All public-source candidates for this run (CSV)</a></p>']
@@ -189,6 +190,8 @@ def build(candidates_path,results_dir,*,today=None):
                     '<p><b>Local status:</b> '+esc(row['current_source_status'] or "Not recorded")+
                     ' · <b>Stage:</b> '+esc(row['stage_from_local_status'])+
                     ' · <b>Source date:</b> '+esc(row['source_record_date'] or "Unknown")+
+                    '</p><p><b>Source-date freshness:</b> '+esc(row['freshness_band'])+
+                    ' · <b>Date basis:</b> '+esc(row['freshness_date_basis'])+
                     '</p><p><b>Possible services:</b> '+esc(row['service_hypotheses'])+
                     '</p><p>'+esc(row['follow_up'])+'</p>')
         url=row['record_source_url']
