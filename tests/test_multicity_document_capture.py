@@ -158,7 +158,8 @@ class MultiCityPDFTests(unittest.TestCase):
                                     "result_file":""})
                 return {"review_outputs":len(selected)}
             first,summary,seen=integrated._build_document_worklist(
-                union,review,seen,paid=True,ai_processor=fake_ai)
+                union,review,seen,paid=True,ai_processor=fake_ai,
+                ranker=lambda _:{"score":18,"eligible_for_paid_ai":True})
             self.assertEqual(len(first),2)
             self.assertEqual(summary["document_ai_backlog_pending"],1)
             # The pending source disappears from the next daily index: keep
@@ -166,7 +167,8 @@ class MultiCityPDFTests(unittest.TestCase):
             with union.open("w",newline="",encoding="utf-8-sig") as h:
                 w=csv.DictWriter(h,fieldnames=cols);w.writeheader()
             second,summary,seen=integrated._build_document_worklist(
-                union,review,seen,paid=True,ai_processor=fake_ai)
+                union,review,seen,paid=True,ai_processor=fake_ai,
+                ranker=lambda _:{"score":18,"eligible_for_paid_ai":True})
             self.assertEqual(len(second),1)
             self.assertEqual(summary["document_ai_backlog_pending"],0)
             self.assertEqual(len(set(attempted)),3)
