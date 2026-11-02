@@ -12,6 +12,14 @@ This *long-term destination* does not replace the immediate hard gates below: in
 
 For the first controlled evidence baseline, see [GTA_RADAR_COMPETITIVE_BENCHMARK_20261101.md](GTA_RADAR_COMPETITIVE_BENCHMARK_20261101.md). It documents the exact ten selected projects, known earlier public disclosures and competitor overlap, and explicitly marks unavailable first-detection timestamps **UNKNOWN**. No source-record date is a substitute for an actual Radar ingestion/publication timestamp. Keep development priorities bounded to verified gaps and customer needs.
 
+## November 2, 2026 — official PDF retrieval beyond Toronto (first bounded adapter)
+
+The normal daily collector now includes `municipal_document_capture.py`: for **Brampton, Mississauga, Hamilton, Burlington, Oakville, Vaughan and Kitchener**, try a bounded number of publicly available same-official-host agenda pages and direct PDF links, with DNS/robots/redirect/content-size/signature/PDF validation. Each attempt is recorded per city and source page; **none of these cities is accepted as reliably documented until actual live captured PDFs are verified**. Dynamic eSCRIBE/Laserfiche portals remain blocked pending municipal-specific, policy-checked adapters; a zero-PDF result is not evidence that the city has no projects.
+
+Captured non-Toronto documents flow through the *same* DeepSeek document review and shared **US$0.25/day ledger** with Toronto, preserving source municipality and original agenda URL. A persistent pending-PDF queue prevents budget-deferred municipal reports from vanishing on subsequent days. A separate permanent `GTA_RADAR_DOCUMENT_PROJECT_CANDIDATES.csv` captures AI-suggested developments, source PDF SHA, agenda provenance, page-quote evidence counts and manual review notes. **This is not an automatic project merge into the canonical permit database**; exact permit/application IDs and independent review must validate the match before publication.
+
+All PDF model suggestions, business roles, first-published dates and potential awards remain *unverified*. Existing manual worklists and competitor benchmark are preserved. Next acceptance gate: prove retrieval completeness with recorded official, dated documents per city, then implement reviewed third-party meeting-platform adapters and exact-ID project promotion.
+
 ## November 2, 2026 — eight-city municipal coverage and AI routing
 
 **Owner direction: connect more municipalities and use AI at every stage where required to deliver earlier, evidence-backed project intelligence.** Prioritize depth of information and freshness, not superficial URL counts.
