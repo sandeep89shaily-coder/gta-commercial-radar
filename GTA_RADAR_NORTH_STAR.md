@@ -12,6 +12,12 @@ This *long-term destination* does not replace the immediate hard gates below: in
 
 For the first controlled evidence baseline, see [GTA_RADAR_COMPETITIVE_BENCHMARK_20261101.md](GTA_RADAR_COMPETITIVE_BENCHMARK_20261101.md). It documents the exact ten selected projects, known earlier public disclosures and competitor overlap, and explicitly marks unavailable first-detection timestamps **UNKNOWN**. No source-record date is a substitute for an actual Radar ingestion/publication timestamp. Keep development priorities bounded to verified gaps and customer needs.
 
+## November 2, 2026 — GROUND and Datum are primary external benchmarks
+
+**Owner-approved goal: develop capabilities comparable to GROUND / GroundIntel and Datum, without copying their protected data.** Evaluate real-time early discovery, council/meeting document intelligence, exact-project lifecycle joins, source attribution, company-role resolution, supplier-sector usefulness and customer value. Treat published competitor capabilities as reference standards, **not** evidence of Radar parity or measured earlier detection.
+
+Each default daily manual-review run now emits **GROUND and Datum per-project manual comparison sheets** with source/date provenance, preserved researcher notes and strictly evidence-gated observation-time comparisons. No scraping, extra AI costs or automatic sales. See [GTA_RADAR_GROUND_DATUM_PARITY.md](GTA_RADAR_GROUND_DATUM_PARITY.md). Do not expand the roadmap endlessly: close proven gaps through focused research → implementation → tests → measured acceptance.
+
 ## November 2, 2026 — freshness-first intelligence policy
 
 **Owner-confirmed motto: freshness first.** The default daily project list and selective paid-DeepSeek gate must favor newly source-dated, commercially meaningful developments, **not** old public permits merely indexed by Radar for the first time. First observed by Radar is not first publicly announced.
