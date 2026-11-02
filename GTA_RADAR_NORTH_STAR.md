@@ -12,6 +12,14 @@ This *long-term destination* does not replace the immediate hard gates below: in
 
 For the first controlled evidence baseline, see [GTA_RADAR_COMPETITIVE_BENCHMARK_20261101.md](GTA_RADAR_COMPETITIVE_BENCHMARK_20261101.md). It documents the exact ten selected projects, known earlier public disclosures and competitor overlap, and explicitly marks unavailable first-detection timestamps **UNKNOWN**. No source-record date is a substitute for an actual Radar ingestion/publication timestamp. Keep development priorities bounded to verified gaps and customer needs.
 
+## November 2, 2026 — integrated daily intelligence is the default
+
+Owner-approved: the standard Windows `RUN_GTA_RADAR_DISCOVERY.bat` run must now orchestrate (a) live V6 permits/planning/business and DeepSeek/contact checks, (b) Toronto/Brampton official meeting index discovery, (c) bounded, policy-checked Toronto municipal PDFs, (d) source-backed PDF analysis and supplemental fresh-project/buyer-role investigation under the **same shared US$0.25/day ledger**, and (e) free evidence checks and a single integrated CSV/HTML worklist. Old projects and undated meeting links are not new public announcements. PDF/model hints never establish exact project identity or open supplier packages. Keep buyer/award/physical checks and sales manual.
+
+**Actual live deployment and document retrieval success on the owner's Windows desktop remain to be confirmed.** Stage failures and source coverage gaps must be visible in the integrated manifest. Do not claim full Datum/ GROUND parity or verification without independently measured output. No unchecked archival/backlog paid sweep, no extra collector DB or video capture.
+
+Implementation: [gta_daily_intelligence.py](gta_daily_intelligence.py) and [gta_discovery_run.py](gta_discovery_run.py). Historical `--full-intelligence` remains a separate legacy research mode, not necessary for the normal integrated daily launcher.
+
 ## November 2, 2026 — GROUND and Datum are primary external benchmarks
 
 **Owner-approved goal: develop capabilities comparable to GROUND / GroundIntel and Datum, without copying their protected data.** Evaluate real-time early discovery, council/meeting document intelligence, exact-project lifecycle joins, source attribution, company-role resolution, supplier-sector usefulness and customer value. Treat published competitor capabilities as reference standards, **not** evidence of Radar parity or measured earlier detection.
