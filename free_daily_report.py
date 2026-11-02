@@ -17,6 +17,7 @@ from urllib.parse import urlparse
 from commercial_selector_v4 import ACTION
 from gta_freshness import assess as freshness_assess, rank as freshness_rank
 from opportunity_lifecycle import classify_status
+from official_record_verifier import BY_ID
 
 FIELDS=[
     "observation","first_seen_local","last_seen_local","project_id","address",
@@ -25,6 +26,7 @@ FIELDS=[
     "freshness_date","freshness_date_basis","source_age_days",
     "paid_freshness_eligible","current_source_status",
     "stage_from_local_status","record_source_url","record_source_url_basis",
+    "official_source_portal_url","official_source_portal_basis","manual_research_url",
     "service_hypotheses","source_group","review_priority",
     "follow_up","warning"
 ]
@@ -68,6 +70,10 @@ def _record(row,observation,first,day,changed_fields=""):
     if observation=="ARCHIVE_CONTEXT":
         next_action="Historical source-dated regional record; not a new municipal event. "+next_action
     current=dict(row, observation=observation, changed_fields=changed_fields)
+    source=BY_ID.get(str(row.get("source_id") or ""),{})
+    portal=str(source.get("official_page") or "")
+    if not portal.startswith("https://") or not urlparse(portal).hostname:
+        portal=""
     freshness=freshness_assess(current, day)
     return {
         **{field:freshness[field] for field in ("freshness_band","freshness_date",
@@ -83,6 +89,9 @@ def _record(row,observation,first,day,changed_fields=""):
         "current_source_status":status,"stage_from_local_status":stage,
         "record_source_url":row.get("record_source_url",""),
         "record_source_url_basis":row.get("record_source_url_basis",""),
+        "official_source_portal_url":portal,
+        "official_source_portal_basis":"OFFICIAL_SOURCE_LANDING_PAGE_NOT_PROJECT_PROOF" if portal else "",
+        "manual_research_url":row.get("manual_research_url",""),
         "service_hypotheses":row.get("service_hypotheses",""),
         "source_group":row.get("source_group",""),
         "review_priority":row.get("review_priority",""),
