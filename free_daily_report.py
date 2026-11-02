@@ -221,7 +221,9 @@ def build(candidates_path,results_dir,*,today=None):
                     '</p><p>'+esc(row['follow_up'])+'</p>')
         url=row['record_source_url']
         if url and urlparse(url).scheme=="https" and urlparse(url).hostname:
-            page.append('<a href="'+esc(url)+'" rel="noopener noreferrer">Official/source record lookup (verify current status)</a>')
+            page.append('<a href="'+esc(url)+'" rel="noopener noreferrer">Exact source record lookup (verify current status)</a>')
+        elif row.get("official_source_portal_url"):
+            page.append('<a href="'+esc(row["official_source_portal_url"])+'" rel="noopener noreferrer">Official source catalogue — NOT a project-specific record</a>')
         page.append('</article>')
     page.append('</body></html>')
     (out/HTML_NAME).write_text(''.join(page),encoding="utf-8")
