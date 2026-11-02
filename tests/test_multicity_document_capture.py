@@ -151,9 +151,16 @@ class MultiCityPDFTests(unittest.TestCase):
             self.assertEqual(docs[0]["city"],"Mississauga")
             self.assertEqual(docs[0]["source_url"],PDF)
             self.assertEqual(result["document_ai"]["review_outputs"],2)
+            register=integrated._csv(result["document_project_candidates"]["review_only_csv"])
+            self.assertEqual(len(register),2)
+            self.assertEqual({r["city"] for r in register},{"Mississauga","Toronto"})
+            self.assertTrue(all(r["canonical_project_match_status"]=="UNVERIFIED_NO_AUTO_MERGE"
+                                for r in register))
+            self.assertTrue(all(r["verified_purchasing_authority"]=="False" for r in register))
             self.assertEqual(result["deepseek_shared_ceiling_usd"],0.25)
             second=test.execute(multicity_capture=multicity)
             self.assertEqual(second["document_ai"]["status"],"NO_NEW_DOCUMENT_BYTES")
+            self.assertEqual(second["persistent_document_project_candidates"],2)
         finally:
             test.doCleanups()
 
