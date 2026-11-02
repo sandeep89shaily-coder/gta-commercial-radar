@@ -10,6 +10,12 @@ FEEDS={
  "brampton_planning":"https://www1.brampton.ca/EN/City-Hall/Council-Committees/meetings-agendas/",
  "brampton_preplanning":"https://letsconnect.brampton.ca/yourcityplans",
  "burlington_agendas":"https://www.burlington.ca/en/council-and-city-administration/agendas-and-minutes.aspx",
+ "toronto_council":"https://www.toronto.ca/city-government/council/council-committee-meetings/",
+ "mississauga_council":"https://www.mississauga.ca/council/council-activities/council-and-committees-calendar/",
+ "hamilton_planning":"https://www.hamilton.ca/city-council/council-committee/council-committee-meetings/meetings-agendas-video",
+ "oakville_agendas":"https://www.oakville.ca/town-hall/mayor-council-administration/agendas-meetings/",
+ "vaughan_council":"https://www.vaughan.ca/council/committees-council-agendas-minutes",
+ "kitchener_council":"https://www.kitchener.ca/council-and-city-administration/council-and-committee-meetings/",
  "ieso_connections":"https://www.ieso.ca/en/Sector-Participants/Connection-Process/Application-Status",
  "ero_notices":"https://ero.ontario.ca/search",
 }
@@ -48,15 +54,16 @@ def collect(root,transport=None,now=None):
     absolute=urljoin(url,html.unescape(href))
     parsed=urlparse(absolute)
     if parsed.scheme!="https" or not parsed.hostname or not (
-      parsed.hostname in HOSTS or parsed.hostname.endswith(".escribemeetings.com") or
-      parsed.hostname.endswith(".burlington.ca") or parsed.hostname.endswith(".brampton.ca")
+      parsed.hostname==urlparse(url).hostname or
+      (parsed.hostname.endswith(".escribemeetings.com") and
+       parsed.hostname.split(".")[0].startswith(("pub-","meetings")))
     ):continue
     if not RULE.search(label+" "+parsed.path):continue
     identity=hashlib.sha256((feed+"|"+absolute).encode()).hexdigest()
     db.execute("INSERT OR IGNORE INTO links VALUES (?,?,?,?,?)",
                (identity,feed,absolute,label[:250],observed));matched+=1
    out.append({"feed":feed,"status":"INDEX_FETCHED","candidate_links":matched,
-               "source_url":url,"publication_date_verified":False})
+               "source_url":url,"publication_date_verified":False,"document_contents_retrieved":0})
   except Exception as exc:
    out.append({"feed":feed,"status":"FETCH_FAILED","error_type":type(exc).__name__,"source_url":url})
  db.commit()
