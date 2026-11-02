@@ -12,6 +12,19 @@ This *long-term destination* does not replace the immediate hard gates below: in
 
 For the first controlled evidence baseline, see [GTA_RADAR_COMPETITIVE_BENCHMARK_20261101.md](GTA_RADAR_COMPETITIVE_BENCHMARK_20261101.md). It documents the exact ten selected projects, known earlier public disclosures and competitor overlap, and explicitly marks unavailable first-detection timestamps **UNKNOWN**. No source-record date is a substitute for an actual Radar ingestion/publication timestamp. Keep development priorities bounded to verified gaps and customer needs.
 
+## November 2, 2026 — freshness-first intelligence policy
+
+**Owner-confirmed motto: freshness first.** The default daily project list and selective paid-DeepSeek gate must favor newly source-dated, commercially meaningful developments, **not** old public permits merely indexed by Radar for the first time. First observed by Radar is not first publicly announced.
+
+- Date bands: **0–7 days**, **8–30 days**, **31–90 days**, then historical/unknown (manual review). These are **source-date bands, not verified first-publication bands** unless independently supported. Never use municipal-change detection timestamps as project publication timestamps.
+- Historical projects with a **tracked description/scope change** can re-enter research as **older-project scope-change review**. Do not state the change was freshly published or the supplier package is open. Status-only legacy changes do not automatically consume the selective AI budget.
+- Keep the full historical database and free manual review list; label every candidate's freshness class and date basis. Don't silently erase records or invent publication dates.
+- Research ordering is **freshness, then lifecycle, then commercial relevance/other queue factors**. Preserve existing same-band regional balancing and DeepSeek's source-specific research and public business-contact search.
+- Hard guardrails unchanged: selective DeepSeek **US$0.25/day**, existing Gemini pilot manual and separate, no automatic procurement/outreach/sales or buyer verification.
+- Measure first-publication and actual first-observation dates independently in future benchmarks; do not confuse a rolling change date with either.
+
+See [gta_freshness.py](gta_freshness.py), [free_daily_report.py](free_daily_report.py) and [selective_daily_ai.py](selective_daily_ai.py) for implementation.
+
 ## ONE business objective — do not lose sight of this
 
 **Discover credible GTA / Southern Ontario commercial and industrial investments before suppliers are selected, identify the real buying organization and a lawful public contact path, and sell evidence-backed opportunities to relevant service providers.** Examples: commercial HVAC/refrigeration, industrial equipment, security/fire systems and other specialist vendors. This is a **qualified lead-intelligence business**, not a subscription search engine or a contest to accumulate permit rows.
