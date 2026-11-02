@@ -27,6 +27,7 @@ from pypdf import PdfReader
 
 import robots_policy
 from municipal_meeting_capture import AGENDAS
+from gta_early_applications import SOURCES as EARLY_APPLICATION_SOURCES
 from toronto_pdf_download import AGENT, MAX_BYTES, TIMEOUT, public_dns
 
 MAX_HTML_BYTES = 1_500_000
@@ -34,6 +35,10 @@ MAX_AGENDA_PAGES_PER_CITY = 2
 MAX_PDFS_PER_CITY = 2
 MAX_TOTAL_PDFS = 12
 CITY_PAGES = {city:uri for city,uri in AGENDAS.items() if city!="Toronto"}
+# Additional eight planning index portals are official city-host sources.
+# Direct same-host PDFs only; third-party document systems stay blocked.
+CITY_PAGES.update({city:uri for city,uri in EARLY_APPLICATION_SOURCES.items()
+                   if city not in AGENDAS})
 FIELDS = ("city","source_page","url","status","reason","http_status","bytes",
           "sha256","saved_path","publisher_date_verified","document_type")
 
