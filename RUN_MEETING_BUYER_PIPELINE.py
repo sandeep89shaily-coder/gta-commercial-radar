@@ -45,6 +45,9 @@ def pipeline(city,out,*,recording_url=None,capture_authorized=False,address=None
  discovery.write_text(json.dumps(meeting,indent=2),encoding="utf-8")
  state={"city":city,"official_videos_discovered":meeting["discovered"],
     "meeting_index":str(discovery),"caption_status":"NOT_REQUESTED",
+    "official_index_status":meeting.get("official_index_status","UNKNOWN"),
+    "agenda_links_discovered":meeting.get("agenda_links_discovered",0),
+    "documents_retrieved":0,"publication_dates_verified":0,
     "buyer_evidence_status":"NOT_REQUESTED","verified_leads":0}
  if recording_url:
   official={x["recording_url"] for x in meeting["meetings"]}
@@ -102,7 +105,7 @@ def pipeline(city,out,*,recording_url=None,capture_authorized=False,address=None
  return state
 def main():
  p=argparse.ArgumentParser()
- p.add_argument("--city",choices=["Toronto","Brampton"],required=True)
+ p.add_argument("--city",choices=list(__import__("municipal_meeting_capture").OFFICIAL),required=True)
  p.add_argument("--out",required=True)
  p.add_argument("--recording-url")
  p.add_argument("--authorize-caption-capture",action="store_true")
