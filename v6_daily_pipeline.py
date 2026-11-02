@@ -694,6 +694,18 @@ def main(argv=None):
     parser.add_argument('--offline-test', action='store_true', help='Only for local diagnostics, never marketed as fresh collection')
     parser.add_argument('--no-schedule', action='store_true')
     args=parser.parse_args(argv)
+    # Backward-compatible entrypoint: existing 08:30 scheduled jobs invoke
+    # RUN_GTA_RADAR_V6.bat --unattended --selective-ai. Those jobs now enter
+    # the FULL integrated discovery runner once. Its inner V6 worker passes
+    # --no-schedule, so it cannot recurse or run the collectors twice.
+    if (args.unattended and args.selective_ai and not args.no_schedule
+            and not args.offline_test and not args.install_selective_schedule
+            and not args.install_free_schedule and not args.no_ai
+            and args.database is None and args.results_dir is None
+            and args.max_projects == MAX_INVESTIGATIONS):
+        from gta_discovery_run import execute as integrated_discovery
+        say('Scheduled selective run -> integrated meetings, documents, project and buyer research')
+        return integrated_discovery(args.workspace)
     try:
         workspace = find_workspace(args.workspace)
         db = args.database or choose_database(workspace)
