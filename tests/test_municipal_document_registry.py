@@ -8,10 +8,11 @@ class RegistryTest(unittest.TestCase):
     def test_all_official_entrypoints_registered_without_false_operational_claims(self):
         records=validate(ROOT/"config"/"municipal_document_sources.csv")
         self.assertEqual({r["city"] for r in records},
-                         {"Toronto","Brampton","Mississauga","Hamilton"})
+                         {"Toronto","Brampton","Mississauga","Hamilton",
+                          "Burlington","Oakville","Vaughan","Kitchener"})
         with tempfile.TemporaryDirectory() as t:
             result=report(ROOT/"config"/"municipal_document_sources.csv",t)
-            self.assertEqual(result["registered_sources"],4)
+            self.assertEqual(result["registered_sources"],8)
             self.assertEqual(result["documents_retrieved"],0)
             self.assertEqual(result["automated_source_fetch_approved"],0)
             self.assertEqual(result["commercial_reuse_permissions_confirmed"],0)
