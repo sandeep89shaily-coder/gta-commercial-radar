@@ -6,8 +6,9 @@ from v6_daily_pipeline import find_workspace
 import desktop_update
 ROOT=Path(__file__).resolve().parent
 def execute(workspace=None,*,full_intelligence=False):
-    # Discovery + initial DeepSeek is the default while the owner manually
-    # verifies project participants, buyers and supplier opportunities.
+    # Integrated daily discovery+meetings+docs+bounded project/buyer source
+    # research is the default. The legacy exhaustive full-intelligence workflow
+    # is an explicitly opted-in separate mode, not needed to run daily Radar.
     if not full_intelligence:
         from gta_discovery_run import execute as run_discovery
         return run_discovery(workspace)
@@ -116,6 +117,6 @@ if __name__=="__main__":
     p=argparse.ArgumentParser()
     p.add_argument("--workspace")
     p.add_argument("--full-intelligence",action="store_true",
-                   help="Explicitly opt in to legacy buyer/procurement AI stages")
+                   help="Explicit legacy exhaustive pipeline (normal daily launcher already runs integrated research)")
     args=p.parse_args()
     raise SystemExit(execute(args.workspace,full_intelligence=args.full_intelligence))

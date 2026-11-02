@@ -67,7 +67,7 @@ class DiscoveryManualHandoffTests(unittest.TestCase):
             self.assertNotEqual(report["manual_review_csv"],report2["manual_review_csv"])
             self.assertTrue(Path(report["manual_review_csv"]).exists())
 
-    def test_default_runner_selective_deepseek_including_contacts_and_no_buyer_jobs(self):
+    def test_default_runner_integrates_meetings_documents_and_buyers_without_sales(self):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d)
             called=[]
@@ -81,16 +81,27 @@ class DiscoveryManualHandoffTests(unittest.TestCase):
                     "company_contact_searches":1,"daily_ceiling_usd":0.25}}))
                 return Result()
             def ok(*args,**kwargs):return {"ok":True,"status":"OK_UP_TO_DATE","installed_commit":"abc"}
-            rc=discovery.execute(root,runner=fake,preflight=ok)
+            integrated_called=[]
+            def fake_integrator(results,**kwargs):
+                integrated_called.append((Path(results), kwargs))
+                return {"status":"INTEGRATED_REVIEW_READY","failed_stages":[],
+                        "combined_records":2,
+                        "combined_csv":str(Path(results)/"GTA_RADAR_INTEGRATED_INTELLIGENCE.csv"),
+                        "combined_html":str(Path(results)/"GTA_RADAR_INTEGRATED_INTELLIGENCE.html"),
+                        "deepseek_shared_ceiling_usd":0.25}
+            rc=discovery.execute(root,runner=fake,preflight=ok,
+                                 integrator=fake_integrator)
             self.assertEqual(rc,0)
             self.assertEqual(len(called),1)
+            self.assertEqual(integrated_called[0][1]["allow_paid"], True)
             self.assertIn("--selective-ai",called[0])
             self.assertNotIn("--no-ai",called[0])
             self.assertNotIn("gta_integrated_buyer_investigation.py"," ".join(called[0]))
             out=json.loads((root/"GTA_RADAR_RESULTS"/"GTA_RADAR_DISCOVERY_RUN_STATUS.json").read_text())
             self.assertTrue(out["completed"])
             self.assertEqual(out["initial_deepseek"]["company_contact_searches"],1)
-            self.assertFalse(out["supplier_or_procurement_investigation_automated"])
+            self.assertTrue(out["supplier_or_procurement_investigation_automated"])
+            self.assertEqual(out["status"],"INTEGRATED_INTELLIGENCE_READY")
 
     def test_existing_full_command_defaults_to_discovery(self):
         with patch("gta_discovery_run.execute",return_value=0) as mocked:

@@ -1,7 +1,8 @@
 """GTA Radar's default stage: find new/changed projects and make a human review list.
 
-Live V6 collection plus the existing selective DeepSeek queries, INCLUDING
-public business contact search. No separate buyer/procurement AI pipeline.
+Default integrated workflow: live V6 collection, selective DeepSeek, municipal
+meetings, verified official PDFs, bounded source-backed document/project/buyer
+research, one merged human review list. All paid stages share US$0.25/day.
 """
 from __future__ import annotations
 import argparse,datetime as dt,json,subprocess,sys
@@ -9,19 +10,20 @@ from pathlib import Path
 import desktop_update
 from v6_daily_pipeline import find_workspace
 from gta_manual_project_list import build as build_manual_list
+from gta_daily_intelligence import integrate as run_integrated_intelligence
 
 ROOT=Path(__file__).resolve().parent
 WATCH="GTA_RADAR_DAILY_NEW_DEVELOPMENTS.csv"
 
-def execute(workspace=None,*,runner=None,preflight=None,list_builder=None):
+def execute(workspace=None,*,runner=None,preflight=None,list_builder=None,integrator=None):
     ws=find_workspace(workspace)
     results=ws/"GTA_RADAR_RESULTS"
     results.mkdir(parents=True,exist_ok=True)
     report=results/"GTA_RADAR_DISCOVERY_RUN_STATUS.json"
-    record={"mode":"DISCOVERY_PLUS_INITIAL_DEEPSEEK_CONTACT_HINTS",
+    record={"mode":"INTEGRATED_DAILY_INTELLIGENCE",
             "started":dt.datetime.now().astimezone().isoformat(),
             "completed":False,"commercial_qualification_automated":False,
-            "supplier_or_procurement_investigation_automated":False,
+            "supplier_or_procurement_investigation_automated":True,
             "daily_deepseek_cap_usd":0.25}
     def save():
         report.write_text(json.dumps(record,indent=2),encoding="utf-8")
@@ -40,8 +42,8 @@ def execute(workspace=None,*,runner=None,preflight=None,list_builder=None):
          "--workspace",str(ws),"--results-dir",str(results),
          "--selective-ai","--no-schedule","--unattended"]
     record["collector_command"]="V6 LIVE COLLECTION + SELECTIVE DEEPSEEK"
-    print("Running live project discovery, initial DeepSeek queries AND public contact searches.",flush=True)
-    print("No automatic deep buyer, supplier or procurement investigations.",flush=True)
+    print("Running daily discovery, evidence-backed meeting/document intelligence and bounded DeepSeek investigations.",flush=True)
+    print("Buyer research is automatic; purchasing authority, supplier awards and outreach require manual verification.",flush=True)
     log=results/"GTA_RADAR_DISCOVERY_COLLECTION.log"
     with log.open("w",encoding="utf-8") as handle:
         outcome=(runner or subprocess.run)(cmd,cwd=ROOT,stdout=handle,stderr=subprocess.STDOUT)
@@ -67,16 +69,32 @@ def execute(workspace=None,*,runner=None,preflight=None,list_builder=None):
         save()
         raise
     record["manual_list"]=listing
-    record["completed"]=outcome.returncode==0
-    record["status"]="DISCOVERY_LIST_READY" if outcome.returncode==0 else "PARTIAL_COLLECTION_REVIEW_LIST_READY"
+    # The integrated stage is part of EVERY normal run, not a --full-intelligence
+    # opt-in. If V6 partially failed, allow free review but no additional paid AI.
+    try:
+        unified=(integrator or run_integrated_intelligence)(
+            results,allow_paid=outcome.returncode==0)
+        record["integrated_intelligence"]={
+            k:unified.get(k) for k in ("status","failed_stages","combined_records",
+               "combined_csv","combined_html","pdfs_captured_in_union",
+               "new_source_dated_project_candidates","deepseek_shared_ceiling_usd")}
+        record["meeting_document_pipeline_complete"]=unified.get("status")=="INTEGRATED_REVIEW_READY"
+    except Exception as exc:
+        record["meeting_document_pipeline_complete"]=False
+        record["integrated_intelligence"]={"status":"FAILED",
+            "error":type(exc).__name__+": "+str(exc)[:250]}
+    record["completed"]=outcome.returncode==0 and record["meeting_document_pipeline_complete"]
+    record["status"]=("INTEGRATED_INTELLIGENCE_READY" if record["completed"] else
+                      "INTEGRATED_PARTIAL_REVIEW_REQUIRED")
     record["finished"]=dt.datetime.now().astimezone().isoformat()
     save()
     print("PROJECTS TO REVIEW:",listing["new_or_changed_source_records"],flush=True)
     print("INITIAL CONTACT HINTS:",listing["initial_public_contact_hints"],flush=True)
     print("CSV:",listing["manual_review_csv"],flush=True)
     print("HTML:",listing["manual_review_html"],flush=True)
+    print("INTEGRATED:",record["integrated_intelligence"].get("combined_html","see status JSON"),flush=True)
     print("RUN STATUS:",record["status"],flush=True)
-    return 0 if outcome.returncode==0 else 2
+    return 0 if record["completed"] else 2
 
 if __name__=="__main__":
     p=argparse.ArgumentParser()
