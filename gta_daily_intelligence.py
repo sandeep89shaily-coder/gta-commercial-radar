@@ -411,6 +411,8 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
         "Source dates are not necessarily first publication dates. AI findings and named companies are UNVERIFIED. "
         "No purchasing authority, open supplier contract, award or competitive first detection is claimed.</p>",
         "<p><a href='"+DETAIL+"'>Download combined CSV</a> · "
+        "<a href='GTA_RADAR_DOCUMENT_PROJECT_CANDIDATES.csv'>AI municipal report candidates (review only)</a> · "
+        "<a href='GTA_RADAR_DOCUMENT_AI_PENDING.csv'>Unprocessed PDF research backlog</a> · "
         "<a href='GTA_RADAR_DISCOVERY_RUN_STATUS.json'>Read run status / missing sources</a></p>",
     ]
     for row in combined:
