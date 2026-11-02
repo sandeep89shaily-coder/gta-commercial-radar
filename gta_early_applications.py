@@ -175,6 +175,7 @@ def run(results,*,today=None,fetcher=None,sources=None):
         if state.get("schema")!=1:raise ValueError("UNKNOWN_EARLY_APP_STATE")
     else:state={"schema":1,"projects":{},"links":{}}
     old=state["projects"];known_links=state["links"]
+    city_baselines=state.setdefault("city_application_baselines",{})
     baseline=not path.exists()
     records=[];changed=[];newlinks=[];source_audit=[]
     for city,url in source_list.items():
@@ -188,12 +189,18 @@ def run(results,*,today=None,fetcher=None,sources=None):
             status["fetch_status"]="INDEX_FETCHED"
             status["actual_application_rows"]=len(entries)
             status["links_observed"]=len(links)
+            # A failed/empty fetch is not a completed application baseline.
+            # If a dynamic portal finally becomes parseable weeks later,
+            # do not mislabel all its existing applications newly announced.
+            city_baselined=bool(city_baselines.get(city)) or any(
+                v.get("city")==city for v in old.values())
             if not entries:status["fetch_status"]="INDEX_ONLY_NO_STRUCTURED_APPLICATIONS"
+            elif not city_baselined:status["initial_application_baseline"]=True
             for row in entries:
                 pid=row["project_id"]
                 digest=hashlib.sha256(_clean(row["description"]).casefold().encode()).hexdigest()
                 prev=old.get(pid)
-                observation=("INITIAL_BASELINE" if baseline and prev is None
+                observation=("INITIAL_BASELINE" if not city_baselined and prev is None
                     else "FIRST_OBSERVED" if prev is None
                     else "RECORD_CHANGED" if prev.get("digest")!=digest else "UNCHANGED")
                 first=prev.get("first_seen_local") if prev else day
@@ -204,6 +211,7 @@ def run(results,*,today=None,fetcher=None,sources=None):
                     changed.append(row);status["new_or_changed"]+=1
                 old[pid]={"digest":digest,"first_seen_local":first,
                           "last_seen_local":day,"city":city}
+            if entries:city_baselines[city]=day
             for item in links:
                 url_key=item["url"]
                 prev=known_links.get(url_key)
@@ -232,6 +240,7 @@ def run(results,*,today=None,fetcher=None,sources=None):
              "new_or_changed_application_records":len(changed),
              "new_links":len(newlinks),
              "baseline_only":baseline,
+             "cities_with_application_baseline":len(city_baselines),
              "project_filing_or_first_publication_dates_verified":0,
              "ai_calls":0,"automatically_promoted_to_canonical_projects":0,
              "city_status":source_audit,
