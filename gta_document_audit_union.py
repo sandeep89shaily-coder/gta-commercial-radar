@@ -2,7 +2,7 @@
 import csv
 from pathlib import Path
 
-FIELDS=("url","status","reason","http_status","bytes","sha256","saved_path")
+FIELDS=("url","status","reason","http_status","bytes","sha256","saved_path","city","source_page")
 
 def union(paths, target):
     selected={}
