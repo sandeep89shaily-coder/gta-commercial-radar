@@ -145,6 +145,7 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
     from toronto_verified_report_queue import run as report_default
     from toronto_ai_document_batch import process as document_default
     from municipal_document_capture import run as multicity_capture_default
+    from gta_document_project_candidates import update as update_doc_candidates
     from gta_execute_ai_project_research import execute as project_default
     from gta_integrated_buyer_investigation import run as buyer_default
     from gta_live_procurement_evidence import execute as procurement_default
@@ -270,6 +271,12 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
             temp = root / (DOC_LEDGER + ".tmp")
             temp.write_text(json.dumps(done,indent=2),encoding="utf-8")
             temp.replace(root / DOC_LEDGER)
+
+    doc_candidates=step("persistent_document_project_candidacy",
+        lambda:update_doc_candidates(root,selected_docs,
+            review/"DOCUMENT_AI"/"TORONTO_AI_DOCUMENT_BATCH_AUDIT.csv",
+            today=today),required=True)
+    state["document_project_candidates"]=doc_candidates
 
     fresh = _valid_new_projects(root,today)
     candidate_file = review / "FRESH_RESEARCH_CANDIDATES.csv"
@@ -411,6 +418,8 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
         "municipal_official_index_count":len(municipal_official),
         "municipal_agenda_links_new_to_radar":len(new_agenda_links),
         "meeting_documents_fetched_outside_toronto":multicity.get("direct_pdf_captured",0),
+        "new_pdf_document_candidates":doc_candidates.get("added_this_run",0),
+        "persistent_document_project_candidates":doc_candidates.get("document_candidates_total",0),
         "other_city_document_capture":{k:multicity.get(k) for k in
             ("cities_configured","cities_attempted","successful_document_cities",
              "direct_pdf_attempted","direct_pdf_captured","audit_csv","coverage_warning")},
