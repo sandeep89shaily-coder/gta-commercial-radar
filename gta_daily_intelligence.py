@@ -25,6 +25,7 @@ AUDIT = "GTA_RADAR_INTEGRATED_INTELLIGENCE_STATUS.json"
 DETAIL = "GTA_RADAR_INTEGRATED_INTELLIGENCE.csv"
 DASHBOARD = "GTA_RADAR_INTEGRATED_INTELLIGENCE.html"
 DOC_LEDGER = "GTA_RADAR_DOCUMENT_AI_SEEN.json"
+DOC_BACKLOG = "GTA_RADAR_DOCUMENT_AI_PENDING.csv"
 MEETING_LINK_LEDGER = "GTA_RADAR_MEETING_LINK_FIRST_SEEN.json"
 REPORT_CATEGORIES = ("PROJECT", "SOURCE_INDEX_LINK_REVIEW", "MUNICIPAL_AGENDA_LINK_REVIEW", "MUNICIPAL_DOCUMENT_REVIEW")
 FIELDS = ("kind", "project_id", "address", "city", "description", "source_url",
@@ -99,17 +100,26 @@ def _build_document_worklist(union_csv, out, seen, *, paid, ai_processor):
     failed/budget-deferred documents remain eligible to retry. No false
     publication timestamp is inferred from downloading a PDF today.
     """
-    source = [r for r in _csv(union_csv)
-              if r.get("status") == "CAPTURED"
-              and r.get("sha256") and _url(r.get("url"))
-              and Path(r.get("saved_path") or "").is_file()]
-    queued = [r for r in source if r["sha256"] not in seen]
+    fields=("url", "status", "reason", "http_status", "bytes", "sha256",
+            "saved_path", "city", "source_page")
+    backlog=Path(out).parent/DOC_BACKLOG
+    # Persist captured but not-yet-processed documents, including documents
+    # that vanish from the city's index before a later research run.
+    candidates={}
+    for r in [*_csv(backlog),*_csv(union_csv)]:
+        if (r.get("status")!="CAPTURED" or not r.get("sha256")
+                or not _url(r.get("url")) or
+                not Path(r.get("saved_path") or "").is_file()):
+            continue
+        candidates[(r["url"],r["sha256"])]=r
+    queued=[r for r in candidates.values() if r["sha256"] not in seen]
+    _write_csv(backlog, queued, fields)
     # Share the two-document DeepSeek cap across all cities; an eligible
     # non-Toronto report can be researched before another Toronto report.
-    from_other = next((r for r in queued if r.get("city") and r["city"]!="Toronto"),None)
-    selected = ([from_other] if from_other else [])
+    from_other=next((r for r in queued if r.get("city") and r["city"]!="Toronto"),None)
+    selected=([from_other] if from_other else [])
     selected.extend(r for r in queued if r is not from_other)
-    selected = selected[:2]
+    selected=selected[:2]
     to_analyze = Path(out) / "NEW_DOCUMENTS_FOR_REVIEW.csv"
     _write_csv(to_analyze, selected,
                ("url", "status", "reason", "http_status", "bytes", "sha256", "saved_path", "city", "source_page"))
@@ -126,6 +136,10 @@ def _build_document_worklist(union_csv, out, seen, *, paid, ai_processor):
     else:
         summary = {"status":"NO_NEW_DOCUMENT_BYTES","review_outputs":0,
                    "ai_calls_reported":0,"errors":0}
+    remaining=[r for r in queued if r["sha256"] not in seen]
+    _write_csv(backlog, remaining, fields)
+    summary["document_ai_backlog_pending"]=len(remaining)
+    summary["document_ai_backlog_csv"]=str(backlog)
     return selected, summary, seen
 
 
