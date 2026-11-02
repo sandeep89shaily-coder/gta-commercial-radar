@@ -101,19 +101,21 @@ class DailyIntegrationTests(unittest.TestCase):
         assert kwargs.get("limit")==2
         rows=daily._csv(audit)
         Path(out).mkdir(parents=True,exist_ok=True)
+        audited=[]
         for r in rows:
-            model=Path(out)/"pdf_analysis.json"
+            model=Path(out)/(r["sha256"][:16]+"_analysis.json")
             if kwargs["paid"]:
                 model.write_text(json.dumps({"model_output":{
                     "address":"10 Industrial Parkway",
                     "proposed_scope":"Warehouse expansion",
                     "developer":"Possible Developer Ltd",
                 }}),encoding="utf-8")
-            write_csv(Path(out)/"TORONTO_AI_DOCUMENT_BATCH_AUDIT.csv",[
+            audited.append(
                 {"source_url":r["url"],"sha256_download":r["sha256"],
                  "status":"AI_REVIEW_ONLY_NOT_SALE_READY" if kwargs["paid"] else "READY_NOT_SENT",
-                 "result_file":str(model) if kwargs["paid"] else ""},
-            ])
+                 "result_file":str(model) if kwargs["paid"] else ""})
+        write_csv(Path(out)/"TORONTO_AI_DOCUMENT_BATCH_AUDIT.csv",audited,
+                  ["source_url","sha256_download","status","result_file"])
         return {"status":"DOCUMENTS_REVIEWED","review_outputs":len(rows) if kwargs["paid"] else 0,
                 "ai_calls_reported":len(rows) if kwargs["paid"] else 0}
 
