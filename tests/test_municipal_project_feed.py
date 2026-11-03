@@ -98,3 +98,28 @@ def test_kitchener_projects_never_claim_application_number():
         "https://www.kitchener.ca/strategic-plans-and-projects/projects/")
     assert len(rows)==1 and rows[0]["application_id"]==""
     assert rows[0]["record_kind"]=="PROJECT_INDEX_SIGNAL"
+
+
+def test_guelph_page_has_real_application_id_not_address_guess():
+    from gta_municipal_project_feed import _detail_project
+    page="""<h1>501 Hanlon Creek Boulevard</h1><h2>File Number OZS26-011</h2>
+    <p>Applications received to permit a veterinary service in an
+    existing employment-area property and associated plan amendment.</p>"""
+    result=_detail_project("Guelph",page,"https://guelph.ca/2026/10/501-hanlon-creek-boulevard/")
+    assert len(result)==1
+    assert result[0]["application_id"]=="OZS26-011"
+
+def test_guelph_address_only_does_not_invent_file():
+    from gta_municipal_project_feed import _detail_project
+    result=_detail_project("Guelph","<h1>70 Monarch Road</h1><p>Industrial facility amendment</p>",
+                           "https://guelph.ca/2026/09/70-monarch-road/")
+    assert result==[]
+
+def test_halton_official_file_no_html():
+    from gta_municipal_project_feed import _detail_project
+    page="""<h1>279 Guelph Street</h1><p>Proposed dairy plant expansion and
+    office development (D11SPA26.003).</p>"""
+    result=_detail_project("Halton Hills",page,
+         "https://www.haltonhills.ca/work/planning-development/active-development-applications/279-guelph-street")
+    assert len(result)==1
+    assert result[0]["application_id"]=="D11SPA26.003"
