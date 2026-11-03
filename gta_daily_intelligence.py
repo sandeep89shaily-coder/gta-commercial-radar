@@ -172,7 +172,7 @@ def _build_document_worklist(union_csv, out, seen, *, paid, ai_processor, ranker
 def integrate(results, *, today=None, meeting_pipeline=None, document_discover=None,
               agenda_pipeline=None, verified_reports=None, document_ai=None,
               multicity_capture=None, document_ranker=None,
-              application_monitor=None, gis_monitor=None, other_gis_monitor=None, project_ai=None, buyer_ai=None, procurement=None, buyer_batch=None,
+              application_monitor=None, gis_monitor=None, other_gis_monitor=None, municipal_monitor=None, project_ai=None, buyer_ai=None, procurement=None, buyer_batch=None,
               graph=None, api_key_check=None, allow_paid=True):
     """Run integrated bounded stages and expose individual failure provenance.
 
@@ -194,6 +194,7 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
     from gta_early_applications import run as applications_default
     from gta_official_gis_applications import run as gis_default
     from gta_additional_city_gis import run as other_gis_default
+    from gta_municipal_project_feed import run as municipal_default
     from gta_city_coverage_report import build as measured_coverage_default
     from gta_markham_circulations import run as markham_default
 
@@ -211,6 +212,12 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
     verified_reports = verified_reports or report_default
     document_ai = document_ai or document_default
     multicity_capture = multicity_capture or multicity_capture_default
+    # Fully injected offline tests must never acquire network side effects.
+    # Production runs use the real municipal adapter by default.
+    municipal_fn = municipal_monitor or (
+        municipal_default if application_monitor is None else
+        (lambda root, *, today=None: {"source_status":[],"application_id_rows":0,
+                                      "project_only_signals":0,"new_or_changed":0}))
     application_monitor = application_monitor or applications_default
     gis_monitor = gis_monitor or gis_default
     other_gis_monitor = other_gis_monitor or other_gis_default
@@ -278,6 +285,10 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
         lambda:gis_monitor(root,today=today))
     other_gis=step("hamilton_kitchener_official_gis_applications",
         lambda:other_gis_monitor(root,today=today))
+    municipal=step("source_aware_municipal_project_feed",
+        lambda:municipal_fn(root,today=today))
+    state["municipal_feed"]={k:municipal.get(k) for k in (
+        "application_id_rows","project_only_signals","new_or_changed","source_status")}
     state["other_city_official_gis"]={k:other_gis.get(k) for k in (
         "sources_configured","sources_successful","commercial_candidates",
         "new_or_changed","source_status")}
@@ -329,7 +340,7 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
         "source_pdfs_parsed","rows_extracted","first_run_baseline",
         "new_or_changed","pdfs_unreadable_or_invalid","warning")}
     coverage=step("measured_sixteen_city_application_coverage",
-        lambda:measured_coverage_default(root,early_apps,gis,other_gis,markham),
+        lambda:measured_coverage_default(root,early_apps,gis,other_gis,markham,municipal),
         required=True)
     state["measured_city_coverage"]={k:coverage.get(k) for k in (
         "cities_configured","cities_with_extracted_application_candidates",
@@ -485,6 +496,22 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
             "ai_next_step":"VERIFY_EXACT_APPLICATION_BEFORE_PAID_AI",
             "verification_required":app.get("verification_required",""),
         })
+    for app in _csv(root/"GTA_RADAR_MUNICIPAL_PROJECT_CHANGES.csv"):
+        combined.append({
+            "kind":("MUNICIPAL_APPLICATION_ID_REVIEW" if app.get("application_id")
+                    else "MUNICIPAL_PROJECT_INDEX_SIGNAL_REVIEW"),
+            "project_id":app.get("project_id",""),"city":app.get("city",""),
+            "address":app.get("address",""),
+            "description":app.get("description") or app.get("project_title",""),
+            "source_url":app.get("source_url",""),
+            "freshness":"FIRST_OBSERVED_OR_CHANGED_NOT_FIRST_PUBLICATION",
+            "source_date":"","date_basis":"NO_VERIFIED_PUBLICATION_DATE",
+            "observed_at":app.get("first_seen_local",""),
+            "research_status":("APPLICATION_ID_UNVERIFIED_SCOPE" if app.get("application_id")
+                               else "PROJECT_INDEX_ONLY_NO_APPLICATION_ID"),
+            "ai_next_step":"VERIFY_EXACT_PROJECT_AND_EVIDENCE_BEFORE_PAID_AI",
+            "verification_required":app.get("verification_required",""),
+        })
     for app in _csv(root/"GTA_RADAR_EARLY_APPLICATION_NEW_OR_CHANGED.csv"):
         combined.append({
             "kind":"EARLY_PLANNING_APPLICATION_REVIEW",
@@ -554,6 +581,8 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
         "<a href='GTA_RADAR_STRUCTURED_APPLICATION_SOURCE_STATUS.json'>Toronto/Brampton GIS source status</a> · "
         "<a href='GTA_RADAR_MARKHAM_CIRCULATED_APPLICATIONS.csv'>Markham dated circulation applications</a> · "
         "<a href='GTA_RADAR_CITY_COVERAGE_AUDIT.csv'>Measured coverage by city (not configured links)</a> · "
+        "<a href='GTA_RADAR_MUNICIPAL_PROJECT_FEED.csv'>Official municipal project feed</a> · "
+        "<a href='GTA_RADAR_MUNICIPAL_PROJECT_FEED_STATUS.json'>Municipal feed source diagnostics</a> · "
         "<a href='GTA_RADAR_ADDITIONAL_CITY_GIS_APPLICATIONS.csv'>Hamilton/Kitchener application baseline</a> · "
         "<a href='GTA_RADAR_ADDITIONAL_CITY_GIS_STATUS.json'>Hamilton/Kitchener source status</a> · "
         "<a href='GTA_RADAR_EARLY_APPLICATION_SOURCE_STATUS.json'>HTML source audit</a> · "

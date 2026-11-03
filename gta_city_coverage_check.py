@@ -14,6 +14,7 @@ from gta_official_gis_applications import run as tb_gis_run
 from gta_additional_city_gis import run as other_gis_run
 from gta_markham_circulations import run as markham_run
 from gta_city_coverage_report import build
+from gta_municipal_project_feed import run as municipal_run
 
 def execute(workspace):
     root=Path(workspace).expanduser()/"GTA_RADAR_RESULTS"
@@ -21,13 +22,14 @@ def execute(workspace):
     html=html_run(root)
     tb=tb_gis_run(root)
     other=other_gis_run(root)
+    municipal=municipal_run(root)
     pdf_union=(root/"DAILY_INTEGRATED_REVIEW"/"TORONTO_DOCUMENTS"/
                "COMBINED_PDF_FETCH_AUDIT.csv")
     if pdf_union.is_file():
         markham=markham_run(pdf_union,root)
     else:
         markham={"rows_extracted":0,"warning":"No previous verified official PDF union; Markham PDF capture not run by this diagnostic"}
-    coverage=build(root,html,tb,other,markham)
+    coverage=build(root,html,tb,other,markham,municipal)
     print("\nGTA RADAR: MEASURED 16-CITY PLANNING APPLICATION COVERAGE (NO DEEPSEEK)")
     print("City".ljust(16)+"HTML".rjust(7)+"GIS".rjust(7)+
           "PDF".rjust(7)+"  Result")
@@ -43,6 +45,9 @@ def execute(workspace):
           "/ 16 (NOT citywide complete coverage)")
     print("Cities with no application candidates:",
           coverage["cities_without_extracted_applications"],"/ 16")
+    print("Additional municipal application ID rows:",municipal["application_id_rows"])
+    print("Official project-only signals:",municipal["project_only_signals"])
+    print("Municipal feed status:",root/"GTA_RADAR_MUNICIPAL_PROJECT_FEED_STATUS.json")
     print("City audit:",root/"GTA_RADAR_CITY_COVERAGE_AUDIT.csv")
     print("Detailed status:",root/"GTA_RADAR_CITY_COVERAGE_STATUS.json")
     print("Toronto/Brampton GIS status:",root/"GTA_RADAR_STRUCTURED_APPLICATION_SOURCE_STATUS.json")
