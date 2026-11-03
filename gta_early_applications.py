@@ -230,6 +230,79 @@ def _rows(markup,city,url):
         if len(links)>=100:break
     return list(candidates.values()),list(links.values())
 
+
+# Detail-page crawling is bounded to official, same-host planning links. It is
+# intentionally separate from a generic website crawler and never follows
+# external links, PDFs, portals or arbitrary navigation.
+DETAIL_TERMS = re.compile(
+    r"(?i)(?:development.?application|planning.?application|complete.?application|"
+    r"application.?notice|notice.?of|active.?development|current.?development|"
+    r"proposal.?under.?review|site.?plan|rezoning|zoning.?amendment|"
+    r"development.?proposal|public.?meeting|planning.?file)")
+DETAIL_CITIES = frozenset((
+    "Milton", "Halton Hills", "Cambridge", "Oakville", "Guelph",
+    "Burlington", "Caledon", "Hamilton", "Kitchener", "Toronto",
+    "Brampton", "Vaughan", "Markham"))
+MAX_DETAIL_PAGES = 16
+
+
+def _detail_urls(markup, city, index_url, *, limit=MAX_DETAIL_PAGES):
+    """Find plausible municipal application pages, not arbitrary site links."""
+    if city not in DETAIL_CITIES:
+        return []
+    soup = BeautifulSoup(markup, "html.parser")
+    candidates = []
+    seen = {index_url}
+    for a in soup.find_all("a", href=True):
+        title = _clean(a.get_text(" ", strip=True))[:180]
+        href = a["href"].strip()
+        target = urljoin(index_url, href)
+        parsed = urlparse(target)
+        if (target in seen or not _safe(target, index_url) or
+                parsed.query or not parsed.path or
+                re.search(r"\\.(?:pdf|docx?|xlsx?|zip|jpe?g|png|mp4)$",
+                          parsed.path, re.I)):
+            continue
+        # Ignore broad news/nav links; links must look planning-specific.
+        if not DETAIL_TERMS.search(title + " " + parsed.path.replace("-", " ")):
+            continue
+        seen.add(target)
+        candidates.append(target)
+        if len(candidates) >= limit:
+            break
+    return candidates
+
+
+def _enrich_from_details(markup, city, url, fetcher, *, limit=MAX_DETAIL_PAGES):
+    """Collect additional ID-bearing records from linked pages, fail individually.
+
+    Return an audit of attempted/succeeded/failed pages. Failed pages never
+    establish a baseline or manufacture a new observation.
+    """
+    paths = _detail_urls(markup, city, url, limit=limit)
+    rows = {}
+    attempted = 0
+    successful = 0
+    failures = []
+    for target in paths:
+        attempted += 1
+        try:
+            body = fetcher(target)
+            items, _ = _rows(body, city, target)
+            successful += 1
+            for item in items:
+                key = item["project_id"]
+                current = rows.get(key)
+                if current is None or len(item["description"]) > len(current["description"]):
+                    rows[key] = item
+        except Exception as exc:
+            failures.append({"url": target,
+                             "error": type(exc).__name__ + ":" + str(exc)[:120]})
+    return list(rows.values()), {"detail_pages_attempted": attempted,
+            "detail_pages_fetched": successful, "detail_page_failures": failures[:16],
+            "detail_application_candidates": len(rows)}
+
+
 def _write(path,rows,fields):
     with Path(path).open("w",encoding="utf-8-sig",newline="") as f:
         w=csv.DictWriter(f,fieldnames=fields,extrasaction="ignore")
@@ -256,6 +329,14 @@ def run(results,*,today=None,fetcher=None,sources=None):
         try:
             markup=(fetcher or _fetch)(url)
             entries,links=_rows(markup,city,url)
+            # When an official index has no parseable application IDs,
+            # follow a small set of application-specific official pages.
+            # This remains a no-AI, read-only, robots-respecting collection.
+            if not entries:
+                detail,detail_audit=_enrich_from_details(
+                    markup,city,url,fetcher or _fetch)
+                status.update(detail_audit)
+                entries=detail
             status["fetch_status"]="INDEX_FETCHED"
             status["actual_application_rows"]=len(entries)
             status["links_observed"]=len(links)
