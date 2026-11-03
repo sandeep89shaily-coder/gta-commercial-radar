@@ -1,0 +1,56 @@
+name: Remaining municipal source probes (no AI)
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/remaining-municipal-sources.yml'
+      - 'gta_burlington_gis.py'
+      - 'gta_york_region_gis.py'
+  workflow_dispatch:
+jobs:
+  source-access:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r requirements.txt
+      - name: Official permitted source diagnostics
+        shell: bash
+        run: |
+          python - <<'PY'
+          from robots_policy import evaluate
+          import requests,json
+          SOURCES={
+            "BURLINGTON_GIS":"https://mapping.burlington.ca/arcgisweb/rest/services/COB/Development_Apps/MapServer/0",
+            "YORK_REGION_GIS":"https://services1.arcgis.com/GzvOwaQBbX7KLiuG/ArcGIS/rest/services/Hosted_Development_Application_Status_And_Teams/FeatureServer/0",
+            "KITCHENER_OFFICIAL_GIS":"https://services1.arcgis.com/qAo1OsXi67t7XgmS/ArcGIS/rest/services/Planning_Applications_Active/FeatureServer/0",
+            "BURLINGTON_HUB":"https://navburl-burlington.opendata.arcgis.com/datasets/Burlington::burlington-development-application-summary-tables-2025-2026"
+          }
+          for name,url in SOURCES.items():
+              session=requests.Session();session.trust_env=False
+              session.headers["User-Agent"]="GTARadarPublicSourceProbe/1.0"
+              report={"source":name}
+              try:
+                  ok,why=evaluate(session,url,"GTARadarPublicSourceProbe/1.0",timeout=5)
+                  report.update(robots_allowed=ok,policy=why)
+                  if ok:
+                      params={"f":"json"} if "GIS" in name else {}
+                      resp=session.get(url,params=params,timeout=(6,12),
+                                       allow_redirects=False,stream=True)
+                      report.update(http=resp.status_code,
+                                    content_type=resp.headers.get("Content-Type",""),
+                                    location=resp.headers.get("Location","")[:150])
+                      if resp.status_code==200 and "json" in resp.headers.get("Content-Type","").lower():
+                          data=resp.json()
+                          report["fields"]=[x.get("name") for x in data.get("fields",[])][:60]
+                          report["objectIdField"]=data.get("objectIdField")
+                          report["error"]=data.get("error")
+                      resp.close()
+              except Exception as exc:
+                  report["error"]=type(exc).__name__+":"+str(exc)[:180]
+              print("OFFICIAL_SOURCE",json.dumps(report))
+          PY
