@@ -101,6 +101,7 @@ jobs:
                       "error":type(exc).__name__+":"+str(exc)[:160]}))
           # Decode small public metadata documents without following external
           # redirects or collecting personal information.
+          import re
           import xml.etree.ElementTree as ET
           from urllib.parse import urlparse
           for label,url in (
@@ -137,6 +138,29 @@ jobs:
                   print("OFFICIAL_ALTERNATIVE",json.dumps(result))
               except Exception as e:
                   print("OFFICIAL_ALTERNATIVE",json.dumps({"source":label,"error":str(e)[:150]}))
+          # Probe the official ArcGIS download redirect with policy checks
+          # on both sides; never send a request to an unchecked redirect.
+          seed="https://opendata.arcgis.com/datasets/b7e2f8feda7340eaa5f4dd7b9c4d5ac0_0.csv"
+          try:
+              ss=requests.Session();ss.trust_env=False
+              ss.headers["User-Agent"]="GTARadarPublicSourceProbe/1.0"
+              rr=ss.get(seed,timeout=(5,8),allow_redirects=False)
+              loc=rr.headers.get("Location","")
+              print("KITCHENER_FIRST_REDIRECT",json.dumps({"code":rr.status_code,"location":loc[:300]}))
+              if loc.startswith("https://"):
+                  yes,why=evaluate(ss,loc,"GTARadarPublicSourceProbe/1.0",timeout=5)
+                  info={"target":loc[:200],"allowed":yes,"policy":why}
+                  if yes:
+                      resp=ss.get(loc,timeout=(5,12),allow_redirects=False,stream=True)
+                      info.update(status=resp.status_code,
+                                  redirected=resp.headers.get("Location","")[:220],
+                                  content_type=resp.headers.get("Content-Type",""))
+                      if resp.status_code==200:
+                          info["csv_head"]=resp.raw.read(1400,decode_content=True).decode("utf-8","replace")[:1000]
+                      resp.close()
+                  print("KITCHENER_EXPORT_RESULT",json.dumps(info))
+          except Exception as exc:
+              print("KITCHENER_EXPORT_ERROR",str(exc)[:180])
           print("No paid AI calls made.")
           PY
       - name: Upload raw source evidence
