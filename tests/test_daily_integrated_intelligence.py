@@ -153,6 +153,10 @@ class DailyIntegrationTests(unittest.TestCase):
                 "indexes_failed":0,"application_candidate_rows":0,
                 "new_or_changed_application_records":0,
                 "city_status":[]},
+            "gis_monitor":lambda root,**kw:{
+                "status":"OK","sources_configured":3,
+                "sources_successful":3,"application_candidates":0,
+                "new_or_changed":0,"source_status":[]},
             "project_ai":self.project_ai,
             "buyer_ai":self.buyer_ai,"procurement":self.procurement,
             "buyer_batch":self.buyer_batch,"graph":self.graph,
