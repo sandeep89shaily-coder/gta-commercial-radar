@@ -483,96 +483,26 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
             "ai_next_step":"NO_PAID_AI_FOR_LINK_ONLY_FETCH_ORIGINAL_DOCUMENT_FIRST",
             "verification_required":"Read original agenda, establish actual project and posting date",
         })
-    for app in _csv(root/"GTA_RADAR_STRUCTURED_APPLICATION_CHANGES.csv"):
+    # Single, source-deduplicated, quality-gated application review queue.
+    # The legacy raw CSVs remain available as evidence but must not inflate
+    # the combined daily report with baseline, closed or project-only signals.
+    for app in _csv(root/"GTA_RADAR_COLLECTION_NEW_OR_CHANGED_REVIEW.csv"):
         combined.append({
-            "kind":"OFFICIAL_STRUCTURED_PLANNING_APPLICATION_REVIEW",
-            "project_id":app.get("project_id",""),"city":app.get("city",""),
-            "address":app.get("address",""),"description":app.get("description",""),
-            "source_url":app.get("record_source_url",""),
-            "official_source_portal_url":app.get("source_layer_url",""),
-            "freshness":"GIS_FIRST_OBSERVED_OR_CHANGED_NOT_PUBLICATION_PROOF",
-            "source_date":app.get("source_record_date",""),
-            "date_basis":app.get("source_record_date_basis",""),
-            "observed_at":app.get("first_seen_local",""),
-            "research_status":"OFFICIAL_APPLICATION_ID_AND_SCOPE_TO_VERIFY",
-            "organization_hint":app.get("applicant_company_unverified",""),
-            "ai_next_step":"OPEN_OFFICIAL_APPLICATION_THEN_SOURCE_EVIDENCE",
-            "verification_required":app.get("verification_required",""),
-        })
-    for app in _csv(root/"GTA_RADAR_ADDITIONAL_CITY_GIS_NEW_OR_CHANGED.csv"):
-        combined.append({
-            "kind":"HAMILTON_KITCHENER_GIS_APPLICATION_REVIEW",
-            "project_id":app.get("project_id",""),"city":app.get("city",""),
-            "address":app.get("address",""),"description":app.get("description",""),
-            "source_url":"","official_source_portal_url":app.get("source_url",""),
-            "freshness":"GIS_FIRST_OBSERVED_OR_CHANGED_NOT_PUBLICATION_PROOF",
-            "source_date":app.get("source_record_date",""),
-            "date_basis":app.get("date_basis","NO_VERIFIED_APPLICATION_POSTING_DATE"),
-            "observed_at":app.get("first_seen_local",""),
-            "research_status":"OFFICIAL_GIS_ID_AND_SCOPE_UNVERIFIED",
-            "ai_next_step":"VERIFY_EXACT_APPLICATION_BEFORE_PAID_AI",
-            "verification_required":app.get("verification_required",""),
-        })
-    for app in _csv(root/"GTA_RADAR_TORONTO_OPEN_DATA_CHANGES.csv"):
-        combined.append({
-            "kind":"TORONTO_OFFICIAL_CKAN_APPLICATION_REVIEW",
-            "project_id":app.get("project_id",""),"city":"Toronto",
+            "kind":"CANONICAL_NEW_OR_CHANGED_APPLICATION_REVIEW",
+            "project_id":app.get("canonical_id",""),
+            "city":app.get("city",""),
+            "application_id":app.get("application_id",""),
             "address":app.get("address",""),
             "description":app.get("description",""),
-            "source_url":"","official_source_portal_url":app.get("source_dataset_url",""),
-            "freshness":"CKAN_FIRST_OBSERVED_OR_CHANGED_NOT_PUBLICATION_PROOF",
-            "source_date":app.get("source_record_date",""),
-            "date_basis":app.get("date_basis","NO_VERIFIED_PUBLICATION_DATE"),
+            "source_url":(app.get("evidence_urls","").split("; ")[0]
+                          if app.get("evidence_urls") else ""),
+            "source_date":app.get("date",""),
+            "date_basis":app.get("date_basis","DATE_UNVERIFIED"),
             "observed_at":app.get("first_seen_local",""),
-            "research_status":"CITY_CKAN_APPLICATION_ID_AND_SCOPE_NEED_VERIFICATION",
-            "ai_next_step":"VERIFY_OFFICIAL_APPLICATION_RECORD_BEFORE_PAID_AI",
+            "freshness":"RADAR_FIRST_OBSERVED_OR_CHANGED_NOT_PUBLICATION",
+            "research_status":"DEDUPLICATED_COMMERCIAL_CANDIDATE_MANUAL_VERIFICATION",
+            "ai_next_step":"VERIFY_PRIMARY_EVIDENCE_BEFORE_PAID_AI",
             "verification_required":app.get("verification_required",""),
-        })
-    for app in _csv(root/"GTA_RADAR_MUNICIPAL_PROJECT_CHANGES.csv"):
-        combined.append({
-            "kind":("MUNICIPAL_APPLICATION_ID_REVIEW" if app.get("application_id")
-                    else "MUNICIPAL_PROJECT_INDEX_SIGNAL_REVIEW"),
-            "project_id":app.get("project_id",""),"city":app.get("city",""),
-            "address":app.get("address",""),
-            "description":app.get("description") or app.get("project_title",""),
-            "source_url":app.get("source_url",""),
-            "freshness":"FIRST_OBSERVED_OR_CHANGED_NOT_FIRST_PUBLICATION",
-            "source_date":"","date_basis":"NO_VERIFIED_PUBLICATION_DATE",
-            "observed_at":app.get("first_seen_local",""),
-            "research_status":("APPLICATION_ID_UNVERIFIED_SCOPE" if app.get("application_id")
-                               else "PROJECT_INDEX_ONLY_NO_APPLICATION_ID"),
-            "ai_next_step":"VERIFY_EXACT_PROJECT_AND_EVIDENCE_BEFORE_PAID_AI",
-            "verification_required":app.get("verification_required",""),
-        })
-    for app in _csv(root/"GTA_RADAR_EARLY_APPLICATION_NEW_OR_CHANGED.csv"):
-        combined.append({
-            "kind":"EARLY_PLANNING_APPLICATION_REVIEW",
-            "project_id":app.get("project_id",""),"city":app.get("city",""),
-            "address":"","description":app.get("description",""),
-            "source_url":app.get("record_source_url") or app.get("source_url",""),
-            "freshness":"NEW_TO_RADAR_APPLICATION_ID_OR_CONTENT_NOT_PUBLICATION_PROOF",
-            "source_date":app.get("source_record_date",""),
-            "date_basis":app.get("source_record_date_basis","DATE_UNKNOWN"),
-            "observed_at":app.get("first_seen_local",""),
-            "research_status":"EXACT_APPLICATION_ID_FROM_OFFICIAL_INDEX_UNVERIFIED_MATCH",
-            "ai_next_step":"RETRIEVE_APPLICATION_REPORT_AND_SOURCE_QUOTES_BEFORE_AI",
-            "verification_required":app.get("verification_required",""),
-        })
-    for app in _csv(root/"GTA_RADAR_MARKHAM_CIRCULATION_CHANGES.csv"):
-        combined.append({
-            "kind":"MARKHAM_CIRCULATED_APPLICATION_REVIEW",
-            "project_id":app.get("project_id",""),"city":"Markham",
-            "address":app.get("address",""),
-            "description":"Markham circulated application "+app.get("application_id","")+
-                          ": "+app.get("proposed_use",""),
-            "source_url":app.get("pdf_url",""),
-            "freshness":"FIRST_OBSERVED_OR_CHANGED_NOT_FIRST_PUBLICATION",
-            "source_date":app.get("circulation_date",""),
-            "date_basis":"OFFICIAL_APPLICATION_CIRCULATION_DATE_NOT_PUBLICATION",
-            "observed_at":app.get("first_seen_local",""),
-            "research_status":"OFFICIAL_PDF_TABLE_EXTRACTED_NEEDS_PROJECT_VERIFICATION",
-            "ai_next_step":"OPEN_MAPPIT_EXACT_APPLICATION_ID_AND_VERIFY_PROJECT_SCOPE",
-            "verification_required":"Match Markham MappiT application ID, verify owner and actual publication and procurement stage",
         })
     ai_reviews=_csv(review/"DOCUMENT_AI"/"TORONTO_AI_DOCUMENT_BATCH_AUDIT.csv")
     docs_by_url={r.get("source_url"):r for r in ai_reviews}
@@ -663,7 +593,7 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
         "combined_records":len(combined),
         "permit_planning_events":sum(r["kind"]=="PROJECT" for r in combined),
         "early_applications_new_or_changed_for_review":sum(
-            r["kind"]=="EARLY_PLANNING_APPLICATION_REVIEW" for r in combined),
+            r["kind"]=="CANONICAL_NEW_OR_CHANGED_APPLICATION_REVIEW" for r in combined),
         "early_application_city_status":early_apps.get("city_status",[]),
         "early_application_baseline_count":early_apps.get("application_candidate_rows",0),
         "cities_with_application_candidates_measured":coverage.get(
