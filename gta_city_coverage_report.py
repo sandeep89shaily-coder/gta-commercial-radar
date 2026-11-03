@@ -7,11 +7,11 @@ from gta_early_applications import SOURCES
 OUTPUT="GTA_RADAR_CITY_COVERAGE_AUDIT.csv"
 STATUS="GTA_RADAR_CITY_COVERAGE_STATUS.json"
 COLUMNS=("city","official_landing_page","index_fetch","html_application_rows",
-         "gis_application_rows","pdf_application_rows",
+         "gis_application_rows","pdf_application_rows","municipal_application_rows","project_only_signals",
          "total_source_candidate_rows_not_deduplicated",
          "measured_source_state","missing_capability","source_details")
 
-def build(root,html_status,toronto_brampton_gis,other_gis,markham):
+def build(root,html_status,toronto_brampton_gis,other_gis,markham,municipal=None):
     root=Path(root)
     html={r["city"]:r for r in html_status.get("city_status",[])
           if isinstance(r,dict) and r.get("city")}
@@ -26,6 +26,7 @@ def build(root,html_status,toronto_brampton_gis,other_gis,markham):
                 "source":row.get("source",""),"status":status,
                 "count":int(row.get("commercial_candidates",0) or 0),
             })
+    municipal_map={r['city']:r for r in (municipal or {}).get('source_status',[])}
     results=[]
     for city,url in SOURCES.items():
         h=html.get(city,{})
@@ -34,7 +35,10 @@ def build(root,html_status,toronto_brampton_gis,other_gis,markham):
         gis_n=sum(r["count"] for r in layers if r["status"] in
                   ("OK_BASELINE","OK_MONITORED","BASELINE_COMPLETE","COLLECTED"))
         pdf_n=int(markham.get("rows_extracted",0) or 0) if city=="Markham" else 0
-        total=html_n+gis_n+pdf_n
+        mun=municipal_map.get(city,{})
+        mun_n=int(mun.get('application_id_rows',0) or 0)
+        signal_n=int(mun.get('project_only_signals',0) or 0)
+        total=html_n+gis_n+pdf_n+mun_n
         index_status=h.get("fetch_status","NOT_RUN")
         if total>0:
             measured="APPLICATION_CANDIDATES_EXTRACTED_NOT_CITYWIDE_COMPLETE"
@@ -47,10 +51,12 @@ def build(root,html_status,toronto_brampton_gis,other_gis,markham):
             measured="NO_APPLICATION_RECORDS_EXTRACTED"
             missing="Official application-level adapter; index response alone is insufficient"
         details=" | ".join(r["source"]+":"+r["status"] for r in layers)
+        if mun:details+=" | MunicipalFeed:"+mun.get("state","UNKNOWN")
         if city=="Markham":details+=" | Markham PDF:"+str(pdf_n)
         results.append({"city":city,"official_landing_page":url,
               "index_fetch":index_status,"html_application_rows":html_n,
               "gis_application_rows":gis_n,"pdf_application_rows":pdf_n,
+              "municipal_application_rows":mun_n,"project_only_signals":signal_n,
               "total_source_candidate_rows_not_deduplicated":total,
               "measured_source_state":measured,"missing_capability":missing,
               "source_details":details})
@@ -65,6 +71,7 @@ def build(root,html_status,toronto_brampton_gis,other_gis,markham):
       "candidate_source_rows_not_deduplicated":sum(
           x["total_source_candidate_rows_not_deduplicated"] for x in results),
       "verified_citywide_complete_coverage":0,
+      "project_only_signals_not_counted_as_applications":sum(x["project_only_signals"] for x in results),
       "city_status":results,"csv":str(root/OUTPUT),
       "warning":"Official source configuration is not usable coverage. Count is source-candidate rows, not unique fresh commercial leads. GIS, PDF and HTML may overlap; official first-publication dates and citywide completeness remain unverified."}
     (root/STATUS).write_text(json.dumps(summary,indent=2),encoding="utf-8")
