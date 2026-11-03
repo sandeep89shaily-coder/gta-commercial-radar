@@ -76,3 +76,25 @@ def test_halton_js_table_absent_preserves_major_project_signals():
       "https://www.haltonhills.ca/developmentproposalsunderreview")
     assert len(rows)==1 and rows[0]["record_kind"]=="PROJECT_INDEX_SIGNAL"
     assert rows[0]["application_id"]==""
+
+
+def test_vaughan_public_notice_excludes_minor_variance_and_extracts_commercial():
+    page="""<main><p>City File No.: OP.26.005 & Z.26.018</p>
+    <p>Subject Land: 8000 Bathurst Street</p>
+    <p>Meeting Date: 11/24/2026</p>
+    <p>Notice Description: Proposed mixed-use residential buildings with commercial
+    retail space at grade.</p><p>Notice Type: Proposal for an Official Plan Amendment</p>
+    <p>City File No.: A110/26</p><p>Subject Land: 227 Creek Boulevard</p>
+    <p>Meeting Date: 10/29/2026</p>
+    <p>Notice Description: Relief requested for a cabana.</p></main>"""
+    rows=_parse("Vaughan",page,
+        "https://www.vaughan.ca/about-city-vaughan/departments/office-city-clerk/public-notices")
+    assert {r["application_id"] for r in rows}=={"OP.26.005","Z.26.018"}
+
+def test_kitchener_projects_never_claim_application_number():
+    page="""<a href="/strategic-plans-and-projects/projects/downtown-fire-station-and-residential-development/">
+    Downtown fire station and residential development</a>"""
+    rows=_parse("Kitchener",page,
+        "https://www.kitchener.ca/strategic-plans-and-projects/projects/")
+    assert len(rows)==1 and rows[0]["application_id"]==""
+    assert rows[0]["record_kind"]=="PROJECT_INDEX_SIGNAL"
