@@ -14,7 +14,7 @@ import json
 import re
 import socket
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import urlparse, unquote
 
 import requests
 
@@ -158,8 +158,15 @@ def _parse(source_key,attrs):
         kind=_clean(attrs.get("FOLDERTYPE_DESC") or attrs.get("APPLICATION_TYPE"))
         status=_clean(attrs.get("STATUS_DESC"))
         link=_clean(attrs.get("AIC_URL"))
-        allow_link=urlparse(link).scheme=="https" and urlparse(link).hostname in (
-            "www.toronto.ca","toronto.ca","secure.toronto.ca")
+        # The official GIS AIC_URL field can point to a general search page.
+        # Treat it as an exact record link only when it contains this file ID
+        # in the actual URL. Do not invent record-level evidence from a portal.
+        normalized_id=re.sub(r"[^A-Z0-9]","",num.upper())
+        normalized_link=re.sub(r"[^A-Z0-9]","",unquote(link).upper())
+        allow_link=(urlparse(link).scheme=="https" and
+                    urlparse(link).hostname in (
+                        "www.toronto.ca","toronto.ca","secure.toronto.ca") and
+                    len(normalized_id)>=8 and normalized_id in normalized_link)
         direct=link if allow_link else ""
         applicant=""
     else:
