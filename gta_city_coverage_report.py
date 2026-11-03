@@ -7,11 +7,11 @@ from gta_early_applications import SOURCES
 OUTPUT="GTA_RADAR_CITY_COVERAGE_AUDIT.csv"
 STATUS="GTA_RADAR_CITY_COVERAGE_STATUS.json"
 COLUMNS=("city","official_landing_page","index_fetch","html_application_rows",
-         "gis_application_rows","pdf_application_rows","municipal_application_rows","project_only_signals",
+         "gis_application_rows","pdf_application_rows","municipal_application_rows","project_only_signals","official_csv_application_rows",
          "total_source_candidate_rows_not_deduplicated",
          "measured_source_state","missing_capability","source_details")
 
-def build(root,html_status,toronto_brampton_gis,other_gis,markham,municipal=None):
+def build(root,html_status,toronto_brampton_gis,other_gis,markham,municipal=None,toronto_csv=None):
     root=Path(root)
     html={r["city"]:r for r in html_status.get("city_status",[])
           if isinstance(r,dict) and r.get("city")}
@@ -38,7 +38,10 @@ def build(root,html_status,toronto_brampton_gis,other_gis,markham,municipal=None
         mun=municipal_map.get(city,{})
         mun_n=int(mun.get('application_id_rows',0) or 0)
         signal_n=int(mun.get('project_only_signals',0) or 0)
-        total=html_n+gis_n+pdf_n+mun_n
+        csv_n=(int((toronto_csv or {}).get("commercial_candidates",0) or 0)
+               if city=="Toronto" and (toronto_csv or {}).get("status") in
+               ("BASELINED","COLLECTED") else 0)
+        total=html_n+gis_n+pdf_n+mun_n+csv_n
         index_status=h.get("fetch_status","NOT_RUN")
         if total>0:
             measured="APPLICATION_CANDIDATES_EXTRACTED_NOT_CITYWIDE_COMPLETE"
@@ -52,11 +55,13 @@ def build(root,html_status,toronto_brampton_gis,other_gis,markham,municipal=None
             missing="Official application-level adapter; index response alone is insufficient"
         details=" | ".join(r["source"]+":"+r["status"] for r in layers)
         if mun:details+=" | MunicipalFeed:"+mun.get("state","UNKNOWN")
+        if city=="Toronto" and toronto_csv:details+=" | TorontoCKAN:"+toronto_csv.get("status","UNKNOWN")
         if city=="Markham":details+=" | Markham PDF:"+str(pdf_n)
         results.append({"city":city,"official_landing_page":url,
               "index_fetch":index_status,"html_application_rows":html_n,
               "gis_application_rows":gis_n,"pdf_application_rows":pdf_n,
               "municipal_application_rows":mun_n,"project_only_signals":signal_n,
+              "official_csv_application_rows":csv_n,
               "total_source_candidate_rows_not_deduplicated":total,
               "measured_source_state":measured,"missing_capability":missing,
               "source_details":details})

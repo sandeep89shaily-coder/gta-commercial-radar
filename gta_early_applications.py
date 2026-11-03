@@ -239,10 +239,9 @@ DETAIL_TERMS = re.compile(
     r"application.?notice|notice.?of|active.?development|current.?development|"
     r"proposal.?under.?review|site.?plan|rezoning|zoning.?amendment|"
     r"development.?proposal|public.?meeting|planning.?file)")
-DETAIL_CITIES = frozenset((
-    "Milton", "Halton Hills", "Cambridge", "Oakville", "Guelph",
-    "Burlington", "Caledon", "Hamilton", "Kitchener", "Toronto",
-    "Brampton", "Vaughan", "Markham"))
+# Purpose-built municipal feeds replace wasteful generic crawling in these cities.
+# Keep generic discovery only where no dedicated page parser currently exists.
+DETAIL_CITIES = frozenset(("Caledon", "Kitchener", "Vaughan", "Markham"))
 MAX_DETAIL_PAGES = 16
 
 
@@ -260,7 +259,7 @@ def _detail_urls(markup, city, index_url, *, limit=MAX_DETAIL_PAGES):
         parsed = urlparse(target)
         if (target in seen or not _safe(target, index_url) or
                 parsed.query or not parsed.path or
-                re.search(r"\\.(?:pdf|docx?|xlsx?|zip|jpe?g|png|mp4)$",
+                re.search(r"\.(?:pdf|docx?|xlsx?|zip|jpe?g|png|webp|gif|svg|mp4)$",
                           parsed.path, re.I)):
             continue
         # Ignore broad news/nav links; links must look planning-specific.

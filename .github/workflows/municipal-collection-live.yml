@@ -1,0 +1,80 @@
+name: Live municipal collection evidence (no AI)
+on:
+  pull_request:
+    paths:
+      - 'gta_municipal_project_feed.py'
+      - 'gta_toronto_open_data.py'
+      - '.github/workflows/municipal-collection-live.yml'
+  workflow_dispatch:
+jobs:
+  source-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r requirements.txt
+      - name: Test municipal feeds against public sources (no DeepSeek)
+        shell: bash
+        run: |
+          python - <<'PY'
+          import os, json
+          from gta_municipal_project_feed import run as municipal
+          from gta_toronto_open_data import run as toronto
+          path=os.path.join(os.environ["RUNNER_TEMP"],"GTA_RADAR_RESULTS")
+          m=municipal(path)
+          t=toronto(path)
+          print("CITY_SOURCE_RESULTS")
+          for item in m["source_status"]:
+              print(json.dumps({k:item.get(k) for k in ("city","state","configured_pages","pages_fetched","application_id_rows","project_only_signals","new_or_changed","failures")}))
+          print("TORONTO_CKAN",json.dumps(t))
+          # Diagnostic only: identify whether Halton's public HTML contains
+          # server-rendered table records or requires a separate data source.
+          from gta_early_applications import _fetch
+          from bs4 import BeautifulSoup
+          try:
+              page=_fetch("https://www.haltonhills.ca/developmentproposalsunderreview")
+              soup=BeautifulSoup(page,"html.parser")
+              print("HALTON_HTML",json.dumps({
+                  "bytes":len(page),"tr":len(soup.find_all("tr")),
+                  "table":len(soup.find_all("table")),
+                  "file_numbers_in_html":page.upper().count("D11SPA"),
+                  "table_sample":[tr.get_text(" ",strip=True)[:220]
+                                  for tr in soup.find_all("tr")[:3]]}))
+              print("HALTON_EMBEDS",json.dumps({
+                  "iframes":[{"src":e.get("src"),"title":e.get("title")}
+                             for e in soup.find_all("iframe")[:10]],
+                  "possible_data_links":[{"text":a.get_text(" ",strip=True)[:80],
+                       "href":a.get("href")} for a in soup.find_all("a",href=True)
+                       if any(v in (a.get("href") or "").lower()
+                              for v in ("development","application","arcgis","dashboard"))][:30],
+                  "script_src":[sc.get("src") for sc in soup.find_all("script",src=True)[-12:]]}))
+          except Exception as exc:
+              print("HALTON_HTML_ERROR",type(exc).__name__,str(exc)[:160])
+          for alternative in (
+              "https://www.burlington.ca/en/news/current-development-projects.aspx",
+              "https://www.burlington.ca/en/news/current-development-projects/1376-1382-plains-rd-e.aspx"):
+              try:
+                  body=_fetch(alternative)
+                  print("BURLINGTON_ALTERNATIVE",json.dumps({"url":alternative,"bytes":len(body),
+                      "file_number_count":body.lower().count("file numbers")}))
+              except Exception as exc:
+                  print("BURLINGTON_ALTERNATIVE_FAILED",json.dumps({"url":alternative,
+                      "error":type(exc).__name__+":"+str(exc)[:160]}))
+          print("No paid AI calls made.")
+          PY
+      - name: Upload raw source evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: municipal-collection-evidence
+          path: |
+            ${{ runner.temp }}/GTA_RADAR_RESULTS/GTA_RADAR_MUNICIPAL_PROJECT_FEED_STATUS.json
+            ${{ runner.temp }}/GTA_RADAR_RESULTS/GTA_RADAR_MUNICIPAL_PROJECT_FEED.csv
+            ${{ runner.temp }}/GTA_RADAR_RESULTS/GTA_RADAR_TORONTO_OPEN_DATA_STATUS.json
+            ${{ runner.temp }}/GTA_RADAR_RESULTS/GTA_RADAR_TORONTO_OPEN_DATA_APPLICATIONS.csv
+          if-no-files-found: warn

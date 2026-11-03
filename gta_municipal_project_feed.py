@@ -30,6 +30,12 @@ SOURCES={
     "Oakville":[
         OAKVILLE+"ward-"+str(n)+"-development-and-site-plan-applications/"
         for n in range(1,8)],
+    "Hamilton":[
+        "https://www.hamilton.ca/city-council/news-notices/news-releases?category=143"],
+    "Brampton":[
+        "https://letsconnect.brampton.ca/yourcityplans"],
+    "Burlington":[
+        "https://www.burlington.ca/Modules/News/en/Development"],
 }
 # Distinct application identifiers use city-specific formats, not a synthetic
 # ID inferred from arbitrary prose. A row with no ID remains a project signal.
@@ -38,6 +44,8 @@ ID_PATTERNS={
     "Cambridge":re.compile(r"\b(?:OR|OP|R)\d{1,2}/\d{2}\b|\b30(?:CDM|T)-\d{5,6}\b",re.I),
     "Oakville":re.compile(r"\b(?:Z[.]|OPA\s*|SP\s*|24T-|24CDM-)\s*\d{2,6}(?:[.]\d{2,4})?(?:/\d{1,4})?\b|\b\d{4}[.]\d{3}/\d{2}\b",re.I),
     "Milton":re.compile(r"\b(?:Z|OPA|SP|D)-\d{2}/\d{2}\b",re.I),
+    "Hamilton":re.compile(r"\bDPA-20\d{2}-\d{4,6}\b",re.I),
+    "Brampton":re.compile(r"\b(?:OZS|SP|PDC)-20\d{2}-\d{4}\b",re.I),
 }
 SOURCE_TYPE="OFFICIAL_MUNICIPAL_HTML"
 STATE="GTA_RADAR_MUNICIPAL_FEED_SEEN.json"
@@ -92,6 +100,21 @@ def _halton(soup,url):
             row=_project("Halton Hills",location+" — "+ident,desc,url,
                          application_id=ident,address=location)
             if row:out.append(row)
+    # Town's active-application table is dynamically rendered and absent
+    # from the original HTML response. Preserve actual official major project
+    # links as *project signals*, never fabricated application numbers.
+    if not out:
+        seen=set()
+        for a in soup.find_all("a",href=True):
+            href=urljoin(url,a["href"])
+            if (href in seen or not _safe(href,url) or
+                    "/work/planning-development/active-development-applications/" not in href):
+                continue
+            title=_clean(a.get_text(" ",strip=True))
+            if len(title)<8:continue
+            row=_project("Halton Hills",title,title,href)
+            if row:out.append(row);seen.add(href)
+            if len(out)>=25:break
     return out
 
 def _cambridge(soup,url):
@@ -176,8 +199,76 @@ def _guelph(soup,url):
         if row:out.append(row)
     return out
 
+
+def _notice_links(markup,url):
+    """Source-specific Hamilton complete-application notices only."""
+    soup=BeautifulSoup(markup,"html.parser")
+    selected=[];seen=set()
+    for a in soup.find_all("a",href=True):
+        title=_clean(a.get_text(" ",strip=True))
+        link=urljoin(url,a["href"])
+        if (link in seen or not _safe(link,url)
+                or "complete application" not in title.lower()
+                or "/news-releases/" not in urlparse(link).path):
+            continue
+        selected.append(link);seen.add(link)
+        if len(selected)>=16:break
+    return selected
+
+def _hamilton(soup,url):
+    # Detail-page source: stable official DPA number plus the municipal
+    # proposal/address text. Index pages intentionally yield no fake IDs.
+    text=_clean(soup.get_text(" ",strip=True))
+    match=re.search(r"\bFile Number\s*:\s*(DPA-20\d{2}-\d{4,6})\b",text,re.I)
+    if not match:return []
+    ident=match.group(1)
+    heading=soup.find("h1")
+    title=_clean(heading.get_text(" ",strip=True)) if heading else "Hamilton "+ident
+    proposal=re.search(r"\bProposal\s*:\s*(.{10,850}?)(?=\s+\bAddress\s*:|\s+\bFile Number\s*:)",text,re.I)
+    desc=proposal.group(1) if proposal else title
+    address=re.search(r"\bAddress\s*:\s*(.{5,220}?)(?=\s+\bFile Number\s*:)",text,re.I)
+    addr=address.group(1) if address else ""
+    row=_project("Hamilton",title,desc,url,application_id=ident,address=addr)
+    return [row] if row else []
+
+def _brampton(soup,url):
+    # The City's public PDC community page includes featured applications
+    # with their OZS numbers. No search form or inaccessible GIS is used.
+    out=[]
+    for node in soup.find_all(["h2","h3","h4","p","li"]):
+        txt=_clean(node.get_text(" ",strip=True))
+        if len(txt)>1200:continue
+        ids=list(dict.fromkeys(m.group(0) for m in ID_PATTERNS["Brampton"].finditer(txt)))
+        if not ids:continue
+        container=node.parent
+        context=_clean(container.get_text(" ",strip=True))[:900] if container else txt
+        for ident in ids:
+            row=_project("Brampton",txt[:210],context,url,application_id=ident)
+            if row:out.append(row)
+    return out
+
+def _burlington(soup,url):
+    # The news/project directory can expose named ward development pages
+    # even when it does not expose a file number. Keep as project signals.
+    out=[]
+    for a in soup.find_all("a",href=True):
+        title=_clean(a.get_text(" ",strip=True))
+        link=urljoin(url,a["href"])
+        if not _safe(link,url) or link==url:continue
+        if re.search(r"\.(?:png|jpe?g|pdf|webp|docx?)$",urlparse(link).path,re.I):
+            continue
+        if (len(title)<14 or
+                not re.search(r"(?i)(?:development|project|ward\s*[1-6]|"
+                              r"\d{2,5}\s+[A-Za-z].{1,60}(?:street|road|drive|"
+                              r"avenue|boulevard|lane))",title)):
+            continue
+        row=_project("Burlington",title,title,link)
+        if row:out.append(row)
+    return out
+
 PARSERS={"Halton Hills":_halton,"Cambridge":_cambridge,
-         "Oakville":_oakville,"Milton":_milton,"Guelph":_guelph}
+         "Oakville":_oakville,"Milton":_milton,"Guelph":_guelph,
+         "Hamilton":_hamilton,"Brampton":_brampton,"Burlington":_burlington}
 
 def _parse(city,markup,url):
     soup=BeautifulSoup(markup,"html.parser")
@@ -188,66 +279,98 @@ def _parse(city,markup,url):
 def run(results,*,today=None,fetcher=None,sources=None):
     root=Path(results);root.mkdir(parents=True,exist_ok=True)
     day=(today or dt.date.today()).isoformat()
-    state_path=root/STATE
-    state=json.loads(state_path.read_text(encoding="utf-8")) if state_path.exists() else {"schema":1,"sources":{}}
+    path=root/STATE
+    state=json.loads(path.read_text(encoding="utf-8")) if path.exists() else {"schema":1,"sources":{}}
     if state.get("schema")!=1:raise ValueError("UNRECOGNIZED_MUNICIPAL_FEED_STATE")
-    all_rows=[];changed=[];audit=[]
+    all_rows={};changed={};audits=[]
     for city,urls in (sources or SOURCES).items():
-        previous=state["sources"].get(city)
-        seen=dict(previous.get("seen",{})) if previous else {}
+        city_state=state["sources"].get(city,{})
+        old_pages=city_state.get("pages",{})
+        updated_pages=dict(old_pages)
         found={}
-        failures=[]
-        successful=0
+        errors=[]
+        pages_fetched=0
+        city_new=set()
+        page_status=[]
         for url in urls:
+            # A ward/list page is an independent baseline. A failed page cannot
+            # roll back or suppress good pages in the same municipality.
+            old_page=old_pages.get(url)
+            if old_page is None and "seen" in city_state:
+                # Backward-compatible migration from city-level v1 ledger.
+                old_page={"seen":city_state["seen"],
+                          "baseline_date":city_state.get("baseline_date",day)}
             try:
                 markup=(fetcher or _fetch)(url)
                 items=_parse(city,markup,url)
-                successful+=1
+                if city=="Hamilton":
+                    for link in _notice_links(markup,url):
+                        detail=(fetcher or _fetch)(link)
+                        items.extend(_parse(city,detail,link))
+                unique={}
                 for row in items:
                     key=row["project_id"]
-                    if key not in found or len(row["description"])>len(found[key]["description"]):
-                        found[key]=row
-            except Exception as exc:
-                failures.append({"url":url,"error":type(exc).__name__+":"+str(exc)[:140]})
-        # Incomplete multi-page feeds must not declare a complete baseline.
-        complete=successful==len(urls)
-        new=0
-        for key,row in sorted(found.items()):
-            digest=hashlib.sha256((row["project_title"]+"|"+row["description"]+"|"+
-                                    row["application_id"]).encode()).hexdigest()
-            prior=seen.get(key)
-            observation=("INITIAL_BASELINE" if previous is None or not previous.get("complete")
+                    if key not in unique or len(row["description"])>len(unique[key]["description"]):
+                        unique[key]=row
+                before=old_page.get("seen",{}) if old_page else {}
+                after=dict(before)
+                for key,row in unique.items():
+                    digest=hashlib.sha256((row["project_title"]+"|"+row["description"]+
+                                           "|"+row["application_id"]).encode()).hexdigest()
+                    prior=before.get(key)
+                    obs=("INITIAL_BASELINE" if old_page is None and prior is None
                          else "FIRST_OBSERVED" if prior is None
                          else "RECORD_CHANGED" if prior["digest"]!=digest
                          else "UNCHANGED")
-            row["first_seen_local"]=prior.get("first_seen_local",day) if prior else day
-            row["observation"]=observation
-            all_rows.append(row)
-            if observation in ("FIRST_OBSERVED","RECORD_CHANGED") and complete:
-                changed.append(row);new+=1
-            if complete:
-                seen[key]={"digest":digest,"first_seen_local":row["first_seen_local"]}
-        if complete:
-            state["sources"][city]={"seen":seen,"complete":True,"baseline_date":
-                                   previous.get("baseline_date",day) if previous else day}
-        audit.append({"city":city,"configured_pages":len(urls),
-            "pages_fetched":successful,"complete":complete,
-            "application_id_rows":sum(bool(r["application_id"]) for r in found.values()),
-            "project_only_signals":sum(not r["application_id"] for r in found.values()),
-            "new_or_changed":new,"failures":failures[:20],
-            "state":"COLLECTED" if complete and found else
-                "NO_MATCHING_PROJECT_RECORDS" if complete else "INCOMPLETE_SOURCE"})
-    for filename,rows in ((ALL,all_rows),(CHANGED,changed)):
+                    row["first_seen_local"]=prior.get("first_seen_local",day) if prior else day
+                    row["observation"]=obs
+                    existing=found.get(key)
+                    if existing is None or len(row["description"])>len(existing["description"]):
+                        found[key]=row
+                    if obs in ("FIRST_OBSERVED","RECORD_CHANGED"):
+                        changed[key]=row
+                        city_new.add(key)
+                    after[key]={"digest":digest,"first_seen_local":row["first_seen_local"]}
+                # Empty/unparsed first fetch cannot establish an
+                # application baseline; otherwise parser changes look like new leads.
+                if unique or old_page is not None:
+                    updated_pages[url]={"seen":after,"baseline_date":
+                                        old_page.get("baseline_date",day) if old_page else day}
+                pages_fetched+=1
+                page_status.append({"url":url,"status":"COLLECTED",
+                                    "application_ids":sum(bool(v["application_id"]) for v in unique.values()),
+                                    "project_only_signals":sum(not v["application_id"] for v in unique.values())})
+            except Exception as exc:
+                failure={"url":url,"error":type(exc).__name__+":"+str(exc)[:150]}
+                errors.append(failure)
+                page_status.append({"url":url,"status":"FAILED",
+                                    "error":failure["error"]})
+        if updated_pages:
+            state["sources"][city]={"pages":updated_pages}
+        for key,row in found.items():
+            existing=all_rows.get(key)
+            if existing is None or len(row["description"])>len(existing["description"]):
+                all_rows[key]=row
+        audits.append({"city":city,"configured_pages":len(urls),
+             "pages_fetched":pages_fetched,"complete":pages_fetched==len(urls),
+             "application_id_rows":sum(bool(r["application_id"]) for r in found.values()),
+             "project_only_signals":sum(not r["application_id"] for r in found.values()),
+             "new_or_changed":len(city_new),"failures":errors[:20],
+             "page_status":page_status,
+             "state":"COLLECTED" if pages_fetched==len(urls) and found else
+                 "NO_MATCHING_PROJECT_RECORDS" if pages_fetched==len(urls) else
+                 "PARTIAL_SOURCE_FAILURE" if pages_fetched else "INCOMPLETE_SOURCE"})
+    for filename,rows in ((ALL,list(all_rows.values())),(CHANGED,list(changed.values()))):
         with (root/filename).open("w",encoding="utf-8-sig",newline="") as handle:
             writer=csv.DictWriter(handle,fieldnames=COLUMNS)
             writer.writeheader();writer.writerows(rows)
-    temp=state_path.with_suffix(".tmp")
+    temp=path.with_suffix(".tmp")
     temp.write_text(json.dumps(state,indent=2),encoding="utf-8")
-    temp.replace(state_path)
-    summary={"source_status":audit,
-             "application_id_rows":sum(bool(r["application_id"]) for r in all_rows),
-             "project_only_signals":sum(not r["application_id"] for r in all_rows),
+    temp.replace(path)
+    summary={"source_status":audits,
+             "application_id_rows":sum(bool(r["application_id"]) for r in all_rows.values()),
+             "project_only_signals":sum(not r["application_id"] for r in all_rows.values()),
              "new_or_changed":len(changed),"paid_ai_calls":0,
-             "warning":"Project-only signals are not verified applications. No first publication date inferred; incomplete sources do not advance first-seen baselines."}
+             "warning":"Project-only signals are not verified applications; every city page has an independent baseline. No first-publication date inferred."}
     (root/STATUS).write_text(json.dumps(summary,indent=2),encoding="utf-8")
     return summary
