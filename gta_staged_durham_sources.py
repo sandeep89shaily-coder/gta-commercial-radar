@@ -78,9 +78,17 @@ def _collect(source,fetcher):
         if len(features)>PAGE or offset>count:
             raise ValueError("INCONSISTENT_PAGE_LENGTH")
     if offset!=count:raise ValueError("PARTIAL_SOURCE_SNAPSHOT")
-    keys=[(r["source_id"],r["record_id"]) for r in collected]
-    if len(keys)!=len(set(keys)):raise ValueError("NON_UNIQUE_IDENTIFIERS")
-    return collected,fields
+    # Official consent polygons can repeat the same filed application number
+    # across lots. One file identity is one staging record, not a collector
+    # failure or several invented "new" applications.
+    collapsed={}
+    for row in collected:
+        key=(row["source_id"],row["record_id"])
+        old=collapsed.get(key)
+        if old is None or (len(row["project_description"])+len(row["address"]) >
+                           len(old["project_description"])+len(old["address"])):
+            collapsed[key]=row
+    return list(collapsed.values()),fields
 
 def _csv(path,rows):
     with path.open("w",newline="",encoding="utf-8-sig") as f:

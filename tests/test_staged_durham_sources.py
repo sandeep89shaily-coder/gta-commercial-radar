@@ -28,3 +28,18 @@ def test_partial_snapshots_refused():
     try:_collect(c,broken)
     except ValueError as exc:assert "EMPTY_OR_INVALID_PAGE" in str(exc)
     else:raise AssertionError("Partial source silently accepted")
+
+
+def test_source_repeated_geometries_deduplicate_one_file():
+    one=config()[0]
+    def duplicates(url,params):
+        if not url.endswith("/query"):
+            return {"fields":[{"name":n} for n in ("OBJECTID","DESCRIPTION","UPDATED")],
+                    "objectIdField":"OBJECTID"}
+        if params.get("returnCountOnly")=="true":return {"count":2}
+        return {"features":[
+          {"attributes":{"OBJECTID":9,"DESCRIPTION":"Commercial facility","UPDATED":"2026-11-01"}},
+          {"attributes":{"OBJECTID":9,"DESCRIPTION":"Commercial facility expansion","UPDATED":"2026-11-01"}}]}
+    rows,_=_collect(one,duplicates)
+    assert len(rows)==1
+    assert rows[0]["project_description"]=="Commercial facility expansion"
