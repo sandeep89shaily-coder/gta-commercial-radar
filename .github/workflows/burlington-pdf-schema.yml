@@ -1,0 +1,41 @@
+name: Burlington official PDF schema verification
+on:
+  pull_request:
+    paths: ['.github/workflows/burlington-pdf-schema.yml','gta_burlington_summary_pdf.py']
+  workflow_dispatch:
+jobs:
+  official-pdf:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r requirements.txt
+      - name: Read official Burlington ZIP PDF text without saving private records
+        shell: bash
+        run: |
+          python - <<'PY'
+          import requests,io,zipfile,json
+          from pypdf import PdfReader
+          from robots_policy import evaluate
+          u='https://mapping.burlington.ca/docs/Burlington%20Development%20Application%20Summary%20Tables.zip'
+          s=requests.Session();s.trust_env=False
+          s.headers['User-Agent']='GTARadarOfficialPDFProbe/1.0'
+          ok,why=evaluate(s,u,'GTARadarOfficialPDFProbe/1.0',timeout=8)
+          print('ACCESS',ok,why)
+          if not ok:raise ValueError('BURLINGTON_OFFICIAL_PDF_ACCESS_RESTRICTED')
+          r=s.get(u,timeout=(6,18),allow_redirects=False)
+          r.raise_for_status()
+          assert len(r.content)<5000000 and zipfile.is_zipfile(io.BytesIO(r.content))
+          z=zipfile.ZipFile(io.BytesIO(r.content))
+          for p in z.infolist()[:5]:
+              if p.filename.lower().endswith('.pdf') and p.file_size<1000000:
+                  pdf=PdfReader(io.BytesIO(z.read(p)))
+                  print('DOC',p.filename,'pages',len(pdf.pages))
+                  for i,page in enumerate(pdf.pages[:2]):
+                      print('PAGE',i,(page.extract_text() or '')[:3800])
+          PY
