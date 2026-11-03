@@ -1,0 +1,32 @@
+name: Burlington official quarterly activity (no AI)
+on:
+  pull_request:
+    paths:
+      - 'gta_burlington_summary_pdf.py'
+      - 'tests/test_burlington_summary_pdf.py'
+      - '.github/workflows/burlington-pdf-schema.yml'
+  workflow_dispatch:
+jobs:
+  live-burlington:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r requirements.txt
+      - name: Read official quarterly source, no DeepSeek
+        run: |
+          python - <<'PY'
+          import tempfile,json
+          from gta_burlington_summary_pdf import run
+          with tempfile.TemporaryDirectory() as d:
+              report=run(d)
+              print('BURLINGTON_ACTIVITY_STATUS',json.dumps(report))
+              if report['status']=='FAILED':
+                  raise SystemExit(1)
+              assert report['application_id_rows']==0
+          PY
