@@ -38,4 +38,29 @@ jobs:
                   print('DOC',p.filename,'pages',len(pdf.pages))
                   for i,page in enumerate(pdf.pages[:2]):
                       print('PAGE',i,(page.extract_text() or '')[:3800])
+          from robots_policy import evaluate
+          import requests,json
+          probes={
+            'VAUGHAN_ESCRIBE':'https://pub-vaughan.escribemeetings.com/',
+            'VAUGHAN_ESCRIBE_MEETINGS':'https://pub-vaughan.escribemeetings.com/Meetings.aspx',
+            'KITCHENER_METADATA':'https://app2.kitchener.ca/appdocs/GISImages/GIS_Web_External/GIS_Metadata_Open_Data/Planning_Applications_Active.html',
+            'KITCHENER_OPEN_HUB':'https://open-kitchenergis.opendata.arcgis.com/datasets/KitchenerGIS::planning-applications-active',
+            'BURLINGTON_SITE':'https://www.burlington.ca/en/news/current-development-projects/1376-1382-plains-rd-e.aspx',
+          }
+          for name,url in probes.items():
+              s=requests.Session();s.trust_env=False
+              agent='GTARadarOfficialSourceProbe/1.0'
+              s.headers['User-Agent']=agent
+              result={'source':name}
+              try:
+                  ok,reason=evaluate(s,url,agent,timeout=5)
+                  result.update(allowed=ok,reason=reason)
+                  if ok:
+                      r=s.get(url,timeout=(6,10),allow_redirects=False)
+                      result.update(http=r.status_code,type=r.headers.get('Content-Type'),
+                                    bytes=len(r.content))
+                      if r.status_code==200 and 'text/html' in r.headers.get('Content-Type',''):
+                          result['sample']=r.text[:400]
+              except Exception as e:result['error']=type(e).__name__+':'+str(e)[:140]
+              print('ALTERNATIVE_POLICY',json.dumps(result))
           PY
