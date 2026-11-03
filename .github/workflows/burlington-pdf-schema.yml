@@ -22,6 +22,7 @@ jobs:
           import requests,io,zipfile,json
           from pypdf import PdfReader
           from robots_policy import evaluate
+          print('BURLINGTON_QUARTERLY_COLLECTOR',json.dumps(__import__('gta_burlington_summary_pdf').run(os.path.join(os.environ['RUNNER_TEMP'],'burlington_quarterly'))))
           u='https://mapping.burlington.ca/docs/Burlington%20Development%20Application%20Summary%20Tables.zip'
           s=requests.Session();s.trust_env=False
           s.headers['User-Agent']='GTARadarOfficialPDFProbe/1.0'

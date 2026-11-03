@@ -172,7 +172,7 @@ def _build_document_worklist(union_csv, out, seen, *, paid, ai_processor, ranker
 def integrate(results, *, today=None, meeting_pipeline=None, document_discover=None,
               agenda_pipeline=None, verified_reports=None, document_ai=None,
               multicity_capture=None, document_ranker=None,
-              application_monitor=None, gis_monitor=None, other_gis_monitor=None, municipal_monitor=None, toronto_csv_monitor=None, guelph_gis_monitor=None, burlington_gis_monitor=None, project_ai=None, buyer_ai=None, procurement=None, buyer_batch=None,
+              application_monitor=None, gis_monitor=None, other_gis_monitor=None, municipal_monitor=None, toronto_csv_monitor=None, guelph_gis_monitor=None, burlington_gis_monitor=None, burlington_pdf_monitor=None, project_ai=None, buyer_ai=None, procurement=None, buyer_batch=None,
               graph=None, api_key_check=None, allow_paid=True):
     """Run integrated bounded stages and expose individual failure provenance.
 
@@ -198,6 +198,7 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
     from gta_toronto_open_data import run as toronto_csv_default
     from gta_guelph_gis import run as guelph_gis_default
     from gta_burlington_gis import run as burlington_gis_default
+    from gta_burlington_summary_pdf import run as burlington_pdf_default
     from gta_collection_truth import build as collection_acceptance_default
     from gta_city_coverage_report import build as measured_coverage_default
     from gta_markham_circulations import run as markham_default
@@ -234,6 +235,10 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
         burlington_gis_default if application_monitor is None else
         (lambda root, *, today=None: {"status":"SKIPPED_TEST","project_only_signals":0,
                                        "new_or_changed":0}))
+    burlington_pdf_fn = burlington_pdf_monitor or (
+        burlington_pdf_default if application_monitor is None else
+        (lambda root, *, today=None: {"status":"SKIPPED_TEST","report_quarters":0,
+                                       "application_id_rows":0}))
     application_monitor = application_monitor or applications_default
     gis_monitor = gis_monitor or gis_default
     other_gis_monitor = other_gis_monitor or other_gis_default
@@ -309,6 +314,10 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
         lambda:guelph_gis_fn(root,today=today))
     burlington_gis=step("burlington_official_development_project_gis",
         lambda:burlington_gis_fn(root,today=today))
+    burlington_pdf=step("burlington_official_quarterly_planning_statistics",
+        lambda:burlington_pdf_fn(root,today=today))
+    state["burlington_quarterly_official"]={k:burlington_pdf.get(k) for k in (
+        "status","report_quarters","latest_period","latest_new_applications","error")}
     state["burlington_official_gis"]={k:burlington_gis.get(k) for k in (
         "status","project_only_signals","application_id_rows","new_or_changed","error")}
     state["guelph_official_gis"]={k:guelph_gis.get(k) for k in (
@@ -567,6 +576,7 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
         "<a href='GTA_RADAR_GUELPH_GIS_APPLICATIONS.csv'>Guelph official GIS applications</a> · "
         "<a href='GTA_RADAR_GUELPH_GIS_STATUS.json'>Guelph GIS diagnostics</a> · "
         "<a href='GTA_RADAR_BURLINGTON_GIS_PROJECTS.csv'>Burlington official GIS project signals (not application IDs)</a> · "
+        "<a href='GTA_RADAR_BURLINGTON_QUARTERLY_ACTIVITY.csv'>Burlington planning application quarterly statistics (aggregate only)</a> · "
         "<a href='GTA_RADAR_MUNICIPAL_PROJECT_FEED.csv'>Official municipal project feed</a> · "
         "<a href='GTA_RADAR_MUNICIPAL_PROJECT_FEED_STATUS.json'>Municipal feed source diagnostics</a> · "
         "<a href='GTA_RADAR_TORONTO_OPEN_DATA_APPLICATIONS.csv'>Toronto official CKAN applications</a> · "

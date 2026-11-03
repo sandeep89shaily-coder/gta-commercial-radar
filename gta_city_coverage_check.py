@@ -19,6 +19,7 @@ from gta_toronto_open_data import run as toronto_csv_run
 from gta_collection_truth import build as build_collection_acceptance
 from gta_guelph_gis import run as guelph_gis_run
 from gta_burlington_gis import run as burlington_gis_run
+from gta_burlington_summary_pdf import run as burlington_pdf_run
 
 def execute(workspace):
     root=Path(workspace).expanduser()/"GTA_RADAR_RESULTS"
@@ -30,6 +31,7 @@ def execute(workspace):
     toronto_csv=toronto_csv_run(root)
     guelph_gis=guelph_gis_run(root)
     burlington_gis=burlington_gis_run(root)
+    burlington_pdf=burlington_pdf_run(root)
     pdf_union=(root/"DAILY_INTEGRATED_REVIEW"/"TORONTO_DOCUMENTS"/
                "COMBINED_PDF_FETCH_AUDIT.csv")
     if pdf_union.is_file():
@@ -71,6 +73,9 @@ def execute(workspace):
     print("Guelph GIS diagnostics:",root/"GTA_RADAR_GUELPH_GIS_STATUS.json")
     print("Burlington official GIS project signals:",burlington_gis["project_only_signals"])
     print("Burlington GIS diagnostics:",root/"GTA_RADAR_BURLINGTON_GIS_STATUS.json")
+    print("Burlington official quarterly reports:",burlington_pdf["report_quarters"],
+          "aggregate counts only, not application IDs")
+    print("Burlington quarterly source:",root/"GTA_RADAR_BURLINGTON_QUARTERLY_STATUS.json")
     print("City audit:",root/"GTA_RADAR_CITY_COVERAGE_AUDIT.csv")
     print("Detailed status:",root/"GTA_RADAR_CITY_COVERAGE_STATUS.json")
     print("Toronto/Brampton GIS status:",root/"GTA_RADAR_STRUCTURED_APPLICATION_SOURCE_STATUS.json")
