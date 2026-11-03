@@ -23,7 +23,7 @@ def toronto(**change):
         "APPLICATION_TYPE":"SA",
         "FOLDERTYPE_DESC":"Site Plan Approval",
         "SUBMIT_DATE":ts("2026-09-10"),"STATUS_DESC":"Under Review",
-        "AIC_URL":"https://www.toronto.ca/city-government/planning-development/application-information-centre/",
+        "AIC_URL":"https://www.toronto.ca/city-government/planning-development/application-information-centre/?app=26200555STE10SA",
         "OBJECTID":12,
     }
     attrs.update(change);return {"attributes":attrs}
@@ -53,6 +53,10 @@ class StructuredGISApplicationTests(unittest.TestCase):
         self.assertEqual(t["application_id"],"26 200555 STE 10 SA")
         self.assertEqual(t["source_record_date"],"2026-09-10")
         self.assertEqual(t["record_source_url_basis"],"TORONTO_AIC_RECORD_LINK_FROM_OFFICIAL_GIS")
+        generic=gis._parse("TORONTO_AIC",toronto(
+            AIC_URL="https://www.toronto.ca/city-government/planning-development/application-information-centre/")["attributes"])
+        self.assertFalse(generic["record_source_url"])
+        self.assertEqual(generic["record_source_url_basis"],"NO_DIRECT_RECORD_LINK_GIS_LAYER_ONLY")
         self.assertEqual(b["applicant_company_unverified"],"Example Applicant Ltd")
         self.assertFalse(b["record_source_url"])
         self.assertEqual(b["record_source_url_basis"],"NO_DIRECT_RECORD_LINK_GIS_LAYER_ONLY")
