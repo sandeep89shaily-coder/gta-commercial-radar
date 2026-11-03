@@ -63,4 +63,17 @@ jobs:
                           result['sample']=r.text[:400]
               except Exception as e:result['error']=type(e).__name__+':'+str(e)[:140]
               print('ALTERNATIVE_POLICY',json.dumps(result))
+          from bs4 import BeautifulSoup
+          home='https://pub-vaughan.escribemeetings.com/'
+          ss=requests.Session();ss.trust_env=False
+          ss.headers["User-Agent"]="GTARadarOfficialSourceProbe/1.0"
+          html=ss.get(home,timeout=(5,12)).text
+          soup=BeautifulSoup(html,"html.parser")
+          links=[]
+          for a in soup.find_all("a",href=True):
+              href=a.get("href","")
+              if "Meeting.aspx?" in href or "Agenda=" in href:
+                  links.append({"title":a.get_text(" ",strip=True)[:100],"href":href[:300]})
+          print("VAUGHAN_MEETING_LINKS",json.dumps(links[:14]))
+          print("VAUGHAN_FILE_ID_COUNT",len(__import__('re').findall(r"(?:OP|Z|DA)\\.\\d{2}\\.\\d{3}",soup.get_text(' ',strip=True))))
           PY
