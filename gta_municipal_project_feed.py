@@ -264,76 +264,95 @@ def _parse(city,markup,url):
 def run(results,*,today=None,fetcher=None,sources=None):
     root=Path(results);root.mkdir(parents=True,exist_ok=True)
     day=(today or dt.date.today()).isoformat()
-    state_path=root/STATE
-    state=json.loads(state_path.read_text(encoding="utf-8")) if state_path.exists() else {"schema":1,"sources":{}}
+    path=root/STATE
+    state=json.loads(path.read_text(encoding="utf-8")) if path.exists() else {"schema":1,"sources":{}}
     if state.get("schema")!=1:raise ValueError("UNRECOGNIZED_MUNICIPAL_FEED_STATE")
-    all_rows=[];changed=[];audit=[]
+    all_rows={};changed={};audits=[]
     for city,urls in (sources or SOURCES).items():
-        previous=state["sources"].get(city)
-        seen=dict(previous.get("seen",{})) if previous else {}
+        city_state=state["sources"].get(city,{})
+        old_pages=city_state.get("pages",{})
+        updated_pages=dict(old_pages)
         found={}
-        failures=[]
-        successful=0
+        errors=[]
+        pages_fetched=0
+        city_new=set()
+        page_status=[]
         for url in urls:
+            # A ward/list page is an independent baseline. A failed page cannot
+            # roll back or suppress good pages in the same municipality.
+            old_page=old_pages.get(url)
+            if old_page is None and "seen" in city_state:
+                # Backward-compatible migration from city-level v1 ledger.
+                old_page={"seen":city_state["seen"],
+                          "baseline_date":city_state.get("baseline_date",day)}
             try:
                 markup=(fetcher or _fetch)(url)
                 items=_parse(city,markup,url)
-                successful+=1
                 if city=="Hamilton":
-                    # Following only official 'Complete Application' detail
-                    # pages yields real DPA numbers rather than index links.
-                    for detail_url in _notice_links(markup,url):
-                        try:
-                            detail=(fetcher or _fetch)(detail_url)
-                            items.extend(_parse(city,detail,detail_url))
-                        except Exception as exc:
-                            failures.append({"url":detail_url,
-                                "error":type(exc).__name__+":"+str(exc)[:140]})
+                    for link in _notice_links(markup,url):
+                        detail=(fetcher or _fetch)(link)
+                        items.extend(_parse(city,detail,link))
+                unique={}
                 for row in items:
                     key=row["project_id"]
-                    if key not in found or len(row["description"])>len(found[key]["description"]):
-                        found[key]=row
-            except Exception as exc:
-                failures.append({"url":url,"error":type(exc).__name__+":"+str(exc)[:140]})
-        # Incomplete multi-page feeds must not declare a complete baseline.
-        complete=successful==len(urls) and not failures
-        new=0
-        for key,row in sorted(found.items()):
-            digest=hashlib.sha256((row["project_title"]+"|"+row["description"]+"|"+
-                                    row["application_id"]).encode()).hexdigest()
-            prior=seen.get(key)
-            observation=("INITIAL_BASELINE" if previous is None or not previous.get("complete")
+                    if key not in unique or len(row["description"])>len(unique[key]["description"]):
+                        unique[key]=row
+                before=old_page.get("seen",{}) if old_page else {}
+                after=dict(before)
+                for key,row in unique.items():
+                    digest=hashlib.sha256((row["project_title"]+"|"+row["description"]+
+                                           "|"+row["application_id"]).encode()).hexdigest()
+                    prior=before.get(key)
+                    obs=("INITIAL_BASELINE" if old_page is None and prior is None
                          else "FIRST_OBSERVED" if prior is None
                          else "RECORD_CHANGED" if prior["digest"]!=digest
                          else "UNCHANGED")
-            row["first_seen_local"]=prior.get("first_seen_local",day) if prior else day
-            row["observation"]=observation
-            all_rows.append(row)
-            if observation in ("FIRST_OBSERVED","RECORD_CHANGED") and complete:
-                changed.append(row);new+=1
-            if complete:
-                seen[key]={"digest":digest,"first_seen_local":row["first_seen_local"]}
-        if complete:
-            state["sources"][city]={"seen":seen,"complete":True,"baseline_date":
-                                   previous.get("baseline_date",day) if previous else day}
-        audit.append({"city":city,"configured_pages":len(urls),
-            "pages_fetched":successful,"complete":complete,
-            "application_id_rows":sum(bool(r["application_id"]) for r in found.values()),
-            "project_only_signals":sum(not r["application_id"] for r in found.values()),
-            "new_or_changed":new,"failures":failures[:20],
-            "state":"COLLECTED" if complete and found else
-                "NO_MATCHING_PROJECT_RECORDS" if complete else "INCOMPLETE_SOURCE"})
-    for filename,rows in ((ALL,all_rows),(CHANGED,changed)):
+                    row["first_seen_local"]=prior.get("first_seen_local",day) if prior else day
+                    row["observation"]=obs
+                    existing=found.get(key)
+                    if existing is None or len(row["description"])>len(existing["description"]):
+                        found[key]=row
+                    if obs in ("FIRST_OBSERVED","RECORD_CHANGED"):
+                        changed[key]=row
+                        city_new.add(key)
+                    after[key]={"digest":digest,"first_seen_local":row["first_seen_local"]}
+                updated_pages[url]={"seen":after,"baseline_date":
+                                    old_page.get("baseline_date",day) if old_page else day}
+                pages_fetched+=1
+                page_status.append({"url":url,"status":"COLLECTED",
+                                    "application_ids":sum(bool(v["application_id"]) for v in unique.values()),
+                                    "project_only_signals":sum(not v["application_id"] for v in unique.values())})
+            except Exception as exc:
+                failure={"url":url,"error":type(exc).__name__+":"+str(exc)[:150]}
+                errors.append(failure)
+                page_status.append({"url":url,"status":"FAILED",
+                                    "error":failure["error"]})
+        if updated_pages:
+            state["sources"][city]={"pages":updated_pages}
+        for key,row in found.items():
+            existing=all_rows.get(key)
+            if existing is None or len(row["description"])>len(existing["description"]):
+                all_rows[key]=row
+        audits.append({"city":city,"configured_pages":len(urls),
+             "pages_fetched":pages_fetched,"complete":pages_fetched==len(urls),
+             "application_id_rows":sum(bool(r["application_id"]) for r in found.values()),
+             "project_only_signals":sum(not r["application_id"] for r in found.values()),
+             "new_or_changed":len(city_new),"failures":errors[:20],
+             "page_status":page_status,
+             "state":"COLLECTED" if pages_fetched==len(urls) and found else
+                 "NO_MATCHING_PROJECT_RECORDS" if pages_fetched==len(urls) else
+                 "PARTIAL_SOURCE_FAILURE" if pages_fetched else "INCOMPLETE_SOURCE"})
+    for filename,rows in ((ALL,list(all_rows.values())),(CHANGED,list(changed.values()))):
         with (root/filename).open("w",encoding="utf-8-sig",newline="") as handle:
             writer=csv.DictWriter(handle,fieldnames=COLUMNS)
             writer.writeheader();writer.writerows(rows)
-    temp=state_path.with_suffix(".tmp")
+    temp=path.with_suffix(".tmp")
     temp.write_text(json.dumps(state,indent=2),encoding="utf-8")
-    temp.replace(state_path)
-    summary={"source_status":audit,
-             "application_id_rows":sum(bool(r["application_id"]) for r in all_rows),
-             "project_only_signals":sum(not r["application_id"] for r in all_rows),
+    temp.replace(path)
+    summary={"source_status":audits,
+             "application_id_rows":sum(bool(r["application_id"]) for r in all_rows.values()),
+             "project_only_signals":sum(not r["application_id"] for r in all_rows.values()),
              "new_or_changed":len(changed),"paid_ai_calls":0,
-             "warning":"Project-only signals are not verified applications. No first publication date inferred; incomplete sources do not advance first-seen baselines."}
+             "warning":"Project-only signals are not verified applications; every city page has an independent baseline. No first-publication date inferred."}
     (root/STATUS).write_text(json.dumps(summary,indent=2),encoding="utf-8")
     return summary

@@ -48,3 +48,23 @@ def test_brampton_featured_application():
     <p>Office mixed-use block (City File: OZS-2025-0048) Ward 10</p></section>"""
     rows=_parse("Brampton",page,"https://letsconnect.brampton.ca/yourcityplans")
     assert rows and any(r["application_id"]=="OZS-2025-0048" for r in rows)
+
+
+def test_one_ward_failure_does_not_suppress_other_ward_baseline(tmp_path):
+    from gta_municipal_project_feed import run, STATE
+    import json
+    city="Oakville"
+    ward1="https://www.oakville.ca/business-development/planning-development/active-development-applications/ward-1-development-and-site-plan-applications/"
+    ward2="https://www.oakville.ca/business-development/planning-development/active-development-applications/ward-2-development-and-site-plan-applications/"
+    def fetch(url):
+        if url==ward1:raise ValueError("ROBOTS_ACCESS_DENIED")
+        return "<li>AVID-IGH Hotel - 170 North Service Road West - 1517.001/01</li>"
+    first=run(tmp_path,sources={city:[ward1,ward2]},fetcher=fetch)
+    assert first["application_id_rows"]==1
+    assert first["source_status"][0]["pages_fetched"]==1
+    assert not first["new_or_changed"]
+    state=json.loads((tmp_path/STATE).read_text())
+    assert ward2 in state["sources"][city]["pages"]
+    assert ward1 not in state["sources"][city]["pages"]
+    second=run(tmp_path,sources={city:[ward1,ward2]},fetcher=fetch)
+    assert second["new_or_changed"]==0
