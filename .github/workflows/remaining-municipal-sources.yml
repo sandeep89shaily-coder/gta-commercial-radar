@@ -119,4 +119,8 @@ jobs:
           except Exception as exc:
               report["error"]=type(exc).__name__+":"+str(exc)[:190]
           print("OFFICIAL_BURLINGTON_ZIP",json.dumps(report)[:5500])
+          from gta_burlington_gis import run as burlington_run
+          import os
+          root=os.path.join(os.environ["RUNNER_TEMP"],"burlington_source")
+          print("BURLINGTON_COLLECTOR",json.dumps(burlington_run(root)))
           PY
