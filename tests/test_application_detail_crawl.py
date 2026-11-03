@@ -30,3 +30,11 @@ def test_detail_page_failure_not_counted_as_success():
     assert rows==[]
     assert audit["detail_pages_fetched"]==0
     assert audit["detail_page_failures"]
+
+
+def test_detail_crawler_excludes_images_and_pdfs():
+    markup='''<a href="/news/notice-of-application-photo.png">Notice of Application</a>
+    <a href="/news/notice-of-application.pdf">Notice of Application</a>
+    <a href="/news/notice-of-application/">Notice of Application</a>'''
+    assert _detail_urls(markup,"Markham",URL)==[
+      "https://www.milton.ca/news/notice-of-application/"]
