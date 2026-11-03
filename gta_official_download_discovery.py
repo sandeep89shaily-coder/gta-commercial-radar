@@ -4,13 +4,13 @@ from urllib.parse import urlparse,urljoin
 from robots_policy import evaluate
 AGENT="GTARadarOfficialExportProbe/1.0"
 TARGETS={
- "MISS_SITE_HUB":"https://opendata-mississauga.hub.arcgis.com/datasets/mississauga::site-plan-applications",
- "MISS_REZONE_HUB":"https://opendata-mississauga.hub.arcgis.com/datasets/mississauga::rezoning-applications",
- "MISS_SITE_META":"https://www.arcgis.com/sharing/rest/content/items/9b25caf083d54593a7db21ea056cfb3d",
- "NIAGARA_PACKAGE":"https://www.niagaraopendata.ca/api/3/action/package_show?id=building-permits-public",
- "NIAGARA_PACKAGE_ALT":"https://niagaraopendata.ca/api/3/action/package_show?id=building-permits-public",
- "NIAGARA_DATASET":"https://www.niagaraopendata.ca/dataset/building-permits-public",
- "NIAGARA_RESOURCE_CSV":"https://www.niagaraopendata.ca/dataset/building-permits-public/resource",
+ "MISS_SITE_CATALOG":"https://www.arcgis.com/sharing/rest/content/items/85536f145719436ebde8d31f36d11d83?f=json",
+ "MISS_REZONE_CATALOG":"https://www.arcgis.com/sharing/rest/content/items/9b25caf083d54593a7db21ea056cfb3d?f=json",
+ "NIAGARA_CATALOG":"https://www.arcgis.com/sharing/rest/content/items/83f3b80be17a4fd29c58529dc945f371?f=json",
+ "MISS_SITE_CSV":"https://hub.arcgis.com/api/download/v1/items/85536f145719436ebde8d31f36d11d83/csv?redirect=false&layers=0",
+ "MISS_REZONE_CSV":"https://hub.arcgis.com/api/download/v1/items/9b25caf083d54593a7db21ea056cfb3d/csv?redirect=false&layers=0",
+ "NIAGARA_CSV":"https://hub.arcgis.com/api/download/v1/items/83f3b80be17a4fd29c58529dc945f371/csv?redirect=false&layers=0",
+ "NIAGARA_HUB_PAGE":"https://st-catharines-open-data-2-stcatharines.hub.arcgis.com/datasets/83f3b80be17a4fd29c58529dc945f371_0",
 }
 def probe(name,url):
     sess=requests.Session();sess.trust_env=False;sess.headers["User-Agent"]=AGENT
@@ -32,7 +32,7 @@ def probe(name,url):
                     report["resources"]=[{"name":x.get("name"),"format":x.get("format"),"url":x.get("url")}
                                          for x in value["resources"]][:25]
                 else:
-                    report["metadata"]={k:value.get(k) for k in ("id","title","name","url","type","owner","access")}
+                    report["metadata"]={k:value.get(k) for k in ("id","title","name","url","type","owner","access","resultUrl","href","status","serviceItemId")}
             else:
                 import re
                 report["download_hints"]=list(dict.fromkeys(re.findall(r'https?[^" ]{5,160}(?:csv|download)[^" ]*',content,re.I)))[:8]
