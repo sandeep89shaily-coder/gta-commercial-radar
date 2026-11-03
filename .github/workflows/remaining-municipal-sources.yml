@@ -53,4 +53,35 @@ jobs:
               except Exception as exc:
                   report["error"]=type(exc).__name__+":"+str(exc)[:180]
               print("OFFICIAL_SOURCE",json.dumps(report))
+          # Official Burlington GIS sample and Hub item metadata.
+          urls={
+            "BURLINGTON_PROJECT_SAMPLE":"https://mapping.burlington.ca/arcgisweb/rest/services/COB/Development_Apps/MapServer/0/query",
+            "BURLINGTON_HUB_ITEM":"https://www.arcgis.com/sharing/rest/content/items/c32a534bab8e48ebb9a7575e4a6ace7a",
+            "BURLINGTON_HUB_DATA":"https://www.arcgis.com/sharing/rest/content/items/c32a534bab8e48ebb9a7575e4a6ace7a/data"
+          }
+          for name,url in urls.items():
+              ss=requests.Session();ss.trust_env=False
+              ss.headers["User-Agent"]="GTARadarPublicSourceProbe/1.0"
+              result={"source":name}
+              try:
+                  ok,why=evaluate(ss,url,"GTARadarPublicSourceProbe/1.0",timeout=6)
+                  result["allowed"]=ok;result["policy"]=why
+                  if ok:
+                      params={"f":"json"}
+                      if name=="BURLINGTON_PROJECT_SAMPLE":
+                          params.update(where="1=1",outFields="*",returnGeometry="false",
+                                        resultRecordCount="3")
+                      rr=ss.get(url,params=params,timeout=(6,13),allow_redirects=False,stream=True)
+                      result["http"]=rr.status_code
+                      if rr.status_code==200:
+                          data=rr.json()
+                          if name=="BURLINGTON_PROJECT_SAMPLE":
+                              result["features"]=[f.get("attributes") for f in data.get("features",[])][:3]
+                          else:
+                              result["metadata"]={k:data.get(k) for k in ("type","title","url","typeKeywords","description","access")}
+                              result["data_preview"]=str(data)[:1100] if name=="BURLINGTON_HUB_DATA" else ""
+                      rr.close()
+              except Exception as e:
+                  result["error"]=str(e)[:170]
+              print("BURLINGTON_DETAIL",json.dumps(result)[:4500])
           PY
