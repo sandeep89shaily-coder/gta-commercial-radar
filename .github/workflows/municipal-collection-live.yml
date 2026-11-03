@@ -193,6 +193,23 @@ jobs:
               print("KITCHENER_HUB_DIRECT",json.dumps(status))
           except Exception as exc:
               print("KITCHENER_HUB_DIRECT_ERROR",str(exc)[:150])
+          webmap="https://www.arcgis.com/sharing/rest/content/items/fd024cb948de4dfa8186bd8e9630e84d/data?f=json"
+          try:
+              session=requests.Session();session.trust_env=False
+              session.headers["User-Agent"]="GTARadarPublicSourceProbe/1.0"
+              allowed,reason=evaluate(session,webmap,"GTARadarPublicSourceProbe/1.0",timeout=5)
+              result={"allowed":allowed,"policy":reason}
+              if allowed:
+                  resp=session.get(webmap,timeout=(5,9),allow_redirects=False)
+                  result["status"]=resp.status_code
+                  if resp.status_code==200:
+                      data=resp.json()
+                      result["layers"]=[{"id":i.get("id"),"title":i.get("title"),
+                               "url":i.get("url"),"itemId":i.get("itemId")}
+                               for i in data.get("operationalLayers",[])][:30]
+              print("GUELPH_WEBMAP_LAYERS",json.dumps(result))
+          except Exception as e:
+              print("GUELPH_WEBMAP_ERROR",str(e)[:160])
           print("No paid AI calls made.")
           PY
       - name: Upload raw source evidence
