@@ -25,9 +25,12 @@ jobs:
           import os, json
           from gta_municipal_project_feed import run as municipal
           from gta_toronto_open_data import run as toronto
+          from gta_guelph_gis import run as guelph
           path=os.path.join(os.environ["RUNNER_TEMP"],"GTA_RADAR_RESULTS")
           m=municipal(path)
           t=toronto(path)
+          g=guelph(path)
+          print('GUELPH_OFFICIAL_GIS',json.dumps(g))
           from gta_collection_truth import build as quality_acceptance
           q=quality_acceptance(path)
           print("COLLECTION_ACCEPTANCE",json.dumps({k:q.get(k) for k in (
@@ -256,4 +259,6 @@ jobs:
             ${{ runner.temp }}/GTA_RADAR_RESULTS/GTA_RADAR_COLLECTION_MASTER.csv
             ${{ runner.temp }}/GTA_RADAR_RESULTS/GTA_RADAR_COLLECTION_NEW_OR_CHANGED_REVIEW.csv
             ${{ runner.temp }}/GTA_RADAR_RESULTS/GTA_RADAR_COLLECTION_HEALTH.csv
+            ${{ runner.temp }}/GTA_RADAR_RESULTS/GTA_RADAR_GUELPH_GIS_APPLICATIONS.csv
+            ${{ runner.temp }}/GTA_RADAR_RESULTS/GTA_RADAR_GUELPH_GIS_STATUS.json
           if-no-files-found: warn

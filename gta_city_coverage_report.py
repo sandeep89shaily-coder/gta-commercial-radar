@@ -11,12 +11,12 @@ COLUMNS=("city","official_landing_page","index_fetch","html_application_rows",
          "total_source_candidate_rows_not_deduplicated",
          "measured_source_state","missing_capability","source_details")
 
-def build(root,html_status,toronto_brampton_gis,other_gis,markham,municipal=None,toronto_csv=None):
+def build(root,html_status,toronto_brampton_gis,other_gis,markham,municipal=None,toronto_csv=None,guelph_gis=None):
     root=Path(root)
     html={r["city"]:r for r in html_status.get("city_status",[])
           if isinstance(r,dict) and r.get("city")}
     gis={}
-    for summary in (toronto_brampton_gis,other_gis):
+    for summary in (toronto_brampton_gis,other_gis,guelph_gis or {}):
         for row in summary.get("source_status",[]):
             if not isinstance(row,dict):continue
             city=row.get("city")
