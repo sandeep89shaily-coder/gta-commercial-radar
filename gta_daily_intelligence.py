@@ -172,7 +172,7 @@ def _build_document_worklist(union_csv, out, seen, *, paid, ai_processor, ranker
 def integrate(results, *, today=None, meeting_pipeline=None, document_discover=None,
               agenda_pipeline=None, verified_reports=None, document_ai=None,
               multicity_capture=None, document_ranker=None,
-              application_monitor=None, gis_monitor=None, other_gis_monitor=None, municipal_monitor=None, toronto_csv_monitor=None, guelph_gis_monitor=None, burlington_gis_monitor=None, burlington_pdf_monitor=None, project_ai=None, buyer_ai=None, procurement=None, buyer_batch=None,
+              application_monitor=None, gis_monitor=None, other_gis_monitor=None, municipal_monitor=None, toronto_csv_monitor=None, guelph_gis_monitor=None, burlington_gis_monitor=None, burlington_pdf_monitor=None, staged_durham_monitor=None, project_ai=None, buyer_ai=None, procurement=None, buyer_batch=None,
               graph=None, api_key_check=None, allow_paid=True):
     """Run integrated bounded stages and expose individual failure provenance.
 
@@ -199,6 +199,7 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
     from gta_guelph_gis import run as guelph_gis_default
     from gta_burlington_gis import run as burlington_gis_default
     from gta_burlington_summary_pdf import run as burlington_pdf_default
+    from gta_staged_durham_sources import run as staged_durham_default
     from gta_collection_truth import build as collection_acceptance_default
     from gta_city_coverage_report import build as measured_coverage_default
     from gta_markham_circulations import run as markham_default
@@ -239,6 +240,11 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
         burlington_pdf_default if application_monitor is None else
         (lambda root, *, today=None: {"status":"SKIPPED_TEST","report_quarters":0,
                                        "application_id_rows":0}))
+    staged_durham_fn = staged_durham_monitor or (
+        staged_durham_default if application_monitor is None else
+        (lambda root, *, today=None: {"sources":[],"total_rows":0,
+          "new_or_changed_reference_records":0,"paid_ai_calls":0,
+          "sales_lead_publication":False}))
     application_monitor = application_monitor or applications_default
     gis_monitor = gis_monitor or gis_default
     other_gis_monitor = other_gis_monitor or other_gis_default
@@ -316,6 +322,10 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
         lambda:burlington_gis_fn(root,today=today))
     burlington_pdf=step("burlington_official_quarterly_planning_statistics",
         lambda:burlington_pdf_fn(root,today=today))
+    staged_durham=step("staged_durham_four_monthly_reference_feeds",
+        lambda:staged_durham_fn(root,today=today))
+    state["staged_durham"]={k:staged_durham.get(k) for k in
+        ("total_rows","new_or_changed_reference_records","sources","sales_lead_publication")}
     state["burlington_quarterly_official"]={k:burlington_pdf.get(k) for k in (
         "status","report_quarters","latest_period","latest_new_applications","error")}
     state["burlington_official_gis"]={k:burlington_gis.get(k) for k in (
@@ -577,6 +587,8 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
         "<a href='GTA_RADAR_GUELPH_GIS_STATUS.json'>Guelph GIS diagnostics</a> · "
         "<a href='GTA_RADAR_BURLINGTON_GIS_PROJECTS.csv'>Burlington official GIS project signals (not application IDs)</a> · "
         "<a href='GTA_RADAR_BURLINGTON_QUARTERLY_ACTIVITY.csv'>Burlington planning application quarterly statistics (aggregate only)</a> · "
+        "<a href='GTA_RADAR_STAGED_DURHAM_EVIDENCE.csv'>Durham official reference staging (not verified leads)</a> · "
+        "<a href='GTA_RADAR_STAGED_DURHAM_STATUS.json'>Durham staged source diagnostics</a> · "
         "<a href='GTA_RADAR_MUNICIPAL_PROJECT_FEED.csv'>Official municipal project feed</a> · "
         "<a href='GTA_RADAR_MUNICIPAL_PROJECT_FEED_STATUS.json'>Municipal feed source diagnostics</a> · "
         "<a href='GTA_RADAR_TORONTO_OPEN_DATA_APPLICATIONS.csv'>Toronto official CKAN applications</a> · "
