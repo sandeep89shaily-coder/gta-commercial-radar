@@ -115,6 +115,10 @@ def _parse_csv(data,today):
     ids={"APPLICATIONNUMBER","APPLICATIONNO","APPLICATIONNUM",
          "APPLICATIONID","APPLICATION","FILENUMBER","REFERENCEFILE"}
     if not columns.intersection(ids):raise ValueError("CSV_HAS_NO_APPLICATION_IDENTIFIER")
+    scope_columns={"DESCRIPTION","FOLDERDESCRIPTION","PROJECTDESCRIPTION",
+                   "PROPOSALDESCRIPTION","PROPOSEDUSE","WORKDESCRIPTION","FOLDERNAME"}
+    if not columns.intersection(scope_columns):
+        raise ValueError("CSV_HAS_NO_PROJECT_SCOPE_FIELD")
     rows={}
     scanned=0
     cutoff=today-dt.timedelta(days=540)

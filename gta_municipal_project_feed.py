@@ -316,8 +316,11 @@ def run(results,*,today=None,fetcher=None,sources=None):
                         changed[key]=row
                         city_new.add(key)
                     after[key]={"digest":digest,"first_seen_local":row["first_seen_local"]}
-                updated_pages[url]={"seen":after,"baseline_date":
-                                    old_page.get("baseline_date",day) if old_page else day}
+                # Empty/unparsed first fetch cannot establish an
+                # application baseline; otherwise parser changes look like new leads.
+                if unique or old_page is not None:
+                    updated_pages[url]={"seen":after,"baseline_date":
+                                        old_page.get("baseline_date",day) if old_page else day}
                 pages_fetched+=1
                 page_status.append({"url":url,"status":"COLLECTED",
                                     "application_ids":sum(bool(v["application_id"]) for v in unique.values()),
