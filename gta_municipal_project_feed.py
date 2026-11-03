@@ -30,6 +30,12 @@ SOURCES={
     "Oakville":[
         OAKVILLE+"ward-"+str(n)+"-development-and-site-plan-applications/"
         for n in range(1,8)],
+    "Hamilton":[
+        "https://www.hamilton.ca/city-council/news-notices/news-releases?category=143"],
+    "Brampton":[
+        "https://letsconnect.brampton.ca/yourcityplans"],
+    "Burlington":[
+        "https://www.burlington.ca/Modules/News/en/Development"],
 }
 # Distinct application identifiers use city-specific formats, not a synthetic
 # ID inferred from arbitrary prose. A row with no ID remains a project signal.
@@ -38,6 +44,8 @@ ID_PATTERNS={
     "Cambridge":re.compile(r"\b(?:OR|OP|R)\d{1,2}/\d{2}\b|\b30(?:CDM|T)-\d{5,6}\b",re.I),
     "Oakville":re.compile(r"\b(?:Z[.]|OPA\s*|SP\s*|24T-|24CDM-)\s*\d{2,6}(?:[.]\d{2,4})?(?:/\d{1,4})?\b|\b\d{4}[.]\d{3}/\d{2}\b",re.I),
     "Milton":re.compile(r"\b(?:Z|OPA|SP|D)-\d{2}/\d{2}\b",re.I),
+    "Hamilton":re.compile(r"\bDPA-20\d{2}-\d{4,6}\b",re.I),
+    "Brampton":re.compile(r"\b(?:OZS|SP|PDC)-20\d{2}-\d{4}\b",re.I),
 }
 SOURCE_TYPE="OFFICIAL_MUNICIPAL_HTML"
 STATE="GTA_RADAR_MUNICIPAL_FEED_SEEN.json"
@@ -176,8 +184,76 @@ def _guelph(soup,url):
         if row:out.append(row)
     return out
 
+
+def _notice_links(markup,url):
+    """Source-specific Hamilton complete-application notices only."""
+    soup=BeautifulSoup(markup,"html.parser")
+    selected=[];seen=set()
+    for a in soup.find_all("a",href=True):
+        title=_clean(a.get_text(" ",strip=True))
+        link=urljoin(url,a["href"])
+        if (link in seen or not _safe(link,url)
+                or "complete application" not in title.lower()
+                or "/news-releases/" not in urlparse(link).path):
+            continue
+        selected.append(link);seen.add(link)
+        if len(selected)>=16:break
+    return selected
+
+def _hamilton(soup,url):
+    # Detail-page source: stable official DPA number plus the municipal
+    # proposal/address text. Index pages intentionally yield no fake IDs.
+    text=_clean(soup.get_text(" ",strip=True))
+    match=re.search(r"\bFile Number\s*:\s*(DPA-20\d{2}-\d{4,6})\b",text,re.I)
+    if not match:return []
+    ident=match.group(1)
+    heading=soup.find("h1")
+    title=_clean(heading.get_text(" ",strip=True)) if heading else "Hamilton "+ident
+    proposal=re.search(r"\bProposal\s*:\s*(.{10,850}?)(?=\s+\bAddress\s*:|\s+\bFile Number\s*:)",text,re.I)
+    desc=proposal.group(1) if proposal else title
+    address=re.search(r"\bAddress\s*:\s*(.{5,220}?)(?=\s+\bFile Number\s*:)",text,re.I)
+    addr=address.group(1) if address else ""
+    row=_project("Hamilton",title,desc,url,application_id=ident,address=addr)
+    return [row] if row else []
+
+def _brampton(soup,url):
+    # The City's public PDC community page includes featured applications
+    # with their OZS numbers. No search form or inaccessible GIS is used.
+    out=[]
+    for node in soup.find_all(["h2","h3","h4","p","li"]):
+        txt=_clean(node.get_text(" ",strip=True))
+        if len(txt)>1200:continue
+        ids=list(dict.fromkeys(m.group(0) for m in ID_PATTERNS["Brampton"].finditer(txt)))
+        if not ids:continue
+        container=node.parent
+        context=_clean(container.get_text(" ",strip=True))[:900] if container else txt
+        for ident in ids:
+            row=_project("Brampton",txt[:210],context,url,application_id=ident)
+            if row:out.append(row)
+    return out
+
+def _burlington(soup,url):
+    # The news/project directory can expose named ward development pages
+    # even when it does not expose a file number. Keep as project signals.
+    out=[]
+    for a in soup.find_all("a",href=True):
+        title=_clean(a.get_text(" ",strip=True))
+        link=urljoin(url,a["href"])
+        if not _safe(link,url) or link==url:continue
+        if re.search(r"\.(?:png|jpe?g|pdf|webp|docx?)$",urlparse(link).path,re.I):
+            continue
+        if (len(title)<14 or
+                not re.search(r"(?i)(?:development|project|ward\s*[1-6]|"
+                              r"\d{2,5}\s+[A-Za-z].{1,60}(?:street|road|drive|"
+                              r"avenue|boulevard|lane))",title)):
+            continue
+        row=_project("Burlington",title,title,link)
+        if row:out.append(row)
+    return out
+
 PARSERS={"Halton Hills":_halton,"Cambridge":_cambridge,
-         "Oakville":_oakville,"Milton":_milton,"Guelph":_guelph}
+         "Oakville":_oakville,"Milton":_milton,"Guelph":_guelph,
+         "Hamilton":_hamilton,"Brampton":_brampton,"Burlington":_burlington}
 
 def _parse(city,markup,url):
     soup=BeautifulSoup(markup,"html.parser")
@@ -203,6 +279,16 @@ def run(results,*,today=None,fetcher=None,sources=None):
                 markup=(fetcher or _fetch)(url)
                 items=_parse(city,markup,url)
                 successful+=1
+                if city=="Hamilton":
+                    # Following only official 'Complete Application' detail
+                    # pages yields real DPA numbers rather than index links.
+                    for detail_url in _notice_links(markup,url):
+                        try:
+                            detail=(fetcher or _fetch)(detail_url)
+                            items.extend(_parse(city,detail,detail_url))
+                        except Exception as exc:
+                            failures.append({"url":detail_url,
+                                "error":type(exc).__name__+":"+str(exc)[:140]})
                 for row in items:
                     key=row["project_id"]
                     if key not in found or len(row["description"])>len(found[key]["description"]):
@@ -210,7 +296,7 @@ def run(results,*,today=None,fetcher=None,sources=None):
             except Exception as exc:
                 failures.append({"url":url,"error":type(exc).__name__+":"+str(exc)[:140]})
         # Incomplete multi-page feeds must not declare a complete baseline.
-        complete=successful==len(urls)
+        complete=successful==len(urls) and not failures
         new=0
         for key,row in sorted(found.items()):
             digest=hashlib.sha256((row["project_title"]+"|"+row["description"]+"|"+

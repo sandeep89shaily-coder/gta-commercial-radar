@@ -32,3 +32,19 @@ def test_guelph_project_index_is_unverified():
     rows=_parse("Guelph",page,
       "https://guelph.ca/city-government/planning-and-development/current-development-applications/")
     assert len(rows)==1 and rows[0]["application_id"]==""
+
+
+def test_hamilton_complete_application_detail():
+    page="""<h1>Complete Application for 925 Main Street West</h1>
+    <p>Proposal: A 29-storey mixed use building with commercial space.</p>
+    <p>Address: 925 Main Street West (Ward 1)</p>
+    <p>File Number: DPA-2026-00207</p>"""
+    rows=_parse("Hamilton",page,
+      "https://www.hamilton.ca/city-council/news-notices/news-releases/complete-application-925-main-street-west-hamilton")
+    assert len(rows)==1 and rows[0]["application_id"]=="DPA-2026-00207"
+
+def test_brampton_featured_application():
+    page="""<section><h3>Featured Application: June 15, 2026</h3>
+    <p>Office mixed-use block (City File: OZS-2025-0048) Ward 10</p></section>"""
+    rows=_parse("Brampton",page,"https://letsconnect.brampton.ca/yourcityplans")
+    assert rows and any(r["application_id"]=="OZS-2025-0048" for r in rows)
