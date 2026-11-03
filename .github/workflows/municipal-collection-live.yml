@@ -161,6 +161,38 @@ jobs:
                   print("KITCHENER_EXPORT_RESULT",json.dumps(info))
           except Exception as exc:
               print("KITCHENER_EXPORT_ERROR",str(exc)[:180])
+          # ArcGIS Experience data sources identify its official dataset
+          # references. Do not query any layer until separately policy-checked.
+          url="https://www.arcgis.com/sharing/rest/content/items/e66bd026b90e4faaae2d81b7319a0ad6/data?f=json"
+          try:
+              ss=requests.Session();ss.trust_env=False
+              ss.headers["User-Agent"]="GTARadarPublicSourceProbe/1.0"
+              js=ss.get(url,timeout=(5,9)).json()
+              entries=js.get("dataSources",{})
+              print("GUELPH_SOURCE_CONFIG",json.dumps({"count":len(entries),
+                  "sources":[{"name":k,"itemId":v.get("itemId"),
+                       "url":v.get("url"),"layerId":v.get("layerId"),
+                       "type":v.get("type")} for k,v in list(entries.items())[:18]]}))
+          except Exception as exc:
+              print("GUELPH_SOURCE_CONFIG_ERROR",str(exc)[:150])
+          # Explicitly requested CSV export through the public hub download
+          # endpoint, without following any redirects.
+          url="https://hub.arcgis.com/api/download/v1/items/b7e2f8feda7340eaa5f4dd7b9c4d5ac0/csv?redirect=false&layers=0"
+          try:
+              ss=requests.Session();ss.trust_env=False
+              ss.headers["User-Agent"]="GTARadarPublicSourceProbe/1.0"
+              ok,why=evaluate(ss,url,"GTARadarPublicSourceProbe/1.0",timeout=5)
+              status={"allowed":ok,"policy":why}
+              if ok:
+                  response=ss.get(url,timeout=(5,12),allow_redirects=False,stream=True)
+                  status.update(status=response.status_code,content_type=response.headers.get("Content-Type",""),
+                         location=response.headers.get("Location","")[:300])
+                  if response.status_code==200:
+                      status["sample"]=response.raw.read(1600,decode_content=True).decode("utf-8","replace")[:1100]
+                  response.close()
+              print("KITCHENER_HUB_DIRECT",json.dumps(status))
+          except Exception as exc:
+              print("KITCHENER_HUB_DIRECT_ERROR",str(exc)[:150])
           print("No paid AI calls made.")
           PY
       - name: Upload raw source evidence
