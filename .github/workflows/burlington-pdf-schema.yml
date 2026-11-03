@@ -1,12 +1,15 @@
-name: Burlington official PDF schema verification
+name: Burlington official quarterly activity (no AI)
 on:
   pull_request:
-    paths: ['.github/workflows/burlington-pdf-schema.yml','gta_burlington_summary_pdf.py']
+    paths:
+      - 'gta_burlington_summary_pdf.py'
+      - 'tests/test_burlington_summary_pdf.py'
+      - '.github/workflows/burlington-pdf-schema.yml'
   workflow_dispatch:
 jobs:
-  official-pdf:
+  live-burlington:
     runs-on: ubuntu-latest
-    timeout-minutes: 6
+    timeout-minutes: 5
     permissions:
       contents: read
     steps:
@@ -15,97 +18,15 @@ jobs:
         with:
           python-version: '3.12'
       - run: python -m pip install -r requirements.txt
-      - name: Read official Burlington ZIP PDF text without saving private records
-        shell: bash
+      - name: Read official quarterly source, no DeepSeek
         run: |
           python - <<'PY'
-          import requests,io,zipfile,json
-          from pypdf import PdfReader
-          from robots_policy import evaluate
-          import os
-          print('BURLINGTON_QUARTERLY_COLLECTOR',json.dumps(__import__('gta_burlington_summary_pdf').run(os.path.join(os.environ['RUNNER_TEMP'],'burlington_quarterly'))))
-          u='https://mapping.burlington.ca/docs/Burlington%20Development%20Application%20Summary%20Tables.zip'
-          s=requests.Session();s.trust_env=False
-          s.headers['User-Agent']='GTARadarOfficialPDFProbe/1.0'
-          ok,why=evaluate(s,u,'GTARadarOfficialPDFProbe/1.0',timeout=8)
-          print('ACCESS',ok,why)
-          if not ok:raise ValueError('BURLINGTON_OFFICIAL_PDF_ACCESS_RESTRICTED')
-          r=s.get(u,timeout=(6,18),allow_redirects=False)
-          r.raise_for_status()
-          assert len(r.content)<5000000 and zipfile.is_zipfile(io.BytesIO(r.content))
-          z=zipfile.ZipFile(io.BytesIO(r.content))
-          for p in z.infolist()[:5]:
-              if p.filename.lower().endswith('.pdf') and p.file_size<1000000:
-                  pdf=PdfReader(io.BytesIO(z.read(p)))
-                  print('DOC',p.filename,'pages',len(pdf.pages))
-                  for i,page in enumerate(pdf.pages[:2]):
-                      print('PAGE',i,(page.extract_text() or '')[:3800])
-          from robots_policy import evaluate
-          import requests,json
-          probes={
-            'VAUGHAN_ESCRIBE':'https://pub-vaughan.escribemeetings.com/',
-            'VAUGHAN_ESCRIBE_MEETINGS':'https://pub-vaughan.escribemeetings.com/Meetings.aspx',
-            'KITCHENER_METADATA':'https://app2.kitchener.ca/appdocs/GISImages/GIS_Web_External/GIS_Metadata_Open_Data/Planning_Applications_Active.html',
-            'KITCHENER_OPEN_HUB':'https://open-kitchenergis.opendata.arcgis.com/datasets/KitchenerGIS::planning-applications-active',
-            'BURLINGTON_SITE':'https://www.burlington.ca/en/news/current-development-projects/1376-1382-plains-rd-e.aspx',
-          }
-          for name,url in probes.items():
-              s=requests.Session();s.trust_env=False
-              agent='GTARadarOfficialSourceProbe/1.0'
-              s.headers['User-Agent']=agent
-              result={'source':name}
-              try:
-                  ok,reason=evaluate(s,url,agent,timeout=5)
-                  result.update(allowed=ok,reason=reason)
-                  if ok:
-                      r=s.get(url,timeout=(6,10),allow_redirects=False)
-                      result.update(http=r.status_code,type=r.headers.get('Content-Type'),
-                                    bytes=len(r.content))
-                      if r.status_code==200 and 'text/html' in r.headers.get('Content-Type',''):
-                          result['sample']=r.text[:400]
-              except Exception as e:result['error']=type(e).__name__+':'+str(e)[:140]
-              print('ALTERNATIVE_POLICY',json.dumps(result))
-          from bs4 import BeautifulSoup
-          home='https://pub-vaughan.escribemeetings.com/'
-          ss=requests.Session();ss.trust_env=False
-          ss.headers["User-Agent"]="GTARadarOfficialSourceProbe/1.0"
-          html=ss.get(home,timeout=(5,12)).text
-          soup=BeautifulSoup(html,"html.parser")
-          links=[]
-          for a in soup.find_all("a",href=True):
-              href=a.get("href","")
-              if "Meeting.aspx?" in href or "Agenda=" in href:
-                  links.append({"title":a.get_text(" ",strip=True)[:100],"href":href[:300]})
-          print("VAUGHAN_MEETING_LINKS",json.dumps(links[:14]))
-          print("VAUGHAN_FILE_ID_COUNT",len(__import__('re').findall(r"(?:OP|Z|DA)\\.\\d{2}\\.\\d{3}",soup.get_text(' ',strip=True))))
-          import re
-          from urllib.parse import urljoin
-          count=0
-          for anchor in soup.find_all('a',href=True):
-              href=anchor['href']
-              if '/Meeting.aspx?Id=' not in href or count>=7:
-                  continue
-              url=urljoin(home,href)
-              if any(url==x for x in globals().get('seen_meetings',[])):continue
-              seen_meetings=globals().setdefault('seen_meetings',[])
-              seen_meetings.append(url)
-              ok,why=evaluate(ss,url,'GTARadarOfficialSourceProbe/1.0',timeout=5)
-              if not ok:continue
-              rr=ss.get(url,timeout=(5,10),allow_redirects=False)
-              text=BeautifulSoup(rr.text,'html.parser').get_text(' ',strip=True)
-              files=re.findall(r'\\b(?:OP|Z|DA)\\.\\d{2}\\.\\d{3}\\b',text,re.I)
-              print('VAUGHAN_AGENDA',json.dumps({'url':url,'http':rr.status_code,
-                      'bytes':len(rr.content),'files':files[:12],
-                      'title':rr.text[rr.text.find('<title'):rr.text.find('</title>')+8][:180]}))
-              count+=1
-          for meeting in seen_meetings[:4]:
-              u=meeting.replace('Meeting.aspx?Id=','Meeting.aspx?Agenda=PostAgenda&Id=')
-              ok,reason=evaluate(ss,u,'GTARadarOfficialSourceProbe/1.0',timeout=5)
-              if not ok:continue
-              r=ss.get(u,timeout=(5,10),allow_redirects=False)
-              text=BeautifulSoup(r.text,'html.parser').get_text(' ',strip=True)
-              files=re.findall(r'\\b(?:OP|Z|DA)\\.\\d{2}\\.\\d{3}\\b',text,re.I)
-              print('VAUGHAN_POSTAGENDA',json.dumps({'url':u,'status':r.status_code,
-                  'bytes':len(r.content),'fileIds':files[:12],
-                  'preview':text[:800]}))
+          import tempfile,json
+          from gta_burlington_summary_pdf import run
+          with tempfile.TemporaryDirectory() as d:
+              report=run(d)
+              print('BURLINGTON_ACTIVITY_STATUS',json.dumps(report))
+              if report['status']=='FAILED':
+                  raise SystemExit(1)
+              assert report['application_id_rows']==0
           PY
