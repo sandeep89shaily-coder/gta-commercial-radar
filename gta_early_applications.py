@@ -117,7 +117,7 @@ def _record_from_section(city,url,ident,desc,link=""):
     """Return a review-only application; never a verified buyer or new posting."""
     ident=_clean(ident).upper()
     direct=link if link and _safe(link,url) else ""
-    pid="EARLY_APP:"+city.upper().replace(" ","_")+":"+re.sub(r"\\s+","",ident)
+    pid="EARLY_APP:"+city.upper().replace(" ","_")+":"+re.sub(r"\s+","",ident)
     return {"project_id":pid,"city":city,"application_id":ident,
             "description":_clean(desc)[:600],"source_url":url,
             "record_source_url":direct or url,
@@ -144,14 +144,14 @@ def _special_rows(soup,city,url):
             m=ID_PATTERN.search(fileno)
             if not m or not COMMERCIAL.search(desc):continue
             if RESIDENTIAL.search(desc) and not re.search(
-                r"\\b(?:industrial|hotel|office|retail|commercial|manufactur\\w*|warehouse)\\b",
+                r"\b(?:industrial|hotel|office|retail|commercial|manufactur\w*|warehouse)\b",
                 desc,re.I):continue
             row=_record_from_section(city,url,m.group(0),address+" — "+desc)
             result[row["project_id"]]=row
     elif city=="Cambridge":
         # Individual application headings e.g. R02/26 – 210 Royal Oak Road.
         # Bound text to the next heading/application, not the whole page.
-        pattern=re.compile(r"^((?:OR|OP|R)\\d{1,2}/\\d{2}|30CDM-\\d{4,6})\\b",re.I)
+        pattern=re.compile(r"^((?:OR|OP|R)\d{1,2}/\d{2}|30CDM-\d{4,6})\b",re.I)
         for node in soup.find_all(["h2","h3","h4","h5","strong"]):
             head=_clean(node.get_text(" ",strip=True))
             if len(head)>200:continue
@@ -169,8 +169,8 @@ def _special_rows(soup,city,url):
             description=" ".join(chunks)[:800]
             if not COMMERCIAL.search(description):continue
             if RESIDENTIAL.search(description) and not re.search(
-                r"\\b(?:industrial|warehouse|hotel|commercial|retail|office|"
-                r"manufactur\\w*|logistics)\\b",description,re.I):continue
+                r"\b(?:industrial|warehouse|hotel|commercial|retail|office|"
+                r"manufactur\w*|logistics)\b",description,re.I):continue
             row=_record_from_section(city,url,match.group(0),description)
             result[row["project_id"]]=row
     return result
