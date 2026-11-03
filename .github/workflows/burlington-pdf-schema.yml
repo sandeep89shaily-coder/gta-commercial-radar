@@ -96,4 +96,14 @@ jobs:
                       'bytes':len(rr.content),'files':files[:12],
                       'title':rr.text[rr.text.find('<title'):rr.text.find('</title>')+8][:180]}))
               count+=1
+          for meeting in seen_meetings[:4]:
+              u=meeting.replace('Meeting.aspx?Id=','Meeting.aspx?Agenda=PostAgenda&Id=')
+              ok,reason=evaluate(ss,u,'GTARadarOfficialSourceProbe/1.0',timeout=5)
+              if not ok:continue
+              r=ss.get(u,timeout=(5,10),allow_redirects=False)
+              text=BeautifulSoup(r.text,'html.parser').get_text(' ',strip=True)
+              files=re.findall(r'\\b(?:OP|Z|DA)\\.\\d{2}\\.\\d{3}\\b',text,re.I)
+              print('VAUGHAN_POSTAGENDA',json.dumps({'url':u,'status':r.status_code,
+                  'bytes':len(r.content),'fileIds':files[:12],
+                  'preview':text[:800]}))
           PY
