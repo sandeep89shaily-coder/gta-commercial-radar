@@ -99,6 +99,44 @@ jobs:
               except Exception as exc:
                   print("BURLINGTON_ALTERNATIVE_FAILED",json.dumps({"url":alternative,
                       "error":type(exc).__name__+":"+str(exc)[:160]}))
+          # Decode small public metadata documents without following external
+          # redirects or collecting personal information.
+          import xml.etree.ElementTree as ET
+          from urllib.parse import urlparse
+          for label,url in (
+              ("GUELPH_RSS","https://guelph.ca/feed/"),
+              ("GUELPH_PLANNING_RSS","https://guelph.ca/category/city-government/planning-and-development/active-development-files/feed/"),
+              ("GUELPH_EXPERIENCE","https://www.arcgis.com/sharing/rest/content/items/e66bd026b90e4faaae2d81b7319a0ad6/data?f=json"),
+              ("KITCHENER_CSV","https://opendata.arcgis.com/datasets/b7e2f8feda7340eaa5f4dd7b9c4d5ac0_0.csv"),
+              ("KITCHENER_HUB_PAGE","https://open-kitchenergis.opendata.arcgis.com/datasets/b7e2f8feda7340eaa5f4dd7b9c4d5ac0_0/explore")):
+              try:
+                  sess=requests.Session();sess.trust_env=False
+                  sess.headers.update({"User-Agent":"GTARadarPublicSourceProbe/1.0"})
+                  ok,why=evaluate(sess,url,"GTARadarPublicSourceProbe/1.0",timeout=5)
+                  if not ok:
+                      print("OFFICIAL_ALTERNATIVE",json.dumps({"source":label,"status":"POLICY_BLOCK","reason":why}))
+                      continue
+                  resp=sess.get(url,timeout=(5,10),stream=True,allow_redirects=False)
+                  result={"source":label,"status":resp.status_code,"type":resp.headers.get("Content-Type",""),
+                      "redirect":resp.headers.get("Location","")[:250]}
+                  if resp.status_code==200:
+                      body=resp.raw.read(1500000,decode_content=True)
+                      if label.startswith("GUELPH") and "RSS" in label:
+                          tree=ET.fromstring(body)
+                          result["titles"]=[x.text[:120] for x in tree.findall(".//item/title")
+                                            if x.text][:30]
+                          result["links"]=[x.text for x in tree.findall(".//item/link")
+                                           if x.text][:10]
+                      if label=="GUELPH_EXPERIENCE":
+                          data=json.loads(body)
+                          textblob=json.dumps(data)
+                          result["source_refs"]=[v[:200] for v in
+                             set(re.findall(r"https?://[^\\\"\\s]+(?:FeatureServer|MapServer)[^\\\"\\s]*",textblob))][:12]
+                          result["metadata_keys"]=list(data)[:20]
+                  resp.close()
+                  print("OFFICIAL_ALTERNATIVE",json.dumps(result))
+              except Exception as e:
+                  print("OFFICIAL_ALTERNATIVE",json.dumps({"source":label,"error":str(e)[:150]}))
           print("No paid AI calls made.")
           PY
       - name: Upload raw source evidence
