@@ -158,11 +158,13 @@ def _special_rows(soup,city,url):
             match=pattern.search(head)
             if not match:continue
             chunks=[head]
-            pos=node
-            for _ in range(12):
-                pos=pos.find_next_sibling()
-                if pos is None or pos.name in ("h2","h3","h4","h5"):break
-                value=_clean(pos.get_text(" ",strip=True))
+            # Cambridge's public page often nests the application ID in
+            # <strong> inside a paragraph, followed by subheadings (e.g.
+            # "Proposed Development"). Siblings alone would miss the proposal.
+            # Walk only a bounded set of following paragraph/heading blocks;
+            # stop at the next *file-number* heading to avoid mixing sites.
+            for next_node in node.find_all_next(["p","h2","h3","h4","h5"],limit=18):
+                value=_clean(next_node.get_text(" ",strip=True))
                 if pattern.match(value):break
                 if value:chunks.append(value[:400])
                 if sum(len(t) for t in chunks)>1100:break
