@@ -85,4 +85,38 @@ jobs:
               except Exception as e:
                   result["error"]=str(e)[:170]
               print("BURLINGTON_DETAIL",json.dumps(result)[:4500])
+          # Town's official ArcGIS catalog provides a public ZIP of planning
+          # application summary tables. Only read if permitted and bounded.
+          import io,zipfile
+          url="https://mapping.burlington.ca/docs/Burlington%20Development%20Application%20Summary%20Tables.zip"
+          session=requests.Session();session.trust_env=False
+          session.headers["User-Agent"]="GTARadarPublicSourceProbe/1.0"
+          report={"source":"BURLINGTON_OFFICIAL_SUMMARY_ZIP"}
+          try:
+              ok,why=evaluate(session,url,"GTARadarPublicSourceProbe/1.0",timeout=6)
+              report.update(allowed=ok,policy=why)
+              if ok:
+                  response=session.get(url,timeout=(6,16),stream=True,allow_redirects=False)
+                  report["http"]=response.status_code
+                  report["content_type"]=response.headers.get("Content-Type")
+                  report["length"]=response.headers.get("Content-Length")
+                  if response.status_code==200:
+                      body=bytearray()
+                      for part in response.iter_content(32768):
+                          body.extend(part)
+                          if len(body)>4000000:raise ValueError("BURLINGTON_ZIP_TOO_LARGE")
+                      if zipfile.is_zipfile(io.BytesIO(body)):
+                          z=zipfile.ZipFile(io.BytesIO(body))
+                          report["members"]=[{"name":v.filename,"bytes":v.file_size}
+                                             for v in z.infolist()][:25]
+                          preview=[]
+                          for item in z.infolist():
+                              if item.filename.lower().endswith((".csv",".txt")) and item.file_size<500000:
+                                  preview.append({"name":item.filename,
+                                      "head":z.read(item).decode("utf-8-sig","replace")[:1100]})
+                          report["preview"]=preview[:3]
+                  response.close()
+          except Exception as exc:
+              report["error"]=type(exc).__name__+":"+str(exc)[:190]
+          print("OFFICIAL_BURLINGTON_ZIP",json.dumps(report)[:5500])
           PY
