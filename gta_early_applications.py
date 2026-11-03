@@ -23,7 +23,7 @@ SOURCES = {
     "Brampton":"https://planning.brampton.ca/CitizenAccess/Default.aspx",
     "Mississauga":"https://www.mississauga.ca/services-and-programs/planning-and-development/development-applications/active-development-applications/",
     "Hamilton":"https://www.hamilton.ca/build-invest-grow/planning-development/planning-applications/where-development-happening-hamilton",
-    "Burlington":"https://www.burlington.ca/en/planning-and-development/planning-and-development.aspx",
+    "Burlington":"https://www.burlington.ca/Modules/News/en/Development",
     "Oakville":"https://www.oakville.ca/business-development/planning-development/active-development-applications/",
     "Vaughan":"https://www.vaughan.ca/residential/building-and-construction/vaughans-planning-process",
     "Kitchener":"https://app2.kitchener.ca/appdocs/GISImages/GIS_Web_External/GIS_Metadata_Open_Data/Planning_Applications_Active.html",
@@ -31,7 +31,7 @@ SOURCES = {
     "Oshawa":"https://www.oshawa.ca/business-development/planning-and-development/development-applications/",
     "Milton":"https://www.milton.ca/business-development/planning-and-development/development-applications/development-application-notices/",
     "Halton Hills":"https://www.haltonhills.ca/developmentproposalsunderreview",
-    "Caledon":"https://www.caledon.ca/en/town-services/development-applications.aspx",
+    "Caledon":"https://www.caledon.ca/en/town-services/current-applications.aspx",
     "Cambridge":"https://www.cambridge.ca/business-building-development/building-planning/current-development-applications/",
     "Waterloo":"https://www.engagewr.ca/development-planning-projects",
     "Guelph":"https://guelph.ca/city-government/planning-and-development/current-development-applications/",
@@ -43,12 +43,17 @@ ID_PATTERN = re.compile(
     r"OZ\s*\d{2}-\d{1,3}(?:\s+W\d+)?|"
     r"21T-M\s*\d{2}-\d{1,3}|"
     r"30CDM-\d{4,6}|"
+    r"(?:SPA|RZ|POPA)\s*20\d{2}-\d{4}|"
+    r"21T-\d{5}C|"
+    r"(?:R|OR|OP)\d{1,2}/\d{2}|"
+    r"D\d{2}[A-Z]{2,5}\d{2}\.\d{3}(?:\.RV\d+)?|"
     r"(?:S-O|Z|OPA|SP|S|ZBA|DPA|DA)[-/ ]\d{2,4}[-/]\d{1,5}|"
     r"\d{2}T-\d{4,6}/[A-Z]|"
     r"\d{3}-\d{3}/\d{2})\b",re.I)
 COMMERCIAL = re.compile(
     r"\b(?:industrial|warehouse|manufactur\w*|distribution|logistics|"
-    r"factory|commercial|retail|restaurant|employment|data.cent(?:er|re)|"
+    r"factory|commercial|retail|restaurant|employment|quarry|aggregate|"
+    r"data.cent(?:er|re)|"
     r"office|medical|clinic|self.storage|hotel|mixed.use|mixed.use|"
     r"business.park|storage.facility)\b",re.I)
 RESIDENTIAL = re.compile(
@@ -108,11 +113,76 @@ def _fetch(url):
 def _clean(value):
     return re.sub(r"\s+"," ",str(value or "")).strip()
 
+def _record_from_section(city,url,ident,desc,link=""):
+    """Return a review-only application; never a verified buyer or new posting."""
+    ident=_clean(ident).upper()
+    direct=link if link and _safe(link,url) else ""
+    pid="EARLY_APP:"+city.upper().replace(" ","_")+":"+re.sub(r"\s+","",ident)
+    return {"project_id":pid,"city":city,"application_id":ident,
+            "description":_clean(desc)[:600],"source_url":url,
+            "record_source_url":direct or url,
+            "record_source_url_basis":("LINK_ON_APPLICATION_ENTRY_NOT_ID_VERIFIED" if direct
+              else "OFFICIAL_INDEX_CONTEXT_ONLY_NOT_EXACT_RECORD"),
+            "source_record_date":"",
+            "source_record_date_basis":"NOT_PUBLISHED_IN_PARSED_ENTRY",
+            "commercial_fit":"POTENTIAL_COMMERCIAL_NEEDS_REVIEW",
+            "verification_required":"Verify application ID, commercial construction, date, stage, developer and purchasing authority"}
+
+
+def _special_rows(soup,city,url):
+    """Municipal HTML formats that the generic short-heading parser misses."""
+    result={}
+    if city=="Halton Hills":
+        # Official 'All applications under review' HTML table contains
+        # [ID, Location, File No., Description] without links or global IDs.
+        for tr in soup.find_all("tr"):
+            cells=tr.find_all(["td","th"],recursive=False)
+            if len(cells)<4:continue
+            address=_clean(cells[1].get_text(" ",strip=True))
+            fileno=_clean(cells[2].get_text(" ",strip=True))
+            desc=_clean(cells[3].get_text(" ",strip=True))
+            m=ID_PATTERN.search(fileno)
+            if not m or not COMMERCIAL.search(desc):continue
+            if RESIDENTIAL.search(desc) and not re.search(
+                r"\b(?:industrial|hotel|office|retail|commercial|manufactur\w*|warehouse)\b",
+                desc,re.I):continue
+            row=_record_from_section(city,url,m.group(0),address+" — "+desc)
+            result[row["project_id"]]=row
+    elif city=="Cambridge":
+        # Individual application headings e.g. R02/26 – 210 Royal Oak Road.
+        # Bound text to the next heading/application, not the whole page.
+        pattern=re.compile(r"^((?:OR|OP|R)\d{1,2}/\d{2}|30CDM-\d{4,6})\b",re.I)
+        for node in soup.find_all(["h2","h3","h4","h5","strong"]):
+            head=_clean(node.get_text(" ",strip=True))
+            if len(head)>200:continue
+            match=pattern.search(head)
+            if not match:continue
+            chunks=[head]
+            # Cambridge's public page often nests the application ID in
+            # <strong> inside a paragraph, followed by subheadings (e.g.
+            # "Proposed Development"). Siblings alone would miss the proposal.
+            # Walk only a bounded set of following paragraph/heading blocks;
+            # stop at the next *file-number* heading to avoid mixing sites.
+            for next_node in node.find_all_next(["p","h2","h3","h4","h5"],limit=18):
+                value=_clean(next_node.get_text(" ",strip=True))
+                if pattern.match(value):break
+                if value:chunks.append(value[:400])
+                if sum(len(t) for t in chunks)>1100:break
+            description=" ".join(chunks)[:800]
+            if not COMMERCIAL.search(description):continue
+            if RESIDENTIAL.search(description) and not re.search(
+                r"\b(?:industrial|warehouse|hotel|commercial|retail|office|"
+                r"manufactur\w*|logistics)\b",description,re.I):continue
+            row=_record_from_section(city,url,match.group(0),description)
+            result[row["project_id"]]=row
+    return result
+
+
 def _rows(markup,city,url):
     soup=BeautifulSoup(markup,"html.parser")
     for node in soup(["script","style","nav","footer","header","form"]):
         node.decompose()
-    candidates={}
+    candidates=_special_rows(soup,city,url)
     # Detect field IDs only inside a compact record, never by mining the
     # entire application page body (which mixes different developments).
     for element in soup.find_all(["h2","h3","h4","h5","li","article","tr"]):
