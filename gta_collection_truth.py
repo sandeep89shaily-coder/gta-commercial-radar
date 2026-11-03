@@ -19,6 +19,7 @@ from gta_early_applications import SOURCES
 INPUTS={
     "TORONTO_CKAN":"GTA_RADAR_TORONTO_OPEN_DATA_APPLICATIONS.csv",
     "GUELPH_GIS":"GTA_RADAR_GUELPH_GIS_APPLICATIONS.csv",
+    "BURLINGTON_GIS":"GTA_RADAR_BURLINGTON_GIS_PROJECTS.csv",
     "MUNICIPAL_HTML":"GTA_RADAR_MUNICIPAL_PROJECT_FEED.csv",
     "EARLY_HTML":"GTA_RADAR_EARLY_APPLICATION_CANDIDATES.csv",
     "TORONTO_BRAMP_GIS":"GTA_RADAR_STRUCTURED_APPLICATIONS_TORONTO_BRAMPTON.csv",
@@ -195,6 +196,7 @@ def build(results):
             gis[item.get("city")].append(item)
     ckan=_json(root/"GTA_RADAR_TORONTO_OPEN_DATA_STATUS.json")
     guelph=_json(root/"GTA_RADAR_GUELPH_GIS_STATUS.json")
+    burlington=_json(root/"GTA_RADAR_BURLINGTON_GIS_STATUS.json")
     health=[]
     for city in SOURCES:
         items=by_city[city]
@@ -211,6 +213,8 @@ def build(results):
         for entry in g:
             if entry.get("status") in ("FAILED","FAILED_OR_INCOMPLETE"):
                 failures.append(_text(entry.get("source"))+":"+_text(entry.get("error")))
+        if city=="Burlington" and burlington.get("status")=="FAILED":
+            failures.append("BURLINGTON_GIS:"+_text(burlington.get("error")))
         if city=="Guelph" and guelph.get("source_status"):
             gi=guelph["source_status"][0]
             if gi.get("status")=="FAILED":
