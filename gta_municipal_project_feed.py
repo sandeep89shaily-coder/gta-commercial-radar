@@ -100,6 +100,21 @@ def _halton(soup,url):
             row=_project("Halton Hills",location+" — "+ident,desc,url,
                          application_id=ident,address=location)
             if row:out.append(row)
+    # Town's active-application table is dynamically rendered and absent
+    # from the original HTML response. Preserve actual official major project
+    # links as *project signals*, never fabricated application numbers.
+    if not out:
+        seen=set()
+        for a in soup.find_all("a",href=True):
+            href=urljoin(url,a["href"])
+            if (href in seen or not _safe(href,url) or
+                    "/work/planning-development/active-development-applications/" not in href):
+                continue
+            title=_clean(a.get_text(" ",strip=True))
+            if len(title)<8:continue
+            row=_project("Halton Hills",title,title,href)
+            if row:out.append(row);seen.add(href)
+            if len(out)>=25:break
     return out
 
 def _cambridge(soup,url):

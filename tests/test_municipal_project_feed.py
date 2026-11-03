@@ -68,3 +68,11 @@ def test_one_ward_failure_does_not_suppress_other_ward_baseline(tmp_path):
     assert ward1 not in state["sources"][city]["pages"]
     second=run(tmp_path,sources={city:[ward1,ward2]},fetcher=fetch)
     assert second["new_or_changed"]==0
+
+
+def test_halton_js_table_absent_preserves_major_project_signals():
+    page="""<a href="/work/planning-development/active-development-applications/37-king-street">37 King Street, Georgetown (Exchange Hotel)</a>"""
+    rows=_parse("Halton Hills",page,
+      "https://www.haltonhills.ca/developmentproposalsunderreview")
+    assert len(rows)==1 and rows[0]["record_kind"]=="PROJECT_INDEX_SIGNAL"
+    assert rows[0]["application_id"]==""
