@@ -45,8 +45,26 @@ jobs:
                   "file_numbers_in_html":page.upper().count("D11SPA"),
                   "table_sample":[tr.get_text(" ",strip=True)[:220]
                                   for tr in soup.find_all("tr")[:3]]}))
+              print("HALTON_EMBEDS",json.dumps({
+                  "iframes":[{"src":e.get("src"),"title":e.get("title")}
+                             for e in soup.find_all("iframe")[:10]],
+                  "possible_data_links":[{"text":a.get_text(" ",strip=True)[:80],
+                       "href":a.get("href")} for a in soup.find_all("a",href=True)
+                       if any(v in (a.get("href") or "").lower()
+                              for v in ("development","application","arcgis","dashboard"))][:30],
+                  "script_src":[sc.get("src") for sc in soup.find_all("script",src=True)[-12:]]}))
           except Exception as exc:
               print("HALTON_HTML_ERROR",type(exc).__name__,str(exc)[:160])
+          for alternative in (
+              "https://www.burlington.ca/en/news/current-development-projects.aspx",
+              "https://www.burlington.ca/en/news/current-development-projects/1376-1382-plains-rd-e.aspx"):
+              try:
+                  body=_fetch(alternative)
+                  print("BURLINGTON_ALTERNATIVE",json.dumps({"url":alternative,"bytes":len(body),
+                      "file_number_count":body.lower().count("file numbers")}))
+              except Exception as exc:
+                  print("BURLINGTON_ALTERNATIVE_FAILED",json.dumps({"url":alternative,
+                      "error":type(exc).__name__+":"+str(exc)[:160]}))
           print("No paid AI calls made.")
           PY
       - name: Upload raw source evidence
