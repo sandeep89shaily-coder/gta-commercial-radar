@@ -36,6 +36,10 @@ SOURCES={
         "https://letsconnect.brampton.ca/yourcityplans"],
     "Burlington":[
         "https://www.burlington.ca/Modules/News/en/Development"],
+    "Vaughan":[
+        "https://www.vaughan.ca/about-city-vaughan/departments/office-city-clerk/public-notices"],
+    "Kitchener":[
+        "https://www.kitchener.ca/strategic-plans-and-projects/projects/"],
 }
 # Distinct application identifiers use city-specific formats, not a synthetic
 # ID inferred from arbitrary prose. A row with no ID remains a project signal.
@@ -266,9 +270,62 @@ def _burlington(soup,url):
         if row:out.append(row)
     return out
 
+
+def _vaughan(soup,url):
+    """Source-specific statutory notice extraction, excluding minor variances.
+
+    The public registry exposes file numbers, subject lands, meeting dates and
+    proposed uses in ordinary HTML. A notice is not proof of a new filing.
+    """
+    text=_clean(soup.get_text(" ",strip=True))
+    records=[]
+    pattern=re.compile(r"\b(?:OP|Z|DA)\.\d{2}\.\d{3}\b",re.I)
+    for section in re.split(r"\bCity File No\.\s*:",text,flags=re.I)[1:]:
+        head=section.split("Subject Land:",1)[0]
+        ids=list(dict.fromkeys(x.group(0) for x in pattern.finditer(head)))
+        if not ids:continue
+        land=re.search(r"Subject Land:\s*(.{4,260}?)\s*Meeting Date:",section,re.I)
+        desc=re.search(r"Notice Description:\s*(.{10,1000}?)(?=\s*(?:Notice Type:|Notice of Public Meeting|City File No\.:|$))",section,re.I)
+        description=_clean(desc.group(1)) if desc else ""
+        if not description or not COMMERCIAL.search(description):
+            continue
+        if re.search(r"(?i)\b(?:cabana|hot tub|backyard deck|existing shed)\b",description):
+            continue
+        address=_clean(land.group(1)) if land else ""
+        for ident in ids:
+            row=_project("Vaughan",ident+" — "+address,description,url,
+                         application_id=ident,address=address)
+            if row:records.append(row)
+    return records
+
+
+def _kitchener(soup,url):
+    """Official City project index: project-only signals, not applications."""
+    result=[]
+    seen=set()
+    for a in soup.find_all("a",href=True):
+        target=urljoin(url,a["href"])
+        path=urlparse(target).path.lower()
+        if not _safe(target,url) or target==url or target in seen:
+            continue
+        if "/strategic-plans-and-projects/projects/" not in path:
+            continue
+        title=_clean(a.get_text(" ",strip=True))
+        if len(title)<14 or len(title)>180:
+            continue
+        if title.casefold() in ("projects","view all projects","strategic plans and projects"):
+            continue
+        row=_project("Kitchener",title,title,target)
+        if row:
+            result.append(row)
+            seen.add(target)
+        if len(result)>=60:break
+    return result
+
 PARSERS={"Halton Hills":_halton,"Cambridge":_cambridge,
          "Oakville":_oakville,"Milton":_milton,"Guelph":_guelph,
-         "Hamilton":_hamilton,"Brampton":_brampton,"Burlington":_burlington}
+         "Hamilton":_hamilton,"Brampton":_brampton,"Burlington":_burlington,
+         "Vaughan":_vaughan,"Kitchener":_kitchener}
 
 def _parse(city,markup,url):
     soup=BeautifulSoup(markup,"html.parser")

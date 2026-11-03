@@ -28,6 +28,13 @@ jobs:
           path=os.path.join(os.environ["RUNNER_TEMP"],"GTA_RADAR_RESULTS")
           m=municipal(path)
           t=toronto(path)
+          from gta_collection_truth import build as quality_acceptance
+          q=quality_acceptance(path)
+          print("COLLECTION_ACCEPTANCE",json.dumps({k:q.get(k) for k in (
+              "total_source_rows","unique_application_files","unique_project_only_signals",
+              "excluded_inactive_or_closed","new_or_changed_commercial_manual_review",
+              "cities_with_application_files","cities_with_only_project_signals",
+              "cities_without_any_project_signal")}))
           print("CITY_SOURCE_RESULTS")
           for item in m["source_status"]:
               print(json.dumps({k:item.get(k) for k in ("city","state","configured_pages","pages_fetched","application_id_rows","project_only_signals","new_or_changed","failures")}))
@@ -77,4 +84,8 @@ jobs:
             ${{ runner.temp }}/GTA_RADAR_RESULTS/GTA_RADAR_MUNICIPAL_PROJECT_FEED.csv
             ${{ runner.temp }}/GTA_RADAR_RESULTS/GTA_RADAR_TORONTO_OPEN_DATA_STATUS.json
             ${{ runner.temp }}/GTA_RADAR_RESULTS/GTA_RADAR_TORONTO_OPEN_DATA_APPLICATIONS.csv
+            ${{ runner.temp }}/GTA_RADAR_RESULTS/GTA_RADAR_COLLECTION_ACCEPTANCE.json
+            ${{ runner.temp }}/GTA_RADAR_RESULTS/GTA_RADAR_COLLECTION_MASTER.csv
+            ${{ runner.temp }}/GTA_RADAR_RESULTS/GTA_RADAR_COLLECTION_NEW_OR_CHANGED_REVIEW.csv
+            ${{ runner.temp }}/GTA_RADAR_RESULTS/GTA_RADAR_COLLECTION_HEALTH.csv
           if-no-files-found: warn

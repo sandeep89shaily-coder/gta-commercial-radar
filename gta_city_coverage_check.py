@@ -16,6 +16,7 @@ from gta_markham_circulations import run as markham_run
 from gta_city_coverage_report import build
 from gta_municipal_project_feed import run as municipal_run
 from gta_toronto_open_data import run as toronto_csv_run
+from gta_collection_truth import build as build_collection_acceptance
 
 def execute(workspace):
     root=Path(workspace).expanduser()/"GTA_RADAR_RESULTS"
@@ -32,6 +33,7 @@ def execute(workspace):
     else:
         markham={"rows_extracted":0,"warning":"No previous verified official PDF union; Markham PDF capture not run by this diagnostic"}
     coverage=build(root,html,tb,other,markham,municipal,toronto_csv)
+    acceptance=build_collection_acceptance(root)
     print("\nGTA RADAR: MEASURED 16-CITY PLANNING APPLICATION COVERAGE (NO DEEPSEEK)")
     print("City".ljust(16)+"HTML".rjust(7)+"GIS".rjust(7)+
           "PDF".rjust(7)+"  Result")
@@ -47,6 +49,14 @@ def execute(workspace):
           "/ 16 (NOT citywide complete coverage)")
     print("Cities with no application candidates:",
           coverage["cities_without_extracted_applications"],"/ 16")
+    print("Canonical unique application files:",acceptance["unique_application_files"])
+    print("Canonical project-only signals:",acceptance["unique_project_only_signals"])
+    print("Inactive/closed excluded from current opportunities:",acceptance["excluded_inactive_or_closed"])
+    print("New or changed files for manual review:",acceptance["new_or_changed_commercial_manual_review"])
+    print("Acceptance audit:",root/"GTA_RADAR_COLLECTION_ACCEPTANCE.json")
+    print("Unified master CSV:",root/"GTA_RADAR_COLLECTION_MASTER.csv")
+    print("Unified manual review CSV:",root/"GTA_RADAR_COLLECTION_NEW_OR_CHANGED_REVIEW.csv")
+    print("16-city health CSV:",root/"GTA_RADAR_COLLECTION_HEALTH.csv")
     print("Additional municipal application ID rows:",municipal["application_id_rows"])
     print("Official project-only signals:",municipal["project_only_signals"])
     print("Municipal feed status:",root/"GTA_RADAR_MUNICIPAL_PROJECT_FEED_STATUS.json")
