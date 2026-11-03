@@ -210,6 +210,36 @@ jobs:
               print("GUELPH_WEBMAP_LAYERS",json.dumps(result))
           except Exception as e:
               print("GUELPH_WEBMAP_ERROR",str(e)[:160])
+          # Guelph's official ArcGIS Experience references this exact hosted
+          # municipal application layer. Probe policy, schema and 3 rows.
+          service="https://gismaps.guelph.ca/hosting/rest/services/External/ActiveDevelopmentApplications/FeatureServer/0"
+          try:
+              ss=requests.Session();ss.trust_env=False
+              ss.headers["User-Agent"]="GTARadarPublicSourceProbe/1.0"
+              ok,why=evaluate(ss,service,"GTARadarPublicSourceProbe/1.0",timeout=5)
+              data={"allowed":ok,"policy":why}
+              if ok:
+                  meta=ss.get(service,params={"f":"json"},timeout=(5,10),allow_redirects=False)
+                  data["http"]=meta.status_code
+                  if meta.status_code==200:
+                      info=meta.json()
+                      data["fields"]=[v.get("name") for v in info.get("fields",[])]
+                      data["maxRecordCount"]=info.get("maxRecordCount")
+                      qs=service+"/query"
+                      ok2,why2=evaluate(ss,qs,"GTARadarPublicSourceProbe/1.0",timeout=5)
+                      data["query_allowed"]=ok2;data["query_policy"]=why2
+                      if ok2:
+                          res=ss.get(qs,params={"f":"json","where":"1=1",
+                              "outFields":"*","returnGeometry":"false",
+                              "resultRecordCount":"3"},timeout=(5,10),allow_redirects=False)
+                          data["query_http"]=res.status_code
+                          if res.status_code==200:
+                              content=res.json()
+                              data["rows"]=[v.get("attributes",{}) for v in content.get("features",[])][:3]
+                              data["error"]=content.get("error")
+              print("GUELPH_GIS_LAYER",json.dumps(data)[:7500])
+          except Exception as e:
+              print("GUELPH_GIS_ERROR",str(e)[:200])
           print("No paid AI calls made.")
           PY
       - name: Upload raw source evidence
