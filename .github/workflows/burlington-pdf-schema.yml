@@ -76,4 +76,24 @@ jobs:
                   links.append({"title":a.get_text(" ",strip=True)[:100],"href":href[:300]})
           print("VAUGHAN_MEETING_LINKS",json.dumps(links[:14]))
           print("VAUGHAN_FILE_ID_COUNT",len(__import__('re').findall(r"(?:OP|Z|DA)\\.\\d{2}\\.\\d{3}",soup.get_text(' ',strip=True))))
+          import re
+          from urllib.parse import urljoin
+          count=0
+          for anchor in soup.find_all('a',href=True):
+              href=anchor['href']
+              if '/Meeting.aspx?Id=' not in href or count>=7:
+                  continue
+              url=urljoin(home,href)
+              if any(url==x for x in globals().get('seen_meetings',[])):continue
+              seen_meetings=globals().setdefault('seen_meetings',[])
+              seen_meetings.append(url)
+              ok,why=evaluate(ss,url,'GTARadarOfficialSourceProbe/1.0',timeout=5)
+              if not ok:continue
+              rr=ss.get(url,timeout=(5,10),allow_redirects=False)
+              text=BeautifulSoup(rr.text,'html.parser').get_text(' ',strip=True)
+              files=re.findall(r'\\b(?:OP|Z|DA)\\.\\d{2}\\.\\d{3}\\b',text,re.I)
+              print('VAUGHAN_AGENDA',json.dumps({'url':url,'http':rr.status_code,
+                      'bytes':len(rr.content),'files':files[:12],
+                      'title':rr.text[rr.text.find('<title'):rr.text.find('</title>')+8][:180]}))
+              count+=1
           PY
