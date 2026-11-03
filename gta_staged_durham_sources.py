@@ -97,6 +97,13 @@ def run(results,*,today=None,sources=None,fetcher=None):
     state=json.loads(ledger.read_text(encoding="utf-8")) if ledger.exists() else {"schema":1,"sources":{}}
     if state.get("schema")!=1:raise ValueError("UNKNOWN_SOURCE_STATE_SCHEMA")
     allrows=[];new=[];results_status=[]
+    # Retain prior successful evidence when a source is skipped by its monthly
+    # cadence or becomes inaccessible; never report it as newly fetched.
+    old_rows={}
+    if (root/ALL).exists():
+        with (root/ALL).open(encoding="utf-8-sig",newline="") as handle:
+            for row in csv.DictReader(handle):
+                old_rows.setdefault(row.get("source_id",""),[]).append(row)
     ss=requests.Session();ss.trust_env=False
     ss.headers["User-Agent"]=AGENT
     reader=fetcher or (lambda url,params:fetch(ss,url,params))
@@ -105,7 +112,9 @@ def run(results,*,today=None,sources=None,fetcher=None):
         old=state["sources"].get(sid)
         # This feed is deliberately monthly; skip untouched same-month baselines.
         if old and old.get("last_success_month")==day[:7]:
+            allrows.extend(old_rows.get(sid,[]))
             results_status.append({"source_id":sid,"status":"SKIPPED_MONTHLY_CADENCE",
+                                   "retained_previous_rows":len(old_rows.get(sid,[])),
                                    "baseline_preserved":True});continue
         try:
             records,fields=_collect(src,reader)
@@ -130,8 +139,10 @@ def run(results,*,today=None,sources=None,fetcher=None):
                 "source_records":len(records),"changed":sum(r["source_id"]==sid for r in new),
                 "fields":fields,"baseline_preserved":False})
         except Exception as exc:
+            allrows.extend(old_rows.get(sid,[]))
             results_status.append({"source_id":sid,"status":"FAILED",
                 "error":type(exc).__name__+":"+str(exc)[:180],
+                "retained_previous_rows":len(old_rows.get(sid,[])),
                 "baseline_preserved":True})
     ss.close()
     # Successful source baselines are persisted independently of failures.
