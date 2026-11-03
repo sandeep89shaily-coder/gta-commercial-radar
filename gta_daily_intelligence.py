@@ -172,7 +172,7 @@ def _build_document_worklist(union_csv, out, seen, *, paid, ai_processor, ranker
 def integrate(results, *, today=None, meeting_pipeline=None, document_discover=None,
               agenda_pipeline=None, verified_reports=None, document_ai=None,
               multicity_capture=None, document_ranker=None,
-              application_monitor=None, gis_monitor=None, project_ai=None, buyer_ai=None, procurement=None, buyer_batch=None,
+              application_monitor=None, gis_monitor=None, other_gis_monitor=None, project_ai=None, buyer_ai=None, procurement=None, buyer_batch=None,
               graph=None, api_key_check=None, allow_paid=True):
     """Run integrated bounded stages and expose individual failure provenance.
 
@@ -193,6 +193,8 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
     from gta_unified_intelligence import build as graph_default
     from gta_early_applications import run as applications_default
     from gta_official_gis_applications import run as gis_default
+    from gta_additional_city_gis import run as other_gis_default
+    from gta_city_coverage_report import build as measured_coverage_default
     from gta_markham_circulations import run as markham_default
 
     root = Path(results)
@@ -211,6 +213,7 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
     multicity_capture = multicity_capture or multicity_capture_default
     application_monitor = application_monitor or applications_default
     gis_monitor = gis_monitor or gis_default
+    other_gis_monitor = other_gis_monitor or other_gis_default
     project_ai = project_ai or project_default
     buyer_ai = buyer_ai or buyer_default
     procurement = procurement or procurement_default
@@ -273,6 +276,11 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
         lambda:application_monitor(root,today=today))
     gis=step("toronto_brampton_official_structured_application_layers",
         lambda:gis_monitor(root,today=today))
+    other_gis=step("hamilton_kitchener_official_gis_applications",
+        lambda:other_gis_monitor(root,today=today))
+    state["other_city_official_gis"]={k:other_gis.get(k) for k in (
+        "sources_configured","sources_successful","commercial_candidates",
+        "new_or_changed","source_status")}
     state["official_structured_applications"]={k:gis.get(k) for k in (
         "status","sources_configured","sources_successful",
         "application_candidates","new_or_changed","source_status")}
@@ -320,6 +328,13 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
     state["markham_circulation"]={k:markham.get(k) for k in (
         "source_pdfs_parsed","rows_extracted","first_run_baseline",
         "new_or_changed","pdfs_unreadable_or_invalid","warning")}
+    coverage=step("measured_sixteen_city_application_coverage",
+        lambda:measured_coverage_default(root,early_apps,gis,other_gis,markham),
+        required=True)
+    state["measured_city_coverage"]={k:coverage.get(k) for k in (
+        "cities_configured","cities_with_extracted_application_candidates",
+        "cities_without_extracted_applications","verified_citywide_complete_coverage",
+        "warning")}
     done = _json(root / DOC_LEDGER)
     selected_docs = []
     if pdf_union.is_file():
@@ -456,6 +471,20 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
             "ai_next_step":"OPEN_OFFICIAL_APPLICATION_THEN_SOURCE_EVIDENCE",
             "verification_required":app.get("verification_required",""),
         })
+    for app in _csv(root/"GTA_RADAR_ADDITIONAL_CITY_GIS_NEW_OR_CHANGED.csv"):
+        combined.append({
+            "kind":"HAMILTON_KITCHENER_GIS_APPLICATION_REVIEW",
+            "project_id":app.get("project_id",""),"city":app.get("city",""),
+            "address":app.get("address",""),"description":app.get("description",""),
+            "source_url":"","official_source_portal_url":app.get("source_url",""),
+            "freshness":"GIS_FIRST_OBSERVED_OR_CHANGED_NOT_PUBLICATION_PROOF",
+            "source_date":app.get("source_record_date",""),
+            "date_basis":app.get("date_basis","NO_VERIFIED_APPLICATION_POSTING_DATE"),
+            "observed_at":app.get("first_seen_local",""),
+            "research_status":"OFFICIAL_GIS_ID_AND_SCOPE_UNVERIFIED",
+            "ai_next_step":"VERIFY_EXACT_APPLICATION_BEFORE_PAID_AI",
+            "verification_required":app.get("verification_required",""),
+        })
     for app in _csv(root/"GTA_RADAR_EARLY_APPLICATION_NEW_OR_CHANGED.csv"):
         combined.append({
             "kind":"EARLY_PLANNING_APPLICATION_REVIEW",
@@ -524,7 +553,10 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
         "<a href='GTA_RADAR_STRUCTURED_APPLICATIONS_TORONTO_BRAMPTON.csv'>Toronto/Brampton official structured application baseline</a> · "
         "<a href='GTA_RADAR_STRUCTURED_APPLICATION_SOURCE_STATUS.json'>Toronto/Brampton GIS source status</a> · "
         "<a href='GTA_RADAR_MARKHAM_CIRCULATED_APPLICATIONS.csv'>Markham dated circulation applications</a> · "
-        "<a href='GTA_RADAR_EARLY_APPLICATION_SOURCE_STATUS.json'>Per-city planning coverage audit</a> · "
+        "<a href='GTA_RADAR_CITY_COVERAGE_AUDIT.csv'>Measured coverage by city (not configured links)</a> · "
+        "<a href='GTA_RADAR_ADDITIONAL_CITY_GIS_APPLICATIONS.csv'>Hamilton/Kitchener application baseline</a> · "
+        "<a href='GTA_RADAR_ADDITIONAL_CITY_GIS_STATUS.json'>Hamilton/Kitchener source status</a> · "
+        "<a href='GTA_RADAR_EARLY_APPLICATION_SOURCE_STATUS.json'>HTML source audit</a> · "
         "<a href='GTA_RADAR_DOCUMENT_PROJECT_CANDIDATES.csv'>AI municipal report candidates (review only)</a> · "
         "<a href='GTA_RADAR_DOCUMENT_AI_PENDING.csv'>Unprocessed PDF research backlog</a> · "
         "<a href='GTA_RADAR_DISCOVERY_RUN_STATUS.json'>Read run status / missing sources</a></p>",
@@ -568,6 +600,12 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
             r["kind"]=="EARLY_PLANNING_APPLICATION_REVIEW" for r in combined),
         "early_application_city_status":early_apps.get("city_status",[]),
         "early_application_baseline_count":early_apps.get("application_candidate_rows",0),
+        "cities_with_application_candidates_measured":coverage.get(
+            "cities_with_extracted_application_candidates",0),
+        "cities_without_extracted_application_candidates":coverage.get(
+            "cities_without_extracted_applications",16),
+        "additional_hamilton_kitchener_gis_candidates":other_gis.get("commercial_candidates",0),
+        "additional_hamilton_kitchener_sources_successful":other_gis.get("sources_successful",0),
         "toronto_brampton_structured_gis_candidates":gis.get("application_candidates",0),
         "toronto_brampton_structured_gis_new_or_changed":gis.get("new_or_changed",0),
         "toronto_brampton_structured_gis_status":gis.get("status","NOT_AVAILABLE"),
