@@ -28,7 +28,8 @@ jobs:
             "BURLINGTON_GIS":"https://mapping.burlington.ca/arcgisweb/rest/services/COB/Development_Apps/MapServer/0",
             "YORK_REGION_GIS":"https://services1.arcgis.com/GzvOwaQBbX7KLiuG/ArcGIS/rest/services/Hosted_Development_Application_Status_And_Teams/FeatureServer/0",
             "KITCHENER_OFFICIAL_GIS":"https://services1.arcgis.com/qAo1OsXi67t7XgmS/ArcGIS/rest/services/Planning_Applications_Active/FeatureServer/0",
-            "BURLINGTON_HUB":"https://navburl-burlington.opendata.arcgis.com/datasets/Burlington::burlington-development-application-summary-tables-2025-2026"
+            "BURLINGTON_HUB":"https://navburl-burlington.opendata.arcgis.com/datasets/Burlington::burlington-development-application-summary-tables-2025-2026",
+            "GROWTH_ACTIVE_DEV":"https://services6.arcgis.com/hM5ymMLbxIyWTjn2/ArcGIS/rest/services/Growth_Management_%E2%80%93_Active_Development_Applications/FeatureServer/0"
           }
           for name,url in SOURCES.items():
               session=requests.Session();session.trust_env=False
@@ -38,7 +39,7 @@ jobs:
                   ok,why=evaluate(session,url,"GTARadarPublicSourceProbe/1.0",timeout=5)
                   report.update(robots_allowed=ok,policy=why)
                   if ok:
-                      params={"f":"json"} if "GIS" in name else {}
+                      params={"f":"json"} if "GIS" in name or name=="GROWTH_ACTIVE_DEV" else {}
                       resp=session.get(url,params=params,timeout=(6,12),
                                        allow_redirects=False,stream=True)
                       report.update(http=resp.status_code,
