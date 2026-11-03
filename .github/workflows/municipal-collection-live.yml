@@ -32,6 +32,21 @@ jobs:
           for item in m["source_status"]:
               print(json.dumps({k:item.get(k) for k in ("city","state","configured_pages","pages_fetched","application_id_rows","project_only_signals","new_or_changed","failures")}))
           print("TORONTO_CKAN",json.dumps(t))
+          # Diagnostic only: identify whether Halton's public HTML contains
+          # server-rendered table records or requires a separate data source.
+          from gta_early_applications import _fetch
+          from bs4 import BeautifulSoup
+          try:
+              page=_fetch("https://www.haltonhills.ca/developmentproposalsunderreview")
+              soup=BeautifulSoup(page,"html.parser")
+              print("HALTON_HTML",json.dumps({
+                  "bytes":len(page),"tr":len(soup.find_all("tr")),
+                  "table":len(soup.find_all("table")),
+                  "file_numbers_in_html":page.upper().count("D11SPA"),
+                  "table_sample":[tr.get_text(" ",strip=True)[:220]
+                                  for tr in soup.find_all("tr")[:3]]}))
+          except Exception as exc:
+              print("HALTON_HTML_ERROR",type(exc).__name__,str(exc)[:160])
           print("No paid AI calls made.")
           PY
       - name: Upload raw source evidence

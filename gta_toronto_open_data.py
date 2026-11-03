@@ -45,7 +45,8 @@ def _host_allowed(url):
     return (p.scheme=="https" and p.port in (None,443) and
             p.username is None and p.password is None and
             p.fragment=="" and p.hostname and
-            (p.hostname=="toronto.ca" or p.hostname.endswith(".toronto.ca")))
+            (p.hostname=="toronto.ca" or p.hostname.endswith(".toronto.ca")
+             or p.hostname=="ckan0.cf.opendata.inter.prod-toronto.ca"))
 
 def _get(url, limit):
     if not _host_allowed(url):raise ValueError("NON_OFFICIAL_TORONTO_RESOURCE")
