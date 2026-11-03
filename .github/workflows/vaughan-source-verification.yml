@@ -1,0 +1,44 @@
+name: Vaughan planning GIS source ownership and access
+on:
+  pull_request:
+    paths: ['.github/workflows/vaughan-source-verification.yml','gta_vaughan_applications.py']
+  workflow_dispatch:
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r requirements.txt
+      - name: Verify publisher and permitted public queries
+        run: |
+          python - <<'PY'
+          import requests,json
+          from robots_policy import evaluate
+          urls={
+            'GIS':'https://services5.arcgis.com/cu2HFDk7AqvG7e31/ArcGIS/rest/services/Development_Applications_view_-_Active_Applications/FeatureServer/0',
+            'ITEM':'https://www.arcgis.com/sharing/rest/content/items/e191eaaf961142d9a0f36e4e6cdc6c64',
+          }
+          for key,url in urls.items():
+              s=requests.Session();s.trust_env=False;s.headers['User-Agent']='GTARadarOfficialSourceProbe/1.0'
+              x={'source':key}
+              try:
+                  ok,reason=evaluate(s,url,'GTARadarOfficialSourceProbe/1.0',timeout=6)
+                  x.update(allowed=ok,policy=reason)
+                  if ok:
+                      r=s.get(url,params={'f':'json'},timeout=(6,12),allow_redirects=False)
+                      x['status']=r.status_code
+                      if r.status_code==200:
+                          j=r.json()
+                          x['metadata']={k:j.get(k) for k in
+                              ('owner','orgId','title','description','snippet','name',
+                               'serviceItemId','copyrightText')}
+                          x['fields']=[q.get('name') for q in j.get('fields',[])]
+              except Exception as e:x['error']=str(e)[:150]
+              print('SOURCE_EVIDENCE',json.dumps(x)[:6000])
+          PY
