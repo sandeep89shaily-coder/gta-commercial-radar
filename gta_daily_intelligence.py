@@ -196,6 +196,7 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
     from gta_additional_city_gis import run as other_gis_default
     from gta_municipal_project_feed import run as municipal_default
     from gta_toronto_open_data import run as toronto_csv_default
+    from gta_collection_truth import build as collection_acceptance_default
     from gta_city_coverage_report import build as measured_coverage_default
     from gta_markham_circulations import run as markham_default
 
@@ -355,6 +356,13 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
         "cities_configured","cities_with_extracted_application_candidates",
         "cities_without_extracted_applications","verified_citywide_complete_coverage",
         "warning")}
+    collection_acceptance=step("canonical_collection_quality_acceptance",
+        lambda:collection_acceptance_default(root),required=True)
+    state["collection_acceptance"]={k:collection_acceptance.get(k) for k in (
+        "total_source_rows","unique_application_files","unique_project_only_signals",
+        "excluded_inactive_or_closed","new_or_changed_commercial_manual_review",
+        "cities_with_application_files","cities_with_only_project_signals",
+        "cities_without_any_project_signal","warning")}
     done = _json(root / DOC_LEDGER)
     selected_docs = []
     if pdf_union.is_file():
@@ -605,6 +613,9 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
         "<a href='GTA_RADAR_STRUCTURED_APPLICATION_SOURCE_STATUS.json'>Toronto/Brampton GIS source status</a> · "
         "<a href='GTA_RADAR_MARKHAM_CIRCULATED_APPLICATIONS.csv'>Markham dated circulation applications</a> · "
         "<a href='GTA_RADAR_CITY_COVERAGE_AUDIT.csv'>Measured coverage by city (not configured links)</a> · "
+        "<a href='GTA_RADAR_COLLECTION_MASTER.csv'>Canonical deduplicated application inventory</a> · "
+        "<a href='GTA_RADAR_COLLECTION_NEW_OR_CHANGED_REVIEW.csv'>Quality-gated new or changed applications for manual review</a> · "
+        "<a href='GTA_RADAR_COLLECTION_HEALTH.csv'>16-city source and quality diagnostics</a> · "
         "<a href='GTA_RADAR_MUNICIPAL_PROJECT_FEED.csv'>Official municipal project feed</a> · "
         "<a href='GTA_RADAR_MUNICIPAL_PROJECT_FEED_STATUS.json'>Municipal feed source diagnostics</a> · "
         "<a href='GTA_RADAR_TORONTO_OPEN_DATA_APPLICATIONS.csv'>Toronto official CKAN applications</a> · "
