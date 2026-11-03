@@ -322,6 +322,59 @@ def _kitchener(soup,url):
         if len(result)>=60:break
     return result
 
+
+# Some municipal indexes show an address only, while the linked official
+# application page contains the actual file identifier. Never derive IDs from
+# the address or count a linked page as an application until verified in HTML.
+GUELPH_FILE=re.compile(r"\b(?:OZS|SP|SUB|OP|ZBA)\s*[-.]?\s*(?:20)?\d{2}[-.]\d{2,5}\b",re.I)
+HALTON_DETAIL_FILE=re.compile(r"\bD(?:09|10|11|12|14|25)(?:OPA|SPA|ZBA|SUB|PLC)?\d{2}[.]\d{2,4}(?:[.]RV\d+)?\b",re.I)
+
+def _detail_project(city,markup,url):
+    soup=BeautifulSoup(markup,"html.parser")
+    for node in soup(["script","style","nav","footer","header"]):
+        node.decompose()
+    heading=soup.find("h1")
+    title=_clean(heading.get_text(" ",strip=True)) if heading else ""
+    text=_clean(soup.get_text(" ",strip=True))
+    if not title or not text:return []
+    if city=="Guelph":
+        # The City's project pages explicitly label a File Number.
+        ident_match=re.search(r"\bFile\s+Number\s*:?\s*"+
+            GUELPH_FILE.pattern,text,re.I)
+        if ident_match:
+            ids=list(dict.fromkeys(x.group(0) for x in GUELPH_FILE.finditer(ident_match.group(0))))
+        else:
+            ids=[]
+    elif city=="Halton Hills":
+        # Town project pages sometimes print multiple associated file numbers.
+        # Accept only printed identifiers in the official page body.
+        ids=list(dict.fromkeys(x.group(0) for x in HALTON_DETAIL_FILE.finditer(text)))
+    else:return []
+    # Exclude nav / unrelated sidebar prose by taking bounded first-paragraph
+    # context; the official source URL remains linked for verification.
+    description=""
+    for p in soup.find_all("p"):
+        value=_clean(p.get_text(" ",strip=True))
+        if len(value)>=35 and not NOISE.search(value):
+            description=value[:800];break
+    if not description:description=title
+    out=[]
+    for ident in ids[:5]:
+        row=_project(city,title,description,url,application_id=ident,address=title)
+        if row:out.append(row)
+    return out
+
+def _detail_targets(city,items,index_url,limit=20):
+    if city not in ("Guelph","Halton Hills"):return []
+    targets=[]
+    for row in items:
+        url=row.get("source_url","")
+        if (url and url!=index_url and _safe(url,index_url) and
+                urlparse(url).query=="" and url not in targets):
+            targets.append(url)
+            if len(targets)>=limit:break
+    return targets
+
 PARSERS={"Halton Hills":_halton,"Cambridge":_cambridge,
          "Oakville":_oakville,"Milton":_milton,"Guelph":_guelph,
          "Hamilton":_hamilton,"Brampton":_brampton,"Burlington":_burlington,
@@ -364,6 +417,25 @@ def run(results,*,today=None,fetcher=None,sources=None):
                     for link in _notice_links(markup,url):
                         detail=(fetcher or _fetch)(link)
                         items.extend(_parse(city,detail,link))
+                if city in ("Guelph","Halton Hills"):
+                    # Official project detail pages are independent evidence;
+                    # an unavailable detail is recorded without suppressing
+                    # successfully extracted index signals.
+                    for link in _detail_targets(city,items,url):
+                        try:
+                            detail=(fetcher or _fetch)(link)
+                            extracted=_detail_project(city,detail,link)
+                            if extracted:
+                                # Avoid double-counting the address-only signal
+                                # when the same page establishes a real file.
+                                items=[v for v in items if not (
+                                    v.get("source_url")==link and
+                                    not v.get("application_id"))]
+                                items.extend(extracted)
+                        except Exception as exc:
+                            errors.append({"url":link,"error":type(exc).__name__+
+                                           ":"+str(exc)[:140],
+                                           "stage":"DETAIL_PROJECT"})
                 unique={}
                 for row in items:
                     key=row["project_id"]

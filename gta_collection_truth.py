@@ -18,6 +18,7 @@ from gta_early_applications import SOURCES
 
 INPUTS={
     "TORONTO_CKAN":"GTA_RADAR_TORONTO_OPEN_DATA_APPLICATIONS.csv",
+    "GUELPH_GIS":"GTA_RADAR_GUELPH_GIS_APPLICATIONS.csv",
     "MUNICIPAL_HTML":"GTA_RADAR_MUNICIPAL_PROJECT_FEED.csv",
     "EARLY_HTML":"GTA_RADAR_EARLY_APPLICATION_CANDIDATES.csv",
     "TORONTO_BRAMP_GIS":"GTA_RADAR_STRUCTURED_APPLICATIONS_TORONTO_BRAMPTON.csv",
@@ -193,6 +194,7 @@ def build(results):
         for item in data.get("source_status",[]):
             gis[item.get("city")].append(item)
     ckan=_json(root/"GTA_RADAR_TORONTO_OPEN_DATA_STATUS.json")
+    guelph=_json(root/"GTA_RADAR_GUELPH_GIS_STATUS.json")
     health=[]
     for city in SOURCES:
         items=by_city[city]
@@ -209,6 +211,10 @@ def build(results):
         for entry in g:
             if entry.get("status") in ("FAILED","FAILED_OR_INCOMPLETE"):
                 failures.append(_text(entry.get("source"))+":"+_text(entry.get("error")))
+        if city=="Guelph" and guelph.get("source_status"):
+            gi=guelph["source_status"][0]
+            if gi.get("status")=="FAILED":
+                failures.append("GUELPH_GIS:"+_text(gi.get("error")))
         if city=="Toronto" and ckan.get("status")=="FAILED":
             failures.append("CKAN:"+_text(ckan.get("error")))
         n_app=sum(r["record_kind"]=="APPLICATION_ID" for r in items)

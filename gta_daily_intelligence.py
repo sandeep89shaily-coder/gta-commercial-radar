@@ -172,7 +172,7 @@ def _build_document_worklist(union_csv, out, seen, *, paid, ai_processor, ranker
 def integrate(results, *, today=None, meeting_pipeline=None, document_discover=None,
               agenda_pipeline=None, verified_reports=None, document_ai=None,
               multicity_capture=None, document_ranker=None,
-              application_monitor=None, gis_monitor=None, other_gis_monitor=None, municipal_monitor=None, toronto_csv_monitor=None, project_ai=None, buyer_ai=None, procurement=None, buyer_batch=None,
+              application_monitor=None, gis_monitor=None, other_gis_monitor=None, municipal_monitor=None, toronto_csv_monitor=None, guelph_gis_monitor=None, project_ai=None, buyer_ai=None, procurement=None, buyer_batch=None,
               graph=None, api_key_check=None, allow_paid=True):
     """Run integrated bounded stages and expose individual failure provenance.
 
@@ -196,6 +196,7 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
     from gta_additional_city_gis import run as other_gis_default
     from gta_municipal_project_feed import run as municipal_default
     from gta_toronto_open_data import run as toronto_csv_default
+    from gta_guelph_gis import run as guelph_gis_default
     from gta_collection_truth import build as collection_acceptance_default
     from gta_city_coverage_report import build as measured_coverage_default
     from gta_markham_circulations import run as markham_default
@@ -224,6 +225,10 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
         toronto_csv_default if application_monitor is None else
         (lambda root, *, today=None: {"status":"NOT_RUN_IN_INJECTED_TEST",
                                      "commercial_candidates":0,"new_or_changed":0}))
+    guelph_gis_fn = guelph_gis_monitor or (
+        guelph_gis_default if application_monitor is None else
+        (lambda root, *, today=None: {"source_status":[],"commercial_candidates":0,
+                                       "new_or_changed":0}))
     application_monitor = application_monitor or applications_default
     gis_monitor = gis_monitor or gis_default
     other_gis_monitor = other_gis_monitor or other_gis_default
@@ -295,6 +300,10 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
         lambda:municipal_fn(root,today=today))
     toronto_csv=step("toronto_official_ckan_development_applications",
         lambda:toronto_csv_fn(root,today=today))
+    guelph_gis=step("guelph_official_active_development_gis",
+        lambda:guelph_gis_fn(root,today=today))
+    state["guelph_official_gis"]={k:guelph_gis.get(k) for k in (
+        "commercial_candidates","new_or_changed","source_status")}
     state["toronto_official_open_data"]={k:toronto_csv.get(k) for k in (
         "status","scanned_rows","commercial_candidates","new_or_changed","error")}
     state["municipal_feed"]={k:municipal.get(k) for k in (
@@ -350,7 +359,7 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
         "source_pdfs_parsed","rows_extracted","first_run_baseline",
         "new_or_changed","pdfs_unreadable_or_invalid","warning")}
     coverage=step("measured_sixteen_city_application_coverage",
-        lambda:measured_coverage_default(root,early_apps,gis,other_gis,markham,municipal,toronto_csv),
+        lambda:measured_coverage_default(root,early_apps,gis,other_gis,markham,municipal,toronto_csv,guelph_gis),
         required=True)
     state["measured_city_coverage"]={k:coverage.get(k) for k in (
         "cities_configured","cities_with_extracted_application_candidates",
@@ -546,6 +555,8 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
         "<a href='GTA_RADAR_COLLECTION_MASTER.csv'>Canonical deduplicated application inventory</a> · "
         "<a href='GTA_RADAR_COLLECTION_NEW_OR_CHANGED_REVIEW.csv'>Quality-gated new or changed applications for manual review</a> · "
         "<a href='GTA_RADAR_COLLECTION_HEALTH.csv'>16-city source and quality diagnostics</a> · "
+        "<a href='GTA_RADAR_GUELPH_GIS_APPLICATIONS.csv'>Guelph official GIS applications</a> · "
+        "<a href='GTA_RADAR_GUELPH_GIS_STATUS.json'>Guelph GIS diagnostics</a> · "
         "<a href='GTA_RADAR_MUNICIPAL_PROJECT_FEED.csv'>Official municipal project feed</a> · "
         "<a href='GTA_RADAR_MUNICIPAL_PROJECT_FEED_STATUS.json'>Municipal feed source diagnostics</a> · "
         "<a href='GTA_RADAR_TORONTO_OPEN_DATA_APPLICATIONS.csv'>Toronto official CKAN applications</a> · "
