@@ -39,6 +39,33 @@ jobs:
           for item in m["source_status"]:
               print(json.dumps({k:item.get(k) for k in ("city","state","configured_pages","pages_fetched","application_id_rows","project_only_signals","new_or_changed","failures")}))
           print("TORONTO_CKAN",json.dumps(t))
+          # Public alternative-source policy probe, no prohibited fetch.
+          from robots_policy import evaluate
+          from urllib.parse import urlparse
+          import requests
+          probes={
+             "KITCHENER_ARCGIS_HUB_CSV":"https://opendata.arcgis.com/datasets/b7e2f8feda7340eaa5f4dd7b9c4d5ac0_0.csv",
+             "KITCHENER_HUB_DOWNLOAD":"https://hub.arcgis.com/api/v3/datasets/b7e2f8feda7340eaa5f4dd7b9c4d5ac0_0/downloads/data?format=csv",
+             "GUELPH_OFFICIAL_FEED":"https://guelph.ca/feed/",
+             "GUELPH_ARCGIS_METADATA":"https://www.arcgis.com/sharing/rest/content/items/e66bd026b90e4faaae2d81b7319a0ad6/data?f=json"
+          }
+          for label,url in probes.items():
+              try:
+                  session=requests.Session()
+                  session.trust_env=False
+                  session.headers["User-Agent"]="GTARadarPublicSourceProbe/1.0"
+                  allowed,reason=evaluate(session,url,"GTARadarPublicSourceProbe/1.0",timeout=5)
+                  status={"source":label,"robots_allowed":allowed,"policy":reason}
+                  if allowed:
+                      r=session.get(url,timeout=(5,9),stream=True,allow_redirects=False)
+                      status.update(http_status=r.status_code,
+                            content_type=r.headers.get("Content-Type",""),
+                            host=urlparse(r.url).hostname)
+                      r.close()
+                  print("SOURCE_PROBE",json.dumps(status))
+              except Exception as exc:
+                  print("SOURCE_PROBE",json.dumps({"source":label,
+                        "error":type(exc).__name__+":"+str(exc)[:130]}))
           # Diagnostic only: identify whether Halton's public HTML contains
           # server-rendered table records or requires a separate data source.
           from gta_early_applications import _fetch
