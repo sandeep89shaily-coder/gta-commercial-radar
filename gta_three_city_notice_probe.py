@@ -13,7 +13,11 @@ SOURCES={
  "Burlington GIS catalog":"https://mapping.burlington.ca/arcgisweb/rest/services/COB/Development_Apps/MapServer?f=pjson",
  "Burlington GIS layer":"https://mapping.burlington.ca/arcgisweb/rest/services/COB/Development_Apps/MapServer/0?f=pjson",
  "Burlington GIS polygon layer":"https://mapping.burlington.ca/arcgisweb/rest/services/COB/Development_Apps/MapServer/1?f=pjson",
- "Kitchener GeoHub":"https://open-kitchenergis.opendata.arcgis.com/datasets/KitchenerGIS::planning-applications-active"
+ "Kitchener GeoHub":"https://open-kitchenergis.opendata.arcgis.com/datasets/KitchenerGIS::planning-applications-active",
+ "York hosted applications":"https://services1.arcgis.com/GzvOwaQBbX7KLiuG/ArcGIS/rest/services/Hosted_Development_Application_Status_And_Teams/FeatureServer/0?f=pjson",
+ "York published layer item":"https://www.arcgis.com/sharing/rest/content/items/d599fcc0898f42ad8b58fd376bcdbf54?f=json",
+ "York Hub export":"https://hub.arcgis.com/api/download/v1/items/d599fcc0898f42ad8b58fd376bcdbf54/csv?redirect=false&layers=0",
+ "Kitchener Hub export":"https://hub.arcgis.com/api/download/v1/items/b7e2f8feda7340eaa5f4dd7b9c4d5ac0/csv?redirect=false&layers=0"
 }
 AGENT="GTARadarEarlyPlanningPublicNotice/1.0"
 def one(city,url):
@@ -31,11 +35,16 @@ def one(city,url):
    if response.status_code!=200:return r
    body=response.raw.read(1_500_001,decode_content=True)
    if len(body)>1_500_000:raise ValueError("TOO_LARGE")
-  if "json" in response.headers.get("Content-Type","") or "f=pjson" in url:
+  if "json" in response.headers.get("Content-Type","") or "f=pjson" in url or "f=json" in url or "/api/download/" in url:
    data=json.loads(body)
    r["layer_list"]=[{"id":x.get("id"),"name":x.get("name")} for x in data.get("layers",[])[:50]]
    r["field_names"]=[x.get("name") for x in data.get("fields",[])[:80]]
    r["capabilities"]=data.get("capabilities")
+   r["download_status"]=data.get("status")
+   r["download_result_host"]=urlparse(data.get("resultUrl","")).hostname
+   r["publisher"]=data.get("owner")
+   r["item_title"]=data.get("title")
+   r["item_id"]=data.get("id")
    return r
   soup=bs4.BeautifulSoup(body,"html.parser")
   t=soup.get_text(" ",strip=True)
