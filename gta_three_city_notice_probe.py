@@ -12,6 +12,7 @@ SOURCES={
  "Kitchener":"https://app2.kitchener.ca/appdocs/GISImages/GIS_Web_External/GIS_Metadata_Open_Data/Planning_Applications_Active.html",
  "Burlington GIS catalog":"https://mapping.burlington.ca/arcgisweb/rest/services/COB/Development_Apps/MapServer?f=pjson",
  "Burlington GIS layer":"https://mapping.burlington.ca/arcgisweb/rest/services/COB/Development_Apps/MapServer/0?f=pjson",
+ "Burlington GIS polygon layer":"https://mapping.burlington.ca/arcgisweb/rest/services/COB/Development_Apps/MapServer/1?f=pjson",
  "Kitchener GeoHub":"https://open-kitchenergis.opendata.arcgis.com/datasets/KitchenerGIS::planning-applications-active"
 }
 AGENT="GTARadarEarlyPlanningPublicNotice/1.0"
