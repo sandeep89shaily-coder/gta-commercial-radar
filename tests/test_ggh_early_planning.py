@@ -26,3 +26,21 @@ def test_source_failure_isolated(tmp_path):
  r=run(tmp_path,sources=src,fetcher=lambda _:(_ for _ in ()).throw(ValueError("ROBOTS_ACCESS_DENIED")))
  assert r["source_status"][0]["state"]=="FAILED"
  assert r["application_id_rows"]==0
+
+def test_barrie_official_fileno_not_objectid():
+ from gta_ggh_early_planning import _barrie_gis
+ url="https://gispublic.barrie.ca/arcgis/rest/services/Public/AnnexedLand_ActiveApplications_WA_Static/MapServer/4"
+ def fetch(endpoint,params):
+  if not endpoint.endswith("/query"):
+   return {"fields":[{"name":x} for x in ("OBJECTID","FILENO","LOCATION","STATUS","DESCRIPT")]}
+  return {"features":[
+    {"attributes":{"OBJECTID":15,"FILENO":"D12-2026-001","LOCATION":"100 Industrial Rd",
+                   "DESCRIPT":"Industrial logistics warehouse","STATUS":"Under Review","TYPE":"Site Plan",
+                   "APPLICANT":"Test Development Ltd"}},
+    {"attributes":{"OBJECTID":16,"FILENO":"","LOCATION":"200 Main St","DESCRIPT":"Office"}},
+  ]}
+ rows=_barrie_gis(url,fetch=fetch)
+ assert len(rows)==1
+ assert rows[0]["application_id"]=="D12-2026-001"
+ assert rows[0]["commercial_fit"]=="COMMERCIAL_TEXT_MATCH_REVIEW"
+ assert rows[0]["source_date"]==""

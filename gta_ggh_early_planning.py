@@ -19,7 +19,7 @@ SOURCES={
  "Peterborough":"https://www.peterborough.ca/business-building-development/planning-building-and-development/planning-and-development-services/current-development-applications/",
  "Pickering":"https://www.pickering.ca/devapp",
  "Orillia":"https://www.orillia.ca/build-and-invest/planning-and-development/current-development-activity/",
- "Barrie":"https://www.barrie.ca/planning-building-infrastructure/development-planning/current-development-applications"
+ "Barrie":"https://gispublic.barrie.ca/arcgis/rest/services/Public/AnnexedLand_ActiveApplications_WA_Static/MapServer/4"
 }
 AGENT="GTARadarGGHPlanning/1.0"
 LEDGER="GTA_RADAR_GGH_EXPANSION_SEEN.json"
@@ -156,6 +156,39 @@ def _general(city,soup,source):
   if row:out.append(row)
  return out
 
+def _barrie_gis(url,fetch=None):
+ from gta_additional_city_gis import _read_json
+ fetch=fetch or _read_json
+ meta=fetch(url,{"f":"json"})
+ fields={x.get("name") for x in meta.get("fields",[]) if isinstance(x,dict)}
+ required={"OBJECTID","FILENO","LOCATION","STATUS","DESCRIPT"}
+ if not required.issubset(fields):raise ValueError("BARRIE_GIS_SCHEMA_NOT_VERIFIED")
+ rows=[];offset=0;complete=False
+ for page in range(16):
+  result=fetch(url+"/query",{"f":"json","where":"1=1","returnGeometry":"false",
+      "outFields":"OBJECTID,FILENO,LOCATION,STATUS,DESCRIPT,NAME,TYPE,APPLICANT,OWNER",
+      "orderByFields":"OBJECTID ASC","resultOffset":str(offset),"resultRecordCount":"500"})
+  features=result.get("features")
+  if not isinstance(features,list):raise ValueError("BARRIE_GIS_QUERY_NO_FEATURES")
+  for feature in features:
+   attrs=feature.get("attributes",{}) if isinstance(feature,dict) else {}
+   if not isinstance(attrs,dict):continue
+   number=_clean(attrs.get("FILENO"))
+   if not number or len(number)>110 or not any(x.isdigit() for x in number):continue
+   desc=_clean(attrs.get("DESCRIPT")) or _clean(attrs.get("NAME"))
+   location=_clean(attrs.get("LOCATION"))
+   stage=_clean(attrs.get("STATUS"))
+   kind=_clean(attrs.get("TYPE"))
+   applicant=_clean(attrs.get("APPLICANT"))
+   obj=_record("Barrie",number,location,
+       desc+"; stage: "+stage,url,record_url=url,applicant=applicant,kind=kind)
+   if obj:rows.append(obj)
+  if len(features)<500:
+   complete=True;break
+  offset+=len(features)
+ if not complete:raise ValueError("BARRIE_GIS_INCOMPLETE_PAGINATION")
+ return rows
+
 def _extract(city,html,source):
  soup=BeautifulSoup(html,"html.parser")
  if city=="Niagara Falls":rows=_niagara(soup,source)
@@ -191,8 +224,11 @@ def run(results,*,today=None,sources=None,fetcher=None):
   item={"city":city,"source_url":url,"state":"FAILED","application_id_rows":0,
         "new_or_changed":0,"commercial_text_matches":0,"source_date_verified_rows":0}
   try:
-   html=(fetcher or _fetch)(url)
-   found=_extract(city,html,url)
+   if city=="Barrie" and "gispublic.barrie.ca" in url:
+    found=_barrie_gis(url)
+   else:
+    html=(fetcher or _fetch)(url)
+    found=_extract(city,html,url)
    baseline=not any(x.startswith("GGH:"+city.upper()+":") for x in old)
    item["state"]=("BASELINE_COMPLETE" if baseline else "COLLECTED") if found else "NO_APPLICATION_ID_ROWS"
    for r in sorted(found,key=lambda r:r["project_id"]):
