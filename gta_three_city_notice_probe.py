@@ -30,7 +30,7 @@ def one(city,url):
    if response.status_code!=200:return r
    body=response.raw.read(1_500_001,decode_content=True)
    if len(body)>1_500_000:raise ValueError("TOO_LARGE")
-  if "json" in response.headers.get("Content-Type",""):
+  if "json" in response.headers.get("Content-Type","") or "f=pjson" in url:
    data=json.loads(body)
    r["layer_list"]=[{"id":x.get("id"),"name":x.get("name")} for x in data.get("layers",[])[:50]]
    r["field_names"]=[x.get("name") for x in data.get("fields",[])[:80]]
