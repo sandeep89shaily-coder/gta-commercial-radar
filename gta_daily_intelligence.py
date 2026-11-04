@@ -204,6 +204,7 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
     from gta_collection_truth import build as collection_acceptance_default
     from gta_city_coverage_report import build as measured_coverage_default
     from gta_three_city_recovery_gate import build as three_city_gate_default
+    from gta_three_city_official_csv import run as three_city_official_csv_default
     from gta_markham_circulations import run as markham_default
 
     root = Path(results)
@@ -403,6 +404,11 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
         "cities_configured","cities_with_extracted_application_candidates",
         "cities_without_extracted_applications","verified_citywide_complete_coverage",
         "warning")}
+    assisted_csv=step("authorized_official_csv_intake_three_city",
+        lambda:three_city_official_csv_default(root),required=True)
+    state["assisted_official_csv"]={k:assisted_csv.get(k) for k in
+        ("application_id_rows","new_or_changed","automated_source_recovered",
+         "source_authenticity_verified","source_status")}
     three_city_gap=step("three_city_early_planning_application_gate",
         lambda:three_city_gate_default(root),required=True)
     state["three_city_early_planning"]={k:three_city_gap.get(k) for k in
@@ -597,6 +603,7 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
         "<a href='GTA_RADAR_MARKHAM_CIRCULATED_APPLICATIONS.csv'>Markham dated circulation applications</a> · "
         "<a href='GTA_RADAR_CITY_COVERAGE_AUDIT.csv'>Measured coverage by city (not configured links)</a> · "
         "<a href='GTA_RADAR_THREE_CITY_EARLY_PLANNING_GAPS.csv'>P0 Burlington Vaughan Kitchener application collector gaps</a> · "
+        "<a href='GTA_RADAR_OFFICIAL_CSV_IMPORT_APPLICATIONS.csv'>Assisted official CSV application imports (unverified provenance)</a> · "
         "<a href='GTA_RADAR_COLLECTION_MASTER.csv'>Canonical deduplicated application inventory</a> · "
         "<a href='GTA_RADAR_COLLECTION_NEW_OR_CHANGED_REVIEW.csv'>Quality-gated new or changed applications for manual review</a> · "
         "<a href='GTA_RADAR_COLLECTION_HEALTH.csv'>16-city source and quality diagnostics</a> · "
