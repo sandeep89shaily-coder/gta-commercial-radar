@@ -3,6 +3,7 @@ on:
   pull_request:
     paths:
       - 'gta_ggh_early_planning.py'
+      - 'gta_ggh_barrie_gis_probe.py'
       - '.github/workflows/ggh-early-planning-live.yml'
   workflow_dispatch:
 jobs:
@@ -20,3 +21,5 @@ jobs:
       - name: Probe public early-planning application rows
         run: |
           python -c "import tempfile,json; from gta_ggh_early_planning import run; s=run(tempfile.mkdtemp()); print('GGH_LIVE_APPLICATION_AUDIT',json.dumps(s,sort_keys=True))"
+      - name: Audit Barrie city official GIS planning application layer schema
+        run: python gta_ggh_barrie_gis_probe.py
