@@ -80,3 +80,31 @@ not automatically a Vaughan municipal application number. Use the assisted
 York export for regional-review intelligence and cross-check Vaughan's
 PLANit application viewer before claiming complete Vaughan coverage.
 No robots bypass, anti-bot workaround, or fabricated timestamps.
+
+
+## Vaughan municipal Public Notices assisted intake (new)
+
+Unlike the York Region GIS layer, Vaughan's **own** Public Notices search
+publishes `City File No.`, `Subject Land`, `Meeting Date`, and
+`Notice Description`. For example, its November 24, 2026 notice for
+8000 Bathurst Street lists **OP.26.005** and **Z.26.018**.
+Visit https://www.vaughan.ca/about-city-vaughan/departments/office-city-clerk/public-notices
+in a normal browser. Where saving is permitted, save the displayed HTML as
+`GTA_RADAR_RESULTS/official_exports/VAUGHAN_OFFICIAL_PUBLIC_NOTICES.html`.
+The search view may have pagination or JavaScript loading, so a saved page
+covers **only the notices actually present in that saved snapshot**.
+
+Then run the normal daily batch, or:
+
+```powershell
+python -c "from gta_vaughan_official_notices import run; print(run('GTA_RADAR_RESULTS'))"
+```
+
+It writes `GTA_RADAR_VAUGHAN_OFFICIAL_NOTICES_APPLICATIONS.csv`,
+`GTA_RADAR_VAUGHAN_OFFICIAL_NOTICES_NEW_OR_CHANGED.csv`,
+`GTA_RADAR_VAUGHAN_OFFICIAL_NOTICES_STATUS.json`, and the first-seen
+ledger. These are **assisted municipal notice records**, not automated
+live coverage, and the meeting date is **not** the original publication date.
+Do not conflate the York regional review number with Vaughan's municipal
+file number. Vaughan's own internal audit has flagged delayed or inaccurate
+PLANit application-status updates; independently confirm current status.
