@@ -206,6 +206,7 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
     from gta_three_city_recovery_gate import build as three_city_gate_default
     from gta_three_city_official_csv import run as three_city_official_csv_default
     from gta_burlington_official_pages import run as burlington_official_pages_default
+    from gta_vaughan_official_notices import run as vaughan_official_notices_default
     from gta_regional_early_intelligence import run as regional_early_default
     from gta_ggh_early_planning import run as ggh_expansion_default
     from gta_markham_circulations import run as markham_default
@@ -438,6 +439,11 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
     state["burlington_saved_official_pages"]={k:burlington_pages.get(k) for k in
         ("status","pages_processed","application_id_rows","new_or_changed",
          "automated_source_recovered","source_authenticity_verified","errors")}
+    vaughan_notices=step("vaughan_saved_official_public_notices_application_ids",
+        lambda:vaughan_official_notices_default(root,today=today),required=False)
+    state["vaughan_saved_official_notices"]={k:vaughan_notices.get(k) for k in
+        ("status","application_id_rows","new_or_changed",
+         "automated_source_recovered","source_authenticity_verified","error")}
     three_city_gap=step("three_city_early_planning_application_gate",
         lambda:three_city_gate_default(root),required=True)
     state["three_city_early_planning"]={k:three_city_gap.get(k) for k in
