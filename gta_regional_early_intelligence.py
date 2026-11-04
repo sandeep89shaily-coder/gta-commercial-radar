@@ -20,7 +20,7 @@ SOURCES={
  "Halton":{"url":"https://www.halton.ca/for-residents/infrastructure-and-growth/road-water-wastewater-construction","kind":"INFRASTRUCTURE_INDEX"},
  "Durham":{"url":"https://www.durham.ca/news/posts/notice-of-ajax-water-supply-plant-expansion-project-public-information-centre/","kind":"ENVIRONMENTAL_ASSESSMENT"},
  "Waterloo":{"url":"https://www.regionofwaterloo.ca/programs-and-services/roads-and-transportation/road-construction/","kind":"INFRASTRUCTURE_INDEX"},
- "Niagara":{"url":"https://www.niagararegion.ca/projects/water-wastewater-master-servicing-plan-update/default.aspx","kind":"MASTER_SERVICING_POLICY"},
+ "Niagara":{"url":"https://www.niagararegion.ca/projects-and-priorities/plans-and-strategies/water-and-wastewater-master-servicing-plan/","kind":"MASTER_SERVICING_POLICY"},
  "Simcoe":{"url":"https://simcoe.ca/services/planning/amendments-and-current-applications/","kind":"OFFICIAL_PLAN_APPLICATIONS"}
 }
 AGENT="GTARadarRegionalEarlyIntelligence/1.0"
