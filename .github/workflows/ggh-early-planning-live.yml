@@ -1,0 +1,25 @@
+name: GGH early planning six-city source acceptance
+on:
+  pull_request:
+    paths:
+      - 'gta_ggh_early_planning.py'
+      - 'gta_ggh_barrie_gis_probe.py'
+      - '.github/workflows/ggh-early-planning-live.yml'
+  workflow_dispatch:
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r requirements.txt
+      - name: Probe public early-planning application rows
+        run: |
+          python -c "import tempfile,json; from gta_ggh_early_planning import run; s=run(tempfile.mkdtemp()); print('GGH_LIVE_APPLICATION_AUDIT',json.dumps(s,sort_keys=True))"
+      - name: Audit Barrie city official GIS planning application layer schema
+        run: python gta_ggh_barrie_gis_probe.py
