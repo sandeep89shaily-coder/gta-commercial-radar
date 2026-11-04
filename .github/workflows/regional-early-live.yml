@@ -1,0 +1,22 @@
+name: Regional early intelligence live source audit
+on:
+  pull_request:
+    paths:
+      - 'gta_regional_early_intelligence.py'
+      - '.github/workflows/regional-early-live.yml'
+  workflow_dispatch:
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r requirements.txt
+      - name: Audit nine official regional sources without changing persistent state
+        run: |
+          python -c "import tempfile,json; from gta_regional_early_intelligence import run; t=tempfile.mkdtemp(); d=run(t); print('REGIONAL_EARLY_LIVE_AUDIT',json.dumps(d,sort_keys=True))"
