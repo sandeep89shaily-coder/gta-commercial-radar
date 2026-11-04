@@ -82,9 +82,9 @@ def _pick(attrs,parts):
 def _parse(city,url,attrs):
     # Source schemas differ. Prefer official file-number fields; never use
     # ArcGIS OBJECTID or a street address as an alleged application number.
-    ident=_pick(attrs,("applicationnumber","applicationnum","appnumber",
-        "appnum","filenumber","fileno","filename","fileid","planningfile",
-        "applicno","applicationid"))
+    ident=_pick(attrs,("applicationnumber","applicationnum","applicationno",
+        "appnumber","appnum","filenumber","fileno","filename","fileid",
+        "planningfile","applicno","applicationid"))
     if not ident:
         for key,val in attrs.items():
             if isinstance(val,str) and ID_PATTERN.fullmatch(_clean(val)):
@@ -92,7 +92,7 @@ def _parse(city,url,attrs):
     if not ident or len(ident)>130:return None
     desc=_pick(attrs,("description","filedescription","proposeddevelopment",
         "developmentdescription","proposal","projectdescription",
-        "workdescription","developmenttype","landuse"))
+        "workdescription","developmenttype","proposedlanduse","landuse"))
     if not desc or not COMMERCIAL.search(desc) or CLOSED.search(
         _pick(attrs,("applicationstatus","filestatus","status"))):
         return None
