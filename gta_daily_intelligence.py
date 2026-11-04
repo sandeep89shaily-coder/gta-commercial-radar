@@ -596,6 +596,7 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
         "<a href='GTA_RADAR_STRUCTURED_APPLICATION_SOURCE_STATUS.json'>Toronto/Brampton GIS source status</a> · "
         "<a href='GTA_RADAR_MARKHAM_CIRCULATED_APPLICATIONS.csv'>Markham dated circulation applications</a> · "
         "<a href='GTA_RADAR_CITY_COVERAGE_AUDIT.csv'>Measured coverage by city (not configured links)</a> · "
+        "<a href='GTA_RADAR_THREE_CITY_EARLY_PLANNING_GAPS.csv'>P0 Burlington Vaughan Kitchener application collector gaps</a> · "
         "<a href='GTA_RADAR_COLLECTION_MASTER.csv'>Canonical deduplicated application inventory</a> · "
         "<a href='GTA_RADAR_COLLECTION_NEW_OR_CHANGED_REVIEW.csv'>Quality-gated new or changed applications for manual review</a> · "
         "<a href='GTA_RADAR_COLLECTION_HEALTH.csv'>16-city source and quality diagnostics</a> · "
