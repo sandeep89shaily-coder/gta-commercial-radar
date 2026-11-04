@@ -1,0 +1,22 @@
+name: Three city official notice discovery
+on:
+  pull_request:
+    paths:
+      - 'gta_three_city_notice_probe.py'
+      - '.github/workflows/three-city-notice-live.yml'
+      - 'gta_vaughan_public_notices.py'
+      - 'tests/test_vaughan_public_notices.py'
+  workflow_dispatch:
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r requirements.txt
+      - run: python gta_three_city_notice_probe.py
