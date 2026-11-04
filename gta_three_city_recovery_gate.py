@@ -10,7 +10,7 @@ from pathlib import Path
 CITIES=("Burlington","Vaughan","Kitchener")
 STATUS="GTA_RADAR_THREE_CITY_EARLY_PLANNING_GAPS.json"
 CSV="GTA_RADAR_THREE_CITY_EARLY_PLANNING_GAPS.csv"
-FIELDS=("city","application_id_candidates","project_only_signals",
+FIELDS=("city","application_id_candidates","project_only_signals","gis_project_only_signals",
         "source_state","acceptance","next_action")
 ACTIONS={
  "Burlington":"Exact application number must come from an authorized official notice or file-level export; both public COB Development_Apps GIS layers lack application-ID fields",
@@ -29,8 +29,18 @@ def build(results,coverage=None):
   row=seen.get(city,{})
   count=int(row.get("total_source_candidate_rows_not_deduplicated",0) or 0)
   signals=int(row.get("project_only_signals",0) or 0)
+  gis_signals=0
+  if city=="Burlington":
+   status_path=root/"GTA_RADAR_BURLINGTON_GIS_STATUS.json"
+   if status_path.is_file():
+    try:
+     status=json.loads(status_path.read_text(encoding="utf-8"))
+     if status.get("status") in ("BASELINE_COMPLETE","COLLECTED"):
+      gis_signals=int(status.get("project_only_signals",0) or 0)
+    except (ValueError,OSError,TypeError):
+     gis_signals=0
   records.append({"city":city,"application_id_candidates":count,
-    "project_only_signals":signals,
+    "project_only_signals":signals+gis_signals,"gis_project_only_signals":gis_signals,
     "source_state":row.get("measured_source_state","NOT_YET_MEASURED"),
     "acceptance":"APPLICATION_CANDIDATES_PRESENT_VERIFY_REPEAT" if count else
                  "BLOCKED_NO_APPLICATION_ID_EXTRACTED",

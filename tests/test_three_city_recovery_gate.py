@@ -16,3 +16,15 @@ def test_one_actual_application_does_not_inflate_citywide_verification(tmp_path)
  report=build(tmp_path,coverage=data)
  assert report["cities_with_application_candidates"]==1
  assert report["cities_verified_citywide_complete"]==0
+
+
+def test_burlington_gis_project_signals_are_not_application_files(tmp_path):
+ import json
+ from gta_three_city_recovery_gate import STATUS
+ (tmp_path/"GTA_RADAR_BURLINGTON_GIS_STATUS.json").write_text(json.dumps(
+  {"status":"COLLECTED","project_only_signals":93,"application_id_rows":0}))
+ result=build(tmp_path,coverage=[{"city":"Burlington",
+    "total_source_candidate_rows_not_deduplicated":0,"project_only_signals":2}])
+ assert result["records"][0]["project_only_signals"]==95
+ assert result["records"][0]["gis_project_only_signals"]==93
+ assert result["cities_with_application_candidates"]==0
