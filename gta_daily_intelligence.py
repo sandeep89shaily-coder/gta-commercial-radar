@@ -205,6 +205,7 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
     from gta_city_coverage_report import build as measured_coverage_default
     from gta_three_city_recovery_gate import build as three_city_gate_default
     from gta_three_city_official_csv import run as three_city_official_csv_default
+    from gta_burlington_official_pages import run as burlington_official_pages_default
     from gta_regional_early_intelligence import run as regional_early_default
     from gta_ggh_early_planning import run as ggh_expansion_default
     from gta_markham_circulations import run as markham_default
@@ -432,6 +433,11 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
     state["assisted_official_csv"]={k:assisted_csv.get(k) for k in
         ("application_id_rows","new_or_changed","automated_source_recovered",
          "source_authenticity_verified","source_status")}
+    burlington_pages=step("burlington_saved_official_project_page_application_ids",
+        lambda:burlington_official_pages_default(root,today=today),required=False)
+    state["burlington_saved_official_pages"]={k:burlington_pages.get(k) for k in
+        ("status","pages_processed","application_id_rows","new_or_changed",
+         "automated_source_recovered","source_authenticity_verified","errors")}
     three_city_gap=step("three_city_early_planning_application_gate",
         lambda:three_city_gate_default(root),required=True)
     state["three_city_early_planning"]={k:three_city_gap.get(k) for k in
