@@ -9,7 +9,10 @@ from toronto_pdf_download import public_dns
 SOURCES={
  "Vaughan":"https://www.vaughan.ca/about-city-vaughan/departments/office-city-clerk/public-notices",
  "Burlington":"https://www.burlington.ca/Modules/News/en/Development",
- "Kitchener":"https://app2.kitchener.ca/appdocs/GISImages/GIS_Web_External/GIS_Metadata_Open_Data/Planning_Applications_Active.html"
+ "Kitchener":"https://app2.kitchener.ca/appdocs/GISImages/GIS_Web_External/GIS_Metadata_Open_Data/Planning_Applications_Active.html",
+ "Burlington GIS catalog":"https://mapping.burlington.ca/arcgisweb/rest/services/COB/Development_Apps/MapServer?f=pjson",
+ "Burlington GIS layer":"https://mapping.burlington.ca/arcgisweb/rest/services/COB/Development_Apps/MapServer/0?f=pjson",
+ "Kitchener GeoHub":"https://open-kitchenergis.opendata.arcgis.com/datasets/KitchenerGIS::planning-applications-active"
 }
 AGENT="GTARadarEarlyPlanningPublicNotice/1.0"
 def one(city,url):
@@ -27,6 +30,12 @@ def one(city,url):
    if response.status_code!=200:return r
    body=response.raw.read(1_500_001,decode_content=True)
    if len(body)>1_500_000:raise ValueError("TOO_LARGE")
+  if "json" in response.headers.get("Content-Type",""):
+   data=json.loads(body)
+   r["layer_list"]=[{"id":x.get("id"),"name":x.get("name")} for x in data.get("layers",[])[:50]]
+   r["field_names"]=[x.get("name") for x in data.get("fields",[])[:80]]
+   r["capabilities"]=data.get("capabilities")
+   return r
   soup=bs4.BeautifulSoup(body,"html.parser")
   t=soup.get_text(" ",strip=True)
   r["html_length"]=len(body)
