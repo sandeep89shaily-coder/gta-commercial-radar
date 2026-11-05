@@ -1,6 +1,6 @@
 """GGH early planning: official municipal application-level HTML collection.
 
-Four candidate sources; no invented identifiers or dates. Live policy-aware fetch,
+Twelve candidate sources; no invented identifiers or dates. Live policy-aware fetch,
 source-by-source baseline and separate review candidates. Never marks an HTML
 landing page as verified citywide coverage.
 """
@@ -12,6 +12,10 @@ import requests
 from bs4 import BeautifulSoup
 from robots_policy import evaluate
 from toronto_pdf_download import public_dns
+from gta_ggh_six_city_sources import (
+    SOURCES as SIX_CITY_SOURCES, extract_notice as extract_expanded_notice,
+    extract_thorold as extract_expanded_thorold, notice_links as expanded_notice_links,
+)
 
 SOURCES={
  "Niagara Falls":"https://webpublic.niagarafalls.ca/Planning/",
@@ -21,6 +25,7 @@ SOURCES={
  "Orillia":"https://www.orillia.ca/build-and-invest/planning-and-development/current-development-activity/",
  "Barrie":"https://gispublic.barrie.ca/arcgis/rest/services/Public/AnnexedLand_ActiveApplications_WA_Static/MapServer/4"
 }
+SOURCES.update(SIX_CITY_SOURCES)
 AGENT="GTARadarGGHPlanning/1.0"
 LEDGER="GTA_RADAR_GGH_EXPANSION_SEEN.json"
 STATUS="GTA_RADAR_GGH_EXPANSION_SOURCE_STATUS.json"
@@ -228,7 +233,30 @@ def run(results,*,today=None,sources=None,fetcher=None):
     found=_barrie_gis(url)
    else:
     html=(fetcher or _fetch)(url)
-    found=_extract(city,html,url)
+    if city in SIX_CITY_SOURCES:
+     item["collection_method"]="STRICT_OFFICIAL_NOTICE_FILE_IDS"
+     if city=="Thorold":
+      found=extract_expanded_thorold(html,url,_record)
+     else:
+      found=extract_expanded_notice(city,html,url,url,_record)
+     targets=expanded_notice_links(html,city,url)
+     item["notice_pages_targeted"]=len(targets)
+     item["notice_pages_fetched"]=0
+     item["notice_page_errors"]=[]
+     by_id={x["project_id"]:x for x in found}
+     for target in targets:
+      try:
+       body=(fetcher or _fetch)(target)
+       notice_rows=extract_expanded_notice(city,body,url,target,_record)
+       for row in notice_rows:
+        by_id[row["project_id"]]=row
+       item["notice_pages_fetched"]+=1
+      except Exception as e:
+       item["notice_page_errors"].append({"url":target,
+          "error":type(e).__name__+":"+str(e)[:130]})
+     found=list(by_id.values())
+    else:
+     found=_extract(city,html,url)
    baseline=not any(x.startswith("GGH:"+city.upper()+":") for x in old)
    item["state"]=("BASELINE_COMPLETE" if baseline else "COLLECTED") if found else "NO_APPLICATION_ID_ROWS"
    for r in sorted(found,key=lambda r:r["project_id"]):
@@ -258,6 +286,6 @@ def run(results,*,today=None,sources=None,fetcher=None):
     x["application_id_rows"]>0 for x in statuses),"application_id_rows":len(rows),
     "new_or_changed":len(changes),"verified_fresh_commercial_leads":0,
     "citywide_coverage_verified":0,"source_status":statuses,
-    "warning":"First successful run is historical baseline; source publication dates, true commercial suitability and citywide completeness not verified."}
+    "warning":"Only explicitly numbered official notices are application candidates for six new municipalities. Dynamic maps and index-only pages are not accepted as coverage; source publication dates, commercial suitability and citywide completeness not verified."}
  (root/STATUS).write_text(json.dumps(report,indent=2),encoding="utf-8")
  return report
