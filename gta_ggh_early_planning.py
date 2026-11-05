@@ -15,6 +15,7 @@ from toronto_pdf_download import public_dns
 from gta_ggh_six_city_sources import (
     SOURCES as SIX_CITY_SOURCES, extract_notice as extract_expanded_notice,
     extract_thorold as extract_expanded_thorold, notice_links as expanded_notice_links,
+    new_tec_pdf_links, fetch_official_pdf, extract_new_tec_pdf,
 )
 
 SOURCES={
@@ -217,7 +218,7 @@ def _write(path,rows):
    writer.writerow({k:("'"+v if isinstance(v,str) and v.startswith(("=","+","-","@"))
      else v) for k,v in row.items() if k in FIELDS})
 
-def run(results,*,today=None,sources=None,fetcher=None):
+def run(results,*,today=None,sources=None,fetcher=None,pdf_fetcher=None):
  root=Path(results);root.mkdir(parents=True,exist_ok=True)
  today=(today or dt.date.today()).isoformat()
  catalog=sources if sources is not None else SOURCES
@@ -244,9 +245,11 @@ def run(results,*,today=None,sources=None,fetcher=None):
      item["notice_pages_fetched"]=0
      item["notice_page_errors"]=[]
      by_id={x["project_id"]:x for x in found}
+     fetched_notice_html={}
      for target in targets:
       try:
        body=(fetcher or _fetch)(target)
+       fetched_notice_html[target]=body
        notice_rows=extract_expanded_notice(city,body,url,target,_record)
        for row in notice_rows:
         by_id[row["project_id"]]=row
@@ -254,6 +257,32 @@ def run(results,*,today=None,sources=None,fetcher=None):
       except Exception as e:
        item["notice_page_errors"].append({"url":target,
           "error":type(e).__name__+":"+str(e)[:130]})
+     if city=="New Tecumseth":
+      item["notice_pdfs_attempted"]=0
+      item["notice_pdfs_fetched"]=0
+      item["notice_pdf_errors"]=[]
+      # Injected HTML-only tests must not silently reach the live network.
+      permitted_pdf_fetcher=pdf_fetcher or (fetch_official_pdf if fetcher is None else None)
+      attempted=set()
+      for target in targets:
+       # Only inspect PDFs on notice HTML pages that the collector fetched.
+       if target not in fetched_notice_html:
+        continue
+       for pdf_url in new_tec_pdf_links(fetched_notice_html[target],target):
+        if pdf_url in attempted or len(attempted)>=6:continue
+        attempted.add(pdf_url)
+        item["notice_pdfs_attempted"]+=1
+        if permitted_pdf_fetcher is None:
+         item["notice_pdf_errors"].append({"url":pdf_url,
+                "error":"PDF_FETCH_SKIPPED_IN_INJECTED_TEST"})
+         continue
+        try:
+         pdf_rows=extract_new_tec_pdf(permitted_pdf_fetcher(pdf_url),pdf_url,url,_record)
+         for row in pdf_rows:by_id[row["project_id"]]=row
+         item["notice_pdfs_fetched"]+=1
+        except Exception as e:
+         item["notice_pdf_errors"].append({"url":pdf_url,
+                "error":type(e).__name__+":"+str(e)[:130]})
      found=list(by_id.values())
     else:
      found=_extract(city,html,url)
