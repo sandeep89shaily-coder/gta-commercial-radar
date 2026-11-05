@@ -101,3 +101,73 @@ def test_external_notice_link_not_followed():
     url=SOURCES["Bradford West Gwillimbury"]
     html='<main><a href="https://evil.example/news/posts/notice-of-complete-application/">Notice of Complete Application</a></main>'
     assert notice_links(html,"Bradford West Gwillimbury",url)==[]
+
+
+
+def test_thorold_official_supporting_document_label():
+    from gta_ggh_early_planning import _record
+    url=SOURCES["Thorold"]
+    html="""<main>
+    <h2>1201 Egerter Road - Zoning By-law Amendment</h2>
+    <p>The application concerns the existing rural industrial property.</p>
+    <a href="https://media-003-ca.cdn.govstack.com/file.pdf">
+    D14-09-2026 - Development Approvals Application</a>
+    <h2>26 Clairmont Street</h2><p>Existing unrelated consent D10-18-2025</p>
+    </main>"""
+    found=extract_thorold(html,url,_record)
+    assert {r["application_id"] for r in found}=={"D14-09-2026"}
+    assert found[0]["address"].startswith("1201 Egerter")
+    assert found[0]["official_record_url"]==url
+
+
+def test_new_tec_official_full_notice_pdf_link():
+    from gta_ggh_six_city_sources import new_tec_pdf_links
+    notice_url="https://www.newtecumseth.ca/news-and-notices/notice-of-complete-application/"
+    html="""<main><a href="/en/news/resources/Planning-Notices-/Notice-of-Complete-App--PM.pdf">
+    Click here to view the full notice for more information.</a>
+    <a href="https://evil.example/fake.pdf">full notice</a></main>"""
+    assert new_tec_pdf_links(html,notice_url)==[
+      "https://www.newtecumseth.ca/en/news/resources/Planning-Notices-/Notice-of-Complete-App--PM.pdf"]
+
+
+def test_new_tec_pdf_extract_file_id_with_mock_pdf_reader(tmp_path,monkeypatch):
+    from types import SimpleNamespace
+    import gta_ggh_six_city_sources as mod
+    from gta_ggh_early_planning import _record
+    page=SimpleNamespace(extract_text=lambda:(
+      "The Corporation of the Town of New Tecumseth Notice of a Complete Application "
+      "and Public Meeting concerning a Proposed Zoning By-law Amendment. "
+      "File No. D14-2026-003. The southern portion of the property is municipally known as "
+      "5742 14th Line, in the Town of New Tecumseth. "
+      "The proposed zoning changes concern a low-rise residential project. "
+      "All application materials are available for public review. "))
+    monkeypatch.setattr("pypdf.PdfReader",lambda fp:SimpleNamespace(is_encrypted=False,pages=[page]))
+    url="https://www.newtecumseth.ca/en/news/resources/notice.pdf"
+    rows=mod.extract_new_tec_pdf(b"%PDF-1.7\nfixture",url,SOURCES["New Tecumseth"],_record)
+    assert len(rows)==1
+    assert rows[0]["application_id"]=="D14-2026-003"
+    assert rows[0]["official_record_url"]==url
+    assert rows[0]["source_date"]==""
+    assert rows[0]["commercial_fit"]=="UNCLASSIFIED_REVIEW"
+
+
+def test_new_tec_end_to_end_pdf_stage_injected(tmp_path,monkeypatch):
+    from types import SimpleNamespace
+    pdf="https://www.newtecumseth.ca/en/news/resources/notice.pdf"
+    detail="https://www.newtecumseth.ca/news-and-notices/notice-of-complete-application/"
+    index=SOURCES["New Tecumseth"]
+    index_html=f'<main><a href="{detail}">Notice of Complete Application</a></main>'
+    notice_html=f'<main><h1>Development Notice</h1><a href="{pdf}">full notice</a></main>'
+    text=("Notice of Complete Application and Public Meeting. File No. D14-2026-003. "
+          "The application is for a commercial distribution warehouse and office. "
+          "The lands are municipally known as 100 Industrial Road, New Tecumseth.")
+    monkeypatch.setattr("pypdf.PdfReader",lambda fp:SimpleNamespace(
+        is_encrypted=False,pages=[SimpleNamespace(extract_text=lambda:text)]))
+    result=run(tmp_path,sources={"New Tecumseth":index},
+       fetcher=lambda u:index_html if u==index else notice_html,
+       pdf_fetcher=lambda url:b"%PDF-1.7\nmock")
+    assert result["application_id_rows"]==1
+    status=result["source_status"][0]
+    assert status["notice_pdfs_attempted"]==1
+    assert status["notice_pdfs_fetched"]==1
+    assert result["new_or_changed"]==0
