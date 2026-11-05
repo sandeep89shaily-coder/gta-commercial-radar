@@ -314,7 +314,13 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
     def step(name, function, *, required=False):
         try:
             result = function()
-            log.append({"stage":name,"status":"SUCCESS","details":result})
+            if name.startswith("meeting_") and isinstance(result,dict) and (
+                    result.get("official_index_status")=="HTTP_403_ACCESS_DENIED"):
+                log.append({"stage":name,"status":"BLOCKED",
+                            "error":"Official meeting source returned HTTP 403 Forbidden",
+                            "required":required,"details":result})
+            else:
+                log.append({"stage":name,"status":"SUCCESS","details":result})
             return result
         except Exception as error:
             log.append({"stage":name,"status":"FAILED",
@@ -735,9 +741,11 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
     lines.append("</body></html>")
     (root / DASHBOARD).write_text("".join(lines),encoding="utf-8")
     failed=[x["stage"] for x in log if x["status"]=="FAILED"]
+    blocked=[x["stage"] for x in log if x["status"]=="BLOCKED"]
     state.update({
-        "status":"PARTIAL_REVIEW_REQUIRED" if failed else "INTEGRATED_REVIEW_READY",
+        "status":"PARTIAL_REVIEW_REQUIRED" if (failed or blocked) else "INTEGRATED_REVIEW_READY",
         "failed_stages":failed,
+        "blocked_sources":blocked,
         "meeting_sources_attempted":list(municipal_official),
         "municipal_official_index_count":len(municipal_official),
         "municipal_agenda_links_new_to_radar":len(new_agenda_links),
