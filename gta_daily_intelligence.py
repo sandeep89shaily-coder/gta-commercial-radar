@@ -172,7 +172,7 @@ def _build_document_worklist(union_csv, out, seen, *, paid, ai_processor, ranker
 def integrate(results, *, today=None, meeting_pipeline=None, document_discover=None,
               agenda_pipeline=None, verified_reports=None, document_ai=None,
               multicity_capture=None, document_ranker=None,
-              application_monitor=None, gis_monitor=None, other_gis_monitor=None, municipal_monitor=None, toronto_csv_monitor=None, guelph_gis_monitor=None, burlington_gis_monitor=None, burlington_pdf_monitor=None, staged_durham_monitor=None, official_export_monitor=None, regional_early_monitor=None, regional_detail_monitor=None, regional_document_monitor=None, ggh_expansion_monitor=None, project_ai=None, buyer_ai=None, procurement=None, buyer_batch=None,
+              application_monitor=None, gis_monitor=None, other_gis_monitor=None, municipal_monitor=None, toronto_csv_monitor=None, guelph_gis_monitor=None, burlington_gis_monitor=None, burlington_pdf_monitor=None, staged_durham_monitor=None, official_export_monitor=None, regional_early_monitor=None, regional_detail_monitor=None, regional_document_monitor=None, ggh_expansion_monitor=None, ggh_york_gis_monitor=None, project_ai=None, buyer_ai=None, procurement=None, buyer_batch=None,
               graph=None, api_key_check=None, allow_paid=True):
     """Run integrated bounded stages and expose individual failure provenance.
 
@@ -209,6 +209,7 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
     from gta_regional_project_details import run as regional_details_default
     from gta_regional_document_evidence import run as regional_document_default
     from gta_ggh_early_planning import run as ggh_expansion_default
+    from gta_ggh_york_official_gis import run as ggh_york_gis_default
     from gta_markham_circulations import run as markham_default
 
     root = Path(results)
@@ -277,6 +278,12 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
         (lambda root, *, today=None: {"status":"SKIPPED_OFFLINE_TEST",
           "selected_pdf_links":0,"documents_with_text":0,
           "new_or_changed":0,"failed_documents":0}))
+    ggh_york_gis_fn = ggh_york_gis_monitor or (
+        ggh_york_gis_default if application_monitor is None else
+        (lambda root, *, today=None: {"cities_configured":2,
+         "cities_with_application_ids":0,"application_id_rows":0,
+         "new_or_changed":0,"source_status":[],
+         "status":"SKIPPED_OFFLINE_TEST"}))
     application_monitor = application_monitor or applications_default
     gis_monitor = gis_monitor or gis_default
     other_gis_monitor = other_gis_monitor or other_gis_default
@@ -357,6 +364,11 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
     ggh_expansion=step("ggh_early_planning_twelve_city_pilot",
         lambda:ggh_expansion_fn(root,today=today),required=False)
     state["ggh_early_planning_expansion"]={k:ggh_expansion.get(k) for k in
+        ("cities_configured","cities_with_application_ids","application_id_rows",
+         "new_or_changed","source_status","warning")}
+    ggh_york_gis=step("ggh_richmond_hill_newmarket_official_gis",
+        lambda:ggh_york_gis_fn(root,today=today),required=False)
+    state["ggh_york_official_gis"]={k:ggh_york_gis.get(k) for k in
         ("cities_configured","cities_with_application_ids","application_id_rows",
          "new_or_changed","source_status","warning")}
     regional_early=step("regional_early_intelligence_nine_authorities",
@@ -649,6 +661,9 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
         "<a href='GTA_RADAR_CITY_COVERAGE_AUDIT.csv'>Measured coverage by city (not configured links)</a> · "
         "<a href='GTA_RADAR_GGH_EXPANSION_APPLICATIONS.csv'>GGH twelve-city expansion planning application pilot (review only)</a> · "
         "<a href='GTA_RADAR_GGH_EXPANSION_SOURCE_STATUS.json'>GGH expansion source diagnostics</a> · "
+        "<a href='GTA_RADAR_GGH_OFFICIAL_GIS_APPLICATIONS.csv'>Richmond Hill and Newmarket official GIS applications</a> · "
+        "<a href='GTA_RADAR_GGH_OFFICIAL_GIS_NEW_OR_CHANGED.csv'>Changed York GGH GIS applications</a> · "
+        "<a href='GTA_RADAR_GGH_OFFICIAL_GIS_STATUS.json'>York GGH GIS source diagnostics</a> · "
         "<a href='GTA_RADAR_REGIONAL_EARLY_RECORDS.csv'>Nine-authority regional project and policy signals (baseline only)</a> · "
         "<a href='GTA_RADAR_REGIONAL_EARLY_SOURCE_STATUS.json'>Regional source-level diagnostics</a> · "
         "<a href='GTA_RADAR_REGIONAL_PROJECT_DETAILS.csv'>Regional project detail evidence (pilot)</a> · "
