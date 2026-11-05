@@ -29,7 +29,7 @@ LEDGER="GTA_RADAR_REGIONAL_EARLY_FIRST_SEEN.json"
 ALL="GTA_RADAR_REGIONAL_EARLY_RECORDS.csv"
 CHANGES="GTA_RADAR_REGIONAL_EARLY_NEW_OR_CHANGED.csv"
 FIELDS=("record_id","authority","signal_type","project_title","source_url","official_index_url",
-        "application_id","stage_hint","published_date","published_date_basis",
+        "application_id","stage_hint","published_date","published_date_basis","evidence_class",
         "first_seen_local","observation","verification_required")
 KEYWORDS=re.compile(r"\b(?:watermain|wastewater|sewage|sewer|reservoir|pumping|treatment|trunk|rehabilitation|"
     r"improvement|expansion|capital|storage|infrastructure|station|environmental assessment|"
@@ -92,6 +92,9 @@ def _candidate(authority,kind,index,title,url,context=""):
  return dict(record_id=record_id,authority=authority,signal_type=kind,
     project_title=title,source_url=link,official_index_url=index,
     application_id=found.group() if authority=="Simcoe" and found else "",
+    evidence_class=("POLICY_REFERENCE" if kind=="MASTER_SERVICING_POLICY" else
+                    "OFFICIAL_PLAN_REFERENCE" if kind=="OFFICIAL_PLAN_APPLICATIONS" and not found else
+                    "PROJECT_INDEX_SIGNAL"),
     stage_hint=_stage(title+" "+context[:150]),
     published_date="",published_date_basis="NOT_VERIFIED_IN_SOURCE_ENTRY",
     verification_required="Confirm project scope, current stage, dates, procurement status and publisher identity")
@@ -164,6 +167,10 @@ def run(results,*,today=None,sources=None,fetcher=None):
    state["status"]="BASELINE_COMPLETE" if not any(
      k.startswith("REGIONAL:"+authority.upper()+":") for k in old) else "COLLECTED"
    if not rows:state["status"]="INDEX_FETCHED_NO_IDENTIFIABLE_PROJECTS"
+   state["application_id_records"]=sum(bool(x["application_id"]) for x in rows)
+   state["policy_reference_records"]=sum(x["evidence_class"]=="POLICY_REFERENCE" for x in rows)
+   state["project_index_signals"]=sum(x["evidence_class"]=="PROJECT_INDEX_SIGNAL" for x in rows)
+   state["source_healthy"]=True
    baseline=not any(k.startswith("REGIONAL:"+authority.upper()+":") for k in old)
    for row in sorted(rows,key=lambda x:x["record_id"]):
     identity=row["record_id"]
@@ -192,8 +199,12 @@ def run(results,*,today=None,sources=None,fetcher=None):
     "authorities_with_records":sum(x["records"]>0 for x in status),
     "authorities_failed":sum(x["status"]=="FAILED" for x in status),
     "records":len(all_rows),"new_or_changed":len(changed),
+    "application_id_records":sum(bool(x["application_id"]) for x in all_rows),
+    "project_index_signals":sum(x["evidence_class"]=="PROJECT_INDEX_SIGNAL" for x in all_rows),
+    "policy_reference_records":sum(x["evidence_class"]=="POLICY_REFERENCE" for x in all_rows),
+    "authorities_with_application_ids":sum(any(r["authority"]==a and r["application_id"] for r in all_rows) for a in catalog),
     "verified_commercial_opportunities":0,"paid_ai_calls":0,
     "source_status":status,
-    "warning":"These are official regional project/policy signals only. Baseline is not a new lead; records do not establish current procurement, original publication date, citywide completeness or sale-ready contacts."}
+    "warning":"Project-index hyperlinks and policy references are discovery signals, not verified project records or applications. Count only explicit application IDs as application-ID records. A successful HTTP index fetch does not prove application extraction, publication timing, procurement readiness, or citywide completeness."}
  (root/STATUS).write_text(json.dumps(report,indent=2),encoding="utf-8")
  return report

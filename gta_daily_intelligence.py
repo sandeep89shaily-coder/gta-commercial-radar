@@ -205,6 +205,8 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
     from gta_city_coverage_report import build as measured_coverage_default
     from gta_three_city_recovery_gate import build as three_city_gate_default
     from gta_three_city_official_csv import run as three_city_official_csv_default
+    from gta_burlington_official_pages import run as burlington_official_pages_default
+    from gta_vaughan_official_notices import run as vaughan_official_notices_default
     from gta_regional_early_intelligence import run as regional_early_default
     from gta_regional_project_details import run as regional_details_default
     from gta_regional_document_evidence import run as regional_document_default
@@ -473,6 +475,16 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
     state["assisted_official_csv"]={k:assisted_csv.get(k) for k in
         ("application_id_rows","new_or_changed","automated_source_recovered",
          "source_authenticity_verified","source_status")}
+    burlington_pages=step("burlington_saved_official_project_page_application_ids",
+        lambda:burlington_official_pages_default(root,today=today),required=False)
+    state["burlington_saved_official_pages"]={k:burlington_pages.get(k) for k in
+        ("status","pages_processed","application_id_rows","new_or_changed",
+         "automated_source_recovered","source_authenticity_verified","errors")}
+    vaughan_notices=step("vaughan_saved_official_public_notices_application_ids",
+        lambda:vaughan_official_notices_default(root,today=today),required=False)
+    state["vaughan_saved_official_notices"]={k:vaughan_notices.get(k) for k in
+        ("status","application_id_rows","new_or_changed",
+         "automated_source_recovered","source_authenticity_verified","error")}
     three_city_gap=step("three_city_early_planning_application_gate",
         lambda:three_city_gate_default(root),required=True)
     state["three_city_early_planning"]={k:three_city_gap.get(k) for k in
@@ -683,6 +695,8 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
         "<a href='GTA_RADAR_REGIONAL_DOCUMENT_EVIDENCE_NEW_OR_CHANGED.csv'>Changed regional PDF evidence</a> · "
         "<a href='GTA_RADAR_REGIONAL_DOCUMENT_EVIDENCE_STATUS.json'>Regional PDF extraction diagnostics</a> · "
         "<a href='GTA_RADAR_THREE_CITY_EARLY_PLANNING_GAPS.csv'>P0 Burlington Vaughan Kitchener application collector gaps</a> · "
+        "<a href='GTA_RADAR_BURLINGTON_OFFICIAL_PAGES_APPLICATIONS.csv'>Burlington assisted official development-page applications</a> · "
+        "<a href='GTA_RADAR_VAUGHAN_OFFICIAL_NOTICES_APPLICATIONS.csv'>Vaughan assisted official public-notice applications</a> · "
         "<a href='GTA_RADAR_OFFICIAL_CSV_IMPORT_APPLICATIONS.csv'>Assisted official CSV application imports (unverified provenance)</a> · "
         "<a href='GTA_RADAR_COLLECTION_MASTER.csv'>Canonical deduplicated application inventory</a> · "
         "<a href='GTA_RADAR_COLLECTION_NEW_OR_CHANGED_REVIEW.csv'>Quality-gated new or changed applications for manual review</a> · "
