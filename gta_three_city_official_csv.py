@@ -1,4 +1,4 @@
-"""Evidence-preserving official CSV intake for Kitchener and York/Vaughan.
+"""Evidence-preserving official CSV intake for Kitchener, Vaughan, Richmond Hill, Newmarket.
 
 When automated ArcGIS access is denied by publisher policy, a user may obtain
 the publisher's official CSV export through its ordinary download UI and place
@@ -14,10 +14,14 @@ from pathlib import Path
 FILES={
  "Kitchener":"KITCHENER_PLANNING_ACTIVE_OFFICIAL.csv",
  "Vaughan":"YORK_REGION_ACTIVE_DEVELOPMENT_OFFICIAL.csv",
+ "Richmond Hill":"RICHMOND_HILL_ACTIVE_APPLICATIONS_OFFICIAL.csv",
+ "Newmarket":"NEWMARKET_ACTIVE_DEVELOPMENTS_OFFICIAL.csv",
 }
 SOURCE={
  "Kitchener":"https://www.arcgis.com/home/item.html?id=b7e2f8feda7340eaa5f4dd7b9c4d5ac0",
  "Vaughan":"https://www.arcgis.com/home/item.html?id=d599fcc0898f42ad8b58fd376bcdbf54",
+ "Richmond Hill":"https://services5.arcgis.com/cu2HFDk7AqvG7e31/ArcGIS/rest/services/Development_Applications_view_-_Active_Applications/FeatureServer/0",
+ "Newmarket":"https://services3.arcgis.com/tSwsWwbYRimLwcCZ/ArcGIS/rest/services/OpenNewmarket_Developments/FeatureServer/23",
 }
 FIELDS=("project_id","city","application_id","address","description","application_type",
         "current_status","source_record_date","source_record_date_basis","source_url",
@@ -58,6 +62,20 @@ def _parse(city,row):
   kind=_pick(row,"FOLDERTYPE","SUBTYPE")
   state=_pick(row,"PUBLIC_STATUS_DESC","STATUS","AMANDA_STATUS_DESC")
   date=_pick(row,"INDATE")
+ elif city=="Richmond Hill":
+  ident=_pick(row,"FILENUMBER")
+  desc=_pick(row,"DESCRIPTIONOFAPPLICATION")
+  addr=_pick(row,"ADDRESS")
+  kind=_pick(row,"APPLICATIONTYPE")
+  state=_pick(row,"STATUS")
+  date=_pick(row,"APPLICATIONRECEIVEDDATE")
+ elif city=="Newmarket":
+  ident=_pick(row,"FILE_NUM")
+  desc=_pick(row,"DESCRIPTION")
+  addr=_pick(row,"LOCATION")
+  kind=_pick(row,"APP_TYPE","PROPOSE_LAND_USE")
+  state=_pick(row,"APP_STATUS")
+  date=""
  else:
   if _pick(row,"MUN_NAME").casefold() not in ("vaughan","city of vaughan"):
    return None
@@ -103,7 +121,10 @@ def run(results,*,today=None):
    stats.append(status);continue
   try:
    headers,rows=_load(path)
-   required={"APPLICATION_NO","DESCRIPTION"} if city=="Kitchener" else {"MUN_NAME","REG_FILE_NUM","APPL_DESC"}
+   required=({"APPLICATION_NO","DESCRIPTION"} if city=="Kitchener" else
+       {"FILENUMBER","ADDRESS","DESCRIPTIONOFAPPLICATION"} if city=="Richmond Hill" else
+       {"FILE_NUM","LOCATION","DESCRIPTION"} if city=="Newmarket" else
+       {"MUN_NAME","REG_FILE_NUM","APPL_DESC"})
    if not required.issubset(headers):
     raise ValueError("WRONG_EXPORT_SCHEMA_OR_MISSING_REQUIRED_FIELDS")
    parsed={}

@@ -1,0 +1,24 @@
+name: GGH York official GIS source acceptance
+on:
+  pull_request:
+    paths:
+      - gta_ggh_york_official_gis.py
+      - gta_daily_intelligence.py
+      - tests/test_ggh_york_official_gis.py
+      - .github/workflows/ggh-york-official-gis.yml
+  workflow_dispatch:
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r requirements.txt pytest
+      - name: Run offline GIS source tests
+        run: python -m pytest -q tests/test_ggh_york_official_gis.py
+      - name: Query official Richmond Hill and Newmarket ArcGIS services
+        run: |
+          python -c "import json,tempfile;from gta_ggh_york_official_gis import run; print('GGH_YORK_GIS_LIVE_AUDIT',json.dumps(run(tempfile.mkdtemp()),sort_keys=True))"
