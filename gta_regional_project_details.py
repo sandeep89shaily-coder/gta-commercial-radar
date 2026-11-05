@@ -11,7 +11,7 @@ import hashlib
 import json
 import re
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urljoin
 
 from bs4 import BeautifulSoup
 from gta_regional_early_intelligence import _fetch, _safe_url
@@ -28,7 +28,7 @@ COLUMNS = (
     "project_id", "authority", "project_title", "project_url", "index_url",
     "source_signal_id", "project_type", "stage_evidence", "budget_evidence",
     "explicit_source_date", "source_date_basis", "evidence_excerpt",
-    "document_links_count", "first_seen_local", "observation",
+    "document_links_count", "official_pdf_urls_json", "first_seen_local", "observation",
     "source_verification", "commercial_status", "verification_required",
 )
 RELEVANT = re.compile(
@@ -94,11 +94,20 @@ def _evidence(html, source):
                 continue
             page_date = value
             break
+    # Distinguish all referenced PDF links from the strict official-host queue.
+    # PDFs hosted on unrelated cloud/CDN domains require independent authorization.
     pdf_count = 0
+    accepted_pdfs = []
+    source_url = source.get("source_url", "")
     for tag in main.find_all("a", href=True):
-        url = str(tag["href"]).split("?", 1)[0].lower()
-        if url.endswith(".pdf"):
-            pdf_count += 1
+        candidate = urljoin(source_url, str(tag["href"]).strip()) if source_url else ""
+        if not candidate or not urlparse(candidate).path.lower().endswith(".pdf"):
+            continue
+        pdf_count += 1
+        if _safe_url(candidate, source_url) and candidate not in accepted_pdfs:
+            accepted_pdfs.append(candidate)
+        if len(accepted_pdfs) >= 8:
+            break
     return {
         "project_title": title[:220] if title else source.get("project_title", "")[:220],
         "stage_evidence": stage,
@@ -107,6 +116,7 @@ def _evidence(html, source):
         "source_date_basis": "OFFICIAL_PAGE_TIME_ELEMENT_NOT_FIRST_PUBLICATION" if page_date else "NO_VERIFIED_DATE",
         "evidence_excerpt": evidence,
         "document_links_count": pdf_count,
+        "official_pdf_urls_json": json.dumps(accepted_pdfs),
     }
 
 
@@ -193,7 +203,7 @@ def run(results, *, today=None, fetcher=None, max_per_authority=MAX_PER_AUTHORIT
             }
             digest = hashlib.sha256(json.dumps({k:record[k] for k in
                 ("project_title","stage_evidence","budget_evidence","explicit_source_date",
-                 "evidence_excerpt","document_links_count")},sort_keys=True).encode()).hexdigest()
+                 "evidence_excerpt","document_links_count","official_pdf_urls_json")},sort_keys=True).encode()).hexdigest()
             before = old.get(pid)
             baseline = not any(k.startswith("REGIONAL_DETAIL:") for k in old)
             observation = ("INITIAL_BASELINE" if baseline else "FIRST_OBSERVED" if before is None
