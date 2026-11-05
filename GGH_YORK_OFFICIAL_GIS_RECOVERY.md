@@ -36,3 +36,35 @@ python -m pytest -q tests/test_ggh_york_official_gis.py
 
 Live source acceptance occurs in GitHub Actions and tomorrow's normal Radar
 run, and is diagnostic, not a substitute for source freshness validation.
+
+
+## Live source acceptance (November 4, 2026)
+
+Official field schemas were independently inspected, but the CI runner's
+policy-aware automated ArcGIS fetch returned `ROBOTS_ACCESS_DENIED` for both
+Richmond Hill and Newmarket. The collectors correctly produce zero records
+and source-level `FAILED` status, rather than claiming usable coverage.
+This remains a source access blocker until an explicitly permitted endpoint
+or publisher-authorized export becomes available.
+
+## Existing assisted official-export intake
+
+The normal daily Radar runner also runs `gta_three_city_official_csv.py`,
+whose assisted input directory is `GTA_RADAR_RESULTS/official_exports`.
+For these two additional sources, manually download a CSV through the
+publisher's normal export interface (do not bypass any access restrictions).
+Preserve the official column names and filenames:
+
+- `RICHMOND_HILL_ACTIVE_APPLICATIONS_OFFICIAL.csv`
+  required: FILENUMBER, ADDRESS, DESCRIPTIONOFAPPLICATION.
+- `NEWMARKET_ACTIVE_DEVELOPMENTS_OFFICIAL.csv`
+  required: FILE_NUM, LOCATION, DESCRIPTION.
+
+The existing importer verifies schema and stable case IDs, generates
+`GTA_RADAR_OFFICIAL_CSV_IMPORT_APPLICATIONS.csv`,
+`GTA_RADAR_OFFICIAL_CSV_IMPORT_STATUS.json` and its own first-seen ledger.
+CSV source provenance is still user-supplied, not independently
+authenticated, and **never becomes automated source coverage**.
+
+Innisfil and New Tecumseth also remain blocked on a suitable stable
+application-level feed, despite their official index visibility.
