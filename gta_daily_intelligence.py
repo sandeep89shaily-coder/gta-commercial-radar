@@ -172,7 +172,7 @@ def _build_document_worklist(union_csv, out, seen, *, paid, ai_processor, ranker
 def integrate(results, *, today=None, meeting_pipeline=None, document_discover=None,
               agenda_pipeline=None, verified_reports=None, document_ai=None,
               multicity_capture=None, document_ranker=None,
-              application_monitor=None, gis_monitor=None, other_gis_monitor=None, municipal_monitor=None, toronto_csv_monitor=None, guelph_gis_monitor=None, burlington_gis_monitor=None, burlington_pdf_monitor=None, staged_durham_monitor=None, official_export_monitor=None, regional_early_monitor=None, regional_detail_monitor=None, ggh_expansion_monitor=None, project_ai=None, buyer_ai=None, procurement=None, buyer_batch=None,
+              application_monitor=None, gis_monitor=None, other_gis_monitor=None, municipal_monitor=None, toronto_csv_monitor=None, guelph_gis_monitor=None, burlington_gis_monitor=None, burlington_pdf_monitor=None, staged_durham_monitor=None, official_export_monitor=None, regional_early_monitor=None, regional_detail_monitor=None, regional_document_monitor=None, ggh_expansion_monitor=None, project_ai=None, buyer_ai=None, procurement=None, buyer_batch=None,
               graph=None, api_key_check=None, allow_paid=True):
     """Run integrated bounded stages and expose individual failure provenance.
 
@@ -207,6 +207,7 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
     from gta_three_city_official_csv import run as three_city_official_csv_default
     from gta_regional_early_intelligence import run as regional_early_default
     from gta_regional_project_details import run as regional_details_default
+    from gta_regional_document_evidence import run as regional_document_default
     from gta_ggh_early_planning import run as ggh_expansion_default
     from gta_markham_circulations import run as markham_default
 
@@ -271,6 +272,11 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
         (lambda root, *, today=None: {"status":"SKIPPED_OFFLINE_TEST",
           "selected_project_links":0,"project_detail_records":0,
           "new_or_changed":0,"failed_links":0,"source_status":{}}))
+    regional_document_fn = regional_document_monitor or (
+        regional_document_default if application_monitor is None else
+        (lambda root, *, today=None: {"status":"SKIPPED_OFFLINE_TEST",
+          "selected_pdf_links":0,"documents_with_text":0,
+          "new_or_changed":0,"failed_documents":0}))
     application_monitor = application_monitor or applications_default
     gis_monitor = gis_monitor or gis_default
     other_gis_monitor = other_gis_monitor or other_gis_default
@@ -363,6 +369,11 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
     state["regional_project_details"]={k:regional_details.get(k) for k in
         ("status","authorities","selected_project_links","project_detail_records",
          "new_or_changed","failed_links","source_status","warning")}
+    regional_documents=step("regional_official_pdf_project_evidence_three_authority_pilot",
+        lambda:regional_document_fn(root,today=today),required=False)
+    state["regional_document_evidence"]={k:regional_documents.get(k) for k in
+        ("status","selected_pdf_links","documents_with_text","new_or_changed",
+         "failed_documents","failures","warning")}
     staged_durham=step("staged_durham_four_monthly_reference_feeds",
         lambda:staged_durham_fn(root,today=today))
     official_export=step("official_download_alternative_access_audit",
@@ -643,6 +654,9 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
         "<a href='GTA_RADAR_REGIONAL_PROJECT_DETAILS.csv'>Regional project detail evidence (pilot)</a> · "
         "<a href='GTA_RADAR_REGIONAL_PROJECT_DETAILS_NEW_OR_CHANGED.csv'>Regional detail changes requiring review</a> · "
         "<a href='GTA_RADAR_REGIONAL_PROJECT_DETAILS_STATUS.json'>Regional detail extraction and failures</a> · "
+        "<a href='GTA_RADAR_REGIONAL_DOCUMENT_EVIDENCE.csv'>Official regional PDF evidence (pilot)</a> · "
+        "<a href='GTA_RADAR_REGIONAL_DOCUMENT_EVIDENCE_NEW_OR_CHANGED.csv'>Changed regional PDF evidence</a> · "
+        "<a href='GTA_RADAR_REGIONAL_DOCUMENT_EVIDENCE_STATUS.json'>Regional PDF extraction diagnostics</a> · "
         "<a href='GTA_RADAR_THREE_CITY_EARLY_PLANNING_GAPS.csv'>P0 Burlington Vaughan Kitchener application collector gaps</a> · "
         "<a href='GTA_RADAR_OFFICIAL_CSV_IMPORT_APPLICATIONS.csv'>Assisted official CSV application imports (unverified provenance)</a> · "
         "<a href='GTA_RADAR_COLLECTION_MASTER.csv'>Canonical deduplicated application inventory</a> · "
