@@ -50,3 +50,23 @@ coverage and source dates are verified.
 In particular, a zero count for Richmond Hill, Newmarket or Innisfil means
 **index connected / application source not yet recovered**, not successful
 coverage. Tomorrow's first live collection must check this distinction.
+
+
+## New Tecumseth notice PDFs and Thorold supporting-file labels
+
+Live source acceptance showed that New Tecumseth's official HTML notice
+summaries do not display file numbers; some contain a same-host link labeled
+"view the full notice" which points to a PDF containing the municipal
+`File No.`. The collector now follows at most six PDFs in total across the
+bounded notices, subject to public DNS, robots permissions, HTTPS,
+no-redirect validation, strict PDF signature, a 2 MB file limit and five
+pages. Scanned PDFs report unavailable text; no OCR or bypass is attempted.
+
+Thorold's official active-applications page occasionally publishes an exact
+file number in the supporting-document link *label*, e.g.
+`D14-09-2026 - Development Approvals Application`. That label can become a
+review candidate tied to the official city index. Historic IDs mentioned
+in unrelated background paragraphs do not qualify.
+
+The live acceptance counts must be inspected again on the final commit;
+no citywide completeness or verified commercial procurement is claimed.
