@@ -6,6 +6,7 @@ robots restrictions, or anti-bot controls.
 """
 from __future__ import annotations
 import argparse,datetime as dt,hashlib,html,json,re,subprocess,sys
+from urllib.error import HTTPError
 from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import urljoin,urlparse
@@ -97,7 +98,19 @@ def normalize_video(url):
 def discover(city,*,fetch=None,now=None):
  if city not in OFFICIAL:raise ValueError("Unsupported city; explicitly configure official pages")
  source=OFFICIAL[city];fetch=fetch or fetch_html
- markup=fetch(source)
+ try:
+  markup=fetch(source)
+ except HTTPError as error:
+  if error.code != 403:
+   raise
+  # Publisher denial is not a successful index collection. Keep source
+  # diagnostics and an empty evidence set, without bypassing HTTP restrictions.
+  return {"city":city,"official_page":source,"discovered":0,
+          "meetings":[],"agenda_candidates":[],"agenda_links_discovered":0,
+          "official_index_status":"HTTP_403_ACCESS_DENIED",
+          "source_access_error":"HTTP 403 Forbidden",
+          "documents_retrieved":0,"publication_dates_verified":0,
+          "limitations":"Official meeting index access denied. No links or dates verified; request publisher-approved access."}
  parser=Links();parser.feed(markup)
  videos=[];seen=set()
  for tag,raw,title in parser.values:
