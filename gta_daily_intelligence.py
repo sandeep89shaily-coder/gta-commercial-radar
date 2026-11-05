@@ -210,6 +210,7 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
     from gta_regional_document_evidence import run as regional_document_default
     from gta_ggh_early_planning import run as ggh_expansion_default
     from gta_ggh_york_official_gis import run as ggh_york_gis_default
+    from gta_ggh_source_access_recovery import run as ggh_source_access_default
     from gta_markham_circulations import run as markham_default
 
     root = Path(results)
@@ -371,6 +372,12 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
     state["ggh_york_official_gis"]={k:ggh_york_gis.get(k) for k in
         ("cities_configured","cities_with_application_ids","application_id_rows",
          "new_or_changed","source_status","warning")}
+    ggh_source_access=step("ggh_blocked_official_source_access_recovery",
+        lambda:ggh_source_access_default(root,today=today),required=False)
+    state["ggh_source_access_recovery"]={k:ggh_source_access.get(k) for k in
+        ("municipalities","ready_to_send_requests","emails_sent",
+         "automated_access_granted_by_municipality","request_csv",
+         "request_markdown","warning")}
     regional_early=step("regional_early_intelligence_nine_authorities",
         lambda:regional_early_fn(root,today=today),required=False)
     state["regional_early_intelligence"]={k:regional_early.get(k) for k in
@@ -664,6 +671,9 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
         "<a href='GTA_RADAR_GGH_OFFICIAL_GIS_APPLICATIONS.csv'>Richmond Hill and Newmarket official GIS applications</a> · "
         "<a href='GTA_RADAR_GGH_OFFICIAL_GIS_NEW_OR_CHANGED.csv'>Changed York GGH GIS applications</a> · "
         "<a href='GTA_RADAR_GGH_OFFICIAL_GIS_STATUS.json'>York GGH GIS source diagnostics</a> · "
+        "<a href='GTA_RADAR_GGH_SOURCE_ACCESS_REQUESTS.md'>Official municipal source access request drafts (unsent)</a> · "
+        "<a href='GTA_RADAR_GGH_SOURCE_ACCESS_REQUESTS.csv'>Official municipal source access recovery table</a> · "
+        "<a href='GTA_RADAR_GGH_SOURCE_ACCESS_RECOVERY_STATUS.json'>Source access request status</a> · "
         "<a href='GTA_RADAR_REGIONAL_EARLY_RECORDS.csv'>Nine-authority regional project and policy signals (baseline only)</a> · "
         "<a href='GTA_RADAR_REGIONAL_EARLY_SOURCE_STATUS.json'>Regional source-level diagnostics</a> · "
         "<a href='GTA_RADAR_REGIONAL_PROJECT_DETAILS.csv'>Regional project detail evidence (pilot)</a> · "
