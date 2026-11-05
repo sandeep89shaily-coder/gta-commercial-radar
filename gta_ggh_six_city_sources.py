@@ -157,7 +157,7 @@ def extract_thorold(html,index,record_factory):
     for a in main.find_all("a",href=True):
         label=_clean(a.get_text(" ",strip=True))
         match=FILE.match(label)
-        if not match or not re.search(r"\\bdevelopment approvals application\\b",label,re.I):
+        if not match or not re.search(r"\bdevelopment approvals application\b",label,re.I):
             continue
         title_node=a.find_previous(["h2","h3","h4","button"])
         title=_clean(title_node.get_text(" ",strip=True)) if title_node else ""
