@@ -1,7 +1,7 @@
 import datetime as dt
 from gta_ggh_early_planning import SOURCES,run
-def test_sources_six_not_original_sixteen():
- assert len(SOURCES)==6
+def test_sources_twelve_ggh_not_original_sixteen():
+ assert len(SOURCES)==12
 def test_niagara_brant_baseline_and_diff(tmp_path):
  sources={"Niagara Falls":"https://webpublic.niagarafalls.ca/Planning/",
           "County of Brant":"https://www.brant.ca/planning-and-development/active-applications/"}

@@ -258,7 +258,7 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
                                         "application_records":0,"paid_ai_calls":0}))
     ggh_expansion_fn = ggh_expansion_monitor or (
         ggh_expansion_default if application_monitor is None else
-        (lambda root, *, today=None: {"cities_configured":6,
+        (lambda root, *, today=None: {"cities_configured":12,
           "cities_with_application_ids":0,"application_id_rows":0,
           "new_or_changed":0,"source_status":[],"status":"SKIPPED_OFFLINE_TEST"}))
     regional_early_fn = regional_early_monitor or (
@@ -354,7 +354,7 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
         lambda:burlington_gis_fn(root,today=today))
     burlington_pdf=step("burlington_official_quarterly_planning_statistics",
         lambda:burlington_pdf_fn(root,today=today))
-    ggh_expansion=step("ggh_early_planning_six_city_pilot",
+    ggh_expansion=step("ggh_early_planning_twelve_city_pilot",
         lambda:ggh_expansion_fn(root,today=today),required=False)
     state["ggh_early_planning_expansion"]={k:ggh_expansion.get(k) for k in
         ("cities_configured","cities_with_application_ids","application_id_rows",
@@ -647,7 +647,7 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
         "<a href='GTA_RADAR_STRUCTURED_APPLICATION_SOURCE_STATUS.json'>Toronto/Brampton GIS source status</a> · "
         "<a href='GTA_RADAR_MARKHAM_CIRCULATED_APPLICATIONS.csv'>Markham dated circulation applications</a> · "
         "<a href='GTA_RADAR_CITY_COVERAGE_AUDIT.csv'>Measured coverage by city (not configured links)</a> · "
-        "<a href='GTA_RADAR_GGH_EXPANSION_APPLICATIONS.csv'>GGH expansion early planning application pilot (review only)</a> · "
+        "<a href='GTA_RADAR_GGH_EXPANSION_APPLICATIONS.csv'>GGH twelve-city expansion planning application pilot (review only)</a> · "
         "<a href='GTA_RADAR_GGH_EXPANSION_SOURCE_STATUS.json'>GGH expansion source diagnostics</a> · "
         "<a href='GTA_RADAR_REGIONAL_EARLY_RECORDS.csv'>Nine-authority regional project and policy signals (baseline only)</a> · "
         "<a href='GTA_RADAR_REGIONAL_EARLY_SOURCE_STATUS.json'>Regional source-level diagnostics</a> · "
