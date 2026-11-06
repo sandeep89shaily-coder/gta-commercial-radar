@@ -64,10 +64,14 @@ def _classify(row,today):
   return "WATCH_CONSTRUCTION","Construction already underway; remaining subcontracts unverified"
  if row["source_type"]=="CAPITAL_PIPELINE":
   try:
-   if int(row.get("target_sourcing_year",0))<today.year:
-    return "WATCH_HISTORICAL","Target sourcing year has passed; current award status unverified"
-  except ValueError:pass
-  return "WATCH_PLANNED","Planned procurement is not an open tender"
+   sourcing_year=int(row.get("target_sourcing_year",0))
+  except ValueError:
+   sourcing_year=0
+  if sourcing_year and sourcing_year<today.year:
+   return "WATCH_HISTORICAL","Planned sourcing year has passed; current award status unverified"
+  if sourcing_year>today.year:
+   return "REVIEW_FUTURE_PLANNED","Future planned sourcing; NOT an open tender or new publication, verify procurement timetable and award"
+  return "WATCH_PLANNED","Current or undated sourcing plan: official tender and award status unverified"
  if row.get("observation")=="INITIAL_BASELINE":
   return "WATCH_BASELINE","Initial observed snapshot, not confirmed first publication"
  if row.get("observation")=="UNCHANGED":
