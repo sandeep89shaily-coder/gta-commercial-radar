@@ -86,3 +86,14 @@ def test_canonical_rejects_old_approved_application_despite_change():
  result=_aggregate([old])
  assert result[0]["review_priority"]=="BASELINE_OR_UNVERIFIED"
  assert result[0]["quality_flag"]=="INACTIVE_OR_CLOSED"
+
+
+def test_municipal_location_requires_unambiguous_official_evidence():
+ from gta_regional_commercial_review import _municipality
+ assert _municipality("Markham Reservoir Rehabilitation","Upgrade water reservoir.")=="Markham"
+ assert _municipality("Sewage Works Project",
+   "Project covers the City of Markham and City of Pickering.")==""
+ assert _municipality("Regional Wastewater Programme",
+   "The new treatment system is located in the City of Cambridge.")=="Cambridge"
+ assert _municipality("York Region infrastructure programme",
+   "General infrastructure overview for the Region.")==""
