@@ -149,3 +149,31 @@ def test_later_phase_already_awarded_still_excluded(tmp_path):
         candidate=next(csv.DictReader(f))
     assert candidate["priority"]=="EXCLUDE"
     assert candidate["rejection_reason"]=="EXPLICIT_AWARDED_OR_COMPLETED"
+
+
+def test_upstream_detail_parser_preserves_later_phase_and_hold_statements():
+    from gta_regional_project_details import _evidence
+    westmount="""<main><h1>Westmount Road | Victoria to Erb</h1>
+      <p>We are improving Westmount Road with underground infrastructure upgrades and rehabilitation.</p>
+      <p>The first phase was completed earlier this year as part of construction.</p>
+      <p>The second phase, from Victoria Street to Erb Street, is currently on hold while planning needs are considered.</p>
+      <p>Road resurfacing is planned for 2028. The remaining improvements will be scheduled after the Class EA.</p>
+      </main>"""
+    x=_evidence(westmount,{"authority":"Waterloo",
+      "source_url":"https://www.regionofwaterloo.ca/projects/westmount",
+      "project_title":"Westmount Road | Victoria to Erb"})
+    assert "second phase" in x["evidence_excerpt"]
+    assert "on hold" in x["evidence_excerpt"]
+    river="""<main><h1>River Road/Bleams Road</h1>
+      <p>The Region is building an important road extension with new bridges.</p>
+      <p>Phase 1 of this project includes a bridge across Schneider Creek.</p>
+      <p>Phase 2 includes a highway bridge, interchange and new road construction.</p>
+      <p>Construction phase 1: 2020–2027.</p>
+      <p>Construction phase 2: 2027–2032.</p>
+      <p>Construction is finished for the 2025 season and some work is complete.</p>
+      </main>"""
+    y=_evidence(river,{"authority":"Waterloo",
+      "source_url":"https://www.regionofwaterloo.ca/projects/river-road",
+      "project_title":"River Road/Bleams Road"})
+    assert "Construction phase 2: 2027" in y["evidence_excerpt"]
+    assert "finished for the 2025 season" in y["evidence_excerpt"]
