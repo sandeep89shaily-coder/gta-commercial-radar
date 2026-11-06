@@ -18,7 +18,8 @@ from urllib.parse import urljoin, urlparse
 from bs4 import BeautifulSoup
 from gta_regional_early_intelligence import _fetch, _safe_url
 
-BURLINGTON="https://www.burlington.ca/en/news/current-development-projects/"
+BURLINGTON="https://www.burlington.ca/en/planning-and-development/planning-and-development.aspx"
+BURLINGTON_PROJECT_PREFIX="https://www.burlington.ca/en/news/current-development-projects/"
 VAUGHAN="https://www.vaughan.ca/about-city-vaughan/departments/office-city-clerk/public-notices"
 SOURCES={"Burlington":BURLINGTON,"Vaughan":VAUGHAN}
 OUTPUT="GTA_RADAR_MUNICIPAL_OFFICIAL_APPLICATIONS.csv"
@@ -35,7 +36,7 @@ MAX_ROWS=175
 BURLINGTON_ID=re.compile(r"(?<!\w)(?:505|510|520|525|535)-\d{1,4}\s*/\s*\d{2}(?!\d)",re.I)
 VAUGHAN_ID=re.compile(r"(?<![A-Za-z0-9])(?:OP|Z|DA|19T)\.\d{2}\.\d{3}(?!\d)",re.I)
 LABEL=re.compile(r"\b(?:City\s+)?File\s+No\.?\s*:\s*",re.I)
-STATUS_RE=re.compile(r"^\s*Status\s*[-:]\s*(.{3,80})",re.I)
+STATUS_RE=re.compile(r"\bStatus\s*[-:]\s*(Under Review|Approved|Appealed|On Hold|Refused|Pre-Application|Closed|Complete)\b",re.I)
 SCOPE=re.compile(r"(?:Proposed Development|Notice Description|Description of Development)",re.I)
 CLOSED=re.compile(r"\b(?:closed|refused|withdrawn|cancelled|completed)\b",re.I)
 def _clean(x): return re.sub(r"\s+"," ",str(x or "")).strip()
@@ -148,7 +149,20 @@ def run(results,*,today=None,fetcher=None):
         try:
             html=loader(url)
             if city=="Burlington":
+                # City planning hub points to an official current-projects
+                # index. Inspect at most one same-host index then bounded
+                # official detail pages. Never fetch unrelated domains.
                 links=_burlington_links(html)
+                if not links:
+                    soup=BeautifulSoup(html,"html.parser")
+                    for a in soup.find_all("a",href=True):
+                        label=_clean(a.get_text(" ",strip=True))
+                        target=urljoin(url,str(a["href"]).strip())
+                        if ("Current Development Projects" in label and
+                            _safe_url(target,url) and not urlparse(target).query):
+                            links=_burlington_links(loader(target))
+                            audit["project_index_url"]=target
+                            break
                 audit["notice_pages_attempted"]=len(links)
                 found=[]
                 for link in links:
