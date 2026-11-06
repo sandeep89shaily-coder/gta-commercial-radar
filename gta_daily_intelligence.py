@@ -213,6 +213,8 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
     from gta_regional_document_evidence import run as regional_document_default
     from gta_ggh_early_planning import run as ggh_expansion_default
     from gta_ggh_york_official_gis import run as ggh_york_gis_default
+    from gta_municipal_official_notices import run as municipal_official_notices_default
+    from gta_evidence_backed_commercial_review import run as evidenced_review_default
     from gta_ggh_source_access_recovery import run as ggh_source_access_default
     from gta_markham_circulations import run as markham_default
 
@@ -292,6 +294,11 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
         toronto_capital_default if application_monitor is None else
         (lambda root, *, today=None: {"status":"SKIPPED_OFFLINE_TEST",
          "parsed_projects":0,"new_or_changed":0,"verified_open_tenders":0}))
+    municipal_notices_fn = (municipal_official_notices_default
+        if application_monitor is None else
+        lambda root, *, today=None: {"cities_configured":2,
+            "application_id_rows":0,"new_or_changed":0,"source_status":[],
+            "status":"SKIPPED_OFFLINE_TEST"})
     application_monitor = application_monitor or applications_default
     gis_monitor = gis_monitor or gis_default
     other_gis_monitor = other_gis_monitor or other_gis_default
@@ -383,6 +390,11 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
     ggh_york_gis=step("ggh_richmond_hill_newmarket_official_gis",
         lambda:ggh_york_gis_fn(root,today=today),required=False)
     state["ggh_york_official_gis"]={k:ggh_york_gis.get(k) for k in
+        ("cities_configured","cities_with_application_ids","application_id_rows",
+         "new_or_changed","source_status","warning")}
+    municipal_notices=step("burlington_vaughan_official_application_notices",
+        lambda:municipal_notices_fn(root,today=today),required=False)
+    state["municipal_official_notices"]={k:municipal_notices.get(k) for k in
         ("cities_configured","cities_with_application_ids","application_id_rows",
          "new_or_changed","source_status","warning")}
     ggh_source_access=step("ggh_blocked_official_source_access_recovery",
@@ -634,6 +646,29 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
             "ai_next_step":"NO_PAID_AI_FOR_LINK_ONLY_FETCH_ORIGINAL_DOCUMENT_FIRST",
             "verification_required":"Read original agenda, establish actual project and posting date",
         })
+    evidence_review=step("source_backed_regional_commercial_review",
+        lambda:evidenced_review_default(root,today=today),required=False)
+    state["evidence_backed_review"]={k:evidence_review.get(k) for k in
+        ("source_records","review_candidates","watchlist_records",
+         "excluded_source_explicit","verified_open_tenders","warning")}
+    # Only changed, non-closed source records enter the integrated review;
+    # baseline capital plans and past projects stay in the separate watchlist.
+    for e in _csv(root/"GTA_RADAR_EVIDENCE_BACKED_COMMERCIAL_REVIEW.csv"):
+        combined.append({
+            "kind":"EVIDENCE_BACKED_REGIONAL_REVIEW",
+            "project_id":e.get("project_id",""),
+            "city":e.get("city_or_region",""),
+            "address":"",
+            "description":e.get("work_scope","")[:400],
+            "source_url":e.get("source_url",""),
+            "freshness":"SOURCE_CHANGED_NOT_VERIFIED_NEW_PUBLICATION",
+            "source_date":e.get("source_date",""),
+            "date_basis":e.get("date_basis",""),
+            "research_status":e.get("classification",""),
+            "organization_hint":e.get("owner_or_division",""),
+            "ai_next_step":"VERIFY_OPEN_PROCUREMENT_AND_BUYER_MANUALLY",
+            "verification_required":e.get("required_checks",""),
+        })
     # Single, source-deduplicated, quality-gated application review queue.
     # The legacy raw CSVs remain available as evidence but must not inflate
     # the combined daily report with baseline, closed or project-only signals.
@@ -699,6 +734,11 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
         "<a href='GTA_RADAR_GGH_OFFICIAL_GIS_APPLICATIONS.csv'>Richmond Hill and Newmarket official GIS applications</a> · "
         "<a href='GTA_RADAR_GGH_OFFICIAL_GIS_NEW_OR_CHANGED.csv'>Changed York GGH GIS applications</a> · "
         "<a href='GTA_RADAR_GGH_OFFICIAL_GIS_STATUS.json'>York GGH GIS source diagnostics</a> · "
+        "<a href='GTA_RADAR_MUNICIPAL_OFFICIAL_APPLICATIONS.csv'>Burlington and Vaughan permitted official notices</a> · "
+        "<a href='GTA_RADAR_MUNICIPAL_OFFICIAL_APPLICATIONS_STATUS.json'>Burlington/Vaughan notice access diagnostics</a> · "
+        "<a href='GTA_RADAR_EVIDENCE_BACKED_COMMERCIAL_REVIEW.csv'>Evidence-backed new or changed regional review</a> · "
+        "<a href='GTA_RADAR_EVIDENCE_BACKED_PROJECT_WATCHLIST.csv'>Historical and planned capital watchlist</a> · "
+        "<a href='GTA_RADAR_EVIDENCE_BACKED_REVIEW_STATUS.json'>Evidence-backed review gate diagnostics</a> · "
         "<a href='GTA_RADAR_GGH_SOURCE_ACCESS_REQUESTS.md'>Official municipal source access request drafts (unsent)</a> · "
         "<a href='GTA_RADAR_GGH_SOURCE_ACCESS_REQUESTS.csv'>Official municipal source access recovery table</a> · "
         "<a href='GTA_RADAR_GGH_SOURCE_ACCESS_RECOVERY_STATUS.json'>Source access request status</a> · "
