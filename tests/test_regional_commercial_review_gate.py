@@ -55,7 +55,7 @@ def test_pdf_parent_linked_not_counted_twice(tmp_path):
  p=detail("Reservoir project","https://www.regionofwaterloo.ca/projects/reservoir",
     "Regional water reservoir expansion at preliminary design.", "FIRST_OBSERVED")
  _write(tmp_path,"GTA_RADAR_REGIONAL_PROJECT_DETAILS.csv",[p])
- _write(tmp_path,"GTA_RADAR_REGIONAL_DOCUMENT_EVIDENCE.csv":[{
+ _write(tmp_path,"GTA_RADAR_REGIONAL_DOCUMENT_EVIDENCE.csv",[{
    "project_id":p["project_id"],
    "document_url":"https://www.regionofwaterloo.ca/docs/reservoir.pdf",
    "evidence_excerpt":"Structural design and valve house replacement work for reservoir.",
