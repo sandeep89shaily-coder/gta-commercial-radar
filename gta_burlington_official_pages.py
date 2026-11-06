@@ -18,7 +18,7 @@ LEDGER = "GTA_RADAR_BURLINGTON_OFFICIAL_PAGES_SEEN.json"
 FIELDS = ("project_id","city","application_id","project_title","description","source_url",
           "first_seen_local","observation","changed_fields","provenance",
           "date_basis","verification_required")
-FILE_NO = re.compile(r"(?<![A-Za-z0-9])(?:505|510|520|525)-\d{1,4}\s*/\s*\d{2}(?!\d)", re.I)
+FILE_NO = re.compile(r"(?<![A-Za-z0-9])(?:505|510|520|525|535)-\d{1,4}\s*[/\-]\s*\d{2}(?!\d)", re.I)
 MAX_HTML_BYTES = 2_000_000
 MAX_PAGES = 150
 
