@@ -19,6 +19,7 @@ import requests
 from pypdf import PdfReader
 
 from gta_regional_early_intelligence import _safe_url
+from gta_regional_project_details import _approved_document_url
 from robots_policy import evaluate
 from toronto_pdf_download import public_dns
 
@@ -157,7 +158,7 @@ def _candidates(rows):
         for url in urls[:MAX_PER_PROJECT]:
             if not isinstance(url,str) or not urlparse(url).path.lower().endswith(".pdf"):
                 continue
-            if not _safe_url(url,parent) or url in seen:
+            if not _approved_document_url(url,parent,authority) or url in seen:
                 continue
             selected.append((row,url))
             seen.add(url)
@@ -185,7 +186,9 @@ def run(results, *, today=None, fetcher=None):
                     "project_title":row.get("project_title",""),
                     "project_url":row["project_url"],"document_url":url,
                     **evidence,"source_date_basis":"PDF_TEXT_NO_VERIFIED_FIRST_PUBLICATION",
-                    "source_verification":"OFFICIAL_SAME_HOST_PDF_TEXT_EXTRACTED",
+                    "source_verification":("OFFICIAL_PAGE_LINKED_WATERLOO_CDN_PDF_TEXT_EXTRACTED"
+                        if urlparse(url).hostname!=urlparse(row["project_url"]).hostname
+                        else "OFFICIAL_SAME_HOST_PDF_TEXT_EXTRACTED"),
                     "commercial_status":"DOCUMENT_EVIDENCE_NOT_OPEN_PROCUREMENT",
                     "verification_required":"Verify exact project, source date, budget applicability, contractor and unawarded work"}
             digest=hashlib.sha256(json.dumps({k:record[k] for k in
@@ -215,6 +218,6 @@ def run(results, *, today=None, fetcher=None):
              "new_or_changed":len(changes),"failed_documents":len(failures),
              "failures":failures,"paid_ai_calls":0,
              "verified_procurement_opportunities":0,
-             "warning":"Only same-host, policy-permitted official PDFs. Extracted passages are not proof of first publication or open work; scanned PDFs are reported as unreadable."}
+             "warning":"Official same-host PDFs and explicitly approved Waterloo publisher-linked CDN documents only; robots, public DNS, no redirects, file/page limits apply. Extracted passages are not proof of first publication or open work."}
     (root/STATUS).write_text(json.dumps(summary,indent=2),encoding="utf-8")
     return summary
