@@ -35,7 +35,9 @@ RELEVANT = re.compile(
     r"\b(?:construction|expansion|replacement|upgrade|widening|design|"
     r"reservoir|pumping|watermain|wastewater|stormwater|water treatment|"
     r"sewage|bridge|industrial|employment|rehabilitation|capital project|"
-    r"environmental assessment|road improvement|new facility|infrastructure)\b",
+    r"environmental assessment|road improvement|new facility|infrastructure|"
+    r"\bphase\s+[1-9]|\bsecond phase|\bon hold|\bremaining improvements|"
+    r"\bresurfacing|\breconstruction)\b",
     re.I,
 )
 AMOUNT = re.compile(r"(?<!\w)(?:CAD\s*)?\$\s*\d[\d,]*(?:\.\d+)?\s*(?:million|billion|M|B)?\b", re.I)
