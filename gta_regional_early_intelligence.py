@@ -16,7 +16,8 @@ SOURCES={
  "Toronto":{"url":"https://www.toronto.ca/business-economy/doing-business-with-the-city/upcoming-capital-projects/","kind":"CAPITAL_PIPELINE"},
  "Hamilton":{"url":"https://www.hamilton.ca/environmental-assessments/york-valley-road-hd016-booster-pumping-station-capacity-upgrades","kind":"ENVIRONMENTAL_ASSESSMENT"},
  "York":{"url":"https://www.york.ca/environment/water-and-wastewater/water-and-wastewater-construction-projects","kind":"INFRASTRUCTURE_INDEX"},
- "Peel":{"url":"https://peelregion.ca/construction/environmental-assessments","kind":"ENVIRONMENTAL_ASSESSMENT_INDEX"},
+ "Peel":{"url":"https://peelregion.ca/construction/projects/current-construction-projects","kind":"INFRASTRUCTURE_INDEX",
+         "supplemental":[{"url":"https://peelregion.ca/construction/environmental-assessments/bolton-zone-7-water-elevated-storage-transmission-mains","kind":"ENVIRONMENTAL_ASSESSMENT"}]},
  "Halton":{"url":"https://www.halton.ca/for-residents/infrastructure-and-growth/road-water-wastewater-construction","kind":"INFRASTRUCTURE_INDEX"},
  "Durham":{"url":"https://www.durham.ca/news/posts/notice-of-ajax-water-supply-plant-expansion-project-public-information-centre/","kind":"ENVIRONMENTAL_ASSESSMENT"},
  "Waterloo":{"url":"https://www.regionofwaterloo.ca/programs-and-services/roads-and-transportation/road-construction/","kind":"INFRASTRUCTURE_INDEX"},
@@ -81,6 +82,15 @@ def _stage(value):
 def _candidate(authority,kind,index,title,url,context=""):
  title=_clean(title)
  if len(title)<13 or len(title)>220 or NOISE.search(title) or not KEYWORDS.search(title):
+  return None
+ # Toronto's official upcoming-capital index links to a *PDF table* of
+ # real projects. Its surrounding procurement navigation is not project data.
+ # That PDF is parsed by the dedicated structured capital-pipeline stage.
+ if authority=="Toronto" and kind=="CAPITAL_PIPELINE":
+  return None
+ if re.search(r"\b(?:procurement (?:bylaws?|polic(?:y|ies)|metrics|program)|"
+              r"10.year capital budget|social procurement|how to bid|"
+              r"construction (?:projects? map|safety|standards))\b",title,re.I):
   return None
  if not _safe_url(url,index):return None
  # Identifies an official hyperlink or a source-page project entry; not a generic site.
@@ -163,10 +173,26 @@ def run(results,*,today=None,sources=None,fetcher=None):
   try:
    html=(fetcher or _fetch)(source["url"])
    rows=_extract(authority,html,source)
+   # Some regions provide a standalone, explicitly identified EA project
+   # page in addition to the broader construction index. Each supplemental
+   # source is independently policy-checked by the same official HTML fetcher.
+   supplemental_failures=[]
+   for secondary in source.get("supplemental",[]):
+    try:
+     more=_extract(authority,(fetcher or _fetch)(secondary["url"]),secondary)
+     rows.extend(more)
+    except Exception as secondary_error:
+     supplemental_failures.append({"url":secondary["url"],
+       "error":type(secondary_error).__name__+":"+str(secondary_error)[:140]})
+   rows=list({row["record_id"]:row for row in rows}.values())
+   state["supplemental_failed"]=supplemental_failures
+   state["supplemental_sources_configured"]=len(source.get("supplemental",[]))
    # zero candidates is not a working project collector.
    state["status"]="BASELINE_COMPLETE" if not any(
      k.startswith("REGIONAL:"+authority.upper()+":") for k in old) else "COLLECTED"
    if not rows:state["status"]="INDEX_FETCHED_NO_IDENTIFIABLE_PROJECTS"
+   if authority=="Toronto":
+    state["reason"]="HTML is a PDF index, not project rows; see GTA_RADAR_TORONTO_CAPITAL_PIPELINE_STATUS.json"
    state["application_id_records"]=sum(bool(x["application_id"]) for x in rows)
    state["policy_reference_records"]=sum(x["evidence_class"]=="POLICY_REFERENCE" for x in rows)
    state["project_index_signals"]=sum(x["evidence_class"]=="PROJECT_INDEX_SIGNAL" for x in rows)

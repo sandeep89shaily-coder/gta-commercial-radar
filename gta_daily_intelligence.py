@@ -172,7 +172,7 @@ def _build_document_worklist(union_csv, out, seen, *, paid, ai_processor, ranker
 def integrate(results, *, today=None, meeting_pipeline=None, document_discover=None,
               agenda_pipeline=None, verified_reports=None, document_ai=None,
               multicity_capture=None, document_ranker=None,
-              application_monitor=None, gis_monitor=None, other_gis_monitor=None, municipal_monitor=None, toronto_csv_monitor=None, guelph_gis_monitor=None, burlington_gis_monitor=None, burlington_pdf_monitor=None, staged_durham_monitor=None, official_export_monitor=None, regional_early_monitor=None, regional_detail_monitor=None, regional_document_monitor=None, ggh_expansion_monitor=None, ggh_york_gis_monitor=None, project_ai=None, buyer_ai=None, procurement=None, buyer_batch=None,
+              application_monitor=None, gis_monitor=None, other_gis_monitor=None, municipal_monitor=None, toronto_csv_monitor=None, guelph_gis_monitor=None, burlington_gis_monitor=None, burlington_pdf_monitor=None, staged_durham_monitor=None, official_export_monitor=None, regional_early_monitor=None, toronto_capital_monitor=None, regional_detail_monitor=None, regional_document_monitor=None, ggh_expansion_monitor=None, ggh_york_gis_monitor=None, project_ai=None, buyer_ai=None, procurement=None, buyer_batch=None,
               graph=None, api_key_check=None, allow_paid=True):
     """Run integrated bounded stages and expose individual failure provenance.
 
@@ -208,6 +208,7 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
     from gta_burlington_official_pages import run as burlington_official_pages_default
     from gta_vaughan_official_notices import run as vaughan_official_notices_default
     from gta_regional_early_intelligence import run as regional_early_default
+    from gta_toronto_capital_pipeline import run as toronto_capital_default
     from gta_regional_project_details import run as regional_details_default
     from gta_regional_document_evidence import run as regional_document_default
     from gta_ggh_early_planning import run as ggh_expansion_default
@@ -287,6 +288,10 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
          "cities_with_application_ids":0,"application_id_rows":0,
          "new_or_changed":0,"source_status":[],
          "status":"SKIPPED_OFFLINE_TEST"}))
+    toronto_capital_fn = toronto_capital_monitor or (
+        toronto_capital_default if application_monitor is None else
+        (lambda root, *, today=None: {"status":"SKIPPED_OFFLINE_TEST",
+         "parsed_projects":0,"new_or_changed":0,"verified_open_tenders":0}))
     application_monitor = application_monitor or applications_default
     gis_monitor = gis_monitor or gis_default
     other_gis_monitor = other_gis_monitor or other_gis_default
@@ -391,6 +396,11 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
     state["regional_early_intelligence"]={k:regional_early.get(k) for k in
         ("authorities_configured","authorities_with_records","authorities_failed",
          "records","new_or_changed","source_status","warning")}
+    toronto_capital=step("toronto_official_capital_procurement_pipeline_pdf",
+        lambda:toronto_capital_fn(root,today=today),required=False)
+    state["toronto_capital_pipeline"]={k:toronto_capital.get(k) for k in
+        ("status","parsed_projects","new_or_changed","rejected_table_rows",
+         "official_pdf_url","verified_open_tenders","error","warning")}
     regional_details=step("regional_project_detail_evidence_three_authority_pilot",
         lambda:regional_detail_fn(root,today=today),required=False)
     state["regional_project_details"]={k:regional_details.get(k) for k in
@@ -695,6 +705,9 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
         "<a href='GTA_RADAR_REGIONAL_EARLY_RECORDS.csv'>Nine-authority regional project and policy signals (baseline only)</a> · "
         "<a href='GTA_RADAR_REGIONAL_EARLY_SOURCE_STATUS.json'>Regional source-level diagnostics</a> · "
         "<a href='GTA_RADAR_REGIONAL_PROJECT_DETAILS.csv'>Regional project detail evidence (pilot)</a> · "
+        "<a href='GTA_RADAR_TORONTO_CAPITAL_PIPELINE.csv'>Toronto planned capital contracts: scope, year and budget band</a> · "
+        "<a href='GTA_RADAR_TORONTO_CAPITAL_NEW_OR_CHANGED.csv'>Changed Toronto capital pipeline projects</a> · "
+        "<a href='GTA_RADAR_TORONTO_CAPITAL_PIPELINE_STATUS.json'>Toronto capital PDF extraction diagnostics</a> · "
         "<a href='GTA_RADAR_REGIONAL_PROJECT_DETAILS_NEW_OR_CHANGED.csv'>Regional detail changes requiring review</a> · "
         "<a href='GTA_RADAR_REGIONAL_PROJECT_DETAILS_STATUS.json'>Regional detail extraction and failures</a> · "
         "<a href='GTA_RADAR_REGIONAL_DOCUMENT_EVIDENCE.csv'>Official regional PDF evidence (pilot)</a> · "
