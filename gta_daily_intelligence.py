@@ -498,7 +498,7 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
         "source_pdfs_parsed","rows_extracted","first_run_baseline",
         "new_or_changed","pdfs_unreadable_or_invalid","warning")}
     coverage=step("measured_sixteen_city_application_coverage",
-        lambda:measured_coverage_default(root,early_apps,gis,other_gis,markham,municipal,toronto_csv,guelph_gis),
+        lambda:measured_coverage_default(root,early_apps,gis,other_gis,markham,municipal,toronto_csv,guelph_gis,five_city=five_city),
         required=True)
     state["measured_city_coverage"]={k:coverage.get(k) for k in (
         "cities_configured","cities_with_extracted_application_candidates",
