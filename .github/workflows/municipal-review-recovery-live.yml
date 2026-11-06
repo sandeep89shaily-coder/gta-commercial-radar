@@ -6,6 +6,8 @@ on:
       - 'gta_evidence_backed_commercial_review.py'
       - 'gta_daily_intelligence.py'
       - 'tests/test_municipal_review_and_regional_gate.py'
+      - 'tests/test_five_city_recovery_status.py'
+      - 'gta_five_city_recovery_status.py'
       - '.github/workflows/municipal-review-recovery-live.yml'
   workflow_dispatch:
 jobs:
@@ -21,7 +23,7 @@ jobs:
           python-version: '3.12'
       - run: python -m pip install -r requirements.txt pytest
       - name: Source-independent regressions
-        run: python -m pytest -q tests/test_municipal_review_and_regional_gate.py
+        run: python -m pytest -q tests/test_municipal_review_and_regional_gate.py tests/test_five_city_recovery_status.py
       - name: Access-policy-aware public notice source audit
         run: |
           python -c "import json,tempfile;from gta_municipal_official_notices import run;print('MUNICIPAL_OFFICIAL_NOTICES_LIVE_AUDIT',json.dumps(run(tempfile.mkdtemp()),sort_keys=True))"
