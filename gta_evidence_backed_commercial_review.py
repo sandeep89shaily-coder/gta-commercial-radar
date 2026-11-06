@@ -58,7 +58,7 @@ def _to_row(kind,r):
 def _classify(row,today):
  stage=row.get("stage","")
  text=stage+" "+row.get("work_scope","")[:600]
- if CLOSED.search(stage) or re.search(r"\b(?:contract awarded|tender awarded|project completed)\b",text,re.I):
+ if CLOSED.search(stage) or re.search(r"\b(?:contract (?:was )?awarded|tender (?:was )?awarded|(?:project|construction|work) (?:was |has been )?completed)\b",text,re.I):
   return "EXCLUDED_REVIEW","Source record explicitly indicates completed, awarded or closed"
  if CONSTRUCTION.search(text):
   return "WATCH_CONSTRUCTION","Construction already underway; remaining subcontracts unverified"
