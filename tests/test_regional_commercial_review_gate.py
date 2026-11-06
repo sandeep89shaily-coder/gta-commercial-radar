@@ -97,3 +97,55 @@ def test_municipal_location_requires_unambiguous_official_evidence():
    "The new treatment system is located in the City of Cambridge.")=="Cambridge"
  assert _municipality("York Region infrastructure programme",
    "General infrastructure overview for the Region.")==""
+
+
+def test_waterloo_river_road_completed_season_does_not_discard_phase_two(tmp_path):
+    # Region project 0787: a finished season and older road segment coexist
+    # with Phase 2 (2027-2032) and its Highway 7/8 bridge/ramp work.
+    row=detail("River Road/Bleams Road",
+      "https://www.regionofwaterloo.ca/programs-and-services/roads-and-transportation/road-construction/construction-projects/river-roadbleams-road/",
+      "Construction is finished for the 2025 season. The new Bleams Road extension is open. "
+      "Phase 1 includes bridge across Schneider Creek (2020-2027). "
+      "Phase 2 includes extension of River Road and bridge over Highway 7/8. "
+      "Construction phase 2: 2027-2032.", "RECORD_CHANGED")
+    _write(tmp_path,"GTA_RADAR_REGIONAL_PROJECT_DETAILS.csv",[row])
+    summary=run(tmp_path,today=dt.date(2026,11,6))
+    assert summary["review_records"]==1
+    with (tmp_path/OUTPUT).open(encoding="utf-8-sig") as f:
+        candidate=next(csv.DictReader(f))
+    assert candidate["priority"]=="PROJECT_STAGE_REVIEW"
+    assert candidate["rejection_reason"]=="FUTURE_PHASE_PACKAGE_STATUS_UNVERIFIED"
+    assert candidate["city"]==""
+    assert candidate["verified_open_tender"]=="false"
+    assert summary["new_or_changed_review"]==1
+
+
+def test_waterloo_westmount_prior_work_complete_but_phase_two_on_hold(tmp_path):
+    row=detail("Westmount Road | Victoria to Erb",
+      "https://www.regionofwaterloo.ca/programs-and-services/roads-and-transportation/road-construction/construction-projects/westmount-road-victoria-to-erb/",
+      "The first phase of the Westmount Road project was completed earlier this year "
+      "from Highland Road to Victoria Street. The second phase from Victoria Street "
+      "to Erb Street is currently on hold. Road resurfacing is planned for 2028 "
+      "and the remaining improvements follow the Class EA.", "RECORD_CHANGED")
+    _write(tmp_path,"GTA_RADAR_REGIONAL_PROJECT_DETAILS.csv",[row])
+    summary=run(tmp_path,today=dt.date(2026,11,6))
+    assert summary["review_records"]==0
+    assert summary["excluded_or_deferred"]==1
+    with (tmp_path/EXCLUDED).open(encoding="utf-8-sig") as f:
+        candidate=next(csv.DictReader(f))
+    assert candidate["priority"]=="RECHECK_ON_HOLD"
+    assert candidate["rejection_reason"]=="REMAINING_PROJECT_WORK_ON_HOLD_NOT_COMPLETED"
+    assert candidate["verified_open_tender"]=="false"
+
+
+def test_later_phase_already_awarded_still_excluded(tmp_path):
+    row=detail("Industrial watermain improvements",
+      "https://www.regionofwaterloo.ca/projects/industrial-watermain",
+      "Phase 1 of construction completed in 2024. Phase 2 was awarded "
+      "in 2026 with installation and upgrade scheduled for 2027.", "RECORD_CHANGED")
+    _write(tmp_path,"GTA_RADAR_REGIONAL_PROJECT_DETAILS.csv",[row])
+    run(tmp_path,today=dt.date(2026,11,6))
+    with (tmp_path/EXCLUDED).open(encoding="utf-8-sig") as f:
+        candidate=next(csv.DictReader(f))
+    assert candidate["priority"]=="EXCLUDE"
+    assert candidate["rejection_reason"]=="EXPLICIT_AWARDED_OR_COMPLETED"
