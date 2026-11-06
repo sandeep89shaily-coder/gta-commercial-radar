@@ -44,6 +44,43 @@ PROJECT=re.compile(r"\b(?:construction|building|upgrade|expansion|installation|"
     r"capital works|rail|stormwater|school|hospital|transit)\b",re.I)
 LOW_VALUE=re.compile(r"\b(?:policy statement|master (?:plan|servicing study)|"
     r"guideline|regulation only|public consultation only)\b",re.I)
+# A regional project can include completed/awarded earlier work, while its
+# remaining phase is still in design. Do not classify the entire programme
+# from the first "completed" word found anywhere in its history.
+ON_HOLD=re.compile(r"\b(?:on hold|paused|suspended|deferred|postponed)\b",re.I)
+FUTURE_PHASE=re.compile(
+    r"\b(?:phase\s*(?:2|3|4|ii|iii|iv)|second phase|third phase|"
+    r"remaining (?:phases?|works?|improvements)|next phase)\b",re.I)
+FUTURE_SCOPE=re.compile(
+    r"\b(?:20(?:2[7-9]|3\d)|scheduled|planned|planning|proposed|"
+    r"will (?:be|begin|start|include)|future|upcoming|"
+    r"under design|design in progress|awaiting approval)\b",re.I)
+EXPLICIT_LATER_PHASE_AWARD=re.compile(
+    r"\b(?:phase\s*(?:2|3|4|ii|iii|iv)|second phase|third phase)\b"
+    r"[^.;]{0,140}\b(?:awarded|completed|finished|cancelled|canceled)\b",re.I)
+
+def _project_lifecycle(context,stage,low):
+    """Conservative phase-aware queue. No branch asserts an open contract."""
+    hold=bool(ON_HOLD.search(context))
+    later=bool(FUTURE_PHASE.search(context))
+    future=bool(FUTURE_SCOPE.search(context))
+    closed=bool(_affirmative_closed(context))
+    later_done=bool(EXPLICIT_LATER_PHASE_AWARD.search(context))
+    if hold:
+        return "RECHECK_ON_HOLD","REMAINING_PROJECT_WORK_ON_HOLD_NOT_COMPLETED"
+    # Multiple phases: historic completion does not terminate future design.
+    # Even for an older reported contract award, treat the later phase only
+    # as a verification candidate, never an open tender or confirmed bid.
+    if later and future and not later_done:
+        return "PROJECT_STAGE_REVIEW","FUTURE_PHASE_PACKAGE_STATUS_UNVERIFIED"
+    if closed:
+        return "EXCLUDE","EXPLICIT_AWARDED_OR_COMPLETED"
+    if STARTED.search(context) or stage=="CONSTRUCTION":
+        return "RECHECK_IN_PROGRESS","CONSTRUCTION_ALREADY_STARTED_OR_UNCLEAR"
+    if low:
+        return "EXCLUDE","NOT_AN_IDENTIFIED_CONSTRUCTION_PROJECT"
+    return "PROJECT_STAGE_REVIEW",""
+
 
 def _read(path):
  if not path.is_file():return []
@@ -127,13 +164,7 @@ def _candidate_detail(row,documents):
  low=bool(LOW_VALUE.search(title)) or not PROJECT.search(context)
  # A historical status does not become a newly open opportunity simply
  # because the page is still hosted. Contradictory language stays for review.
- if _affirmative_closed(context):
-  priority,why="EXCLUDE","EXPLICIT_AWARDED_OR_COMPLETED"
- elif STARTED.search(context) or stage=="CONSTRUCTION":
-  priority,why="RECHECK_IN_PROGRESS","CONSTRUCTION_ALREADY_STARTED_OR_UNCLEAR"
- elif low:
-  priority,why="EXCLUDE","NOT_AN_IDENTIFIED_CONSTRUCTION_PROJECT"
- else:priority,why="PROJECT_STAGE_REVIEW",""
+ priority,why=_project_lifecycle(context,stage,low)
  return dict(record_id=_base(authority,url),source_type="REGIONAL_PROJECT_DETAIL",
   authority=authority,city=_municipality(title,scope),project_name=title,scope_of_work=excerpt,
   buyer_organization=authority+" Region",
@@ -181,7 +212,7 @@ def run(results,*,today=None):
  # Exclusions and deferred construction projects remain visible with reasons,
  # rather than disappearing from the evidence record.
  records=sorted(unique.values(),key=lambda r:(
-    {"MONITOR_PLANNED":0,"PROJECT_STAGE_REVIEW":1,"RECHECK_IN_PROGRESS":2,"RECHECK_HISTORICAL":3,"EXCLUDE":4}.get(r["priority"],5),
+    {"MONITOR_PLANNED":0,"PROJECT_STAGE_REVIEW":1,"RECHECK_IN_PROGRESS":2,"RECHECK_ON_HOLD":3,"RECHECK_HISTORICAL":4,"EXCLUDE":5}.get(r["priority"],5),
     r["authority"],r["project_name"]))
  review=[r for r in records if r["priority"] in ("MONITOR_PLANNED","PROJECT_STAGE_REVIEW")]
  changes=[r for r in review if r["observation"] in ("FIRST_OBSERVED","RECORD_CHANGED")]
