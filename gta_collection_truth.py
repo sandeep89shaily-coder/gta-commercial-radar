@@ -25,6 +25,7 @@ INPUTS={
     "TORONTO_BRAMP_GIS":"GTA_RADAR_STRUCTURED_APPLICATIONS_TORONTO_BRAMPTON.csv",
     "HAMILTON_KITCHENER_GIS":"GTA_RADAR_ADDITIONAL_CITY_GIS_APPLICATIONS.csv",
     "MARKHAM_CIRCULATION_PDF":"GTA_RADAR_MARKHAM_CIRCULATED_APPLICATIONS.csv",
+    "OFFICIAL_CITY_NOTICE_RECOVERY":"GTA_RADAR_FIVE_CITY_OFFICIAL_APPLICATIONS.csv",
 }
 OUTPUT_ALL="GTA_RADAR_COLLECTION_MASTER.csv"
 OUTPUT_REVIEW="GTA_RADAR_COLLECTION_NEW_OR_CHANGED_REVIEW.csv"
@@ -39,7 +40,7 @@ HEALTH_COLUMNS=("city","application_files","project_only_signals",
                 "new_or_changed_review","official_sources_with_records",
                 "source_failures","access_failures","source_notes",
                 "quality_status")
-ACTIVITY_CLOSED=re.compile(r"\b(?:inactive|withdrawn|cancelled|canceled|refused|rejected|closed|"
+ACTIVITY_CLOSED=re.compile(r"\b(?:inactive|withdrawn|cancelled|canceled|refused|rejected|closed|omb approved|olt approved|"
                            r"final approval completed)\b",re.I)
 STRONG_COMMERCIAL=re.compile(r"\b(?:industrial|warehouse|logistics|manufactur\w*|"
     r"hotel|restaurant|retail|office|commercial|distribution|factory|"
@@ -139,11 +140,17 @@ def _aggregate(records):
         low=all(r["low_value"] for r in members)
         scope=("COMMERCIAL_SCOPE_REVIEW" if positive else "SCOPE_UNCLASSIFIED")
         quality=("INACTIVE_OR_CLOSED" if inactive else "LOW_VALUE_SCOPE" if low else scope)
+        # A re-observed 2013 file with an ambiguous current scrape timestamp
+        # is not a newly available contract. Preserve it in the master ledger.
+        historical=bool(best["application_year_hint"] and
+            int(best["application_year_hint"])<dt.date.today().year-3 and
+            not any(r["date_basis"]=="VERIFIED_FIRST_PUBLICATION_DATE" for r in members))
         is_new=change in ("FIRST_OBSERVED","RECORD_CHANGED")
         review=(is_new and best["record_kind"]=="APPLICATION_ID"
-                and positive and not inactive and not low)
+                and positive and not inactive and not low and not historical)
         if inactive:why="inactive_or_closed_in_source"
         elif low:why="low_value_scope"
+        elif historical:why="historical_application_year_no_verified_recent_publication"
         elif best["record_kind"]!="APPLICATION_ID":why="no_verifiable_application_id"
         elif not positive:why="commercial_scope_not_established"
         elif not is_new:why="historical_or_unchanged_baseline"

@@ -8,10 +8,10 @@ OUTPUT="GTA_RADAR_CITY_COVERAGE_AUDIT.csv"
 STATUS="GTA_RADAR_CITY_COVERAGE_STATUS.json"
 COLUMNS=("city","official_landing_page","index_fetch","html_application_rows",
          "gis_application_rows","pdf_application_rows","municipal_application_rows","project_only_signals","official_csv_application_rows",
-         "total_source_candidate_rows_not_deduplicated",
+         "live_official_notice_application_rows","total_source_candidate_rows_not_deduplicated",
          "measured_source_state","missing_capability","source_details")
 
-def build(root,html_status,toronto_brampton_gis,other_gis,markham,municipal=None,toronto_csv=None,guelph_gis=None):
+def build(root,html_status,toronto_brampton_gis,other_gis,markham,municipal=None,toronto_csv=None,guelph_gis=None,five_city=None):
     root=Path(root)
     html={r["city"]:r for r in html_status.get("city_status",[])
           if isinstance(r,dict) and r.get("city")}
@@ -27,6 +27,8 @@ def build(root,html_status,toronto_brampton_gis,other_gis,markham,municipal=None
                 "count":int(row.get("commercial_candidates",0) or 0),
             })
     municipal_map={r['city']:r for r in (municipal or {}).get('source_status',[])}
+    live={r.get("city"):r for r in (five_city or {}).get("source_status",[])
+          if isinstance(r,dict) and r.get("automated_source_recovered_this_stage")}
     results=[]
     for city,url in SOURCES.items():
         h=html.get(city,{})
@@ -41,7 +43,8 @@ def build(root,html_status,toronto_brampton_gis,other_gis,markham,municipal=None
         csv_n=(int((toronto_csv or {}).get("commercial_candidates",0) or 0)
                if city=="Toronto" and (toronto_csv or {}).get("status") in
                ("BASELINED","COLLECTED") else 0)
-        total=html_n+gis_n+pdf_n+mun_n+csv_n
+        live_n=int(live.get(city,{}).get("application_id_rows_this_stage",0) or 0)
+        total=html_n+gis_n+pdf_n+mun_n+csv_n+live_n
         index_status=h.get("fetch_status","NOT_RUN")
         if total>0:
             measured="APPLICATION_CANDIDATES_EXTRACTED_NOT_CITYWIDE_COMPLETE"
@@ -56,12 +59,14 @@ def build(root,html_status,toronto_brampton_gis,other_gis,markham,municipal=None
         details=" | ".join(r["source"]+":"+r["status"] for r in layers)
         if mun:details+=" | MunicipalFeed:"+mun.get("state","UNKNOWN")
         if city=="Toronto" and toronto_csv:details+=" | TorontoCKAN:"+toronto_csv.get("status","UNKNOWN")
+        if live_n:details+=" | LiveOfficialNotice:"+str(live_n)
         if city=="Markham":details+=" | Markham PDF:"+str(pdf_n)
         results.append({"city":city,"official_landing_page":url,
               "index_fetch":index_status,"html_application_rows":html_n,
               "gis_application_rows":gis_n,"pdf_application_rows":pdf_n,
               "municipal_application_rows":mun_n,"project_only_signals":signal_n,
               "official_csv_application_rows":csv_n,
+              "live_official_notice_application_rows":live_n,
               "total_source_candidate_rows_not_deduplicated":total,
               "measured_source_state":measured,"missing_capability":missing,
               "source_details":details})

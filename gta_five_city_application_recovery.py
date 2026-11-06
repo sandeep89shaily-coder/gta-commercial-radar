@@ -1,0 +1,248 @@
+"""Policy-aware recovery of *exact* official Burlington/Vaughan planning file IDs.
+
+This is a bounded addition to the existing Radar run. If publisher policies
+deny the source, it reports blocked with zero records. Kitchener, Richmond Hill
+and Newmarket are audited against their existing GIS/authorized-export stages;
+manual exports never count as automatic coverage.
+"""
+from __future__ import annotations
+import csv,datetime as dt,hashlib,json,re
+from pathlib import Path
+from urllib.parse import urlparse,urljoin
+from bs4 import BeautifulSoup
+from gta_regional_early_intelligence import _fetch as fetch_official_html
+from gta_burlington_official_pages import _parse as parse_burlington
+from gta_vaughan_official_notices import parse as parse_vaughan,SOURCE as VAUGHAN
+from gta_early_applications import SOURCES
+
+BURLINGTON_INDEX=SOURCES["Burlington"]
+GIS="GTA_RADAR_BURLINGTON_GIS_PROJECTS.csv"
+OUTPUT="GTA_RADAR_FIVE_CITY_OFFICIAL_APPLICATIONS.csv"
+CHANGES="GTA_RADAR_FIVE_CITY_OFFICIAL_NEW_OR_CHANGED.csv"
+STATUS="GTA_RADAR_FIVE_CITY_RECOVERY_STATUS.json"
+LEDGER="GTA_RADAR_FIVE_CITY_OFFICIAL_SEEN.json"
+MAX_BURLINGTON_PAGES=16
+FIELDS=("project_id","city","application_id","project_title","address","description",
+    "current_status","source_url","record_source_url","source_record_date",
+    "date_basis","first_seen_local","observation","provenance",
+    "commercial_fit","verification_required")
+CITIES=("Burlington","Vaughan","Kitchener","Richmond Hill","Newmarket")
+FILE_ID=re.compile(r"(?:^|[^A-Za-z0-9])(?:505|510|520|525|535)-\d{1,4}[/\-]\d{2}(?!\d)",re.I)
+CLOSED=re.compile(r"\b(?:refused|withdrawn|closed|cancelled|canceled)\b",re.I)
+COMMERCIAL=re.compile(r"\b(?:commercial|industrial|warehouse|retail|office|hotel|"
+       r"logistics|storage|factory|manufactur\w*|restaurant|mixed.use|"
+       r"employment|distribution|business|medical|data.cent(?:er|re))\b",re.I)
+
+def _text(x):
+ return " ".join(str(x or "").split()).strip()
+
+def _valid_burlington(url):
+ try:
+  p=urlparse(url)
+  return (p.scheme=="https" and p.hostname in ("www.burlington.ca","burlington.ca")
+     and p.path.startswith("/en/news/current-development-projects/")
+     and p.path.endswith(".aspx") and not p.query and not p.fragment
+     and not p.username and not p.password and p.port in (None,443))
+ except ValueError:return False
+
+def _read(path):
+ if not path.is_file():return []
+ with path.open(encoding="utf-8-sig",newline="") as f:
+  return list(csv.DictReader(f))
+
+def _json(path):
+ try:return json.loads(path.read_text(encoding="utf-8"))
+ except (ValueError,OSError):return {}
+
+def _write(path,rows):
+ with path.open("w",encoding="utf-8-sig",newline="") as f:
+  w=csv.DictWriter(f,fieldnames=FIELDS,extrasaction="ignore");w.writeheader()
+  for row in rows:
+   w.writerow({k:("'"+v if isinstance(v,str) and v.startswith(("=","+","-","@")) else v)
+               for k,v in row.items() if k in FIELDS})
+
+def _burlington_links(root,fetch):
+ # Prefer real direct project links from the already-permitted city GIS stage.
+ urls=[]
+ for row in _read(root/GIS):
+  value=_text(row.get("source_url"))
+  if _valid_burlington(value) and value not in urls:
+   urls.append(value)
+ # On a failed GIS run, discover on the separate official city index only.
+ # Do not use a cached third-party commercial directory as original evidence.
+ errors=[]
+ if not urls:
+  try:
+   html=fetch(BURLINGTON_INDEX)
+   soup=BeautifulSoup(html,"html.parser")
+   main=soup.find("main") or soup
+   for anchor in main.find_all("a",href=True):
+    u=urljoin(BURLINGTON_INDEX,anchor["href"])
+    if _valid_burlington(u) and u not in urls:urls.append(u)
+    if len(urls)>=MAX_BURLINGTON_PAGES:break
+  except Exception as error:
+   errors.append("INDEX:"+type(error).__name__+":"+str(error)[:140])
+ # Sort by location/name only when the original GIS row supplies it.
+ return urls[:MAX_BURLINGTON_PAGES],errors
+
+def _burlington_records(html,url):
+ parsed=parse_burlington(html,url)
+ soup=BeautifulSoup(html,"html.parser")
+ main=soup.find("main") or soup
+ heading=main.get_text(" ",strip=True)[:1500]
+ status_match=re.search(r"\bStatus\s*[-:]\s*(Under Review|Pre.Application|On Hold|Approved|Appealed|Refused|Withdrawn)\b",
+    heading,re.I)
+ status=_text(status_match.group(1)).upper() if status_match else "NOT_VERIFIED"
+ # Capture the bounded Proposed Development section. The legacy saved-page
+ # parser can correctly extract file IDs while missing paragraph scope when
+ # headings and paragraphs share one <section> wrapper.
+ scope=""
+ for node in main.find_all(["h2","h3","h4","strong"]):
+  if "proposed development" not in _text(node.get_text(" ",strip=True)).lower():
+   continue
+  parts=[]
+  for sibling in node.next_siblings:
+   if getattr(sibling,"name",None) in ("h2","h3","h4"):break
+   val=_text(sibling.get_text(" ",strip=True) if hasattr(sibling,"get_text") else sibling)
+   if val:parts.append(val)
+   if len(" ".join(parts))>1100:break
+  if not parts and node.parent:
+   text=_text(node.parent.get_text(" ",strip=True))
+   parts=[re.split(r"\b(?:File Numbers?|Public Meetings?|Planner on File)\b",text,1,re.I)[0]]
+  scope=" ".join(parts)[:1000]
+  break
+ result=[]
+ for source in parsed:
+  row=dict(project_id=source["project_id"],city="Burlington",
+     application_id=source["application_id"],
+     project_title=source["project_title"],
+     address="",description=scope or _text(source.get("description")) or source["project_title"],
+     current_status=status,source_url=url,record_source_url=url,
+     source_record_date="",date_basis="NO_VERIFIED_FIRST_PUBLICATION_DATE",
+     provenance="LIVE_OFFICIAL_PROJECT_PAGE_EXPLICIT_FILE_NUMBER",
+     commercial_fit="TEXT_MATCH_REVIEW_ONLY" if COMMERCIAL.search(
+        _text(source.get("description"))+" "+source["project_title"]) else "UNCLASSIFIED",
+     verification_required="Verify municipal applicant, project/permit stage, first posting, open work and current buyer")
+  result.append(row)
+ return result
+
+def _vaughan_records(html):
+ rows=[]
+ for source in parse_vaughan(html):
+  status="NOTICE_PUBLISHED_STAGE_NOT_VERIFIED"
+  desc=_text(source.get("description"))
+  rows.append(dict(project_id=source["project_id"],city="Vaughan",
+    application_id=source["application_id"],project_title="Vaughan public notice",
+    address=_text(source.get("address")),description=desc,
+    current_status=status,source_url=VAUGHAN,record_source_url=VAUGHAN,
+    source_record_date="",date_basis="MEETING_DATE_NOT_FIRST_PUBLICATION",
+    provenance="LIVE_OFFICIAL_PUBLIC_NOTICE_EXPLICIT_FILE_NUMBER",
+    commercial_fit="TEXT_MATCH_REVIEW_ONLY" if COMMERCIAL.search(desc) else "UNCLASSIFIED",
+    verification_required="Confirm notice posting date, application current status, site and owner; minor variance may not mean construction"))
+ return rows
+
+def _audit_restricted_sources(root):
+ report=_json(root/"GTA_RADAR_ADDITIONAL_CITY_GIS_STATUS.json")
+ york=_json(root/"GTA_RADAR_GGH_OFFICIAL_GIS_STATUS.json")
+ exports=_json(root/"GTA_RADAR_OFFICIAL_CSV_IMPORT_STATUS.json")
+ reports=report.get("source_status",[])+york.get("source_status",[])
+ assisted={r.get("city"):r for r in exports.get("source_status",[])}
+ results=[]
+ for city in ("Kitchener","Richmond Hill","Newmarket"):
+  item=next((r for r in reports if r.get("city")==city),{})
+  count=int(item.get("application_id_rows",item.get("commercial_candidates",0)) or 0)
+  state=_text(item.get("status") or item.get("state")) or "NO_AUTOMATIC_SOURCE_RESULT"
+  results.append(dict(city=city,status="SOURCE_REPORT_ONLY_NOT_RECOLLECTED",
+    underlying_collector_status=state,
+    underlying_candidate_count=count,
+    assisted_export_status=assisted.get(city,{}).get("status","MISSING_AUTHORIZED_EXPORT"),
+    application_id_rows_this_stage=0,
+    automated_source_recovered_this_stage=False,
+    access_status="RESTRICTED_OR_UNVERIFIED" if not count else "VERIFY_APPLICATION_LEVEL_COMPLETENESS",
+    source_failure=_text(item.get("error"))))
+ return results
+
+def run(results,*,today=None,fetcher=None):
+ root=Path(results);root.mkdir(parents=True,exist_ok=True)
+ day=(today or dt.date.today()).isoformat()
+ fetch=fetcher or fetch_official_html
+ old_path=root/LEDGER
+ ledger=_json(old_path) if old_path.exists() else {"schema":1,"seen":{}}
+ if ledger.get("schema")!=1 or not isinstance(ledger.get("seen"),dict):
+  raise ValueError("UNKNOWN_FIVE_CITY_LEDGER")
+ original=ledger["seen"];updated=dict(original)
+ output=[];changed=[];statuses=[]
+ urls,index_errors=_burlington_links(root,fetch)
+ burlington_status=dict(city="Burlington",status="NO_OFFICIAL_PROJECT_LINKS",
+   links_selected=len(urls),links_parsed=0,failed_links=index_errors,
+   application_id_rows_this_stage=0,automated_source_recovered_this_stage=False)
+ for url in urls:
+  try:
+   html=fetch(url) # Per-link robots, DNS and no-redirect check by shared fetcher.
+   found=_burlington_records(html,url)
+   if not found:
+    raise ValueError("NO_EXPLICIT_CITY_FILE_NUMBERS")
+   output.extend(found);burlington_status["links_parsed"]+=1
+  except Exception as error:
+   burlington_status["failed_links"].append({"url":url,
+     "error":type(error).__name__+":"+str(error)[:150]})
+ if urls and burlington_status["links_parsed"]:
+  burlington_status["status"]="PARTIAL_OFFICIAL_PAGE_COLLECTION" if burlington_status["failed_links"] else "OFFICIAL_PAGE_COLLECTION"
+ elif burlington_status["failed_links"]:
+  burlington_status["status"]="SOURCE_ACCESS_OR_PARSE_BLOCKED"
+ burlington_status["application_id_rows_this_stage"]=len([r for r in output if r["city"]=="Burlington"])
+ burlington_status["automated_source_recovered_this_stage"]=bool(burlington_status["application_id_rows_this_stage"])
+ statuses.append(burlington_status)
+ v=dict(city="Vaughan",status="SOURCE_ACCESS_OR_PARSE_BLOCKED",application_id_rows_this_stage=0,
+        automated_source_recovered_this_stage=False)
+ try:
+  body=fetch(VAUGHAN)
+  v_rows=_vaughan_records(body)
+  output.extend(v_rows)
+  v.update(status="OFFICIAL_NOTICE_COLLECTION" if v_rows else "INDEX_FETCHED_NO_FILE_NUMBERS",
+           application_id_rows_this_stage=len(v_rows),
+           automated_source_recovered_this_stage=bool(v_rows))
+ except Exception as error:
+  v["error"]=type(error).__name__+":"+str(error)[:160]
+ statuses.append(v)
+ # A URL or GIS metadata result cannot increase automated application-ID count.
+ statuses.extend(_audit_restricted_sources(root))
+ # A complete baseline applies per city, preserving any prior successful data
+ # if a different city is blocked on the current run.
+ unique={}
+ for row in output:
+  pid=row["project_id"]
+  if pid in unique and (unique[pid]["description"],unique[pid]["current_status"])!=(
+      row["description"],row["current_status"]):
+   # Duplicate official file numbers may legitimately appear on multiple
+   # project pages: require manual identity review instead of picking one.
+   continue
+  unique[pid]=row
+ for row in sorted(unique.values(),key=lambda item:item["project_id"]):
+  pid=row["project_id"];city=row["city"]
+  fingerprint={k:row[k] for k in ("description","current_status","address","record_source_url")}
+  digest=hashlib.sha256(json.dumps(fingerprint,sort_keys=True).encode()).hexdigest()
+  prior=original.get(pid)
+  baseline=not any(k.startswith("OFFICIAL_PAGE:"+city.upper()+":")
+                   or k.startswith("OFFICIAL_NOTICE:"+city.upper()+":") for k in original)
+  obs="INITIAL_BASELINE" if baseline else "FIRST_OBSERVED" if not prior else "RECORD_CHANGED" if digest!=prior["digest"] else "UNCHANGED"
+  row.update(observation=obs,first_seen_local=prior["first_seen_local"] if prior else day)
+  if obs in ("FIRST_OBSERVED","RECORD_CHANGED"):changed.append(row)
+  updated[pid]={"digest":digest,"first_seen_local":row["first_seen_local"]}
+ _write(root/OUTPUT,list(unique.values()))
+ _write(root/CHANGES,changed)
+ if updated!=original:
+  tmp=old_path.with_suffix(".tmp")
+  tmp.write_text(json.dumps({"schema":1,"seen":updated},indent=2),encoding="utf-8")
+  tmp.replace(old_path)
+ report={"status":"COLLECTED" if unique else "NO_AUTOMATIC_RECOVERY",
+    "cities_targeted":5,
+    "automatic_file_id_rows_this_stage":len(unique),
+    "new_or_changed":len(changed),
+    "automatically_recovered_cities":[r["city"] for r in statuses if r.get("automated_source_recovered_this_stage")],
+    "verified_citywide_complete":0,
+    "verified_new_commercial_leads":0,
+    "source_status":statuses,
+    "warning":"Only file IDs read from permitted live official HTML count here. Separate GIS/assisted exports remain independently audited; meeting dates and Radar first-seen dates do not prove original publication, nor do source records prove unawarded work."}
+ (root/STATUS).write_text(json.dumps(report,indent=2),encoding="utf-8")
+ return report

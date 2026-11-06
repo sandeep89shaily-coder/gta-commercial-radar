@@ -1,0 +1,94 @@
+"""Regression for recovery: no file number, no automatic application coverage."""
+import csv,datetime as dt,json
+from pathlib import Path
+from gta_five_city_application_recovery import (
+ run,OUTPUT,CHANGES,STATUS,VAUGHAN,BURLINGTON_INDEX,_burlington_records
+)
+
+BURLINGTON="https://www.burlington.ca/en/news/current-development-projects/1376-1382-plains-rd-e.aspx"
+PAGE="""<main><h1>1376-1382 Plains Road East</h1>
+ <div>Status - Under Review</div>
+ <section><h2>Proposed Development</h2>
+ <p>Development of a 25-storey mixed-use building with ground-floor retail space.</p></section>
+ <section><h2>File Numbers</h2><p>Official Plan 505-10-26 and Zoning 520-11/26</p></section>
+ </main>"""
+VAUGHAN_HTML="""<main><h1>Public Notices</h1>
+<p>City File No.: OP.26.005 & Z.26.018 Subject Land: 8000 Bathurst Street
+Meeting Date: 11/24/2026 Meeting Type: Committee of the Whole (Public Meeting)
+Notice Description: Proposed 35-storey mixed-use development with commercial units.</p>
+</main>"""
+
+def seed(root):
+ with (root/"GTA_RADAR_BURLINGTON_GIS_PROJECTS.csv").open("w",newline="",encoding="utf-8") as f:
+  w=csv.DictWriter(f,fieldnames=["project_id","city","source_url"])
+  w.writeheader()
+  w.writerow({"project_id":"B1","city":"Burlington","source_url":BURLINGTON})
+  w.writerow({"project_id":"B2","city":"Burlington","source_url":"https://evil.example/fake.aspx"})
+
+def fetch(url):
+ if url==BURLINGTON:return PAGE
+ if url==VAUGHAN:return VAUGHAN_HTML
+ raise ValueError("EXPLICITLY_BLOCKED_INDEX")
+
+def test_real_official_ids_and_provenance_first_baseline(tmp_path):
+ seed(tmp_path)
+ result=run(tmp_path,today=dt.date(2026,11,6),fetcher=fetch)
+ assert result["cities_targeted"]==5
+ assert result["automatic_file_id_rows_this_stage"]==4
+ assert result["automatically_recovered_cities"]==["Burlington","Vaughan"]
+ assert result["new_or_changed"]==0
+ with (tmp_path/OUTPUT).open(encoding="utf-8-sig") as f:
+  rows=list(csv.DictReader(f))
+ assert len(rows)==4
+ assert {r["application_id"] for r in rows}=={"505-10-26","520-11/26","OP.26.005","Z.26.018"}
+ assert all(r["source_record_date"]=="" for r in rows)
+ assert all(r["observation"]=="INITIAL_BASELINE" for r in rows)
+ assert result["verified_citywide_complete"]==0
+ assert result["verified_new_commercial_leads"]==0
+
+def test_repeat_is_unchanged_and_change_is_review_not_new_publication(tmp_path):
+ seed(tmp_path)
+ run(tmp_path,today=dt.date(2026,11,6),fetcher=fetch)
+ repeat=run(tmp_path,today=dt.date(2026,11,7),fetcher=fetch)
+ assert repeat["new_or_changed"]==0
+ updated=run(tmp_path,today=dt.date(2026,11,8),
+    fetcher=lambda u:fetch(u).replace("25-storey","26-storey") if u==BURLINGTON else fetch(u))
+ assert updated["new_or_changed"]==2
+ with (tmp_path/CHANGES).open(encoding="utf-8-sig") as f:
+  changes=list(csv.DictReader(f))
+ assert len(changes)==2
+ assert all(r["first_seen_local"]=="2026-11-06" for r in changes)
+
+def test_robots_block_preserves_first_seen_and_reports_failure(tmp_path):
+ seed(tmp_path)
+ run(tmp_path,today=dt.date(2026,11,6),fetcher=fetch)
+ result=run(tmp_path,today=dt.date(2026,11,7),
+    fetcher=lambda url: (_ for _ in ()).throw(ValueError("POLICY_DENIED:robots")))
+ assert result["automatic_file_id_rows_this_stage"]==0
+ assert not result["automatically_recovered_cities"]
+ assert result["new_or_changed"]==0
+ assert json.loads((tmp_path/"GTA_RADAR_FIVE_CITY_OFFICIAL_SEEN.json").read_text())["seen"]
+ again=run(tmp_path,today=dt.date(2026,11,8),fetcher=fetch)
+ assert again["new_or_changed"]==0
+
+def test_false_positive_phone_without_city_id(tmp_path):
+ seed(tmp_path)
+ fake='<main><h1>Industrial Warehouse</h1><section><h2>File Numbers</h2><p>Telephone 905-555-1234</p></section></main>'
+ result=run(tmp_path,fetcher=lambda u:fake)
+ assert result["automatic_file_id_rows_this_stage"]==0
+ assert result["verified_citywide_complete"]==0
+
+def test_other_three_cities_only_audited_no_fake_gis_recovery(tmp_path):
+ (tmp_path/"GTA_RADAR_GGH_OFFICIAL_GIS_STATUS.json").write_text(json.dumps({
+  "source_status":[{"city":"Richmond Hill","state":"FAILED","application_id_rows":0,
+          "error":"ROBOTS_ACCESS_DENIED"},{"city":"Newmarket","state":"FAILED",
+          "application_id_rows":0,"error":"ROBOTS_ACCESS_DENIED"}]}))
+ (tmp_path/"GTA_RADAR_ADDITIONAL_CITY_GIS_STATUS.json").write_text(json.dumps({
+  "source_status":[{"city":"Kitchener","status":"FAILED","commercial_candidates":0,
+          "error":"POLICY_DENIED:robots"}]}))
+ r=run(tmp_path,fetcher=lambda u:(_ for _ in ()).throw(ValueError("403")))
+ remaining={x["city"]:x for x in r["source_status"]}
+ for city in ("Kitchener","Richmond Hill","Newmarket"):
+  assert remaining[city]["application_id_rows_this_stage"]==0
+  assert remaining[city]["automated_source_recovered_this_stage"] is False
+ assert remaining["Newmarket"]["source_failure"]=="ROBOTS_ACCESS_DENIED"
