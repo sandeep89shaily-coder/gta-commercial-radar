@@ -79,14 +79,15 @@ def test_commercial_gate_separates_baseline_past_sourcing_closed_and_changes(tmp
     ]
     write(tmp_path,"GTA_RADAR_REGIONAL_PROJECT_DETAILS.csv",list(regional[0]),regional)
     report=review(tmp_path,today=dt.date(2026,11,6))
-    assert report["review_candidates"]==1
-    assert report["watchlist_records"]==3
+    assert report["review_candidates"]==2
+    assert report["watchlist_records"]==2
     assert report["excluded_source_explicit"]==1
     assert report["verified_open_tenders"]==0
     with (tmp_path/OUTPUT).open(encoding="utf-8-sig") as f: r=list(csv.DictReader(f))
-    assert [x["project_id"] for x in r]==["R2"]
+    assert {x["project_id"] for x in r}=={"R2","C-FUTURE"}
+    assert next(x for x in r if x["project_id"]=="C-FUTURE")["classification"]=="REVIEW_FUTURE_PLANNED"
     with (tmp_path/WATCH).open(encoding="utf-8-sig") as f: w=list(csv.DictReader(f))
-    assert {x["project_id"] for x in w}=={"C-OLD","C-FUTURE","R3"}
+    assert {x["project_id"] for x in w}=={"C-OLD","R3"}
 
 def test_closed_application_and_new_application_not_confused(tmp_path):
     data=[
