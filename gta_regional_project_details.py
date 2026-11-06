@@ -66,13 +66,15 @@ def _approved_document_url(url, project_url, authority):
 
 def _document_priority(label):
     name=_clean(label).lower()
-    if re.search(r"construction notice|tender|notice of commencement|public information",name):
+    if re.search(r"construction notice|tender|construction update",name):
         return 0
-    if re.search(r"project update|budget|report to council|project plan|design",name):
+    if re.search(r"project update|budget|report to council|public information|design",name):
         return 1
+    if re.search(r"notice of commencement|public consultation",name):
+        return 2
     if re.search(r"appendix|appendices|environmental study report",name):
-        return 3
-    return 2
+        return 4
+    return 3
 
 
 def _clean(value):
