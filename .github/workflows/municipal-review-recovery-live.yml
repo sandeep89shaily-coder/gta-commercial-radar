@@ -1,0 +1,27 @@
+name: Municipal notices and regional review gate acceptance
+on:
+  pull_request:
+    paths:
+      - 'gta_municipal_official_notices.py'
+      - 'gta_evidence_backed_commercial_review.py'
+      - 'gta_daily_intelligence.py'
+      - 'tests/test_municipal_review_and_regional_gate.py'
+      - '.github/workflows/municipal-review-recovery-live.yml'
+  workflow_dispatch:
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r requirements.txt pytest
+      - name: Source-independent regressions
+        run: python -m pytest -q tests/test_municipal_review_and_regional_gate.py
+      - name: Access-policy-aware public notice source audit
+        run: |
+          python -c "import json,tempfile;from gta_municipal_official_notices import run;print('MUNICIPAL_OFFICIAL_NOTICES_LIVE_AUDIT',json.dumps(run(tempfile.mkdtemp()),sort_keys=True))"
