@@ -84,6 +84,24 @@ def _candidate_capital(row,year):
   verification_required="Check current City of Toronto tender portal for solicitation, award, contractor, current timing and actual buyer")
  return record
 
+MUNICIPALITIES=("Markham","Vaughan","Richmond Hill","Newmarket","Aurora",
+ "East Gwillimbury","Whitchurch-Stouffville","Georgina","King","Pickering",
+ "Ajax","Brampton","Mississauga","Caledon","Bolton","Cambridge",
+ "Kitchener","Waterloo","Woolwich","Wellesley","North Dumfries",
+ "Wil mot","Wil mot")  # Unambiguous titles/official city markers only
+
+def _municipality(title,body):
+    """Never guess a municipality from the regional owner's headquarters."""
+    title=_text(title)
+    body=_text(body)
+    # Exact titles with a city are usable; a multi-city project remains blank.
+    found=[c for c in MUNICIPALITIES if re.search(r"(?<!\w)"+re.escape(c)+r"(?!\w)",title,re.I)]
+    if len(found)==1:return found[0]
+    if found:return ""
+    found=[c for c in MUNICIPALITIES if re.search(
+        r"\b(?:City|Town|Township|Village)\s+of\s+"+re.escape(c)+r"\b",body,re.I)]
+    return found[0] if len(found)==1 else ""
+
 def _candidate_detail(row,documents):
  authority=_text(row.get("authority"))
  url=_text(row.get("project_url"))
@@ -109,7 +127,7 @@ def _candidate_detail(row,documents):
   priority,why="EXCLUDE","NOT_AN_IDENTIFIED_CONSTRUCTION_PROJECT"
  else:priority,why="PROJECT_STAGE_REVIEW",""
  return dict(record_id=_base(authority,url),source_type="REGIONAL_PROJECT_DETAIL",
-  authority=authority,city="",project_name=title,scope_of_work=excerpt,
+  authority=authority,city=_municipality(title,scope),project_name=title,scope_of_work=excerpt,
   buyer_organization=authority+" Region",
   project_url=url,evidence_document_url=pdf if _source(pdf) else "",
   document_excerpt=pdf_excerpt if _source(pdf) else "",
