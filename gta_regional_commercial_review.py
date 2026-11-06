@@ -88,7 +88,7 @@ MUNICIPALITIES=("Markham","Vaughan","Richmond Hill","Newmarket","Aurora",
  "East Gwillimbury","Whitchurch-Stouffville","Georgina","King","Pickering",
  "Ajax","Brampton","Mississauga","Caledon","Bolton","Cambridge",
  "Kitchener","Waterloo","Woolwich","Wellesley","North Dumfries",
- "Wil mot","Wil mot")  # Unambiguous titles/official city markers only
+ "Wilmot")  # Unambiguous titles/official city markers only
 
 def _municipality(title,body):
     """Never guess a municipality from the regional owner's headquarters."""
