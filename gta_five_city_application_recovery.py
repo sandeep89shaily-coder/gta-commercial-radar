@@ -93,12 +93,30 @@ def _burlington_records(html,url):
  status_match=re.search(r"\bStatus\s*[-:]\s*(Under Review|Pre.Application|On Hold|Approved|Appealed|Refused|Withdrawn)\b",
     heading,re.I)
  status=_text(status_match.group(1)).upper() if status_match else "NOT_VERIFIED"
+ # Capture the bounded Proposed Development section. The legacy saved-page
+ # parser can correctly extract file IDs while missing paragraph scope when
+ # headings and paragraphs share one <section> wrapper.
+ scope=""
+ for node in main.find_all(["h2","h3","h4","strong"]):
+  if "proposed development" not in _text(node.get_text(" ",strip=True)).lower():
+   continue
+  parts=[]
+  for sibling in node.next_siblings:
+   if getattr(sibling,"name",None) in ("h2","h3","h4"):break
+   val=_text(sibling.get_text(" ",strip=True) if hasattr(sibling,"get_text") else sibling)
+   if val:parts.append(val)
+   if len(" ".join(parts))>1100:break
+  if not parts and node.parent:
+   text=_text(node.parent.get_text(" ",strip=True))
+   parts=[re.split(r"\\b(?:File Numbers?|Public Meetings?|Planner on File)\\b",text,1,re.I)[0]]
+  scope=" ".join(parts)[:1000]
+  break
  result=[]
  for source in parsed:
   row=dict(project_id=source["project_id"],city="Burlington",
      application_id=source["application_id"],
      project_title=source["project_title"],
-     address="",description=_text(source.get("description")) or source["project_title"],
+     address="",description=scope or _text(source.get("description")) or source["project_title"],
      current_status=status,source_url=url,record_source_url=url,
      source_record_date="",date_basis="NO_VERIFIED_FIRST_PUBLICATION_DATE",
      provenance="LIVE_OFFICIAL_PROJECT_PAGE_EXPLICIT_FILE_NUMBER",
