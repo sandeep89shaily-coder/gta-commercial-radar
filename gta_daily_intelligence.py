@@ -215,6 +215,7 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
     from gta_ggh_york_official_gis import run as ggh_york_gis_default
     from gta_municipal_official_notices import run as municipal_official_notices_default
     from gta_evidence_backed_commercial_review import run as evidenced_review_default
+    from gta_five_city_recovery_status import run as five_city_status_default
     from gta_ggh_source_access_recovery import run as ggh_source_access_default
     from gta_markham_circulations import run as markham_default
 
@@ -513,6 +514,12 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
     state["vaughan_saved_official_notices"]={k:vaughan_notices.get(k) for k in
         ("status","application_id_rows","new_or_changed",
          "automated_source_recovered","source_authenticity_verified","error")}
+    five_city_recovery=step("five_city_application_access_and_coverage_readiness",
+        lambda:five_city_status_default(root),required=False)
+    state["five_city_recovery"]={k:five_city_recovery.get(k) for k in
+        ("cities_targeted","cities_with_automated_application_candidates",
+         "cities_with_only_assisted_records","verified_citywide_complete",
+         "source_status","warning")}
     three_city_gap=step("three_city_early_planning_application_gate",
         lambda:three_city_gate_default(root),required=True)
     state["three_city_early_planning"]={k:three_city_gap.get(k) for k in
@@ -739,6 +746,8 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
         "<a href='GTA_RADAR_EVIDENCE_BACKED_COMMERCIAL_REVIEW.csv'>Evidence-backed new or changed regional review</a> · "
         "<a href='GTA_RADAR_EVIDENCE_BACKED_PROJECT_WATCHLIST.csv'>Historical and planned capital watchlist</a> · "
         "<a href='GTA_RADAR_EVIDENCE_BACKED_REVIEW_STATUS.json'>Evidence-backed review gate diagnostics</a> · "
+        "<a href='GTA_RADAR_FIVE_CITY_APPLICATION_RECOVERY.csv'>Five-city collection and assisted export recovery</a> · "
+        "<a href='GTA_RADAR_FIVE_CITY_APPLICATION_RECOVERY_STATUS.json'>Five-city publisher access and coverage diagnostics</a> · "
         "<a href='GTA_RADAR_GGH_SOURCE_ACCESS_REQUESTS.md'>Official municipal source access request drafts (unsent)</a> · "
         "<a href='GTA_RADAR_GGH_SOURCE_ACCESS_REQUESTS.csv'>Official municipal source access recovery table</a> · "
         "<a href='GTA_RADAR_GGH_SOURCE_ACCESS_RECOVERY_STATUS.json'>Source access request status</a> · "
