@@ -1,0 +1,27 @@
+name: Toronto capital PDF and Peel regional source acceptance
+on:
+  pull_request:
+    paths:
+      - 'gta_toronto_capital_pipeline.py'
+      - 'gta_regional_early_intelligence.py'
+      - 'requirements.txt'
+      - 'tests/test_regional_capital_peel_recovery.py'
+      - '.github/workflows/regional-capital-peel-live.yml'
+  workflow_dispatch:
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r requirements.txt pytest
+      - name: Offline regressions
+        run: python -m pytest -q tests/test_regional_capital_peel_recovery.py
+      - name: Probe permitted official sources
+        run: |
+          python -c "import json,tempfile;from gta_toronto_capital_pipeline import run as t;from gta_regional_early_intelligence import run as r,SOURCES; a=t(tempfile.mkdtemp()); b=r(tempfile.mkdtemp(),sources={'Peel':SOURCES['Peel'],'Toronto':SOURCES['Toronto']}); print('TORONTO_CAPITAL_LIVE_AUDIT',json.dumps(a,sort_keys=True)); print('PEEL_REGIONAL_LIVE_AUDIT',json.dumps(b,sort_keys=True))"
