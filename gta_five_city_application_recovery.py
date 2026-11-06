@@ -108,7 +108,7 @@ def _burlington_records(html,url):
    if len(" ".join(parts))>1100:break
   if not parts and node.parent:
    text=_text(node.parent.get_text(" ",strip=True))
-   parts=[re.split(r"\\b(?:File Numbers?|Public Meetings?|Planner on File)\\b",text,1,re.I)[0]]
+   parts=[re.split(r"\b(?:File Numbers?|Public Meetings?|Planner on File)\b",text,1,re.I)[0]]
   scope=" ".join(parts)[:1000]
   break
  result=[]
