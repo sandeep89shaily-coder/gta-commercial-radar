@@ -1,0 +1,55 @@
+name: Five-city official notice and regional review source acceptance
+on:
+  pull_request:
+    paths:
+      - 'gta_five_city_application_recovery.py'
+      - 'gta_regional_commercial_review.py'
+      - 'gta_burlington_official_pages.py'
+      - 'gta_collection_truth.py'
+      - 'gta_daily_intelligence.py'
+      - 'tests/test_five_city_application_recovery.py'
+      - 'tests/test_regional_commercial_review_gate.py'
+      - '.github/workflows/five-city-regional-recovery-live.yml'
+  workflow_dispatch:
+jobs:
+  acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r requirements.txt pytest
+      - name: Offline file-ID and procurement-gate regression
+        run: python -m pytest -q tests/test_five_city_application_recovery.py tests/test_regional_commercial_review_gate.py
+      - name: Strict live source audit, never claims citywide completeness
+        run: |
+          python - <<'PY'
+          import csv,json,tempfile
+          from pathlib import Path
+          from gta_five_city_application_recovery import run,VAUGHAN,BURLINGTON_INDEX,_valid_burlington
+          from gta_regional_early_intelligence import _fetch
+          t=Path(tempfile.mkdtemp())
+          result=run(t)
+          print("FIVE_CITY_LIVE_AUDIT",json.dumps(result,sort_keys=True))
+          # A full official GIS export is not required for the live audit.
+          # Explicit official-page fetch and file-number parsing probes:
+          for name,url in (("Burlington","https://www.burlington.ca/en/news/current-development-projects/1376-1382-plains-rd-e.aspx"),("Vaughan",VAUGHAN)):
+              item={"city":name,"url":url,"status":"NO_PROVEN_APPLICATION_ID"}
+              try:
+                  html=_fetch(url)
+                  if name=="Burlington":
+                      from gta_five_city_application_recovery import _burlington_records
+                      found=_burlington_records(html,url)
+                  else:
+                      from gta_five_city_application_recovery import _vaughan_records
+                      found=_vaughan_records(html)
+                  item.update(status="OFFICIAL_PAGE_IDS_EXTRACTED" if found else "NO_EXACT_IDS",
+                              extracted_ids=len(found),sample_ids=[x["application_id"] for x in found[:4]])
+              except Exception as e:
+                  item.update(status="ACCESS_OR_PARSER_FAILURE",error=type(e).__name__+":"+str(e)[:160])
+              print("OFFICIAL_NOTICE_LIVE_PROBE",json.dumps(item,sort_keys=True))
+          PY
