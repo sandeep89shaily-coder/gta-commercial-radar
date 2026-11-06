@@ -45,6 +45,34 @@ STAGES = (
     ("ASSESSMENT", re.compile(r"\b(?:environmental assessment|public information centre|feasibility study)\b", re.I)),
 )
 DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+WATERLOO_CDN_HOST="media-003-ca.cdn.govstack.com"
+WATERLOO_CDN_PATH="/regionofwaterloo-018-ca/media/"
+
+def _approved_document_url(url, project_url, authority):
+    """Publisher-linked, fixed-host PDF only, not general cross-site scraping."""
+    try:
+        p=urlparse(url)
+        if (p.scheme!="https" or p.port not in (None,443) or p.username or
+            p.password or p.query or p.fragment or not p.path.lower().endswith(".pdf")):
+            return False
+        if _safe_url(url,project_url):
+            return True
+        return (authority=="Waterloo" and
+                urlparse(project_url).hostname=="www.regionofwaterloo.ca" and
+                p.hostname==WATERLOO_CDN_HOST and
+                p.path.startswith(WATERLOO_CDN_PATH))
+    except ValueError:
+        return False
+
+def _document_priority(label):
+    name=_clean(label).lower()
+    if re.search(r"construction notice|tender|notice of commencement|public information",name):
+        return 0
+    if re.search(r"project update|budget|report to council|project plan|design",name):
+        return 1
+    if re.search(r"appendix|appendices|environmental study report",name):
+        return 3
+    return 2
 
 
 def _clean(value):
@@ -99,12 +127,18 @@ def _evidence(html, source):
     pdf_count = 0
     accepted_pdfs = []
     source_url = source.get("source_url", "")
+    authority = source.get("authority", "")
+    eligible = []
     for tag in main.find_all("a", href=True):
         candidate = urljoin(source_url, str(tag["href"]).strip()) if source_url else ""
         if not candidate or not urlparse(candidate).path.lower().endswith(".pdf"):
             continue
         pdf_count += 1
-        if _safe_url(candidate, source_url) and candidate not in accepted_pdfs:
+        if _approved_document_url(candidate, source_url, authority):
+            label = tag.get_text(" ", strip=True)
+            eligible.append((_document_priority(label), candidate))
+    for _, candidate in sorted(eligible, key=lambda item: item[0]):
+        if candidate not in accepted_pdfs:
             accepted_pdfs.append(candidate)
         if len(accepted_pdfs) >= 8:
             break
