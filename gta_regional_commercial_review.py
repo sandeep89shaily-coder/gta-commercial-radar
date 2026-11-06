@@ -24,10 +24,18 @@ COLUMNS=("record_id","source_type","authority","city","project_name","scope_of_w
  "priority","rejection_reason","source_verified_as_official",
  "verified_open_tender","verification_required")
 CLOSED=re.compile(r"\b(?:awarded|award(?:ed)?\s+to|contract\s+executed|"
-                  r"construction\s+(?:completed|finished)|"
-                  r"project\s+(?:completed|cancelled|canceled|terminated)|"
+                  r"(?:construction|project|work)\s+(?:was\s+|has\s+been\s+|is\s+)?(?:completed|finished)|"
+                  r"project\s+(?:cancelled|canceled|terminated)|"
                   r"work\s+is\s+complete|permanently\s+closed|"
                   r"no longer proceeding)\b",re.I)
+NEGATED_AWARD=re.compile(r"\b(?:not\s+(?:yet\s+)?awarded|has\s+not\s+been\s+awarded|"
+                         r"not\s+yet\s+been\s+awarded|never\s+awarded)\b",re.I)
+
+def _affirmative_closed(text):
+    # Explicit negative award statements are not proof of a finalized contract.
+    # Remove only the negative phrase; any separate positive award/completion
+    # evidence still triggers exclusion.
+    return bool(CLOSED.search(NEGATED_AWARD.sub("",text)))
 STARTED=re.compile(r"\b(?:construction\s+(?:began|started|is underway|commenced)|"
                    r"under construction|in construction|work\s+(?:has\s+)?commenced)\b",re.I)
 PROJECT=re.compile(r"\b(?:construction|building|upgrade|expansion|installation|"
@@ -64,7 +72,7 @@ def _candidate_capital(row,year):
  target=_text(row.get("target_sourcing_year"))
  priority="MONITOR_PLANNED" if target.isdigit() and int(target)>=year else "RECHECK_HISTORICAL"
  reason="" if priority=="MONITOR_PLANNED" else "PLANNED_SOURCING_YEAR_BEFORE_CURRENT_YEAR_OR_MISSING"
- rejection="EXPLICIT_AWARDED_OR_COMPLETED" if CLOSED.search(title+" "+scope) else reason
+ rejection="EXPLICIT_AWARDED_OR_COMPLETED" if _affirmative_closed(title+" "+scope) else reason
  if rejection=="EXPLICIT_AWARDED_OR_COMPLETED":priority="EXCLUDE"
  record=dict(record_id=_base("Toronto",title.casefold()),source_type="TORONTO_CAPITAL_PDF",
   authority="Toronto",city="Toronto",project_name=title,scope_of_work=scope,
@@ -119,7 +127,7 @@ def _candidate_detail(row,documents):
  low=bool(LOW_VALUE.search(title)) or not PROJECT.search(context)
  # A historical status does not become a newly open opportunity simply
  # because the page is still hosted. Contradictory language stays for review.
- if CLOSED.search(context):
+ if _affirmative_closed(context):
   priority,why="EXCLUDE","EXPLICIT_AWARDED_OR_COMPLETED"
  elif STARTED.search(context) or stage=="CONSTRUCTION":
   priority,why="RECHECK_IN_PROGRESS","CONSTRUCTION_ALREADY_STARTED_OR_UNCLEAR"
