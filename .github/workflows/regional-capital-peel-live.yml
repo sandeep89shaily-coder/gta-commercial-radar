@@ -25,3 +25,32 @@ jobs:
       - name: Probe permitted official sources
         run: |
           python -c "import json,tempfile;from gta_toronto_capital_pipeline import run as t;from gta_regional_early_intelligence import run as r,SOURCES; a=t(tempfile.mkdtemp()); b=r(tempfile.mkdtemp(),sources={'Peel':SOURCES['Peel'],'Toronto':SOURCES['Toronto']}); print('TORONTO_CAPITAL_LIVE_AUDIT',json.dumps(a,sort_keys=True)); print('PEEL_REGIONAL_LIVE_AUDIT',json.dumps(b,sort_keys=True))"
+
+      - name: Probe one permitted publisher-linked Waterloo document
+        run: |
+          python - <<'PY'
+          import json
+          from gta_regional_early_intelligence import _fetch
+          from gta_regional_project_details import _evidence
+          from gta_regional_document_evidence import _fetch_pdf,_evidence as document_evidence
+          url="https://www.regionofwaterloo.ca/programs-and-services/roads-and-transportation/road-construction/construction-projects/maple-grove-road/"
+          result={"source":url,"accepted_document_links":0,"readable_document":False,"problems":[]}
+          try:
+              html=_fetch(url)
+              found=_evidence(html,{"source_url":url,"project_title":"Maple Grove Road","authority":"Waterloo"})
+              links=json.loads(found["official_pdf_urls_json"])
+              result["accepted_document_links"]=len(links)
+              for pdf_url in links[:2]:
+                  try:
+                      data=_fetch_pdf(pdf_url)
+                      extracted=document_evidence(data)
+                      result["readable_document"]=True
+                      result["source_pdf"]=pdf_url
+                      result["evidence_excerpt"]=extracted["evidence_excerpt"][:120]
+                      break
+                  except Exception as error:
+                      result["problems"].append(type(error).__name__+":"+str(error)[:140])
+          except Exception as error:
+              result["problems"].append(type(error).__name__+":"+str(error)[:140])
+          print("WATERLOO_PUBLISHER_CDN_LIVE_AUDIT",json.dumps(result,sort_keys=True))
+          PY
