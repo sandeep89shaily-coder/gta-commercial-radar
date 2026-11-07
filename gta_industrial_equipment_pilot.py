@@ -437,10 +437,10 @@ def run(out, *, db=None, notice_csv=None, results=None, fetch_official=False,
             max(0,len(cards) - __import__("gta_industrial_review_cursor").reviewed_count(visited))
             if visited is not None else 0),
         "ero_notices_selected_this_run": len(chosen),
-        "same_site_candidate_links": sum(s["project_match_status"] ==
+        "same_site_candidate_links": sum(s.get("project_match_status") ==
             "UNVERIFIED_SINGLE_SITE_CANDIDATE" for s in signals),
         "description_only_site_history_links": sum(
-            r["same_site_history_status"] == "UNVERIFIED_DESCRIPTION_ONLY_SITE_CONTEXT"
+            r.get("same_site_history_status") == "UNVERIFIED_DESCRIPTION_ONLY_SITE_CONTEXT"
             for r in signals),
         "verified_buyers": 0, "verified_open_procurement": 0,
         "limitations": [
