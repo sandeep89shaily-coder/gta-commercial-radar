@@ -97,7 +97,7 @@ def _section(soup, heading, max_chars=25000):
     }
     stops = terminators.get(heading.casefold())
     if stops:
-        lines = [x.strip() for x in soup.get_text("\\n", strip=True).splitlines() if x.strip()]
+        lines = [x.strip() for x in soup.get_text("\n", strip=True).splitlines() if x.strip()]
         for i, line in enumerate(lines):
             if line.casefold() != heading.casefold():
                 continue
@@ -105,7 +105,7 @@ def _section(soup, heading, max_chars=25000):
                         if lines[j].casefold() in stops), None)
             if end is None:
                 continue  # Unbounded page/footer text is not valid source evidence.
-            portion = "\\n".join(lines[i+1:end])[:max_chars]
+            portion = "\n".join(lines[i+1:end])[:max_chars]
             if portion:
                 return portion
     return ""
