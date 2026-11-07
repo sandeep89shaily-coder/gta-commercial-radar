@@ -122,6 +122,39 @@ class OfficialNoticeDetailTests(unittest.TestCase):
         self.assertIn("cooling tower", row["proposal_details"])
         self.assertNotIn("boiler", row["proposal_details"])
 
+    def test_styled_label_without_heading_tags_is_supported_only_with_bounds(self):
+        page = """<html><body><h1>Food Manufacturer - Air approval</h1>
+          <div>ERO (Environmental Registry of Ontario) number</div><div>026-1152</div>
+          <div>Notice stage</div><div>Proposal</div>
+          <div>Proposal posted</div><div>November 6, 2026</div>
+          <div class='label'>Site address</div>
+          <div>2714 Bristol Circle<br>Oakville, ON<br>L6H 6A1<br>Canada</div>
+          <div>Site location map</div>
+          <div>Proponent(s)</div>
+          <div>Pinty's Delicious Foods Inc.</div><div>5063 North Service Road</div>
+          <div>Proposal details</div>
+          <div>This application is to replace Line 3 dust collector with a scrubber.</div>
+          <div>Supporting materials</div>
+          <div>This unrelated page footer includes a new boiler.</div>
+        </body></html>"""
+        row = detail.parse_notice_html(
+            page, "026-1152", "https://ero.ontario.ca/notice/026-1152")
+        self.assertEqual(row["site_address"], "2714 Bristol Circle")
+        self.assertEqual(row["city"], "Oakville")
+        self.assertIn("dust collector", row["proposal_details"])
+        self.assertNotIn("unrelated page footer", row["proposal_details"])
+
+    def test_styled_label_without_safe_end_is_rejected(self):
+        page = """<html><body><h1>Food Manufacturer - Air approval</h1>
+        <p>ERO (Environmental Registry of Ontario) number 026-1152</p>
+        <p>Notice stage Proposal</p>
+        <div>Proposal details</div>
+        <div>New equipment is not documented here.</div>
+        </body></html>"""
+        with self.assertRaisesRegex(ValueError, "PROPOSAL_DETAILS_MISSING"):
+            detail.parse_notice_html(
+                page, "026-1152", "https://ero.ontario.ca/notice/026-1152")
+
     def test_requires_exact_notice_id_and_explicit_site(self):
         url = "https://ero.ontario.ca/notice/026-0424"
         cases = [
