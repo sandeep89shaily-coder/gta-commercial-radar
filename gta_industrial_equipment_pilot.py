@@ -78,7 +78,9 @@ COLUMNS = (
     "radar_first_seen_at", "radar_record_present", "equipment", "action", "replacement_equipment",
     "official_excerpt", "evidence_basis", "source_text_sha256", "retrieved_at",
     "project_match_status",
-    "related_project_id", "related_project_source_url", "procurement_status",
+    "related_project_id", "related_project_source_url",
+    "same_site_history_id", "same_site_history_url", "same_site_history_status",
+    "procurement_status",
     "buyer_verified", "review_status",
 )
 
@@ -252,21 +254,37 @@ def equipment_changes(text):
     return found
 
 def _projects(results):
+    """Structured project address index and independent description-only site history.
+
+    Description-only entries cannot establish a verified project join: they are
+    archived facility context until the actual application is separately checked.
+    """
     index = {}
+    site_history = []
     if results is None:
-        return index
+        return index, site_history
     for name in PROJECT_FILES:
         for row in _read_csv(Path(results) / name):
             address = _norm_address(row.get("address"))
             city = _str(row.get("city") or row.get("municipality")).casefold()
             pid = _str(row.get("project_id") or row.get("canonical_id"))
-            if not address or not city or not pid:
+            if not city or not pid:
+                continue
+            if not address:
+                if name == "GTA_RADAR_COLLECTION_MASTER.csv" and _str(row.get("record_kind")) == "APPLICATION_ID":
+                    description = _norm_address(row.get("description"))
+                    source = _str(row.get("evidence_urls")).split(" | ")[0]
+                    if description and source.startswith("https://"):
+                        site_history.append({
+                            "city": city, "description": description,
+                            "record_id": pid, "source_url": source,
+                        })
                 continue
             index.setdefault((address, city), []).append({
                 "project_id": pid,
                 "source_url": _str(row.get("source_url") or row.get("record_source_url")),
             })
-    return index
+    return index, site_history
 
 def run(out, *, db=None, notice_csv=None, results=None, fetch_official=False,
         fetch_limit=5, official_fetcher=None):
@@ -286,7 +304,7 @@ def run(out, *, db=None, notice_csv=None, results=None, fetch_official=False,
         for record in fetched:
             if _number(record.get("ero_number")) and record["ero_number"] not in notices:
                 notices[record["ero_number"]] = record
-    projects = _projects(results)
+    projects, site_history = _projects(results)
     signals = []
     site_exclusions = []
     for number, notice in sorted(notices.items()):
@@ -306,6 +324,13 @@ def run(out, *, db=None, notice_csv=None, results=None, fetch_official=False,
         city = _str(notice.get("city")).casefold()
         candidates = projects.get((address, city), []) if address and city else []
         matched = list({p["project_id"]: p for p in candidates}.values())
+        # A legacy Oakville site-plan record can carry its civic address only in
+        # the project description. This is a SITE HISTORY link, not proof the
+        # ERO equipment is part of that municipal application.
+        old_refs = [h for h in site_history if h["city"] == city and address
+                    and re.search(r"(?<![a-z0-9])" + re.escape(address)
+                                  + r"(?![a-z0-9])", h["description"])]
+        old_refs = list({h["record_id"]: h for h in old_refs}.values())
         for finding in equipment_changes(notice["proposal_details"]):
             sid = hashlib.sha256(
                 (number + "|" + finding["equipment"] + "|" + finding["action"] + "|" + finding.get("replacement_equipment", "")).encode()
@@ -321,6 +346,12 @@ def run(out, *, db=None, notice_csv=None, results=None, fetch_official=False,
                 "project_match_status": relation,
                 "related_project_id": matched[0]["project_id"] if len(matched) == 1 else "",
                 "related_project_source_url": matched[0]["source_url"] if len(matched) == 1 else "",
+                "same_site_history_id": old_refs[0]["record_id"] if len(old_refs) == 1 else "",
+                "same_site_history_url": old_refs[0]["source_url"] if len(old_refs) == 1 else "",
+                "same_site_history_status": (
+                    "UNVERIFIED_DESCRIPTION_ONLY_SITE_CONTEXT" if len(old_refs) == 1 else
+                    "MULTIPLE_DESCRIPTION_SITE_RECORDS_REVIEW" if old_refs else "NONE"
+                ),
                 "procurement_status": "UNKNOWN", "buyer_verified": "NO",
                 "review_status": "HISTORICAL_DECISION_REVIEW_ONLY" if
                     _str(notice.get("notice_stage")).casefold() == "decision"
@@ -358,11 +389,15 @@ def run(out, *, db=None, notice_csv=None, results=None, fetch_official=False,
         "equipment_change_candidates": len(signals),
         "same_site_candidate_links": sum(s["project_match_status"] ==
             "UNVERIFIED_SINGLE_SITE_CANDIDATE" for s in signals),
+        "description_only_site_history_links": sum(
+            r["same_site_history_status"] == "UNVERIFIED_DESCRIPTION_ONLY_SITE_CONTEXT"
+            for r in signals),
         "verified_buyers": 0, "verified_open_procurement": 0,
         "limitations": [
             "ERO search cards do not establish full proposal equipment scope",
             "Notice CSV excerpts need manual verification against original ERO pages",
             "Matching address and city never proves same project or purchasing authority",
+            "Matching text-embedded addresses creates separate unverified site history only",
             "Optional live fetch requires robots permission and human review; no outreach",
         ],
         "csv": str(out / OUTPUT), "html": str(out / HTML),
