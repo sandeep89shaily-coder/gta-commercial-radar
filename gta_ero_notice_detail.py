@@ -55,26 +55,35 @@ def _date_after(text, name):
         return ""
 
 def _section(soup, heading, max_chars=25000):
-    for tag in soup.find_all(("h2", "h3", "h4")):
+    """Read an ERO section by *document order*, not immediate HTML siblings.
+
+    On ERO's rendered pages, headings and their paragraphs can be enclosed in
+    separate nested <div> wrappers. A heading.next_siblings traversal then
+    returns no content, even though the visible proposal details are present.
+    Stop on the next equal/higher-level heading; never cross into other notices
+    or unrelated sections.
+    """
+    from bs4 import NavigableString
+    for tag in soup.find_all(("h2", "h3", "h4", "h5")):
         if " ".join(tag.stripped_strings).strip().casefold() != heading.casefold():
             continue
-        out = []
         rank = int(tag.name[1])
-        for sibling in tag.next_siblings:
-            name = getattr(sibling, "name", None)
+        parts = []
+        for node in tag.next_elements:
+            name = getattr(node, "name", None)
             if name and re.fullmatch(r"h[1-6]", name) and int(name[1]) <= rank:
                 break
-            if name in ("script", "style", "noscript", "form"):
+            if not isinstance(node, NavigableString):
                 continue
-            if hasattr(sibling, "get_text"):
-                t = sibling.get_text("\n", strip=True)
-            else:
-                t = str(sibling).strip()
-            if t:
-                out.append(t)
-        result = "\n".join(out)
-        if result:
-            return result[:max_chars]
+            if tag in node.parents or node.find_parent(("script", "style", "noscript", "form")):
+                continue
+            word = " ".join(str(node).split()).strip()
+            if word:
+                parts.append(word)
+            if sum(len(x) for x in parts) > max_chars + 500:
+                break
+        if parts:
+            return "\n".join(parts)[:max_chars]
     return ""
 
 def parse_notice_html(page_html, expected_number, source_url):
