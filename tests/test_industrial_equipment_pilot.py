@@ -21,8 +21,10 @@ class IndustrialEquipmentPilotTests(unittest.TestCase):
         text = ("This application is to replace Line 3 dust collector with a scrubber. "
                 "The sources at the facility include scrubber; boilers; heaters; cooling tower.")
         found = pilot.equipment_changes(text)
-        self.assertEqual({x["equipment"] for x in found}, {"Dust collection", "Scrubber"})
-        self.assertEqual({x["action"] for x in found}, {"REPLACEMENT"})
+        self.assertEqual(len(found), 1)
+        self.assertEqual(found[0]["equipment"], "Dust collection")
+        self.assertEqual(found[0]["action"], "REPLACEMENT")
+        self.assertEqual(found[0]["replacement_equipment"], "Scrubber")
         self.assertFalse(any(x["equipment"] == "Boiler" for x in found))
 
     def test_inventory_and_generic_approval_are_not_purchases(self):
@@ -32,6 +34,25 @@ class IndustrialEquipmentPilotTests(unittest.TestCase):
                      "This is a renewal with no changes to existing scrubbers."):
             with self.subTest(text=text):
                 self.assertEqual(pilot.equipment_changes(text), [])
+
+    def test_real_pintys_sentence_does_not_invent_scrubber_removal(self):
+        text = ("This application is to replace Line 3 dust collector with a scrubber "
+                "and remove the limited operational flexibility condition. "
+                "The sources at the facility include scrubber; boilers; heaters; "
+                "cooling tower; fryers and ovens.")
+        result = pilot.equipment_changes(text)
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["equipment"], "Dust collection")
+        self.assertEqual(result[0]["action"], "REPLACEMENT")
+        self.assertEqual(result[0]["replacement_equipment"], "Scrubber")
+        self.assertNotIn("REMOVAL", {x["action"] for x in result})
+
+    def test_distinct_physical_removal_not_confused_with_permit_condition(self):
+        changes = pilot.equipment_changes(
+            "Replace the dust collector with a scrubber and remove the old boiler.")
+        self.assertEqual({(x["equipment"], x["action"]) for x in changes},
+                         {("Dust collection", "REPLACEMENT"), ("Boiler", "REMOVAL")})
+        self.assertEqual(changes[0]["replacement_equipment"], "Scrubber")
 
     def test_candidate_never_marked_open_or_verified(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -54,8 +75,8 @@ class IndustrialEquipmentPilotTests(unittest.TestCase):
                 "city": "Oakville", "source_url": "https://www.oakville.ca/planning/0001"
             }])
             summary = pilot.run(root / "output", notice_csv=docs, results=results)
-            self.assertEqual(summary["equipment_change_candidates"], 2)
-            self.assertEqual(summary["same_site_candidate_links"], 2)
+            self.assertEqual(summary["equipment_change_candidates"], 1)
+            self.assertEqual(summary["same_site_candidate_links"], 1)
             self.assertEqual(summary["verified_open_procurement"], 0)
             rows = pilot._read_csv(root / "output" / pilot.OUTPUT)
             self.assertTrue(all(row["procurement_status"] == "UNKNOWN" for row in rows))
