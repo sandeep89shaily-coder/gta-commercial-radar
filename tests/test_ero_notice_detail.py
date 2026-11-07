@@ -155,6 +155,19 @@ class OfficialNoticeDetailTests(unittest.TestCase):
             detail.parse_notice_html(
                 page, "026-1152", "https://ero.ontario.ca/notice/026-1152")
 
+    def test_extra_lot_concession_line_before_site_city(self):
+        page = example_html().replace(
+            "185 Belfield Road<br>Etobicoke, ON<br>Canada",
+            "1660 Union Avenue<br>Lots 9 &amp; 10, Concession 1<br>Kingsville, ON<br>N9Y 2M6<br>Canada",
+            1
+        )
+        row = detail.parse_notice_html(
+            page, "026-0424", "https://ero.ontario.ca/notice/026-0424")
+        self.assertEqual(row["site_address"], "1660 Union Avenue")
+        self.assertEqual(row["city"], "Kingsville")
+        # Kingsville is outside the pilot's Southern Ontario target-city gate.
+        self.assertNotIn(row["city"].lower(), pilot.TARGET_CITIES)
+
     def test_requires_exact_notice_id_and_explicit_site(self):
         url = "https://ero.ontario.ca/notice/026-0424"
         cases = [
