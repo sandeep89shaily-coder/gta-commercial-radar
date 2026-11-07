@@ -72,10 +72,11 @@ INVENTORY = re.compile(
     re.I,
 )
 COLUMNS = (
-    "signal_id", "ero_number", "official_notice_url", "notice_stage",
+    "signal_id", "ero_number", "official_notice_url", "notice_stage", "decision_posted",
     "proponent", "site_address", "city", "proposal_posted",
     "radar_first_seen_at", "radar_record_present", "equipment", "action",
-    "official_excerpt", "evidence_basis", "project_match_status",
+    "official_excerpt", "evidence_basis", "source_text_sha256", "retrieved_at",
+    "project_match_status",
     "related_project_id", "related_project_source_url", "procurement_status",
     "buyer_verified", "review_status",
 )
@@ -222,13 +223,24 @@ def _projects(results):
             })
     return index
 
-def run(out, *, db=None, notice_csv=None, results=None):
+def run(out, *, db=None, notice_csv=None, results=None, fetch_official=False,
+        fetch_limit=5, official_fetcher=None):
     if db is None and notice_csv is None:
-        raise ValueError("Provide --db and/or --notice-csv; no auto-fetch is performed")
+        raise ValueError("Provide --db and/or --notice-csv")
+    if fetch_official and db is None:
+        raise ValueError("--fetch-official needs the existing --db ERO ledger")
     out = Path(out)
     out.mkdir(parents=True, exist_ok=True)
     cards = read_radar_ero(db)
     notices, rejected = _notices(notice_csv)
+    fetch_audit = []
+    if fetch_official:
+        from gta_ero_notice_detail import fetch_notice_details
+        fetched, fetch_audit = (official_fetcher or fetch_notice_details)(
+            cards, max_notices=fetch_limit)
+        for record in fetched:
+            if _number(record.get("ero_number")) and record["ero_number"] not in notices:
+                notices[record["ero_number"]] = record
     projects = _projects(results)
     signals = []
     site_exclusions = []
@@ -247,7 +259,8 @@ def run(out, *, db=None, notice_csv=None, results=None):
         }
         address = _norm_address(notice.get("site_address"))
         city = _str(notice.get("city")).casefold()
-        matched = projects.get((address, city), []) if address and city else []
+        candidates = projects.get((address, city), []) if address and city else []
+        matched = list({p["project_id"]: p for p in candidates}.values())
         for finding in equipment_changes(notice["proposal_details"]):
             sid = hashlib.sha256(
                 (number + "|" + finding["equipment"] + "|" + finding["action"]).encode()
@@ -258,12 +271,15 @@ def run(out, *, db=None, notice_csv=None, results=None):
                         "NO_PROJECT_MATCH")
             signals.append({
                 **base, **finding, "signal_id": sid,
-                "evidence_basis": "USER_SUPPLIED_OFFICIAL_NOTICE_EXCERPT_NOT_LIVE_RECHECKED",
+                "evidence_basis": notice.get("content_provenance") or
+                    "USER_SUPPLIED_OFFICIAL_NOTICE_EXCERPT_NOT_LIVE_RECHECKED",
                 "project_match_status": relation,
                 "related_project_id": matched[0]["project_id"] if len(matched) == 1 else "",
                 "related_project_source_url": matched[0]["source_url"] if len(matched) == 1 else "",
                 "procurement_status": "UNKNOWN", "buyer_verified": "NO",
-                "review_status": "MANUAL_REVIEW_REQUIRED",
+                "review_status": "HISTORICAL_DECISION_REVIEW_ONLY" if
+                    _str(notice.get("notice_stage")).casefold() == "decision"
+                    else "MANUAL_REVIEW_REQUIRED",
             })
     with (out / OUTPUT).open("w", encoding="utf-8-sig", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=COLUMNS, extrasaction="ignore")
@@ -287,10 +303,12 @@ def run(out, *, db=None, notice_csv=None, results=None):
         "</table></body></html>", encoding="utf-8"
     )
     summary = {
-        "mode": "OFFLINE_REVIEW_ONLY_NO_LIVE_FETCH_NO_PAID_AI",
+        "mode": "BOUNDED_OFFICIAL_FETCH_REVIEW_ONLY" if fetch_official else
+                "OFFLINE_REVIEW_ONLY_NO_LIVE_FETCH_NO_PAID_AI",
         "ero_cards_in_existing_ledger": len(cards),
         "official_notice_excerpts_loaded": len(notices),
         "rejected_notice_rows": rejected,
+        "official_fetch_audit": fetch_audit,
         "excluded_out_of_scope_sites": site_exclusions,
         "equipment_change_candidates": len(signals),
         "same_site_candidate_links": sum(s["project_match_status"] ==
@@ -300,7 +318,7 @@ def run(out, *, db=None, notice_csv=None, results=None):
             "ERO search cards do not establish full proposal equipment scope",
             "Notice CSV excerpts need manual verification against original ERO pages",
             "Matching address and city never proves same project or purchasing authority",
-            "No live source retrieval, enrichment of missing notice details, or outreach",
+            "Optional live fetch requires robots permission and human review; no outreach",
         ],
         "csv": str(out / OUTPUT), "html": str(out / HTML),
     }
@@ -310,12 +328,17 @@ def run(out, *, db=None, notice_csv=None, results=None):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--db", type=Path, help="Existing data/radar.sqlite, read-only")
+    parser.add_argument("--fetch-official", action="store_true",
+                        help="Opt-in bounded ERO detail fetch, robots-gated; not scheduled")
+    parser.add_argument("--fetch-limit", type=int, default=5,
+                        help="Maximum ERO pages to try; hard capped at 10")
     parser.add_argument("--notice-csv", type=Path, help="Official ERO notice excerpts entered for review")
     parser.add_argument("--results", type=Path, help="Existing GTA_RADAR_RESULTS directory, read-only")
     parser.add_argument("--out", type=Path, required=True, help="Separate pilot output directory")
     args = parser.parse_args()
     print(json.dumps(run(args.out, db=args.db, notice_csv=args.notice_csv,
-                         results=args.results), indent=2))
+                         results=args.results, fetch_official=args.fetch_official,
+                         fetch_limit=args.fetch_limit), indent=2))
 
 if __name__ == "__main__":
     main()
