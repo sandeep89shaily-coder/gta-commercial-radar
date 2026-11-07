@@ -104,8 +104,10 @@ class OfficialNoticeDetailTests(unittest.TestCase):
         self.assertIn("scrubber", row["proposal_details"])
         self.assertNotIn("Supporting materials", row["proposal_details"])
         changes = pilot.equipment_changes(row["proposal_details"])
-        self.assertEqual({x["equipment"] for x in changes},
-                         {"Dust collection", "Scrubber"})
+        self.assertEqual(len(changes), 1)
+        self.assertEqual(changes[0]["equipment"], "Dust collection")
+        self.assertEqual(changes[0]["action"], "REPLACEMENT")
+        self.assertEqual(changes[0]["replacement_equipment"], "Scrubber")
 
     def test_nested_heading_does_not_steal_following_section(self):
         page = """<html><body><h1>Example - ECA</h1>
