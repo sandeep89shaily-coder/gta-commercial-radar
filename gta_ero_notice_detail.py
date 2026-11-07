@@ -159,7 +159,15 @@ def parse_notice_html(page_html, expected_number, source_url):
     if len(lines) < 2:
         raise ValueError("EXPLICIT_SITE_CITY_MISSING")
     address = lines[0]
-    city_match = re.match(r"^([A-Za-z .'-]+),\s*(?:ON|Ontario)\b", lines[1], re.I)
+    # ERO site addresses may contain a lot/concession line between the street
+    # and locality (e.g. Five Star Farms, 1660 Union Avenue, Kingsville).
+    # Search only within the bounded labelled SITE ADDRESS section and never
+    # use a proponent/mailing address or a page footer as a fallback.
+    city_match = next(
+        (m for part in lines[1:8]
+         if (m := re.match(r"^([A-Za-z .'-]+),\s*(?:ON|Ontario)\b", part, re.I))),
+        None
+    )
     if not city_match:
         raise ValueError("EXPLICIT_SITE_CITY_MISSING")
     city = city_match.group(1).strip()
