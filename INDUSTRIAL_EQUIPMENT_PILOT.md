@@ -26,6 +26,20 @@ Recommended fields: `proponent,site_address,city,proposal_posted,notice_stage`. 
 
 The sample includes short official excerpts from <https://ero.ontario.ca/notice/026-1152> (Pinty's Delicious Foods Inc., Oakville; proposal posted 2026-11-06) and <https://ero.ontario.ca/notice/026-0424> (Bunge Loders Croklaan Canada Inc., Toronto; originally proposed 2026-04-17 and **decision already granted** on 2026-08-13). These are **two research examples**, not a live test of coverage or verified supplier opportunities.
 
+## Opt-in official notice retrieval (experimental)
+
+The pilot can now request up to **10 full ERO notices per run** from exact notice URLs already in Radar's read-only ERO ledger. It checks `https://ero.ontario.ca/robots.txt` first and **refuses all notice requests if robots policy is unavailable or disallows access**. It does not follow redirects, bypass restrictions, scrape search-engine results, fetch attachments or run AI. Its page requests are capped and delayed.
+
+```bat
+py -3 gta_industrial_equipment_pilot.py --db "%USERPROFILE%\Desktop\new data\data\radar.sqlite" --results "%USERPROFILE%\Desktop\new data\GTA_RADAR_RESULTS" --fetch-official --fetch-limit 5 --out "%USERPROFILE%\Desktop\new data\GTA_RADAR_RESULTS\INDUSTRIAL_PILOT"
+```
+
+Use the **actual** established workspace path if it differs. The command is intentionally separate from the normal one-click daily launcher and **must not be scheduled** before site permissions, HTML field extraction, and coverage have been checked live. Both successful and failed URL attempts are included in the status JSON. A successful GET does not mean equipment extraction succeeded.
+
+The extractor takes only the ERO page's labelled **Proposal details**, exact notice identity, explicit **Site address**, current stage and posted dates; it never treats the proponent's mailing address as the facility. An already-decided notice is marked `HISTORICAL_DECISION_REVIEW_ONLY`, not a newly available equipment purchase. ERO page layouts can change, so unrecognized pages fail closed. It also rejects out-of-scope cities such as Dresden even if a company name contains "York".
+
+**Live-source acceptance remains unverified until the command succeeds on your Windows workspace with current robots access and the resulting original ERO pages have been manually checked.** Offline parser tests are not a substitute for live source coverage.
+
 ## Outputs
 
 In the separate `INDUSTRIAL_PILOT` output directory:
