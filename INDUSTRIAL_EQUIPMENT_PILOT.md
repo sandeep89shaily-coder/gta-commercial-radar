@@ -10,7 +10,7 @@ The existing enabled source `ero_gta_environmental_instruments` stores ERO searc
 
 Double-click **`RUN_INDUSTRIAL_EQUIPMENT_PILOT.bat`** in the updated Radar code folder. This is a separate manual pilot launcher, **not** your normal daily GTA Radar runner.
 
-It locates the existing Desktop/OneDrive `new data` workspace using Radar's established discovery code, opens the compatible `radar.sqlite` read-only, checks official robots rules and requests at most **five** full ERO notices. It creates only separate CSV/HTML/JSON reports under `GTA_RADAR_RESULTS/INDUSTRIAL_PILOT`.
+It locates the existing Desktop/OneDrive `new data` workspace using Radar's established discovery code, opens the compatible `radar.sqlite` read-only, checks official robots rules and requests at most **ten** distinct full ERO notices. It creates only separate CSV/HTML/JSON reports under `GTA_RADAR_RESULTS/INDUSTRIAL_PILOT`.
 
 If your workspace is elsewhere, call `py -3 gta_industrial_equipment_run.py --workspace "D:\Your\Existing\Radar\new data"`. Failure to locate an existing compatible database stops the run rather than creating a new one. If robots access is denied or unavailable, no ERO notices are fetched and the reason is written to the audit.
 
@@ -69,6 +69,16 @@ Or use unittest discovery when `tests` is not an importable package:
 ```bat
 py -3 -m unittest discover -s tests -p "test_industrial_equipment_pilot.py" -v
 ```
+
+## November 7: third live run and distinct-notice review cursor
+
+The third user-uploaded pilot returned **5/5 parsed ERO pages**, two distinct correct equipment findings, two explicitly excluded out-of-area facilities, and **zero verified purchasing contracts**. It also exposed a separate data join gap: Oakville's `GTA_RADAR_COLLECTION_MASTER.csv` describes **Pinty's Delicious Foods Inc. - 2714 Bristol Circle - 1403.071/01** but leaves the structured `address` field blank. The official Oakville record describes a proposed **254.4 m² expansion for processing equipment utilities**, with plans submitted in December 2025, February 2026 and May 2026. This is valid **same-site historical context**, not proof the ERO dust collector/scrubber proposal belongs to the municipal development scope.
+
+The next manual Windows run selects up to **10 distinct unreviewed ERO notices** from the existing 155-card ledger rather than fetching the same five. The pilot saves its review cursor separately as `GTA_RADAR_ERO_REVIEW_CURSOR.json`. For backward compatibility, when that file is absent it seeds successfully reviewed notice IDs from the previous `GTA_RADAR_INDUSTRIAL_EQUIPMENT_STATUS.json`. Previously generated evidence rows are retained in the review CSV while new findings are appended, with a separate `new_equipment_candidates_this_run` metric. Failed retrievals do not silently become successes, and a changed source notice stage/last-updated timestamp makes a previously checked notice eligible for recheck.
+
+Description-only municipal matches have separate `same_site_history_*` fields and carry the `UNVERIFIED_DESCRIPTION_ONLY_SITE_CONTEXT` label. This must **never** be treated as project-scope confirmation or an open supplier contract. Production collectors and the shared DeepSeek cap are unchanged.
+
+**Run:** Double-click `RUN_INDUSTRIAL_EQUIPMENT_PILOT.bat` from the latest pilot branch. Reuse the SAME `GTA_RADAR_RESULTS/INDUSTRIAL_PILOT` folder so the previous status/rows can seed the new persistent cursor.
 
 ## Required acceptance gates before production
 
