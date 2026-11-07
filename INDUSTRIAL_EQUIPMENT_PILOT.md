@@ -79,3 +79,13 @@ py -3 -m unittest discover -s tests -p "test_industrial_equipment_pilot.py" -v
 5. Interview specialist industrial suppliers and seek two paying pilot customers before integrating with the normal daily launcher.
 
 **No procurement, contract, supplier need, funding, installation or construction start is asserted by an ERO equipment mention.**
+
+## November 7 second live pilot audit
+
+The user-provided `INDUSTRIAL_PILOT (2).zip` contained **155 source cards**, **5 attempted notices**, **4 successfully parsed notices**, and **two initially generated equipment rows** from Pinty's Oakville notice `026-1152`. The second generated row was incorrect: the source says **replace Line 3 dust collector with a scrubber** and separately **remove the limited operational flexibility condition**. The old regex incorrectly attributed the conditional removal to the scrubber.
+
+The reviewed correction now emits **one replacement event** with `equipment=Dust collection`, `action=REPLACEMENT`, and `replacement_equipment=Scrubber`. This retains the evidence of a prospective scrubber at the facility without double-counting the change or inventing a scrubber removal.
+
+The fifth notice, Five Star Farms `026-1160`, was incorrectly rejected for a missing site city. Its site-address section has an extra **Lots 9 & 10, Concession 1** line before **Kingsville, ON**. The parser now searches within that labelled address section for the actual city, and the target-area gate correctly excludes Kingsville as out of scope.
+
+No verified purchasing opportunity or proven project join was established. These fixes require a fresh live check before production acceptance.
