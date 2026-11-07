@@ -67,6 +67,61 @@ class OfficialNoticeDetailTests(unittest.TestCase):
         self.assertNotIn("Supporting materials", row["proposal_details"])
         self.assertEqual(row["content_provenance"], "FETCHED_EXACT_ERO_OFFICIAL_NOTICE")
 
+    def test_nested_ero_sections_use_document_order_not_siblings(self):
+        # ERO headings and contents can be in separate wrapper containers.
+        # The previous next_siblings parser returned PROPOSAL_DETAILS_MISSING.
+        page = """<!doctype html><html><body><main>
+            <h1>Pinty's Delicious Foods Inc. - Environmental Compliance Approval (air)</h1>
+            <div><span>ERO (Environmental Registry of Ontario) number</span>
+                 <span>026-1152</span></div>
+            <div><span>Notice stage</span><span>Proposal</span></div>
+            <div><span>Proposal posted</span><span>November 6, 2026</span></div>
+            <section>
+              <div><h2>Location details</h2></div>
+              <div><div><h3>Site address</h3></div></div>
+              <div><div><p>2714 Bristol Circle<br>Oakville, ON<br>L6H 6A1</p></div></div>
+              <div><h3>Site location map</h3></div>
+            </section>
+            <section>
+              <div><h2>Proponent(s)</h2></div>
+              <div><p>Pinty's Delicious Foods Inc.<br>5063 North Service Road</p></div>
+            </section>
+            <section>
+              <div><h2>Proposal details</h2></div>
+              <div><div><p>This application is to replace Line 3 dust collector
+              with a scrubber and remove the limited operational flexibility condition.</p></div></div>
+              <div><h2>Supporting materials</h2></div>
+              <p>Not part of the proposal section.</p>
+            </section>
+        </main></body></html>"""
+        url = "https://ero.ontario.ca/notice/026-1152"
+        row = detail.parse_notice_html(page, "026-1152", url)
+        self.assertEqual(row["site_address"], "2714 Bristol Circle")
+        self.assertEqual(row["city"], "Oakville")
+        self.assertEqual(row["notice_stage"], "Proposal")
+        self.assertEqual(row["proposal_posted"], "2026-11-06")
+        self.assertIn("Line 3 dust collector", row["proposal_details"])
+        self.assertIn("scrubber", row["proposal_details"])
+        self.assertNotIn("Supporting materials", row["proposal_details"])
+        changes = pilot.equipment_changes(row["proposal_details"])
+        self.assertEqual({x["equipment"] for x in changes},
+                         {"Dust collection", "Scrubber"})
+
+    def test_nested_heading_does_not_steal_following_section(self):
+        page = """<html><body><h1>Example - ECA</h1>
+        <p>ERO (Environmental Registry of Ontario) number 026-1152</p>
+        <p>Notice stage Proposal</p>
+        <section><div><h2>Proposal details</h2></div>
+        <div><p>We request an upgrade of the cooling tower.</p></div></section>
+        <section><div><h2>Supporting materials</h2></div>
+        <div><p>This unrelated section proposes to install a boiler.</p></div></section>
+        <section><div><h2>Site address</h2></div>
+        <div><p>1 Industrial Drive<br>Oakville, ON</p></div></section></body></html>"""
+        row = detail.parse_notice_html(page, "026-1152",
+                                       "https://ero.ontario.ca/notice/026-1152")
+        self.assertIn("cooling tower", row["proposal_details"])
+        self.assertNotIn("boiler", row["proposal_details"])
+
     def test_requires_exact_notice_id_and_explicit_site(self):
         url = "https://ero.ontario.ca/notice/026-0424"
         cases = [
