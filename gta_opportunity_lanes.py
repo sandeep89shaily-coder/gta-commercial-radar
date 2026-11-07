@@ -458,3 +458,12 @@ def run(results,*,today=None):
                  "<a href='"+STATUS+"'>Coverage and evidence diagnostics</a></p></body></html>")
     (root/DASHBOARD).write_text("".join(parts),encoding="utf-8")
     return data
+
+
+if __name__=="__main__":
+    import argparse
+    parser=argparse.ArgumentParser(
+        description="Rebuild private and government top-10 rankings from existing Radar results; no network collection.")
+    parser.add_argument("--results",required=True,help="Existing GTA_RADAR_RESULTS folder")
+    args=parser.parse_args()
+    print(json.dumps(run(args.results),indent=2))
