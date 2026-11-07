@@ -74,7 +74,7 @@ INVENTORY = re.compile(
 COLUMNS = (
     "signal_id", "ero_number", "official_notice_url", "notice_stage", "decision_posted",
     "proponent", "site_address", "city", "proposal_posted",
-    "radar_first_seen_at", "radar_record_present", "equipment", "action",
+    "radar_first_seen_at", "radar_record_present", "equipment", "action", "replacement_equipment",
     "official_excerpt", "evidence_basis", "source_text_sha256", "retrieved_at",
     "project_match_status",
     "related_project_id", "related_project_source_url", "procurement_status",
@@ -177,33 +177,77 @@ def _notices(path):
     return accepted, rejected
 
 def equipment_changes(text):
-    """Conservative proposed physical changes, not an existing equipment list."""
+    """Extract distinct physical changes, linking replacement source and target.
+
+    A sentence like 'replace the dust collector with a scrubber and remove
+    the operational flexibility condition' describes ONE equipment replacement.
+    The word 'remove' refers to a permit condition, not the scrubber.
+    This intentionally refuses to infer installations from inventory lists.
+    """
     found = []
     seen = set()
-    for clause in re.split(r"[;\n]+|(?<=[.!?])\s+", _str(text)):
-        if len(clause) > 1000:
+    source = _str(text)[:25000]
+    change_boundary = re.compile(
+        r"\band\s+(?=(?:to\s+|the\s+)?(?:replac(?:e|es|ed|ing|ement)|"
+        r"remov(?:e|al|ed|ing)|install(?:ation|ed|ing)?|"
+        r"upgrad(?:e|ed|ing)|retrofit|decommission(?:ed|ing)?|"
+        r"add(?:ed|ition|ing)?|expand(?:ed|ing)?|moderniz(?:e|ation))\b)",
+        re.I,
+    )
+    replacement = re.compile(
+        r"\b(?:replac(?:e|es|ed|ing)|replacement\s+of)\b"
+        r"(?P<old>.{0,120}?)\b(?:with|by)\b(?P<new>.{0,120})",
+        re.I,
+    )
+    for sentence in re.split(r"[;\n]+|(?<=[.!?])\s+", source):
+        if not sentence or len(sentence) > 1000:
             continue
-        if NEGATED.search(clause) or INVENTORY.search(clause):
+        if INVENTORY.search(sentence) or NEGATED.search(sentence):
             continue
-        for equipment, pattern in REGEX_EQUIPMENT.items():
-            equipment_match = pattern.search(clause)
-            if not equipment_match:
+        for phrase in change_boundary.split(sentence):
+            if not phrase.strip():
                 continue
-            choices = []
-            for action, action_pattern in REGEX_ACTIONS.items():
-                for match in action_pattern.finditer(clause):
-                    distance = min(abs(match.end() - equipment_match.start()),
-                                   abs(equipment_match.end() - match.start()))
-                    if distance <= 100:
-                        choices.append((distance, action))
-            if not choices:
-                continue
-            action = min(choices)[1]
-            marker = (equipment, action)
-            if marker not in seen:
-                seen.add(marker)
-                found.append({"equipment": equipment, "action": action,
-                              "official_excerpt": clause[:500]})
+            paired = replacement.search(phrase)
+            if paired:
+                old = next((family for family, rx in REGEX_EQUIPMENT.items()
+                            if rx.search(paired.group("old"))), "")
+                new = next((family for family, rx in REGEX_EQUIPMENT.items()
+                            if rx.search(paired.group("new"))), "")
+                if old:
+                    marker = (old, "REPLACEMENT", new)
+                    if marker not in seen:
+                        seen.add(marker)
+                        found.append({
+                            "equipment": old, "action": "REPLACEMENT",
+                            "replacement_equipment": new,
+                            "official_excerpt": sentence[:500],
+                        })
+                    # Do not independently classify the destination equipment
+                    # as removed or replaced. A single physical change is
+                    # represented once, with the destination in its own column.
+                    continue
+            for family, equipment_rx in REGEX_EQUIPMENT.items():
+                equipment_match = equipment_rx.search(phrase)
+                if not equipment_match:
+                    continue
+                action_matches = []
+                for action, action_rx in REGEX_ACTIONS.items():
+                    for action_match in action_rx.finditer(phrase):
+                        distance = min(abs(action_match.end() - equipment_match.start()),
+                                       abs(equipment_match.end() - action_match.start()))
+                        if distance <= 80:
+                            action_matches.append((distance, action))
+                if not action_matches:
+                    continue
+                action = min(action_matches)[1]
+                marker = (family, action, "")
+                if marker not in seen:
+                    seen.add(marker)
+                    found.append({
+                        "equipment": family, "action": action,
+                        "replacement_equipment": "",
+                        "official_excerpt": sentence[:500],
+                    })
     return found
 
 def _projects(results):
@@ -263,7 +307,7 @@ def run(out, *, db=None, notice_csv=None, results=None, fetch_official=False,
         matched = list({p["project_id"]: p for p in candidates}.values())
         for finding in equipment_changes(notice["proposal_details"]):
             sid = hashlib.sha256(
-                (number + "|" + finding["equipment"] + "|" + finding["action"]).encode()
+                (number + "|" + finding["equipment"] + "|" + finding["action"] + "|" + finding.get("replacement_equipment", "")).encode()
             ).hexdigest()[:20]
             # More than one project at an address is ambiguous by definition.
             relation = ("UNVERIFIED_SINGLE_SITE_CANDIDATE" if len(matched) == 1 else
@@ -288,7 +332,7 @@ def run(out, *, db=None, notice_csv=None, results=None, fetch_official=False,
     rows = "".join(
         "<tr>" + "".join("<td>" + html.escape(str(s.get(key, ""))) + "</td>"
                             for key in ("ero_number", "proponent", "city", "equipment",
-                                        "action", "official_excerpt", "project_match_status")) +
+                                        "action", "replacement_equipment", "official_excerpt", "project_match_status")) +
         "</tr>" for s in signals
     )
     (out / HTML).write_text(
@@ -299,7 +343,7 @@ def run(out, *, db=None, notice_csv=None, results=None, fetch_official=False,
         "<p>These are source-text change candidates, not verified orders, open bids, "
         "or proven company/project matches. Each finding needs official notice recheck.</p>"
         "<table><tr><th>ERO</th><th>Proponent</th><th>City</th><th>Equipment</th>"
-        "<th>Action</th><th>Source excerpt</th><th>Project link</th></tr>" + rows +
+        "<th>Action</th><th>Replacement with</th><th>Source excerpt</th><th>Project link</th></tr>" + rows +
         "</table></body></html>", encoding="utf-8"
     )
     summary = {
