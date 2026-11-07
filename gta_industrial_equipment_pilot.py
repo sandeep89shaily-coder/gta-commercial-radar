@@ -16,6 +16,18 @@ import sqlite3
 from pathlib import Path
 from urllib.parse import urlsplit
 
+# Exact site-city gate. The upstream ERO collector can match a company name
+# containing "York" even when its actual facility is outside the target area.
+TARGET_CITIES = frozenset({
+    "toronto", "brampton", "mississauga", "caledon", "oakville", "burlington",
+    "milton", "halton hills", "vaughan", "richmond hill", "markham",
+    "newmarket", "aurora", "east gwillimbury", "king", "whitchurch-stouffville",
+    "pickering", "ajax", "whitby", "oshawa", "clarington", "hamilton",
+    "cambridge", "kitchener", "waterloo", "guelph", "st. catharines",
+    "st catharines", "niagara falls", "welland", "grimsby", "lincoln",
+    "barrie", "innisfil", "new tecumseth",
+})
+
 ERO_SOURCE = "ero_gta_environmental_instruments"
 OUTPUT = "GTA_RADAR_INDUSTRIAL_EQUIPMENT_REVIEW.csv"
 STATUS = "GTA_RADAR_INDUSTRIAL_EQUIPMENT_STATUS.json"
@@ -218,7 +230,12 @@ def run(out, *, db=None, notice_csv=None, results=None):
     notices, rejected = _notices(notice_csv)
     projects = _projects(results)
     signals = []
+    site_exclusions = []
     for number, notice in sorted(notices.items()):
+        # Never infer facility location from the proponent mailing address/name.
+        if _str(notice.get("city")).casefold() not in TARGET_CITIES:
+            site_exclusions.append({"ero_number": number, "reason": "MISSING_OR_OUT_OF_SCOPE_SITE_CITY"})
+            continue
         card = cards.get(number, {})
         # When the card exists, its stored first observation is the ONLY source
         # of Radar first-seen truth. Notice posted dates stay separate.
@@ -273,6 +290,7 @@ def run(out, *, db=None, notice_csv=None, results=None):
         "ero_cards_in_existing_ledger": len(cards),
         "official_notice_excerpts_loaded": len(notices),
         "rejected_notice_rows": rejected,
+        "excluded_out_of_scope_sites": site_exclusions,
         "equipment_change_candidates": len(signals),
         "same_site_candidate_links": sum(s["project_match_status"] ==
             "UNVERIFIED_SINGLE_SITE_CANDIDATE" for s in signals),
