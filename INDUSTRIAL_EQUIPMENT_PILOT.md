@@ -24,7 +24,7 @@ Input notice CSV required fields:
 
 Recommended fields: `proponent,site_address,city,proposal_posted,notice_stage`. Enter the verified physical site address and city, **not registered office address**. The pilot accepts only an explicit Southern Ontario target-city list and records missing/out-of-area site cities as exclusions. This addresses a real false positive in the November 7 ERO output: York1's Dresden facility was treated as GTA-related by the upstream broad text filter. Do not import ERO's operator/proponent mailing address as the physical site without explicit location evidence.
 
-The included example has a short official excerpt from <https://ero.ontario.ca/notice/026-1152> (Pinty's Delicious Foods Inc., Oakville; proposal posted 2026-11-06). It is a **single research example**, not a live test of coverage or a verified supplier opportunity.
+The sample includes short official excerpts from <https://ero.ontario.ca/notice/026-1152> (Pinty's Delicious Foods Inc., Oakville; proposal posted 2026-11-06) and <https://ero.ontario.ca/notice/026-0424> (Bunge Loders Croklaan Canada Inc., Toronto; originally proposed 2026-04-17 and **decision already granted** on 2026-08-13). These are **two research examples**, not a live test of coverage or verified supplier opportunities.
 
 ## Outputs
 
