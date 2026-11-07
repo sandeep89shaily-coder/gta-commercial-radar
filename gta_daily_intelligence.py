@@ -172,7 +172,7 @@ def _build_document_worklist(union_csv, out, seen, *, paid, ai_processor, ranker
 def integrate(results, *, today=None, meeting_pipeline=None, document_discover=None,
               agenda_pipeline=None, verified_reports=None, document_ai=None,
               multicity_capture=None, document_ranker=None,
-              application_monitor=None, gis_monitor=None, other_gis_monitor=None, municipal_monitor=None, toronto_csv_monitor=None, guelph_gis_monitor=None, burlington_gis_monitor=None, burlington_pdf_monitor=None, staged_durham_monitor=None, official_export_monitor=None, regional_early_monitor=None, toronto_capital_monitor=None, regional_detail_monitor=None, regional_document_monitor=None, regional_review_monitor=None, five_city_monitor=None, ggh_expansion_monitor=None, ggh_york_gis_monitor=None, project_ai=None, buyer_ai=None, procurement=None, buyer_batch=None,
+              application_monitor=None, gis_monitor=None, other_gis_monitor=None, municipal_monitor=None, toronto_csv_monitor=None, guelph_gis_monitor=None, burlington_gis_monitor=None, burlington_pdf_monitor=None, staged_durham_monitor=None, official_export_monitor=None, regional_early_monitor=None, toronto_capital_monitor=None, regional_detail_monitor=None, regional_document_monitor=None, regional_review_monitor=None, opportunity_lanes_monitor=None, five_city_monitor=None, ggh_expansion_monitor=None, ggh_york_gis_monitor=None, project_ai=None, buyer_ai=None, procurement=None, buyer_batch=None,
               graph=None, api_key_check=None, allow_paid=True):
     """Run integrated bounded stages and expose individual failure provenance.
 
@@ -212,6 +212,7 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
     from gta_regional_project_details import run as regional_details_default
     from gta_regional_document_evidence import run as regional_document_default
     from gta_regional_commercial_review import run as regional_review_default
+    from gta_opportunity_lanes import run as opportunity_lanes_default
     from gta_five_city_application_recovery import run as five_city_default
     from gta_ggh_early_planning import run as ggh_expansion_default
     from gta_ggh_york_official_gis import run as ggh_york_gis_default
@@ -295,6 +296,7 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
         (lambda root, *, today=None: {"status":"SKIPPED_OFFLINE_TEST",
          "parsed_projects":0,"new_or_changed":0,"verified_open_tenders":0}))
     regional_review_fn = regional_review_monitor or regional_review_default
+    opportunity_lanes_fn = opportunity_lanes_monitor or opportunity_lanes_default
     five_city_fn = five_city_monitor or (
         five_city_default if application_monitor is None else
         (lambda root, *, today=None: {"status":"SKIPPED_OFFLINE_TEST",
@@ -458,6 +460,14 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
          "cities_with_parsed_ids","application_candidate_rows",
          "new_or_changed_application_records","new_links","baseline_only",
          "new_or_changed_csv","warning")}
+
+    opportunity_lanes=step("split_private_and_government_opportunity_rankings",
+        lambda:opportunity_lanes_fn(root,today=today),required=False)
+    state["opportunity_lanes"]={k:opportunity_lanes.get(k) for k in
+        ("status","private_projects_eligible","private_top",
+         "private_changes_to_verify","private_verified_recent_publications",
+         "government_projects_eligible","government_top",
+         "government_changes_to_verify","government_open_tenders_verified","warning")}
 
     docdir = review / "TORONTO_DOCUMENTS"
     docdir.mkdir(parents=True, exist_ok=True)
@@ -743,6 +753,14 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
         "<a href='GTA_RADAR_REGIONAL_EARLY_RECORDS.csv'>Nine-authority regional project and policy signals (baseline only)</a> · "
         "<a href='GTA_RADAR_REGIONAL_EARLY_SOURCE_STATUS.json'>Regional source-level diagnostics</a> · "
         "<a href='GTA_RADAR_REGIONAL_PROJECT_DETAILS.csv'>Regional project detail evidence (pilot)</a> · "
+        "<a href='GTA_RADAR_OPPORTUNITY_LANES.html'>Separate private and government opportunity dashboards</a> · "
+        "<a href='GTA_RADAR_PRIVATE_TOP_10.csv'>Private development top 10</a> · "
+        "<a href='GTA_RADAR_PRIVATE_DEVELOPMENT_REVIEW.csv'>All private development candidates</a> · "
+        "<a href='GTA_RADAR_PRIVATE_CHANGES_TO_VERIFY.csv'>Private changes awaiting source verification</a> · "
+        "<a href='GTA_RADAR_PRIVATE_VERIFIED_FRESH.csv'>Verified recent private-source publications</a> · "
+        "<a href='GTA_RADAR_GOVERNMENT_TOP_10.csv'>Separate government procurement top 10</a> · "
+        "<a href='GTA_RADAR_GOVERNMENT_CHANGES_TO_VERIFY.csv'>Government project changes</a> · "
+        "<a href='GTA_RADAR_OPPORTUNITY_LANES_STATUS.json'>Private/government ranking status and freshness policy</a> · "
         "<a href='GTA_RADAR_REGIONAL_COMMERCIAL_REVIEW.csv'>Evidence-gated regional commercial review</a> · "
         "<a href='GTA_RADAR_REGIONAL_COMMERCIAL_CHANGES_TO_REVIEW.csv'>New or changed regional project reviews</a> · "
         "<a href='GTA_RADAR_REGIONAL_COMMERCIAL_EXCLUDED.csv'>Regional deferred and excluded work with reasons</a> · "
