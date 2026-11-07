@@ -51,6 +51,7 @@ EQUIPMENT = {
     "Wastewater treatment": r"\b(?:wastewater treatment system|effluent treatment system)\b",
     "Transformer": r"\b(?:transformers?|switchgear)\b",
     "Furnace": r"\b(?:industrial furnace|kiln)\b",
+    "Cremation equipment": r"\b(?:human cremation units?|cremation units?|cremators?)\b",
 }
 ACTIONS = {
     "REPLACEMENT": r"\b(?:replac(?:e|es|ed|ing|ement)|substitut(?:e|ion))\b",
