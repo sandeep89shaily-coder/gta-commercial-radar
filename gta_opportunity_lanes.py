@@ -128,6 +128,7 @@ def _private_item(source,row):
         date=_str(row.get("source_record_date"))
         basis=_str(row.get("date_basis"))
         kind="OFFICIAL_EXPLICIT_APPLICATION_ID"
+        application_year=""
     elif source=="private_master":
         city=_city(row.get("city"),row.get("address"))
         title=""
@@ -141,6 +142,8 @@ def _private_item(source,row):
         date=_str(row.get("date"))
         basis=_str(row.get("date_basis"))
         kind=_str(row.get("record_kind"))
+        application_year=""
+        application_year=_str(row.get("application_year_hint"))
     elif source=="private_municipal":
         city=_city(row.get("city"),row.get("address"))
         title=_str(row.get("project_title"))
@@ -167,6 +170,7 @@ def _private_item(source,row):
         date=_str(row.get("source_record_date"))
         basis=_str(row.get("date_basis"))
         kind="PERMIT_EVENT_OWNER_NOT_VERIFIED"
+        application_year=""
     else:
         return None
     if not city or not urls or not (description or title):
@@ -189,21 +193,20 @@ def _private_item(source,row):
         proposal=title.rsplit(" - ",1)[1].strip()
         if COMPANY_END.search(proposal) and not PUBLIC_OWNER.search(proposal):
             company=proposal[:180]
-            company_evidence="NAMED_ON_THIS_OFFICIAL_PROJECT_PAGE_VERIFY_ROLE"
+            company_evidence="OFFICIAL_PROJECT_TITLE_NAMED_FIRM_ROLE_NOT_VERIFIED"
     if not company and source=="private_municipal":
         match=re.search(r"\b(?:application (?:made|submitted) by|applicant[: ])\s*"
                         r"([A-Z][\w .&,'()-]{5,110}?)(?=\s*(?:for |to |at |\.|;|$))",
                         description,re.I)
         if match and COMPANY_END.search(match.group(1)):
             company=_str(match.group(1))[:180]
-            company_evidence="SOURCE_TEXT_EXPLICIT_APPLICANT_VERIFY_ROLE"
-    private_evidence=("EXPLICIT_COMPANY_NAMED_IN_PROJECT" if company
-                      else "PRIVATE_USE_INFERRED_OWNER_UNVERIFIED")
+            company_evidence="SOURCE_TEXT_NAMED_APPLICANT_ROLE_NOT_VERIFIED"
+    private_evidence="PRIVATE_USE_INFERRED_OWNER_UNVERIFIED"
     return dict(city=city,address=address,title=title,description=description,
         status=status,application_id=ident,urls=urls,source=source,
         observation=observation,first_seen=firstseen,source_date=date,date_basis=basis,
         company=company,company_evidence=company_evidence,
-        private_evidence=private_evidence,kind=kind)
+        private_evidence=private_evidence,kind=kind,application_year=application_year)
 
 def _group_private(rows):
     # One project, possibly multiple OPA/ZBA/Site Plan file numbers.
@@ -278,13 +281,15 @@ def _candidate(group,today):
         freshness="FIRST_OBSERVED_IN_RADAR_NOT_NEW_PUBLICATION"
     else:
         freshness="HISTORICAL_BASELINE_OR_UNCHANGED"
-    years_from_apps=[int(m.group(1)) for a in apps
-                     if (m:=re.search(r"(?<!\d)(20(?:0\d|1\d|2\d))(?!\d)",a))]
+    years_from_apps=[int(r["application_year"]) for r in group
+                     if r.get("application_year","").isdigit()]
+    years_from_apps.extend(int(m.group(1)) for a in apps
+                     if (m:=re.search(r"(?<!\d)(20(?:0\d|1\d|2\d))(?!\d)",a)))
     older=bool(years_from_apps and min(years_from_apps)<today.year-4)
     score=35
     if any(r["source"]=="private_notice" for r in group):score+=18
     if apps:score+=8
-    if company:score+=13
+    if company:score+=8
     if PRIORITY_SCOPE.search(scope+" "+best["title"]):score+=17
     if stage_gate=="PLANNING_OR_SITE_PLAN_REVIEW":score+=11
     elif stage_gate=="PERMIT_STAGE_VERIFY":score+=5
@@ -307,8 +312,7 @@ def _candidate(group,today):
     result.update(opportunity_id=cid,lane="PRIVATE_DEVELOPMENT",
         city=best["city"],address=location,project_name=best["title"] or location,
         nature_of_work=scope,project_stage=status,stage_gate=stage_gate,
-        private_ownership_evidence="EXPLICIT_COMPANY_NAMED_IN_PROJECT" if company else
-            "PRIVATE_SECTOR_LIKELY_OWNER_NOT_VERIFIED",
+        private_ownership_evidence="PRIVATE_SECTOR_LIKELY_OWNER_NOT_VERIFIED",
         company_name=company,company_evidence=company_evidence,
         contact_status="NO_PROJECT_ASSIGNED_CONTACT_VERIFIED",
         application_ids="; ".join(apps),first_seen_local=first_seen,
