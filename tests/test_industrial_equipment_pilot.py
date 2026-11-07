@@ -54,6 +54,18 @@ class IndustrialEquipmentPilotTests(unittest.TestCase):
                          {("Dust collection", "REPLACEMENT"), ("Boiler", "REMOVAL")})
         self.assertEqual(changes[0]["replacement_equipment"], "Scrubber")
 
+    def test_burlington_cremation_units_explicit_installation(self):
+        statement = "This application is for the installation of two human cremation units."
+        found = pilot.equipment_changes(statement)
+        self.assertEqual(len(found), 1)
+        self.assertEqual(found[0]["equipment"], "Cremation equipment")
+        self.assertEqual(found[0]["action"], "INSTALLATION")
+        self.assertEqual(found[0]["replacement_equipment"], "")
+        self.assertEqual(pilot.equipment_changes(
+            "This proposal is for a new cremation facility."), [])
+        self.assertEqual(pilot.equipment_changes(
+            "Sources at the facility include existing cremation units."), [])
+
     def test_candidate_never_marked_open_or_verified(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
