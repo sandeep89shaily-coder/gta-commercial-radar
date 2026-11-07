@@ -149,6 +149,7 @@ def read_radar_ero(db):
             "notice_stage": _str(card.get("NOTICE_STAGE")),
             "proponent": _str(card.get("ENTITY_NAME")),
             "proposal_posted": _str(card.get("PROPOSAL_POSTED")),
+            "last_updated": _str(card.get("LAST_UPDATED")),
             "radar_first_seen_at": _str(first_seen),
             "source_date": _str(source_date),
         }
@@ -297,13 +298,24 @@ def run(out, *, db=None, notice_csv=None, results=None, fetch_official=False,
     cards = read_radar_ero(db)
     notices, rejected = _notices(notice_csv)
     fetch_audit = []
+    visited = None
+    chosen = {}
+    previous_signals = _read_csv(out / OUTPUT) if fetch_official else []
     if fetch_official:
-        from gta_ero_notice_detail import fetch_notice_details
-        fetched, fetch_audit = (official_fetcher or fetch_notice_details)(
-            cards, max_notices=fetch_limit)
-        for record in fetched:
-            if _number(record.get("ero_number")) and record["ero_number"] not in notices:
-                notices[record["ero_number"]] = record
+        import gta_industrial_review_cursor as cursor
+        visited = cursor.load(out,cards)
+        chosen = cursor.select(cards,visited,fetch_limit)
+        if chosen:
+            from gta_ero_notice_detail import fetch_notice_details
+            fetched, fetch_audit = (official_fetcher or fetch_notice_details)(
+                chosen, max_notices=len(chosen))
+            for record in fetched:
+                if _number(record.get("ero_number")) and record["ero_number"] not in notices:
+                    notices[record["ero_number"]] = record
+            cursor.update(visited,chosen,fetch_audit)
+            cursor.save(out,visited)
+        else:
+            fetch_audit = [{"status":"NO_UNREVIEWED_OR_CHANGED_SOURCE_NOTICES"}]
     projects, site_history = _projects(results)
     signals = []
     site_exclusions = []
@@ -357,6 +369,35 @@ def run(out, *, db=None, notice_csv=None, results=None, fetch_official=False,
                     _str(notice.get("notice_stage")).casefold() == "decision"
                     else "MANUAL_REVIEW_REQUIRED",
             })
+    new_signal_count = len(signals)
+    # Preserve prior evidence-backed rows when reviewing the next tranche. If
+    # a source was successfully re-fetched, replace its older findings rather
+    # than retaining signals it no longer supports. Never claim these are NEW
+    # when they are merely carried forward.
+    updated_notice_ids = set(notices) if fetch_official else set()
+    prior = [row for row in previous_signals
+             if _number(row.get("ero_number")) not in updated_notice_ids
+             and _number(row.get("ero_number"))
+             and _official_notice(row.get("official_notice_url",""),row["ero_number"])]
+    for old in prior:
+        if not old.get("site_address") or not old.get("city"):
+            continue
+        if old.get("same_site_history_status")=="UNVERIFIED_DESCRIPTION_ONLY_SITE_CONTEXT":
+            continue
+        addr=_norm_address(old["site_address"])
+        city=old["city"].strip().casefold()
+        refs=[h for h in site_history if h["city"]==city and addr
+              and re.search(r"(?<![a-z0-9])"+re.escape(addr)
+                            + r"(?![a-z0-9])",h["description"])]
+        refs=list({h["record_id"]:h for h in refs}.values())
+        if len(refs)==1:
+            old["same_site_history_id"]=refs[0]["record_id"]
+            old["same_site_history_url"]=refs[0]["source_url"]
+            old["same_site_history_status"]="UNVERIFIED_DESCRIPTION_ONLY_SITE_CONTEXT"
+    combined = {r["signal_id"]:r for r in prior if r.get("signal_id")}
+    combined.update({r["signal_id"]:r for r in signals})
+    signals=list(combined.values())
+    signals.sort(key=lambda r:(r.get("ero_number",""),r.get("signal_id","")),reverse=True)
     with (out / OUTPUT).open("w", encoding="utf-8-sig", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=COLUMNS, extrasaction="ignore")
         writer.writeheader()
@@ -387,6 +428,15 @@ def run(out, *, db=None, notice_csv=None, results=None, fetch_official=False,
         "official_fetch_audit": fetch_audit,
         "excluded_out_of_scope_sites": site_exclusions,
         "equipment_change_candidates": len(signals),
+        "new_equipment_candidates_this_run": new_signal_count,
+        "prior_equipment_candidates_preserved": len(prior),
+        "ero_detail_successes_total": (
+            __import__("gta_industrial_review_cursor").reviewed_count(visited)
+            if visited is not None else 0),
+        "ero_notices_unreviewed": (
+            max(0,len(cards) - __import__("gta_industrial_review_cursor").reviewed_count(visited))
+            if visited is not None else 0),
+        "ero_notices_selected_this_run": len(chosen),
         "same_site_candidate_links": sum(s["project_match_status"] ==
             "UNVERIFIED_SINGLE_SITE_CANDIDATE" for s in signals),
         "description_only_site_history_links": sum(
