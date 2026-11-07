@@ -132,6 +132,23 @@ class IndustrialEquipmentPilotTests(unittest.TestCase):
             self.assertEqual(rows[0]["project_match_status"], "NO_PROJECT_MATCH")
             self.assertFalse(rows[0]["related_project_id"])
 
+    def test_outside_gta_site_not_allowed_from_brand_york1(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            docs = root / "doc.csv"
+            write_csv(docs, [{
+                "ero_number": "026-0989",
+                "official_notice_url": "https://ero.ontario.ca/notice/026-0989",
+                "proponent": "York1 Environmental Waste Solutions",
+                "site_address": "29831 Irish School Road", "city": "Dresden",
+                "proposal_details": "install new wastewater treatment system",
+            }])
+            summary = pilot.run(root / "out", notice_csv=docs)
+            self.assertEqual(summary["equipment_change_candidates"], 0)
+            self.assertEqual(summary["excluded_out_of_scope_sites"],
+                             [{"ero_number": "026-0989",
+                               "reason": "MISSING_OR_OUT_OF_SCOPE_SITE_CITY"}])
+
     def test_deterministic_rerun_not_a_new_announcement(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
