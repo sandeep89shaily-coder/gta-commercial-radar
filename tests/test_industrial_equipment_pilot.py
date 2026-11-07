@@ -99,6 +99,59 @@ class IndustrialEquipmentPilotTests(unittest.TestCase):
             self.assertTrue(all(row["evidence_basis"].startswith("USER_SUPPLIED") for row in rows))
             self.assertIn("not verified orders", (root / "output" / pilot.HTML).read_text())
 
+    def test_oakville_description_address_is_only_site_history(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            docs = root / "notices.csv"
+            write_csv(docs, [{
+                "ero_number": "026-1152",
+                "official_notice_url": "https://ero.ontario.ca/notice/026-1152",
+                "proponent": "Pinty's Delicious Foods Inc.",
+                "site_address": "2714 Bristol Circle", "city": "Oakville",
+                "proposal_details": "Replace Line 3 dust collector with a scrubber.",
+            }])
+            results = root / "results"
+            results.mkdir()
+            write_csv(results / "GTA_RADAR_COLLECTION_MASTER.csv", [{
+                "canonical_id": "OAKVILLE:FILE:140307101", "city": "Oakville",
+                "record_kind": "APPLICATION_ID", "address": "",
+                "description": "Pinty's Delicious Foods Inc. - 2714 Bristol Circle - 1403.071/01",
+                "evidence_urls": "https://www.oakville.ca/business-development/planning-development/",
+            }])
+            out = root / "review"
+            summary = pilot.run(out, notice_csv=docs, results=results)
+            self.assertEqual(summary["equipment_change_candidates"], 1)
+            self.assertEqual(summary["same_site_candidate_links"], 0)
+            self.assertEqual(summary["description_only_site_history_links"], 1)
+            row = pilot._read_csv(out / pilot.OUTPUT)[0]
+            self.assertEqual(row["project_match_status"], "NO_PROJECT_MATCH")
+            self.assertEqual(row["related_project_id"], "")
+            self.assertEqual(row["same_site_history_id"], "OAKVILLE:FILE:140307101")
+            self.assertEqual(row["same_site_history_status"],
+                             "UNVERIFIED_DESCRIPTION_ONLY_SITE_CONTEXT")
+            self.assertEqual(row["procurement_status"], "UNKNOWN")
+
+    def test_description_site_history_does_not_match_partial_street_number(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            docs = root / "notices.csv"
+            write_csv(docs, [{
+                "ero_number": "026-1152",
+                "official_notice_url": "https://ero.ontario.ca/notice/026-1152",
+                "site_address": "2714 Bristol Circle", "city": "Oakville",
+                "proposal_details": "Replace Line 3 dust collector with a scrubber.",
+            }])
+            results = root / "results"
+            results.mkdir()
+            write_csv(results / "GTA_RADAR_COLLECTION_MASTER.csv", [{
+                "canonical_id": "OAKVILLE:FILE:XYZ", "city": "Oakville",
+                "record_kind": "APPLICATION_ID", "address": "",
+                "description": "Nearby site - 12714 Bristol Circle - file XYZ",
+                "evidence_urls": "https://www.oakville.ca/business/",
+            }])
+            result = pilot.run(root / "out", notice_csv=docs, results=results)
+            self.assertEqual(result["description_only_site_history_links"], 0)
+
     def test_first_seen_from_existing_readonly_radar_db_only(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
