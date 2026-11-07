@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+from contextlib import closing
 import hashlib
 import html
 import json
@@ -116,7 +117,7 @@ def read_radar_ero(db):
     if not p.is_file():
         raise FileNotFoundError("Radar database not found: " + str(p))
     uri = p.resolve().as_uri() + "?mode=ro"
-    with sqlite3.connect(uri, uri=True, timeout=6) as conn:
+    with closing(sqlite3.connect(uri, uri=True, timeout=6)) as conn:
         values = conn.execute(
             """SELECT c.record_key,c.first_seen_at,c.source_date,v.payload_json
                FROM records_current c JOIN record_versions v
