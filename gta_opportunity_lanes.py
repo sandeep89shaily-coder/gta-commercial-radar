@@ -142,7 +142,6 @@ def _private_item(source,row):
         date=_str(row.get("date"))
         basis=_str(row.get("date_basis"))
         kind=_str(row.get("record_kind"))
-        application_year=""
         application_year=_str(row.get("application_year_hint"))
     elif source=="private_municipal":
         city=_city(row.get("city"),row.get("address"))
@@ -157,6 +156,7 @@ def _private_item(source,row):
         date=""
         basis=""
         kind=_str(row.get("record_kind"))
+        application_year=""
     elif source=="private_daily":
         city=_city(row.get("city"),row.get("address"))
         title=""
