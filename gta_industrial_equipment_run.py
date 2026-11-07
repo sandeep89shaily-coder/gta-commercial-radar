@@ -12,7 +12,7 @@ from pathlib import Path
 from v6_daily_pipeline import choose_database, find_workspace
 from gta_industrial_equipment_pilot import run as pilot_run
 
-def execute(workspace=None, *, limit=5, pilot=pilot_run):
+def execute(workspace=None, *, limit=10, pilot=pilot_run):
     ws = find_workspace(workspace)
     db = choose_database(ws)
     results = ws / "GTA_RADAR_RESULTS"
@@ -34,7 +34,7 @@ def execute(workspace=None, *, limit=5, pilot=pilot_run):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--workspace", help="Optional existing Radar 'new data' folder")
-    parser.add_argument("--limit", type=int, default=5)
+    parser.add_argument("--limit", type=int, default=10)
     args = parser.parse_args()
     try:
         execute(args.workspace, limit=args.limit)
