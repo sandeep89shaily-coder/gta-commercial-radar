@@ -35,6 +35,7 @@ FITOUT=re.compile(r"\b(?:interior alterations?|interior renovation|tenant (?:fit
 RESIDENTIAL=re.compile(r"\b(?:single.family|semi.detached|townhouse|basement apartment|secondary suite|residential (?:dwelling|renovation)|accessory dwelling|garden suite)\b",re.I)
 TERMINAL=re.compile(r"cancel|revok|withdraw|refus|expir|closed|complet|finali[sz]",re.I)
 RENEWAL=re.compile(r"\brenew(?:al|ed|ing)?\b",re.I)
+DEACTIVATION=re.compile(r"\b(?:decommission(?:ing|ed)?|demolition|fire damage restoration|back to shell|existing tenant vacat(?:ing|ed))\b",re.I)
 SEGMENTS={
  "Food service":"POS systems;Foodservice equipment;Commercial cleaning;Commercial insurance",
  "Retail":"Retail POS;Commercial security;Commercial cleaning;Commercial insurance",
@@ -128,6 +129,7 @@ def classify(record,as_of,window_days):
   desc=text(" ".join(get(raw,k) for k in ("DESCRIPTION","WORKDESC","SUBDESC","SCOPE","WORK","PROPOSED_USE","CURRENT_USE")))
   use=text(desc+" "+get(raw,"FILE_TYPE"))
   if RESIDENTIAL.search(use) and not COMMERCIAL.search(use):return None,"RESIDENTIAL_ONLY"
+  if DEACTIVATION.search(desc):return None,"DEACTIVATION_NOT_OPENING"
   if not COMMERCIAL.search(use) or not FITOUT.search(desc):
    return None,"NO_COMMERCIAL_FITOUT_EVIDENCE"
   sector=("Food service" if re.search("restaurant|food|cafe|bakery",use,re.I) else
@@ -137,7 +139,7 @@ def classify(record,as_of,window_days):
    else "Commercial facility")
   if re.search("inspect",status,re.I):stage="PERMIT_INSPECTION_NOT_OPENING_CONFIRMED"
   elif re.search(r"\bissued\b",status,re.I):stage="FITOUT_PERMIT_ISSUED_NOT_OPENING_CONFIRMED"
-  elif re.search("under review|ready for issuance|not started|pending|received",status,re.I):
+  elif re.search("under review|ready for issuance|not started|pending|received|application acceptable|notice sent|examiner.s notice|response accepted",status,re.I):
    stage="PREPARATION_PERMIT_NOT_OPENING_CONFIRMED"
   else:return None,"UNKNOWN_PERMIT_STAGE"
   when=(event_date(get(raw,"STATUS_DATE","PROCESSDATE")) or
