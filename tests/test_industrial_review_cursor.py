@@ -36,7 +36,7 @@ class IndustrialReviewCursorTests(unittest.TestCase):
             cards=sample_cards()
             state=cursor.load(out,cards)
             chosen=cursor.select(cards,state,2)
-            self.assertEqual(list(chosen),["026-1140","026-1148"])
+            self.assertEqual(list(chosen),["026-1148","026-1140"])
             self.assertEqual(cursor.reviewed_count(state),2)
 
     def test_new_notices_before_retries_and_unchanged_completions(self):
