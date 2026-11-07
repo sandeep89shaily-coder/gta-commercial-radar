@@ -110,6 +110,22 @@ def _section(soup, heading, max_chars=25000):
                 return portion
     return ""
 
+def _page_shape(page_html):
+    """Safe diagnostics only: DOM heading labels, not scraped page bodies."""
+    soup = BeautifulSoup(page_html[:MAX_HTML_BYTES], "html.parser")
+    heading_labels = [" ".join(tag.stripped_strings)[:80]
+                      for tag in soup.find_all(("h1", "h2", "h3", "h4", "h5"))[:25]]
+    visible = soup.get_text(" ", strip=True)
+    return {
+        "html_sha256": hashlib.sha256(page_html.encode("utf-8")).hexdigest(),
+        "heading_samples": heading_labels,
+        "proposal_details_label_seen": bool(
+            re.search(r"\bProposal details\b", visible, re.I)),
+        "site_address_label_seen": bool(
+            re.search(r"\bSite address\b", visible, re.I)),
+    }
+
+
 def parse_notice_html(page_html, expected_number, source_url):
     """Return only fields visibly present in exact official notice HTML."""
     if not exact_ero_url(expected_number, source_url):
@@ -216,6 +232,7 @@ def fetch_notice_details(cards, *, max_notices=5, session=None, sleep=time.sleep
                 continue
             if inspected > 1:
                 sleep(MIN_REQUEST_GAP_SECONDS)
+            page = None
             try:
                 page = _bounded_get(session, url)
                 record = parse_notice_html(page, number, url)
@@ -226,10 +243,13 @@ def fetch_notice_details(cards, *, max_notices=5, session=None, sleep=time.sleep
                     "source_text_sha256": record["source_text_sha256"],
                 })
             except (requests.RequestException, OSError, ValueError) as e:
-                audit.append({
+                failure = {
                     "ero_number": number, "status": "DETAIL_REJECTED",
                     "reason": type(e).__name__ + ": " + str(e)[:120],
-                })
+                }
+                if page is not None and isinstance(e, ValueError):
+                    failure["page_shape"] = _page_shape(page)
+                audit.append(failure)
         return notices, audit
     finally:
         if owned:
