@@ -84,6 +84,30 @@ def _section(soup, heading, max_chars=25000):
                 break
         if parts:
             return "\n".join(parts)[:max_chars]
+    # Some ERO field templates use a styled field label rather than an h2/h3.
+    # Fall back only to exact visible label lines, with explicit section-ending
+    # labels. Never infer a proposal from the generic notice summary.
+    terminators = {
+        "proposal details": {"supporting materials", "comment", "decision details",
+                             "view materials in person", "contact"},
+        "site address": {"site location map", "proponent(s)", "proposal details",
+                         "decision details", "supporting materials"},
+        "proponent(s)": {"proposal details", "decision details", "supporting materials",
+                         "comment", "location details"},
+    }
+    stops = terminators.get(heading.casefold())
+    if stops:
+        lines = [x.strip() for x in soup.get_text("\\n", strip=True).splitlines() if x.strip()]
+        for i, line in enumerate(lines):
+            if line.casefold() != heading.casefold():
+                continue
+            end = next((j for j in range(i+1, len(lines))
+                        if lines[j].casefold() in stops), None)
+            if end is None:
+                continue  # Unbounded page/footer text is not valid source evidence.
+            portion = "\\n".join(lines[i+1:end])[:max_chars]
+            if portion:
+                return portion
     return ""
 
 def parse_notice_html(page_html, expected_number, source_url):
