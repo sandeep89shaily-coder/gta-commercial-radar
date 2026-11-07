@@ -215,13 +215,12 @@ def _group_private(rows):
     for r in rows:
         if "reject" in r:continue
         site=_site(r["address"]) or _site(_site_from_title(r["title"]))
-        # If no address, a specific official detail URL is a safe fallback.
-        if site:
-            key=(r["city"].casefold(),site)
-        else:
-            url=r["urls"][0] if r["urls"] else ""
-            key=(r["city"].casefold(),"URL:"+url)
-        grouped[key].append(r)
+        # Blank-address project-only signals generate duplicate rows for
+        # Burlington; generic Toronto index URLs may also silently collapse
+        # unrelated projects. Neither URL nor observation date is a site ID.
+        if not site:
+            continue
+        grouped[(r["city"].casefold(),site)].append(r)
     return grouped
 
 def _candidate(group,today):
@@ -285,9 +284,29 @@ def _candidate(group,today):
                      if r.get("application_year","").isdigit()]
     years_from_apps.extend(int(m.group(1)) for a in apps
                      if (m:=re.search(r"(?<!\d)(20(?:0\d|1\d|2\d))(?!\d)",a)))
-    older=bool(years_from_apps and min(years_from_apps)<today.year-4)
+    # Municipal identifiers may use compact years (e.g. 520-11/04).
+    # A new 2026 phase at a site with an older file must NOT inherit 2004.
+    for app in apps:
+        match=re.search(r"(?:/|-)([012]\d)$",app.strip())
+        if match:
+            inferred=2000+int(match.group(1))
+            if 2000<=inferred<=today.year:
+                years_from_apps.append(inferred)
+    newest=max(years_from_apps) if years_from_apps else 0
+    older=bool(newest and newest<today.year-4)
+    historical_approval=older and bool(re.search(r"\b(?:approved|noac issued|completed)\b",status,re.I))
+    if historical_approval:
+        stage_gate="HISTORICAL_APPROVAL_EXCLUDE"
     score=35
     if any(r["source"]=="private_notice" for r in group):score+=18
+    if newest>=today.year-1:score+=14
+    elif newest>=today.year-2:score+=6
+    if re.search(r"\b(?:industrial|warehouse|logistics|manufactur\w*|distribution)\b",scope,re.I):score+=16
+    if re.search(r"\b(?:residential|dwelling units|residential units)\b",scope,re.I) and not re.search(r"\bindustrial\b",scope,re.I):score-=12
+    if any(_valid(u) and "/dataset/" not in u and "/open-data" not in u
+           for u in links):score+=5
+    if re.search(r"\b(?:construction|buildings?|[0-9][,.0-9]*\s*(?:m2|m²|sq\.?m|square.metres?))\b",scope,re.I):score+=4
+    if observation=="RECORD_CHANGED":score+=3
     if apps:score+=8
     if company:score+=8
     if PRIORITY_SCOPE.search(scope+" "+best["title"]):score+=17
@@ -295,7 +314,8 @@ def _candidate(group,today):
     elif stage_gate=="PERMIT_STAGE_VERIFY":score+=5
     elif stage_gate=="PERMIT_OR_NOAC_ISSUED_VERIFY_PROCUREMENT":score-=7
     elif stage_gate=="APPEALED_OR_ON_HOLD":score-=27
-    if older:score-=22
+    if older:score-=35
+    if historical_approval:score-=45
     if freshness=="OFFICIAL_PUBLICATION_WITHIN_7_DAYS":score+=9
     # Project identity uses site and city, NOT application-ID count.
     cid="PRIVATE:"+hashlib.sha256(
@@ -321,7 +341,8 @@ def _candidate(group,today):
         source_urls="; ".join(links),commercial_use_cases=use,
         procurement_status="UNKNOWN_NOT_VERIFIED_UNAWARDED",
         score=str(max(0,score)),
-        reason=("OLD_APPLICATION_YEAR_REVIEW" if older else
+        reason=("HISTORICAL_APPLICATION_NOT_SALES_READY" if historical_approval else
+                "OLD_APPLICATION_YEAR_REVIEW" if older else
                 "PHASE_OR_APPEAL_REVIEW" if stage_gate=="APPEALED_OR_ON_HOLD" else
                 "PRIVATE_PROJECT_SOURCE_REVIEW"),
         next_action=next_action)
@@ -334,10 +355,18 @@ def _government(row):
     if not _valid(url):return None
     title=_str(row.get("project_name"))
     if not title:return None
-    score=40
-    if priority=="MONITOR_PLANNED":score+=15
-    if _str(row.get("observation")) in ("RECORD_CHANGED","FIRST_OBSERVED"):score+=8
-    if _str(row.get("estimated_contract_value")):score+=7
+    # This is ranking by investigation value, NOT procurement availability.
+    scope=_str(row.get("scope_of_work"))
+    value=_str(row.get("estimated_contract_value"))
+    score=35
+    if priority=="MONITOR_PLANNED":score+=8
+    if _str(row.get("observation")) in ("RECORD_CHANGED","FIRST_OBSERVED"):score+=10
+    if "Over $50M" in value:score+=17
+    elif "$5M to $50M" in value:score+=9
+    elif value:score+=3
+    if re.search(r"\b(?:construction|replacement|rehabilitation|bridge|tunnel|facility)\b",scope,re.I):score+=11
+    if re.search(r"\b(?:engineering services|appraisal reports|study|assessment)\b",title+" "+scope,re.I):score-=6
+    if re.search(r"\b(?:2025|2026|phase\s*2)\b",title+" "+scope,re.I):score+=3
     if _str(row.get("evidence_document_url")):score+=4
     r={k:"" for k in FIELDS}
     r.update(opportunity_id=_str(row.get("record_id")) or
@@ -394,9 +423,9 @@ def run(results,*,today=None):
     counts["private_gis"]=len(_csv(root/FILES["private_gis"]))
     private=_rank([_candidate(g,today) for g in _group_private(inputs).values()])
     for r in private:
-        if r["stage_gate"]=="CLOSED_EXCLUDE":
+        if r["stage_gate"] in ("CLOSED_EXCLUDE","HISTORICAL_APPROVAL_EXCLUDE"):
             rejected["CLOSED"]+=1
-    active=[r for r in private if r["stage_gate"]!="CLOSED_EXCLUDE"]
+    active=[r for r in private if r["stage_gate"] not in ("CLOSED_EXCLUDE","HISTORICAL_APPROVAL_EXCLUDE")]
     # An observed date or initial baseline is NOT verified publication.
     changed=[r for r in active if r["freshness_class"] in
         ("CHANGED_IN_RADAR_PUBLISHER_DATE_NOT_VERIFIED",

@@ -174,3 +174,72 @@ def test_html_escapes_source_titles_and_csv_formula(tmp_path):
     assert "<script>" not in text
     assert "&lt;script&gt;" in text
     assert "<img src=x" not in text
+
+
+def test_november7_burlington_duplicate_blank_address_and_2004_case_excluded(tmp_path):
+    # Reproduces actual Nov 7 source-layout: detailed rows have addresses,
+    # generic canonical project-only signals may have blank site addresses.
+    present=notice()
+    burloak=notice("520-16/26","800 Burloak Dr.",
+       "https://www.burlington.ca/en/news/current-development-projects/800-burloak-dr.aspx",
+       "Proposed eight-storey mixed-use building, retail space and 275 units.")
+    ancient=notice("520-11/04","Emshih Developments Prince William Dr.",
+       "https://www.burlington.ca/en/news/current-development-projects/emshih-developments-prince-william-dr.aspx",
+       "Applications dating to March 2004 for a neighbourhood commercial shopping development.",
+       status="APPROVED")
+    ancient["address"]="700 and 800 Burloak Drive"
+    write(tmp_path,"GTA_RADAR_FIVE_CITY_OFFICIAL_APPLICATIONS.csv",
+          [present,burloak,ancient])
+    write(tmp_path,"GTA_RADAR_COLLECTION_MASTER.csv",[
+        dict(city="Burlington",record_kind="PROJECT_ONLY_SIGNAL",
+           address="",application_id="",description=present["description"],
+           current_status="UNDER REVIEW",evidence_urls=present["record_source_url"],
+           first_seen_local="2026-11-07",observation="UNCHANGED"),
+        dict(city="Burlington",record_kind="PROJECT_ONLY_SIGNAL",
+           address="",application_id="",description=burloak["description"],
+           current_status="UNDER REVIEW",evidence_urls=burloak["record_source_url"],
+           first_seen_local="2026-11-07",observation="UNCHANGED")])
+    state=run(tmp_path,today=dt.date(2026,11,7))
+    titles=[r["project_name"] for r in read(tmp_path,PRIVATE_TOP)]
+    assert len(titles)==2
+    assert len(set(titles))==2
+    assert not any("Prince William" in title for title in titles)
+    excluded=read(tmp_path,PRIVATE_REJECTED)
+    assert any(r["stage_gate"]=="HISTORICAL_APPROVAL_EXCLUDE" for r in excluded)
+    assert state["private_projects_eligible"]==2
+
+
+def test_industrial_2026_prioritized_above_mixed_residential_and_old(tmp_path):
+    write(tmp_path,"GTA_RADAR_COLLECTION_MASTER.csv",[
+        dict(city="Toronto",record_kind="APPLICATION_ID",
+             application_id="26 115080 WET 01 SA",
+             address="8-28 WESTMORE DR",application_year_hint="2026",
+             description="Three industrial buildings totaling 18220 m2, 40 warehouse units.",
+             current_status="Under Review",
+             evidence_urls="https://open.toronto.ca/dataset/development-applications/",
+             first_seen_local="2026-11-07",observation="UNCHANGED"),
+        dict(city="Toronto",record_kind="APPLICATION_ID",
+             application_id="21 165080 STE 21 OZ",
+             address="100 CUMBERLAND ST",application_year_hint="2021",
+             description="A 40-storey mixed use building with 600 residential dwelling units and retail.",
+             current_status="Under Review",
+             evidence_urls="https://open.toronto.ca/dataset/development-applications/",
+             first_seen_local="2026-11-07",observation="UNCHANGED")])
+    run(tmp_path,today=dt.date(2026,11,7))
+    ranked=read(tmp_path,PRIVATE_TOP)
+    assert ranked[0]["address"]=="8-28 WESTMORE DR"
+    assert int(ranked[0]["score"])>int(ranked[1]["score"])
+
+
+def test_government_commercial_significance_breaks_alphabetical_tie(tmp_path):
+    small=gov("Appraisal Reports")
+    small["scope_of_work"]="To complete new appraisal reports for property assets."
+    small["estimated_contract_value"]="Up to $5M"
+    large=gov("Black Creek Tunnel Construction")
+    large["scope_of_work"]="Construction of major sanitary tunnel relief system."
+    large["estimated_contract_value"]="Over $50M"
+    write(tmp_path,"GTA_RADAR_REGIONAL_COMMERCIAL_REVIEW.csv",[small,large])
+    run(tmp_path,today=dt.date(2026,11,7))
+    data=read(tmp_path,GOV_TOP)
+    assert data[0]["project_name"]=="Black Creek Tunnel Construction"
+    assert all(r["procurement_status"]=="CURRENT_TENDER_AND_AWARD_STATUS_NOT_VERIFIED" for r in data)
