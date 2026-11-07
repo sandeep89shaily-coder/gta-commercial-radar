@@ -71,6 +71,23 @@ class ActivationPilotTests(unittest.TestCase):
             self.assertFalse(row["business_name"]) # contractor is not operator
             self.assertEqual(row["opening_confirmed"],"NO")
 
+    def test_real_world_toronto_early_stages_not_claimed_open(self):
+        for status in ("Application Acceptable","Ready for Issuance",
+                       "Issuance Pending","Not Started - Express"):
+            row,why=p.classify(permit(status=status),TODAY,120)
+            with self.subTest(status=status):
+                self.assertIsNone(why)
+                self.assertEqual(row["activation_stage"],
+                                 "PREPARATION_PERMIT_NOT_OPENING_CONFIRMED")
+                self.assertEqual(row["opening_confirmed"],"NO")
+
+    def test_decommissioning_is_not_commercial_opening_signal(self):
+        r=permit()
+        r["raw"]["DESCRIPTION"]="Interior alterations for tenant decommissioning and removal of vault"
+        row,why=p.classify(r,TODAY,120)
+        self.assertIsNone(row)
+        self.assertEqual(why,"DEACTIVATION_NOT_OPENING")
+
     def test_residential_or_terminal_permit_excluded(self):
         residential=record("toronto_active_building_permits","RX",{
             "STREET_NUM":"12","STREET_NAME":"Yonge","STREET_TYPE":"Street",
