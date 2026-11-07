@@ -6,6 +6,14 @@
 
 The existing enabled source `ero_gta_environmental_instruments` stores ERO search cards in Radar's normal `data/radar.sqlite` database. Search cards contain the ERO number, title, notice stage and source dates but **not necessarily the proposal details**, so detecting a specific scrubber/boiler change from the existing `SUMMARY` would be misleading. This pilot requires a separate, manually checked, exact official ERO notice excerpt.
 
+## Easiest Windows test
+
+Double-click **`RUN_INDUSTRIAL_EQUIPMENT_PILOT.bat`** in the updated Radar code folder. This is a separate manual pilot launcher, **not** your normal daily GTA Radar runner.
+
+It locates the existing Desktop/OneDrive `new data` workspace using Radar's established discovery code, opens the compatible `radar.sqlite` read-only, checks official robots rules and requests at most **five** full ERO notices. It creates only separate CSV/HTML/JSON reports under `GTA_RADAR_RESULTS/INDUSTRIAL_PILOT`.
+
+If your workspace is elsewhere, call `py -3 gta_industrial_equipment_run.py --workspace "D:\Your\Existing\Radar\new data"`. Failure to locate an existing compatible database stops the run rather than creating a new one. If robots access is denied or unavailable, no ERO notices are fetched and the reason is written to the audit.
+
 ## First run on Windows
 
 From the installed Radar code directory, open a command prompt:
