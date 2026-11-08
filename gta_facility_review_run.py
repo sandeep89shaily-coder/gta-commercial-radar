@@ -65,7 +65,13 @@ def execute(workspace=None, *, results=None, as_of=None, max_age_days=180):
         "role_hints_verified":0,
         "toronto_permit_audit_status":(
             "NOT_RUN_MISSING_DAILY_EXPORT" if permit_status is None else
-            "LOCAL_SOURCE_RECORDS_RECONCILED_NOT_LIVE_RECHECKED"),
+            "NO_TORONTO_PERMITS_IN_EXISTING_EXPORT" if not
+                permit_status["toronto_project_groups"] else
+            "LOCAL_COLLECTOR_DATABASE_UNAVAILABLE_NOT_VERIFIED" if
+                permit_status["local_snapshot_state"] != "LOCAL_SQLITE_READ_ONLY" else
+            "NO_LOCAL_EXACT_PERMIT_PAYLOADS_MATCHED" if not
+                permit_status["local_record_payloads_matched"] else
+            "SOME_LOCAL_EXACT_PERMIT_PAYLOADS_MATCHED_NOT_LIVE_RECHECKED"),
         "toronto_constituent_permit_keys_found":(
             0 if permit_status is None else
             permit_status["distinct_original_constituent_keys"]),
