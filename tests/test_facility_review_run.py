@@ -51,7 +51,18 @@ class ManualReviewRunnerTests(unittest.TestCase):
                 "record_source_url":"https://maps1.brampton.ca/arcgis/rest/services/BuildingPermit/Building_Permits/FeatureServer/0/query?where=PERMITNUMBER",
                 "current_source_status":"Permit Issued",
             }])
+            role_file=results/"GTA_RADAR_PROJECT_OPPORTUNITIES.csv"
+            with role_file.open("w",encoding="utf-8-sig",newline="") as f:
+                fields=("project_id","operator","project_identity_confidence",
+                        "official_record_url","official_verification_level")
+                w=csv.DictWriter(f,fieldnames=fields);w.writeheader()
+                w.writerow({"project_id":"brampton_building_permits:26-183257-000-00",
+                            "operator":"Hypothetical Facility Inc.",
+                            "project_identity_confidence":"EXACT_LOCAL_COLLECTOR",
+                            "official_record_url":"https://maps1.brampton.ca/",
+                            "official_verification_level":"COLLECTOR_SOURCE_MATCH"})
             before=csv_path.read_bytes()
+            role_before=role_file.read_bytes()
             output=runner.execute(results=results,as_of="2026-11-08")
             self.assertEqual(output["source_rows_read"]["radar"],1)
             self.assertEqual(output["graph_site_identities"],1)
@@ -60,7 +71,10 @@ class ManualReviewRunnerTests(unittest.TestCase):
             self.assertFalse(output["new_records_published_claimed"])
             self.assertFalse(output["outreach_authorized"])
             self.assertEqual(output["verified_open_supplier_contracts"],0)
+            self.assertEqual(output["unverified_company_role_hints"],1)
+            self.assertEqual(output["role_hints_verified"],0)
             self.assertEqual(csv_path.read_bytes(),before)
+            self.assertEqual(role_file.read_bytes(),role_before)
             self.assertTrue((results/"FACILITY_INTELLIGENCE_PILOT"/graph.OUTPUT_EVENTS).is_file())
             report=(results/"FACILITY_DOSSIER_PILOT"/dossier.REPORT_STATUS)
             self.assertTrue(report.is_file())
