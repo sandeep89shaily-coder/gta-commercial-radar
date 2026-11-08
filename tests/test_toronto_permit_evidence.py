@@ -14,6 +14,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
 import gta_toronto_permit_evidence as permits
+import gta_toronto_permit_acceptance as acceptance
 
 
 def daily(project="toronto_active_building_permits:26 265617",
@@ -234,6 +235,30 @@ class TorontoPermitRecordAuditTests(unittest.TestCase):
             self.assertIn("CKAN_ROW_DOES_NOT_PROVE_BUYER_OR_OPEN_CONTRACT",
                           row["review_blockers"])
             self.assertEqual(row["buyer_verified"],"NO")
+
+    def test_live_mocked_permit_saves_original_city_row_and_acceptance_can_replay(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder)
+            write_daily(root,[daily(keys="26 265617 BLD|00")])
+            official_check_date=__import__("datetime").datetime.now(
+                __import__("datetime").timezone.utc)
+            status=permits.run(root,live=True,live_limit=1,
+                               fetch=fake_ckan,as_of=official_check_date)
+            path=Path(status["immutable_live_batch_file"])
+            self.assertTrue(path.is_file())
+            saved=json.loads(path.read_text(encoding="utf-8"))
+            self.assertEqual(saved["attempted_records"],1)
+            self.assertEqual(saved["records_with_exact_live_key"],1)
+            raw=saved["original_public_ckan_rows_by_source_key"]["26 265617 BLD|00"]
+            self.assertEqual(raw["PERMIT_NUM"],"26 265617 BLD")
+            self.assertEqual(raw["REVISION_NUM"],"00")
+            self.assertEqual(raw["STATUS"],"Permit Issued")
+            self.assertFalse(saved["commercial_buyer_verified"])
+            sample=acceptance.run(path.parent,root/"acceptance",
+                                  as_of=official_check_date)
+            self.assertEqual(sample["recent_unique_exact_ckan_source_records"],1)
+            self.assertFalse(sample["official_source_sample_gate_passed"])
+            self.assertFalse(sample["commercial_production_accepted"])
 
     def test_unexpected_resource_id_fails_without_falling_back_to_wrong_dataset(self):
         with tempfile.TemporaryDirectory() as folder:
