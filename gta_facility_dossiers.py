@@ -333,8 +333,8 @@ def run(graph_dir, out=None, *, html_limit=200):
         tasks.extend(todo)
     all_dossiers.sort(key=lambda r:(
         PRIORITY_ORDER[r["research_priority"]],
-        -(int(r["source_age_days"]) if (r["source_age_days"] or "").isdigit()
-          else -1000000),
+        (int(r["source_age_days"]) if (r["source_age_days"] or "").isdigit()
+         else 1000000),
         r["dossier_id"]))
     rich_by_id = {r["dossier_id"]:r for r in details}
     tasks_by_id = defaultdict(list)
