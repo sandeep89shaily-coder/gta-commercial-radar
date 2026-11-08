@@ -462,6 +462,135 @@ class TorontoPermitRecordAuditTests(unittest.TestCase):
                         permits.run(root,live=True,live_offset=offset,
                                     fetch=no_calls)
 
+    def test_cleared_lookup_requires_explicit_live_opt_in(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);write_daily(root,[daily(keys="26 265617 BLD|00")])
+            with self.assertRaisesRegex(ValueError,"live-only"):
+                permits.run(root,check_cleared=True)
+            self.assertFalse((root/"TORONTO_PERMIT_EVIDENCE_PILOT").exists())
+
+    @staticmethod
+    def _active_then_cleared_mock(*, cleared=True, street="YONGE",
+                                   resource_ok=True):
+        requests=[]
+        def fetch(url):
+            requests.append(url)
+            p=urlsplit(url);q=parse_qs(p.query)
+            if p.path.endswith("package_show"):
+                ident=q.get("id",[""])[0]
+                if ident==permits.PACKAGE:
+                    return {"success":True,"result":{
+                        "name":permits.PACKAGE,
+                        "resources":[{"id":permits.RESOURCE_HINT,"datastore_active":True}]}}
+                if ident==permits.CLEARED_PACKAGE:
+                    return {"success":True,"result":{
+                        "name":permits.CLEARED_PACKAGE,
+                        "resources":[{"id":permits.CLEARED_RESOURCE_HINT if resource_ok
+                                      else "unexpected-resource",
+                                      "datastore_active":True}]}}
+                raise AssertionError("Unexpected package")
+            if p.path.endswith("datastore_search"):
+                rid=q["resource_id"][0]
+                selection=json.loads(q["filters"][0])
+                if rid==permits.RESOURCE_HINT:
+                    return {"success":True,"result":{"records":[],"total":0}}
+                if rid==permits.CLEARED_RESOURCE_HINT:
+                    rec=payload(permit=selection["PERMIT_NUM"],
+                                rev=selection["REVISION_NUM"],
+                                status="Closed",street=street)
+                    rec["COMPLETED_DATE"]="2026-11-04"
+                    return {"success":True,"result":{
+                        "records":[rec] if cleared else [],
+                        "total":1 if cleared else 0}}
+            raise AssertionError("Unexpected official query")
+        return fetch,requests
+
+    def test_active_missing_exact_cleared_record_preserves_source_history_not_open_contract(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);write_daily(root,[daily(keys="26 265617 BLD|00")])
+            fetch,calls=self._active_then_cleared_mock()
+            summary=permits.run(root,live=True,check_cleared=True,
+                                live_limit=1,fetch=fetch)
+            self.assertEqual(len(calls),4)
+            self.assertEqual(summary["cleared_exact_queries_attempted"],1)
+            self.assertEqual(summary["cleared_exact_source_records_received"],1)
+            self.assertEqual(summary["live_exact_record_payloads_received"],0)
+            self.assertEqual(summary["verified_open_contracts"],0)
+            self.assertEqual(summary["verified_buyers"],0)
+            with (root/"TORONTO_PERMIT_EVIDENCE_PILOT"/permits.AUDIT_CSV).open(
+                    encoding="utf-8-sig",newline="") as f:
+                row=next(csv.DictReader(f))
+            self.assertEqual(row["remote_status"],
+                             "NOT_PRESENT_IN_ACTIVE_DATASTORE_NOT_PROOF_OF_CLOSURE")
+            self.assertEqual(row["cleared_lookup_status"],
+                             "EXACT_KEY_FOUND_IN_OFFICIAL_CLEARED_SINCE_2017")
+            self.assertEqual(row["cleared_record_status"],"Closed")
+            self.assertEqual(row["cleared_completed_date"],"2026-11-04")
+            self.assertEqual(row["cleared_address_comparison"],"MATCHES_ARCHIVED_SITE")
+            self.assertEqual(row["final_evidence_level"],
+                             "REMOVED_FROM_ACTIVE_EXACT_CLEARED_RECORD_REVIEW")
+            self.assertEqual(row["buyer_verified"],"NO")
+            stored=json.loads(Path(summary["immutable_live_batch_file"]).read_text())
+            original=stored["original_public_cleared_rows_by_source_key"][
+                "26 265617 BLD|00"]
+            self.assertEqual(original["COMPLETED_DATE"],"2026-11-04")
+            self.assertEqual(stored["cleared_resource_id"],permits.CLEARED_RESOURCE_HINT)
+
+    def test_cleared_address_conflict_never_matches_same_facility(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);write_daily(root,[daily(keys="26 265617 BLD|00")])
+            fetch,_=self._active_then_cleared_mock(street="BAY")
+            summary=permits.run(root,live=True,check_cleared=True,
+                                live_limit=1,fetch=fetch)
+            self.assertEqual(summary["cleared_exact_source_records_received"],0)
+            with (root/"TORONTO_PERMIT_EVIDENCE_PILOT"/permits.AUDIT_CSV).open(
+                    encoding="utf-8-sig",newline="") as f:
+                row=next(csv.DictReader(f))
+            self.assertEqual(row["cleared_lookup_status"],"CLEARED_SITE_CONFLICT_REVIEW")
+            self.assertEqual(row["cleared_address_comparison"],"CLEARED_ADDRESS_CONFLICT")
+            self.assertEqual(row["final_evidence_level"],"CLEARED_SOURCE_ADDRESS_CONFLICT")
+
+    def test_absent_active_and_cleared_does_not_infer_closed_or_cancelled(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);write_daily(root,[daily(keys="26 265617 BLD|00")])
+            fetch,_=self._active_then_cleared_mock(cleared=False)
+            summary=permits.run(root,live=True,check_cleared=True,
+                                live_limit=1,fetch=fetch)
+            self.assertEqual(summary["cleared_exact_source_records_received"],0)
+            with (root/"TORONTO_PERMIT_EVIDENCE_PILOT"/permits.AUDIT_CSV).open(
+                    encoding="utf-8-sig",newline="") as f:
+                row=next(csv.DictReader(f))
+            self.assertEqual(row["cleared_lookup_status"],
+                             "NOT_FOUND_IN_CLEARED_SINCE_2017_STATUS_UNRESOLVED")
+            self.assertEqual(row["final_evidence_level"],
+                             "LIVE_RECORD_MISSING_OR_AMBIGUOUS_MANUAL_REVIEW")
+            self.assertEqual(row["buyer_verified"],"NO")
+
+    def test_wrong_cleared_resource_refuses_unverified_substitution(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);write_daily(root,[daily(keys="26 265617 BLD|00")])
+            fetch,calls=self._active_then_cleared_mock(resource_ok=False)
+            summary=permits.run(root,live=True,check_cleared=True,
+                                live_limit=1,fetch=fetch)
+            self.assertEqual(len(calls),3)
+            self.assertEqual(summary["cleared_exact_queries_attempted"],0)
+            self.assertIn("CLEARED_RESOURCE_ERROR",summary["cleared_source_error"])
+            self.assertEqual(summary["verified_open_contracts"],0)
+
+    def test_source_present_in_active_requires_no_secondary_cleared_request(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);write_daily(root,[daily(keys="26 265617 BLD|00")])
+            calls=[]
+            def active(url):
+                calls.append(url)
+                return fake_ckan(url)
+            summary=permits.run(root,live=True,check_cleared=True,
+                                live_limit=1,fetch=active)
+            self.assertEqual(len(calls),2)
+            self.assertEqual(summary["cleared_exact_queries_attempted"],0)
+            self.assertEqual(summary["cleared_exact_source_records_received"],0)
+            self.assertEqual(summary["live_exact_record_payloads_received"],1)
+
     def test_missing_daily_file_is_error_not_zero_opportunities(self):
         with tempfile.TemporaryDirectory() as folder:
             with self.assertRaises(FileNotFoundError):
