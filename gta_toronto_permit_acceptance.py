@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import csv
 import datetime as dt
+import hashlib
 import json
 from collections import Counter, defaultdict
 from pathlib import Path
@@ -24,6 +25,7 @@ BATCH_MAX_BYTES=2_000_000
 SOURCE_DAYS_MAX=7
 MIN_SOURCE_RECORDS=20
 MIN_DISTINCT_PROJECTS=15
+MIN_DISTINCT_PHYSICAL_SITES=10
 FIELDNAMES=(
     "source_key","project_id","permit_num","revision_num",
     "live_checked_at_utc","source_status","source_address","source_query_url",
@@ -46,8 +48,11 @@ def _read_batch(path):
     if data.get("source_dataset")!=permits.OFFICIAL_DATASET:
         raise ValueError("Unrecognized official source dataset")
     rows=data.get("audit_records")
+    original_rows=data.get("original_public_ckan_rows_by_source_key")
     if not isinstance(rows,list) or len(rows)>permits.MAX_LIVE:
         raise ValueError("Evidence batch is not bounded to ten records")
+    if not isinstance(original_rows,dict) or len(original_rows)>permits.MAX_LIVE:
+        raise ValueError("Evidence batch missing bounded original public source rows")
     if data.get("attempted_records")!=len(rows):
         raise ValueError("Evidence batch attempt count contradicts saved rows")
     timestamp=data.get("retrieved_at_utc","")
@@ -57,7 +62,7 @@ def _read_batch(path):
         raise ValueError("Evidence retrieval time missing or malformed") from exc
     if checked.tzinfo is None:
         raise ValueError("Evidence retrieval timestamp must be timezone aware")
-    return checked.astimezone(dt.timezone.utc),rows
+    return checked.astimezone(dt.timezone.utc),rows,original_rows
 
 
 def _validate_remote_url(url,permit_num,revision):
@@ -83,7 +88,7 @@ def _validate_remote_url(url,permit_num,revision):
         return False
 
 
-def _classify(row):
+def _classify(row, original=None):
     key=graph.clean(row.get("source_key",""))
     match=permits.KEY.fullmatch(key)
     if not match:
@@ -108,6 +113,21 @@ def _classify(row):
         return "REMOTE_STATUS_OR_ADDRESS_MISSING"
     if row.get("remote_address_comparison")!="ADDRESS_COMPATIBLE_WITH_AVAILABLE_SNAPSHOTS":
         return "ADDRESS_NOT_COMPATIBLE_WITH_ARCHIVE"
+    if not isinstance(original,dict):
+        return "ORIGINAL_PUBLIC_SOURCE_PAYLOAD_NOT_SAVED"
+    canonical=json.dumps(original,sort_keys=True,ensure_ascii=False,separators=(",",":"))
+    digest=hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+    if row.get("remote_payload_sha256")!=digest:
+        return "ORIGINAL_PUBLIC_SOURCE_ROW_HASH_MISMATCH"
+    original_permit=graph.clean(original.get("PERMIT_NUM"))
+    original_revision=graph.clean(original.get("REVISION_NUM"))
+    if original_permit!=permit or original_revision!=revision:
+        return "ORIGINAL_PUBLIC_SOURCE_RECORD_KEY_CONFLICT"
+    original_status=graph.clean(original.get("STATUS"))
+    original_address=permits._official_status_address(original)
+    if original_status!=row.get("remote_record_status") or (
+            original_address!=row.get("remote_record_address")):
+        return "ORIGINAL_SOURCE_ROW_STATUS_OR_SITE_CONTRADICTION"
     if row.get("buyer_verified")!="NO":
         return "UNEXPECTED_BUYER_VERIFICATION_CLAIM"
     if row.get("record_is_a_verified_open_supplier_contract")!="NO":
@@ -136,7 +156,7 @@ def run(batches_dir, out=None, *, as_of=None, days=SOURCE_DAYS_MAX):
     total_records=0
     for path in files:
         try:
-            checked,rows=_read_batch(path)
+            checked,rows,original_rows=_read_batch(path)
         except (ValueError,OSError,UnicodeError,json.JSONDecodeError) as exc:
             rejected["MALFORMED_OR_UNTRUSTED_BATCH"]+=1
             continue
@@ -145,7 +165,7 @@ def run(batches_dir, out=None, *, as_of=None, days=SOURCE_DAYS_MAX):
             continue
         for row in rows:
             total_records+=1
-            state=_classify(row)
+            state=_classify(row,original_rows.get(row.get("source_key","")))
             if state!="EXACT_OFFICIAL_SOURCE_ROW_WITH_ARCHIVED_ADDRESS_COMPATIBLE":
                 rejected[state]+=1
                 continue
@@ -168,9 +188,11 @@ def run(batches_dir, out=None, *, as_of=None, days=SOURCE_DAYS_MAX):
             "research_action":"Manually verify City permit status and independently establish project buyer/procurement",
         })
     projects={r["project_id"] for r in records}
+    physical_sites={r["source_address"] for r in records}
     stage_buckets={permits._stage_bucket(r["source_status"]) for r in records}
     sample_gate=(len(records)>=MIN_SOURCE_RECORDS and
                  len(projects)>=MIN_DISTINCT_PROJECTS and
+                 len(physical_sites)>=MIN_DISTINCT_PHYSICAL_SITES and
                  len(stage_buckets)>=2 and
                  not any(k in rejected for k in ("UNEXPECTED_BUYER_VERIFICATION_CLAIM",
                                                  "UNEXPECTED_OPEN_CONTRACT_CLAIM")))
@@ -184,10 +206,12 @@ def run(batches_dir, out=None, *, as_of=None, days=SOURCE_DAYS_MAX):
         "recheck_row_attempts_in_eligible_batches":total_records,
         "recent_unique_exact_ckan_source_records":len(records),
         "distinct_project_folders_rechecked":len(projects),
+        "distinct_physical_sites_rechecked":len(physical_sites),
         "source_stage_buckets_covered":sorted(stage_buckets),
         "rejected_or_unproven_counts":dict(sorted(rejected.items())),
         "source_sample_threshold":MIN_SOURCE_RECORDS,
         "distinct_project_threshold":MIN_DISTINCT_PROJECTS,
+        "distinct_physical_site_threshold":MIN_DISTINCT_PHYSICAL_SITES,
         "official_source_sample_gate_passed":sample_gate,
         "field_human_reviewer_approved":False,
         "buyer_and_open_procurement_verified":False,
@@ -198,6 +222,8 @@ def run(batches_dir, out=None, *, as_of=None, days=SOURCE_DAYS_MAX):
             "The City dataset may be updated on a different schedule from the building-permit status application.",
             "An exact original record and matching address do not identify tenant, supplier, buyer or available project work.",
             "No human original-record review, procurement, licensing or buyer attestation is accepted here.",
+            "Only bounded exact-record batches with preserved original public CKAN rows and matching hashes count.",
+            "Saved local source rows and hashes can still be falsified; acceptance is not independent City attestation.",
             "Malformed and stale verification batches cannot inflate the accepted source count.",
         ],
         "records_csv":str(out/OUTPUT_CSV),
