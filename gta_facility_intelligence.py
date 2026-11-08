@@ -474,11 +474,19 @@ def facility_profiles(events, links):
     return profiles
 
 
+def _csv_safe(value):
+    """Untrusted source text must not execute spreadsheet formulas."""
+    if isinstance(value, str) and value.lstrip().startswith(("=", "+", "-", "@")):
+        return "'" + value
+    return value
+
+
 def write_csv(path, rows, fields):
     with Path(path).open("w", encoding="utf-8-sig", newline="") as out:
         writer=csv.DictWriter(out,fieldnames=fields,extrasaction="ignore")
         writer.writeheader()
-        writer.writerows(rows)
+        for row in rows:
+            writer.writerow({k:_csv_safe(v) for k,v in row.items()})
 
 
 def run(results, out=None, *, max_events=100000, as_of=None, max_age_days=180):
