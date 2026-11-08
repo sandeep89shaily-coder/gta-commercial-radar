@@ -12,6 +12,7 @@ from pathlib import Path
 
 import gta_facility_intelligence as graph
 import gta_facility_dossiers as dossiers
+import gta_facility_role_review as role_review
 from v6_daily_pipeline import find_workspace
 
 
@@ -34,6 +35,8 @@ def execute(workspace=None, *, results=None, as_of=None, max_age_days=180):
     dossier_dir = folder/"FACILITY_DOSSIER_PILOT"
     graph_status = graph.run(folder,graph_dir,as_of=date,max_age_days=max_age_days)
     dossier_status = dossiers.run(graph_dir,dossier_dir)
+    role_status = role_review.run(
+        graph_dir,folder/"GTA_RADAR_PROJECT_OPPORTUNITIES.csv",dossier_dir)
     result = {
         "mode":"MANUAL_OFFLINE_EVIDENCE_REVIEW_ONLY",
         "as_of":date.isoformat(),
@@ -44,6 +47,8 @@ def execute(workspace=None, *, results=None, as_of=None, max_age_days=180):
         "cross_source_civic_candidate_links":graph_status["cross_source_candidate_links"],
         "research_dossiers":dossier_status["candidate_dossiers"],
         "manual_evidence_tasks":dossier_status["manual_verification_tasks"],
+        "unverified_company_role_hints":role_status["role_hints"],
+        "role_hints_verified":0,
         "verified_open_supplier_contracts":0,
         "buyers_verified":0,
         "outreach_authorized":False,
@@ -52,6 +57,7 @@ def execute(workspace=None, *, results=None, as_of=None, max_age_days=180):
         "dossier_status_file":str(dossier_dir/dossiers.REPORT_STATUS),
         "dossier_csv":str(dossier_dir/dossiers.DOSSIERS_CSV),
         "dossier_html":str(dossier_dir/dossiers.REPORT_HTML),
+        "role_review_csv":str(dossier_dir/role_review.OUT_CSV),
         "caveat":"This processes previously exported source snapshots, not a live run; "
                  "no newly published records or procurement opportunities are confirmed.",
     }
