@@ -49,6 +49,28 @@ City status values in the checked 20 constituent permit records:
 
 The `Refusal Notice` record at **29 Jutland Rd** remained in the blocked stage and cannot be labelled an active sales opportunity.
 
+## Follow-up: validated source-to-dossier handoff
+
+The subsequent end-to-end GitHub Actions run [#42494508977](https://github.com/sandeep89shaily-coder/gta-commercial-radar/actions/runs/42494508977) independently rechecked the same original 20 archived permit/revision keys on November 8, 2026, then reconstructed the facility graph and research dossiers using **all 44 constituent permit/revision keys** from their 20 original project folders.
+
+Its [saved live evidence artifact #13623051547](https://github.com/sandeep89shaily-coder/gta-commercial-radar/actions/runs/42494508977/artifacts/13623051547) contains the City acceptance records, original safe CKAN source projections, a graph, 20 research dossiers and the new **`GTA_RADAR_TORONTO_DOSSIER_SOURCE_EVIDENCE.csv`**.
+
+| End-to-end measure | Verified result |
+| --- | ---: |
+| Original project folders reconstructed | **20** |
+| All underlying constituent permit/revision keys | **44** |
+| Exact *individual* City keys rechecked live | **20** |
+| Dossiers correctly linked to the checked source record | **20** |
+| Checked permits from multi-key project folders | **13** |
+| Distinct source-summary/individual-stage differences | **6** |
+| Blocked/refusal permit stages correctly held | **1** |
+| Full project-folder permit completeness asserted | **0** |
+| Independently established buyers or open contracts | **0** |
+
+The handoff refuses to join a City source record to a dossier unless the exact project ID, original included permit key, civic address, time freshness, source query, accepted CSV SHA-256 and source sample gate all agree. It writes **an overlay**, never silently changes the original project/dossier status or authorizes outreach. All thirteen multi-permit dossiers remain only **partially checked**.
+
+**The source gate is a meaningful technical acceptance achievement, not a commercial launch gate.** Actual company and buyer relationships, current procurement opportunities, public business contacts, a ten-lead customer-ready sample and two paying pilot customers remain outstanding.
+
 ## Product implications and next acceptance
 
 **Confirmed:** The City endpoint is reachable from a GitHub Actions environment, the original twenty IDs are found in its active permit DataStore, their civic locations agree with Radar, and exact-key queries can populate reproducible source-evidence records.
