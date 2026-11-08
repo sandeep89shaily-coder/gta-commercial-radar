@@ -36,7 +36,7 @@ OUTPUT_STATUS = "GTA_RADAR_FACILITY_INTELLIGENCE_STATUS.json"
 
 EVENT_FIELDS = (
     "event_id", "source_family", "source_id", "source_record_id",
-    "source_url", "url_evidence_level", "record_hash", "source_date",
+    "source_lookup_key", "source_url", "url_evidence_level", "record_hash", "source_date",
     "radar_first_seen_at", "source_age_days", "city", "site_address", "site_unit", "site_id",
     "site_identity_status", "organization", "organization_role", "project_id",
     "signal_type", "stage_label", "source_status", "description",
@@ -96,6 +96,13 @@ TERMINAL = re.compile(
     r"\b(?:withdrawn|cancelled|canceled|revoked|refused|rejected|"
     r"expired|awarded|completed|closed|terminated|denied)\b", re.I,
 )
+# "Refusal Notice" and "Revocation Pending" are not necessarily final
+# decisions; they still must NOT be presented as active supplier leads.
+ON_HOLD = re.compile(
+    r"\b(?:on hold|refusal notice|revocation pending|blocked or inactive|"
+    r"under appeal|stop work|suspended|suspension)\b", re.I,
+)
+ERO_NUMBER = re.compile(r"^\d{3}-\d{4}$")
 FUTURE_WORDS = re.compile(
     r"\b(?:propos(?:e|ed|al)|application|planned|intended|"
     r"under review|pending|submitted|requested)\b", re.I,
@@ -211,12 +218,16 @@ def adapt(family, row, *, as_of=None, max_age_days=180):
         organization = ""
         role = "UNKNOWN"
         description = first(row, "description")
-        stage = first(row, "stage_from_local_status", "current_source_status")
+        # Preserve the actual municipal source status. Generic lifecycle
+        # classes can obscure refusal notices, holds and revocations.
+        stage = first(row, "current_source_status", "stage_from_local_status")
         scope = "MUNICIPAL_PROJECT_RECORD"
         segments = first(row, "service_hypotheses")
         event_date = first(row, "source_record_date", "event_date")
         observed = first(row, "first_seen_local")
         source_url = first(row, "record_source_url")
+        source_portal_url = first(row, "official_source_portal_url")
+        source_lookup_key = first(row, "source_keys") or key
         project = key
         signal = "MUNICIPAL_PERMIT_OR_PROJECT_ACTIVITY"
         procurement = "UNKNOWN"
@@ -239,6 +250,8 @@ def adapt(family, row, *, as_of=None, max_age_days=180):
         event_date = first(row, "date")
         observed = first(row, "first_seen_local")
         source_url = first(row, "evidence_urls").split(" | ")[0].split("; ")[0]
+        source_portal_url = ""
+        source_lookup_key = first(row, "application_id") or key
         project = key
         signal = "MUNICIPAL_PLANNING_APPLICATION"
         procurement = "UNKNOWN"
@@ -273,6 +286,8 @@ def adapt(family, row, *, as_of=None, max_age_days=180):
         event_date = first(row, "proposal_posted")
         observed = first(row, "radar_first_seen_at")
         source_url = first(row, "official_notice_url")
+        source_portal_url = ""
+        source_lookup_key = first(row, "ero_number")
         project = first(row, "related_project_id")
         signal = "INDUSTRIAL_" + (first(row, "action") or "EQUIPMENT")
         procurement = first(row, "procurement_status") or "UNKNOWN"
@@ -295,6 +310,8 @@ def adapt(family, row, *, as_of=None, max_age_days=180):
         event_date = first(row, "source_event_date")
         observed = first(row, "radar_first_seen_at")
         source_url = first(row, "source_dataset_url")
+        source_portal_url = ""
+        source_lookup_key = key
         project = ""
         signal = "COMMERCIAL_ACTIVATION_SIGNAL"
         procurement = first(row, "purchasing_status") or "UNKNOWN"
@@ -322,9 +339,28 @@ def adapt(family, row, *, as_of=None, max_age_days=180):
                        "SOURCE_JURISDICTION_CITY_NOT_INDEPENDENTLY_CHECKED" if city_derived else
                        "STRUCTURED_CIVIC_ADDRESS_NOT_INDEPENDENTLY_GEOCODED")
     url = https(source_url)
-    evidence_level = ("RECORD_URL_NOT_LIVE_CHECKED" if url and family in {"radar", "industrial"} else
-                      "SOURCE_REFERENCE_NOT_RECORD_SPECIFIC" if url else "SOURCE_URL_MISSING")
+    derived_ero_url = False
+    if (not url and family == "radar" and
+            source_id == "ero_gta_environmental_instruments"):
+        # Exact ERO notice ID is a recoverable primary-source pointer. This
+        # URL is DERIVED from the official notice pattern, NOT live validated.
+        notice = source_lookup_key.strip()
+        if ERO_NUMBER.fullmatch(notice):
+            url = "https://ero.ontario.ca/notice/" + notice
+            derived_ero_url = True
+    if url and derived_ero_url:
+        evidence_level = "DERIVED_ERO_NOTICE_URL_NOT_LIVE_RECHECKED"
+    elif url and family in {"radar", "industrial"}:
+        evidence_level = "RECORD_URL_NOT_LIVE_CHECKED"
+    elif url:
+        evidence_level = "SOURCE_REFERENCE_NOT_RECORD_SPECIFIC"
+    elif family == "radar" and https(source_portal_url):
+        url = https(source_portal_url)
+        evidence_level = "SOURCE_REFERENCE_NOT_RECORD_SPECIFIC"
+    else:
+        evidence_level = "SOURCE_URL_MISSING"
     closed = bool(TERMINAL.search(stage))
+    on_hold = bool(ON_HOLD.search(stage))
     source_day = iso_day(event_date)
     source_age = ((as_of - dt.date.fromisoformat(source_day)).days
                   if source_day else None)
@@ -334,6 +370,8 @@ def adapt(family, row, *, as_of=None, max_age_days=180):
                          first(row, "observation") not in {"FIRST_OBSERVED", "RECORD_CHANGED"})
     if closed:
         tier = "HISTORICAL_OR_TERMINAL_REVIEW_ONLY"
+    elif on_hold:
+        tier = "STATUS_HOLD_OR_REVOCATION_RECHECK_ONLY"
     elif not site:
         tier = "IDENTITY_REPAIR_REQUIRED"
     elif archived_baseline:
@@ -356,6 +394,8 @@ def adapt(family, row, *, as_of=None, max_age_days=180):
         blockers.append("NO_SOURCE_URL")
     elif evidence_level == "SOURCE_REFERENCE_NOT_RECORD_SPECIFIC":
         blockers.append("INDIVIDUAL_SOURCE_RECORD_RECHECK_REQUIRED")
+    elif evidence_level == "DERIVED_ERO_NOTICE_URL_NOT_LIVE_RECHECKED":
+        blockers.append("DERIVED_OFFICIAL_NOTICE_URL_NOT_LIVE_VERIFIED")
     if not source_day:
         blockers.append("SOURCE_DATE_NOT_VERIFIED")
     if source_age is not None and source_age < -1:
@@ -376,9 +416,12 @@ def adapt(family, row, *, as_of=None, max_age_days=180):
         blockers.append("ADDRESS_EXTRACTED_FROM_DESCRIPTION_ONLY")
     if closed:
         blockers.append("HISTORICAL_OR_TERMINAL_STATUS")
+    if on_hold:
+        blockers.append("MUNICIPAL_STATUS_ON_HOLD_OR_REVOCATION_RECHECK")
     output = {
         "event_id":event_id(family, source_id, key),
         "source_family":family, "source_id":source_id, "source_record_id":key,
+        "source_lookup_key":source_lookup_key[:300],
         "source_url":url, "url_evidence_level":evidence_level,
         "record_hash":evidence_hash, "source_date":source_day,
         "radar_first_seen_at":observed,
@@ -555,6 +598,16 @@ def run(results, out=None, *, max_events=100000, as_of=None, max_age_days=180):
         "unit_conflicts_blocked":sum(
             link["relationship"] == "DIFFERENT_UNITS_NOT_SAME_TENANT" for link in links),
         "cross_source_links_verified_as_same_project":0,
+        "exact_record_url_unchecked":sum(
+            e["url_evidence_level"] == "RECORD_URL_NOT_LIVE_CHECKED" for e in events),
+        "derived_ero_notice_urls_unchecked":sum(
+            e["url_evidence_level"] == "DERIVED_ERO_NOTICE_URL_NOT_LIVE_RECHECKED" for e in events),
+        "portal_only_record_pointers":sum(
+            e["url_evidence_level"] == "SOURCE_REFERENCE_NOT_RECORD_SPECIFIC" for e in events),
+        "no_source_pointer":sum(
+            e["url_evidence_level"] == "SOURCE_URL_MISSING" for e in events),
+        "source_status_hold_for_recheck":sum(
+            e["review_tier"] == "STATUS_HOLD_OR_REVOCATION_RECHECK_ONLY" for e in events),
         "verified_open_supplier_contracts":0,
         "verified_buyers":0, "verified_business_openings":0,
         "exclusions":dict(sorted(exclusions.items())),
