@@ -88,6 +88,14 @@ def fake_ckan(url):
 
 
 class TorontoPermitRecordAuditTests(unittest.TestCase):
+    def test_archived_actual_toronto_hold_and_revocation_buckets(self):
+        self.assertEqual(permits._stage_bucket("Application On Hold"),"BLOCKED")
+        self.assertEqual(permits._stage_bucket("Refusal Notice"),"BLOCKED")
+        self.assertEqual(permits._stage_bucket("Revocation Pending"),"BLOCKED")
+        self.assertEqual(permits._stage_bucket("Permit Issued"),"ISSUED")
+        self.assertEqual(permits._stage_bucket("Inspection"),"INSPECTION")
+        self.assertEqual(permits._stage_bucket("Under Review"),"PREPARATION")
+
     def test_actual_three_key_bundle(self):
         keys,reason=permits.split_source_keys(daily())
         self.assertFalse(reason)
