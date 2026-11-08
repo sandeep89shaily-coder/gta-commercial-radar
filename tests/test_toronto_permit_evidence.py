@@ -327,6 +327,108 @@ class TorontoPermitRecordAuditTests(unittest.TestCase):
             self.assertEqual(out["live_exact_record_payloads_received"],0)
             self.assertEqual(out["verified_open_contracts"],0)
 
+    def test_live_sample_stratifies_statuses_and_rotates_to_fresh_distinct_projects(self):
+        sample=[]
+        statuses=["Permit Issued","Under Review","Inspection","Application On Hold"]
+        for idx in range(28):
+            folder=f"26 {200000+idx:06d}"
+            item=daily(
+                project="toronto_active_building_permits:"+folder,
+                keys=folder+" BLD|00",
+                status=statuses[idx%4]
+            )
+            item["source_record_date"]="2026-11-05" if idx>=14 else "2024-02-01"
+            sample.append(item)
+        audit=[{"project_id":r["project_id"],
+                "source_key":r["source_keys"],
+                "permit_type":"BLD"}
+               for r in sample]
+        first=permits.choose_live_recheck_sample(audit,sample,limit=10,offset=0)
+        next_batch=permits.choose_live_recheck_sample(audit,sample,limit=10,offset=10)
+        self.assertEqual(len(first),10)
+        self.assertEqual(len(next_batch),10)
+        self.assertFalse({x["source_key"] for x in first}&
+                         {x["source_key"] for x in next_batch})
+        self.assertEqual(len({x["project_id"] for x in first}),10)
+        self.assertTrue(all(x["source_key"].startswith("26 ") for x in first))
+        self.assertGreaterEqual(
+            len({permits._stage_bucket(next(r["current_source_status"]
+                for r in sample if r["project_id"]==x["project_id"]))
+                for x in first}),4)
+        self.assertEqual(
+            permits.choose_live_recheck_sample(audit,sample,limit=10,offset=0),
+            first)
+        self.assertEqual(
+            permits.choose_live_recheck_sample(audit,sample,limit=10,offset=28),[])
+
+    def test_live_recheck_offset_reports_next_batch_without_claiming_source_verified(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder)
+            sample=[]
+            for idx in range(21):
+                number=f"26 {270000+idx:06d}"
+                row=daily(project=permits.SOURCE+":"+number,
+                          keys=number+" BLD|00",status="Permit Issued")
+                row["source_record_date"]="2026-11-05"
+                sample.append(row)
+            write_daily(root,sample)
+            result=permits.run(root,live=True,live_offset=10,
+                               live_limit=10,fetch=fake_ckan)
+            self.assertEqual(result["live_record_queries_attempted"],10)
+            self.assertEqual(result["live_offset"],10)
+            self.assertEqual(result["live_next_offset"],20)
+            self.assertEqual(len(result["live_selected_record_keys"]),10)
+            self.assertEqual(result["live_exact_record_payloads_received"],10)
+            self.assertEqual(result["verified_buyers"],0)
+            self.assertEqual(result["verified_open_contracts"],0)
+
+    def test_missing_remote_stage_cannot_count_as_fully_verified_record(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder)
+            write_daily(root,[daily(keys="26 265617 BLD|00")])
+            def blank(url):
+                data=fake_ckan(url)
+                if urlsplit(url).path.endswith("datastore_search"):
+                    data["result"]["records"][0]["STATUS"]=""
+                return data
+            status=permits.run(root,live=True,live_limit=1,fetch=blank)
+            self.assertEqual(status["live_record_queries_attempted"],1)
+            with (root/"TORONTO_PERMIT_EVIDENCE_PILOT"/permits.AUDIT_CSV).open(
+                    encoding="utf-8-sig",newline="") as f:
+                row=next(csv.DictReader(f))
+            self.assertEqual(row["final_evidence_level"],"LIVE_ROW_STAGE_UNVERIFIED")
+            self.assertEqual(row["remote_stage_comparison"],"REMOTE_STATUS_MISSING_RECHECK")
+            self.assertIn("REMOTE_STATUS_MISSING",row["review_blockers"])
+            self.assertEqual(row["buyer_verified"],"NO")
+
+    def test_remote_stage_change_is_visible_but_not_a_supplier_opportunity(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder)
+            write_daily(root,[daily(keys="26 265617 BLD|00")])
+            s=permits.run(root,live=True,live_limit=1,fetch=fake_ckan)
+            self.assertEqual(s["live_exact_record_payloads_received"],1)
+            with (root/"TORONTO_PERMIT_EVIDENCE_PILOT"/permits.AUDIT_CSV).open(
+                    encoding="utf-8-sig",newline="") as f:
+                row=next(csv.DictReader(f))
+            self.assertEqual(row["remote_stage_comparison"],
+                             "STATUS_CHANGED_SINCE_EXPORTED_GROUP")
+            self.assertIn("ARCHIVED_PROJECT_STATUS_DIFFERS_FROM_LIVE_CONSTITUENT",
+                          row["review_blockers"])
+            self.assertEqual(row["record_is_a_verified_open_supplier_contract"],"NO")
+            self.assertEqual(s["verified_buyers"],0)
+
+    def test_live_offset_out_of_bounds_refuses_before_network_calls(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder)
+            write_daily(root,[daily()])
+            def no_calls(_):
+                raise AssertionError("No network expected")
+            for offset in (-1,10001):
+                with self.subTest(offset=offset):
+                    with self.assertRaisesRegex(ValueError,"0..10000"):
+                        permits.run(root,live=True,live_offset=offset,
+                                    fetch=no_calls)
+
     def test_missing_daily_file_is_error_not_zero_opportunities(self):
         with tempfile.TemporaryDirectory() as folder:
             with self.assertRaises(FileNotFoundError):
