@@ -257,13 +257,16 @@ def _recent_date(value):
         return 0
 
 
-def choose_live_recheck_sample(audit, projects, limit=MAX_LIVE):
-    """Fair bounded sample: diverse stages and projects, recent source first.
+def choose_live_recheck_sample(audit, projects, limit=MAX_LIVE, offset=0):
+    """Fair bounded rotating sample: stages, distinct projects, recent first.
 
     Never claim a project is checked if only one of its revision keys was
     queried. This samples *records*, not source-complete facilities.
     """
     limit=max(0,min(int(limit),MAX_LIVE))
+    offset=int(offset)
+    if offset<0 or offset>10000:
+        raise ValueError("Live source-record offset must be 0..10000")
     if not limit:
         return []
     metadata={p["project_id"]:p for p in projects}
@@ -282,10 +285,9 @@ def choose_live_recheck_sample(audit, projects, limit=MAX_LIVE):
     selected=[]
     used_ids=set()
     used_projects=set()
-    # Stage coverage first: verify at least one source record per status tier.
+    # Stage coverage first: one source record per status tier. Offset applies
+    # to the resulting deterministic full order, not before stage sampling.
     for stage in STAGE_SEQUENCE:
-        if len(selected)>=limit:
-            break
         if by_stage[stage]:
             row,_=by_stage[stage].pop(0)
             selected.append(row)
@@ -303,21 +305,17 @@ def choose_live_recheck_sample(audit, projects, limit=MAX_LIVE):
         item[1]["project_id"],item[1]["source_key"]
     ))
     for _,row,_ in remaining:
-        if len(selected)>=limit:
-            break
         if row["project_id"] in used_projects:
             continue
         selected.append(row)
         used_ids.add(row["source_key"])
         used_projects.add(row["project_id"])
     for _,row,_ in remaining:
-        if len(selected)>=limit:
-            break
         if row["source_key"] in used_ids:
             continue
         selected.append(row)
         used_ids.add(row["source_key"])
-    return selected
+    return selected[offset:offset+limit]
 
 
 def _audit_row(project,ident,permit_num,rev,local,export_status,export_address):
@@ -353,7 +351,7 @@ def _audit_row(project,ident,permit_num,rev,local,export_status,export_address):
     }
 
 def run(results, out=None, *, db=None, live=False, live_limit=10,
-        fetch=_get_payload, as_of=None):
+        live_offset=0, fetch=_get_payload, as_of=None):
     results=Path(results)
     source=results/DAILY_CSV
     rows=graph.read_csv(source,REQUIRED) if source.is_file() else None
@@ -364,6 +362,8 @@ def run(results, out=None, *, db=None, live=False, live_limit=10,
         raise ValueError("Output must not overwrite Radar source folder")
     if not 0<=int(live_limit)<=MAX_LIVE:
         raise ValueError("Bounded live query limit must be 0.."+str(MAX_LIVE))
+    if not 0<=int(live_offset)<=10000:
+        raise ValueError("Live source-record offset must be 0..10000")
     all_projects=[r for r in rows if clean(r.get("source_id"))==SOURCE]
     audit=[];projects=[];failures=Counter();parsed_projects=[]
     keyset=set()
@@ -414,7 +414,8 @@ def run(results, out=None, *, db=None, live=False, live_limit=10,
             live_status="OFFICIAL_CKAN_RESOURCE_RESOLVED"
             # Stratify stage classes and prefer the most recently source-dated
             # records, with distinct projects before secondary constituent keys.
-            selected=choose_live_recheck_sample(audit,all_projects,live_limit)
+            selected=choose_live_recheck_sample(
+                audit,all_projects,live_limit,live_offset)
             stamp=(as_of.isoformat() if isinstance(as_of,(dt.date,dt.datetime))
                    else str(as_of) if as_of else
                    dt.datetime.now(dt.timezone.utc).isoformat())
@@ -523,6 +524,17 @@ def run(results, out=None, *, db=None, live=False, live_limit=10,
         "local_record_payloads_matched":sum(r["local_snapshot_status"]==
             "LOCAL_EXACT_PERMIT_REVISION_PAYLOAD_MATCH_NOT_LIVE_RECHECKED" for r in audit),
         "live_requested":live_requested,
+        "live_requested_limit":int(live_limit),
+        "live_offset":int(live_offset),
+        "live_selection_eligible_records":len(audit),
+        "live_selected_record_keys":(
+            [row["source_key"] for row in choose_live_recheck_sample(
+                audit,all_projects,live_limit,live_offset)]
+            if live_requested else []),
+        "live_next_offset":(
+            min(int(live_offset)+len(choose_live_recheck_sample(
+                audit,all_projects,live_limit,live_offset)),len(audit))
+            if live_requested else None),
         "live_selection_policy":"STAGE_DIVERSITY_THEN_RECENT_SOURCE_DATE_THEN_DISTINCT_PROJECTS;ONE_RECORD_DOES_NOT_VERIFY_WHOLE_PROJECT",
         "live_status":live_status,
         "live_record_queries_attempted":live_checked,
@@ -557,9 +569,12 @@ def main():
     p.add_argument("--live-ckan",action="store_true",
                    help="Opt-in: at most 10 official CKAN exact permit/revision queries")
     p.add_argument("--live-limit",type=int,default=10)
+    p.add_argument("--live-offset",type=int,default=0,
+                   help="Next bounded manual batch; offset 10 checks new records")
     args=p.parse_args()
     print(json.dumps(run(args.results,args.out,db=args.db,
-                         live=args.live_ckan,live_limit=args.live_limit),indent=2))
+                         live=args.live_ckan,live_limit=args.live_limit,
+                         live_offset=args.live_offset),indent=2))
 
 if __name__=="__main__":
     main()
