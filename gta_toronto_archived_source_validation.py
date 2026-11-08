@@ -26,6 +26,8 @@ from pathlib import Path
 import gta_facility_intelligence as graph
 import gta_toronto_permit_evidence as permit
 import gta_toronto_permit_acceptance as acceptance
+import gta_facility_dossiers as dossiers
+import gta_toronto_dossier_source_overlay as overlay
 
 FIXTURE=Path(__file__).resolve().parent/"tests"/"fixtures"/"toronto_archived_20_permits_20261107.csv"
 ORIGINAL_DAILY_CSV_SHA256="a4d0f1ee098e30dd504dcb7aa00e8ee13471ba396e874e8748473f7ca118b13d"
@@ -37,7 +39,7 @@ def validate_fixture(path):
     path=Path(path)
     with path.open(encoding="utf-8-sig",newline="") as f:
         reader=csv.DictReader(f)
-        required=permit.REQUIRED|{"source_record_date"}
+        required=permit.REQUIRED|{"source_record_date","full_source_keys"}
         if not required<=set(reader.fieldnames or ()):
             raise ValueError("Archived City permit fixture schema is incomplete")
         rows=list(reader)
@@ -53,6 +55,11 @@ def validate_fixture(path):
         if why or len(keys)!=1:
             raise ValueError("Expected one exact archived permit/revision per project: "+why)
         key=keys[0][0]
+        original={"project_id":row["project_id"],
+                  "source_keys":row["full_source_keys"]}
+        all_keys,original_reason=permit.split_source_keys(original)
+        if original_reason or key not in {original_id for original_id,_,_ in all_keys}:
+            raise ValueError("Selected sample source ID must exist in full archived project bundle")
         if key in unique_keys:
             raise ValueError("Duplicate source key in independently sampled evidence")
         unique_keys.add(key)
@@ -87,6 +94,7 @@ def run(out,*,fixture=FIXTURE,fetch=permit._get_payload,check_cleared=True):
         "commercial_production_accepted":False,
         "batch_results":[],
         "source_acceptance":None,
+        "dossier_evidence_handoff":None,
         "errors":[]
     }
     report_path=out/REPORT_NAME
@@ -131,6 +139,46 @@ def run(out,*,fixture=FIXTURE,fetch=permit._get_payload,check_cleared=True):
                 accept["recent_unique_exact_ckan_source_records"]+
                 accept["recent_distinct_exact_cleared_history_records"]>0
             )
+            # Actual end-to-end test: graph and dossier history contain the
+            # FULL original project bundle, while only the representative
+            # specific City permit/revision is considered source checked.
+            all_original=[{**row,"source_keys":row["full_source_keys"]}
+                          for row in rows]
+            with (scratch/permit.DAILY_CSV).open(
+                    "w",encoding="utf-8-sig",newline="") as source_stream:
+                columns=list(all_original[0])
+                writer=csv.DictWriter(source_stream,fieldnames=columns)
+                writer.writeheader()
+                writer.writerows(all_original)
+            graph_dir=out/"FACILITY_INTELLIGENCE_PILOT"
+            dossier_dir=out/"FACILITY_DOSSIER_PILOT"
+            graph_status=graph.run(scratch,graph_dir,
+                                   as_of=dt.datetime.now(dt.timezone.utc).date())
+            dossier_status=dossiers.run(graph_dir,dossier_dir)
+            attached=overlay.run(dossier_dir,city_dir,dossier_dir)
+            result["dossier_evidence_handoff"]={
+                "original_project_folders":len(rows),
+                "full_original_constituent_permit_keys":sum(
+                    len(permit.split_source_keys({
+                        "project_id":row["project_id"],
+                        "source_keys":row["full_source_keys"]})[0])
+                    for row in rows),
+                "source_events_in_graph":graph_status["source_event_count"],
+                "research_dossiers":dossier_status["candidate_dossiers"],
+                "dossiers_with_exact_checked_permit":
+                    attached["toronto_dossiers_with_exact_checked_permit_source"],
+                "verified_constituents_in_multi_permit_folders":
+                    attached["verified_constituents_in_multi_permit_project_folders"],
+                "project_summary_vs_individual_permit_stage_differences":
+                    attached["source_stage_difference_to_archived_project_summary"],
+                "blocked_city_permit_stages":
+                    attached["blocked_source_status_records_not_sales_ready"],
+                "supplier_contracts_verified":0,
+                "buyers_verified":0,
+                "original_project_full_status_verified":False,
+                "commercial_production_accepted":False,
+                "source_dossier_evidence_csv":str(dossier_dir/overlay.OUTPUT_CSV),
+            }
     except Exception as exc:
         result["errors"].append(type(exc).__name__+": "+str(exc)[:250])
     result["api_evidence_sample_passed"]=bool(
