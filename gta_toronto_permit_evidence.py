@@ -38,6 +38,9 @@ RESOURCE_HINT="6d0229af-bc54-46de-9c2b-26759b01dd05"
 API="https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action/"
 OFFICIAL_DATASET="https://open.toronto.ca/dataset/building-permits-active-permits/"
 OFFICIAL_STATUS=graph.TORONTO_PERMIT_STATUS_SEARCH
+CLEARED_PACKAGE="building-permits-cleared-permits"
+CLEARED_RESOURCE_HINT="a96c0ba4-3026-402b-b09d-5b1268b8f810"
+OFFICIAL_CLEARED_DATASET="https://open.toronto.ca/dataset/building-permits-cleared-permits/"
 
 # Example original keys: "26 265617 HVA|00 | 26 265617 BLD|00".
 KEY=re.compile(r"^(?P<folder>\d{2} \d{6}) (?P<type>[A-Z]{3})\|(?P<rev>\d{2})$")
@@ -56,6 +59,8 @@ AUDIT_FIELDS=(
     "remote_status","remote_record_status","remote_record_address",
     "remote_address_comparison","remote_stage_comparison",
     "remote_payload_sha256","remote_query_url","remote_retrieved_at",
+    "cleared_lookup_status","cleared_record_status","cleared_record_address",
+    "cleared_completed_date","cleared_payload_sha256","cleared_query_url",
     "final_evidence_level","individual_record_retrieved_live",
     "record_is_a_verified_open_supplier_contract","buyer_verified",
     "review_blockers",
@@ -64,7 +69,7 @@ PROJECT_FIELDS=(
     "project_id","permit_folder","source_key_count","local_records_matched",
     "local_records_missing","local_record_stage_count",
     "local_statuses","live_records_matched","live_records_checked",
-    "project_review_status","source_permit_evidence_summary",
+    "cleared_exact_record_matches","project_review_status","source_permit_evidence_summary",
     "source_provenance","verified_open_contract","buyer_verified",
 )
 # Verification selection is *stratified*, not a leaderboard and not proof of
@@ -226,6 +231,16 @@ def _resource(fetch):
             return RESOURCE_HINT,clean(res.get("last_modified"))
     raise ValueError("Expected active Toronto permit DataStore resource unavailable; no fallback to wrong dataset")
 
+def _cleared_resource(fetch):
+    metadata,_=_official_action("package_show",{"id":CLEARED_PACKAGE},fetch)
+    if metadata.get("name")!=CLEARED_PACKAGE:
+        raise ValueError("Unexpected Toronto cleared-permits dataset identity")
+    for res in metadata.get("resources",[]):
+        if res.get("id")==CLEARED_RESOURCE_HINT and res.get("datastore_active") is True:
+            return CLEARED_RESOURCE_HINT,clean(res.get("last_modified"))
+    raise ValueError("Official since-2017 cleared permit resource not active; no fallback")
+
+
 def _remote_record(permit_num,revision,resource_id,fetch):
     params={"resource_id":resource_id,"filters":json.dumps({
         "PERMIT_NUM":permit_num,"REVISION_NUM":revision},separators=(",",":")),"limit":3}
@@ -345,6 +360,9 @@ def _audit_row(project,ident,permit_num,rev,local,export_status,export_address):
         "remote_address_comparison":"","remote_stage_comparison":"",
         "remote_payload_sha256":"",
         "remote_query_url":"","remote_retrieved_at":"",
+        "cleared_lookup_status":"NOT_REQUESTED",
+        "cleared_record_status":"","cleared_record_address":"",
+        "cleared_completed_date":"","cleared_payload_sha256":"","cleared_query_url":"",
         "final_evidence_level":"SOURCE_SNAPSHOT_EXACT_KEY_NOT_LIVE_CHECKED" if
              state=="LOCAL_EXACT_PERMIT_REVISION_PAYLOAD_MATCH_NOT_LIVE_RECHECKED" else
              "UNVERIFIED_SOURCE_RECORD_ID",
@@ -354,7 +372,7 @@ def _audit_row(project,ident,permit_num,rev,local,export_status,export_address):
     }
 
 def run(results, out=None, *, db=None, live=False, live_limit=10,
-        live_offset=0, fetch=_get_payload, as_of=None):
+        live_offset=0, check_cleared=False, fetch=_get_payload, as_of=None):
     results=Path(results)
     source=results/DAILY_CSV
     rows=graph.read_csv(source,REQUIRED) if source.is_file() else None
@@ -367,6 +385,8 @@ def run(results, out=None, *, db=None, live=False, live_limit=10,
         raise ValueError("Bounded live query limit must be 0.."+str(MAX_LIVE))
     if not 0<=int(live_offset)<=10000:
         raise ValueError("Live source-record offset must be 0..10000")
+    if check_cleared and not live:
+        raise ValueError("Cleared lookup is live-only and requires explicit --live-ckan")
     all_projects=[r for r in rows if clean(r.get("source_id"))==SOURCE]
     audit=[];projects=[];failures=Counter();parsed_projects=[]
     keyset=set()
@@ -412,6 +432,11 @@ def run(results, out=None, *, db=None, live=False, live_limit=10,
     resource_id=""
     metadata_modified=""
     remote_public_rows={}
+    cleared_public_rows={}
+    cleared_resource_id=""
+    cleared_metadata_modified=""
+    cleared_resource_error=""
+    cleared_attempts=0
     if live_requested and audit and live_limit>0:
         try:
             resource_id,metadata_modified=_resource(fetch)
@@ -478,6 +503,53 @@ def run(results, out=None, *, db=None, live=False, live_limit=10,
                             row["review_blockers"]+=";ARCHIVED_PROJECT_STATUS_DIFFERS_FROM_LIVE_CONSTITUENT"
                     else:
                         row["final_evidence_level"]="LIVE_RECORD_MISSING_OR_AMBIGUOUS_MANUAL_REVIEW"
+                        # A permit that disappeared from ACTIVE is not proof it
+                        # was cancelled. Optionally verify exact key in the
+                        # distinct official CLEARED since-2017 dataset.
+                        if (check_cleared and
+                            state=="NOT_PRESENT_IN_ACTIVE_DATASTORE_NOT_PROOF_OF_CLOSURE"):
+                            if not cleared_resource_id and not cleared_resource_error:
+                                try:
+                                    cleared_resource_id,cleared_metadata_modified=(
+                                        _cleared_resource(fetch))
+                                except (ValueError,OSError,TimeoutError) as exc:
+                                    cleared_resource_error="CLEARED_RESOURCE_ERROR_"+type(exc).__name__
+                            if cleared_resource_id:
+                                cleared_attempts+=1
+                                try:
+                                    clear_state,clear_record,clear_url=_remote_record(
+                                        row["permit_num"],row["revision_num"],
+                                        cleared_resource_id,fetch)
+                                    row["cleared_query_url"]=clear_url
+                                    if clear_record:
+                                        original=json.dumps(clear_record,sort_keys=True,
+                                            ensure_ascii=False,separators=(",",":"))
+                                        row["cleared_payload_sha256"]=hashlib.sha256(
+                                            original.encode("utf-8")).hexdigest()
+                                        cleared_public_rows[row["source_key"]]=clear_record
+                                        row["cleared_record_status"]=clean(
+                                            clear_record.get("STATUS"))
+                                        row["cleared_record_address"]=(
+                                            _official_status_address(clear_record))
+                                        row["cleared_completed_date"]=clean(
+                                            clear_record.get("COMPLETED_DATE"))
+                                        row["cleared_lookup_status"]=(
+                                            "EXACT_KEY_FOUND_IN_OFFICIAL_CLEARED_SINCE_2017")
+                                        row["final_evidence_level"]=(
+                                            "REMOVED_FROM_ACTIVE_EXACT_CLEARED_RECORD_REVIEW")
+                                        row["review_blockers"]+=(
+                                            ";CLEARED_SOURCE_REQUIRES_MANUAL_LIFECYCLE_CONFIRMATION")
+                                    elif clear_state=="AMBIGUOUS_OR_NONEXACT_CKAN_PERMIT_MATCH":
+                                        row["cleared_lookup_status"]="AMBIGUOUS_CLEARED_RECORD"
+                                    else:
+                                        row["cleared_lookup_status"]=(
+                                            "NOT_FOUND_IN_CLEARED_SINCE_2017_STATUS_UNRESOLVED")
+                                except (ValueError,OSError,TimeoutError) as exc:
+                                    row["cleared_lookup_status"]=(
+                                        "CLEARED_LOOKUP_ERROR_"+type(exc).__name__)
+                            else:
+                                row["cleared_lookup_status"]=(
+                                    cleared_resource_error or "CLEARED_SOURCE_UNAVAILABLE")
                 except (ValueError,OSError,TimeoutError,sqlite3.Error) as exc:
                     row["remote_status"]="LIVE_CKAN_QUERY_ERROR_"+type(exc).__name__
                     row["final_evidence_level"]="LIVE_RECHECK_FAILED_MANUAL_REVIEW"
@@ -513,6 +585,9 @@ def run(results, out=None, *, db=None, live=False, live_limit=10,
             "local_statuses":";".join(sorted(statuses)),
             "live_records_matched":len(livehits),
             "live_records_checked":sum(r["individual_record_retrieved_live"]=="YES" for r in rows_for),
+            "cleared_exact_record_matches":sum(
+                r["cleared_lookup_status"]=="EXACT_KEY_FOUND_IN_OFFICIAL_CLEARED_SINCE_2017"
+                for r in rows_for),
             "project_review_status":result,
             "source_permit_evidence_summary":"BUNDLE_OF_DISTINCT_PERMIT_REVISIONS_NOT_A_SINGLE_PERMIT",
             "source_provenance":"OFFICIAL_RADAR_SNAPSHOT_OR_EXPLICIT_PUBLIC_CKAN_QUERY",
@@ -549,6 +624,8 @@ def run(results, out=None, *, db=None, live=False, live_limit=10,
             "open_supplier_contracts_verified":0,
             "audit_records":selected_rows,
             "original_public_ckan_rows_by_source_key":remote_public_rows,
+            "original_public_cleared_rows_by_source_key":cleared_public_rows,
+            "cleared_resource_id":cleared_resource_id,
         }
         with path.open("x",encoding="utf-8") as outstream:
             json.dump(batch,outstream,indent=2)
@@ -584,6 +661,14 @@ def run(results, out=None, *, db=None, live=False, live_limit=10,
         "live_record_queries_attempted":live_checked,
         "live_queries_failed":sum(
             row["remote_status"].startswith("LIVE_CKAN_QUERY_ERROR_") for row in audit),
+        "cleared_lookup_explicitly_requested":bool(check_cleared),
+        "cleared_resource_id":cleared_resource_id,
+        "cleared_metadata_modified_not_individual_publication":cleared_metadata_modified,
+        "cleared_source_error":cleared_resource_error,
+        "cleared_exact_queries_attempted":cleared_attempts,
+        "cleared_exact_source_records_received":sum(
+            row["cleared_lookup_status"]=="EXACT_KEY_FOUND_IN_OFFICIAL_CLEARED_SINCE_2017"
+            for row in audit),
         "live_exact_record_payloads_received":sum(r["individual_record_retrieved_live"]=="YES"
                                                   for r in audit),
         "metadata_resource_id":resource_id,
@@ -594,7 +679,9 @@ def run(results, out=None, *, db=None, live=False, live_limit=10,
             "Local collector SQLite is a historical source snapshot, not live permit verification.",
             "City CKAN exact-row response is source publication evidence, not live construction or purchase intent.",
             "Toronto status portal is updated as of the previous business day and can differ from CKAN.",
-            "Not present in active CKAN does not prove closed; check the separately cleared archive and official status portal.",
+            "Not present in active CKAN does not prove closed; optional cleared-since-2017 exact match provides historical lifecycle evidence.",
+            "Not found in active OR cleared datasets is not proof of a cancellation, closure or absence.",
+            "Cleared records, if found, are historical/non-active research only and not commercial buying leads.",
             "Multiple BLD/HVA/PLB permit records in a project group may have different statuses; never collapse into one verified stage.",
             "Live mode is opt-in and capped; missing/unqueried records stay unverified.",
             "No buyers, organizations, contact details, procurement or business opening is verified here.",
@@ -613,12 +700,15 @@ def main():
     p.add_argument("--live-ckan",action="store_true",
                    help="Opt-in: at most 10 official CKAN exact permit/revision queries")
     p.add_argument("--live-limit",type=int,default=10)
+    p.add_argument("--check-cleared",action="store_true",
+                   help="Opt-in: if active exact key absent, also check official cleared permits since 2017")
     p.add_argument("--live-offset",type=int,default=0,
                    help="Next bounded manual batch; offset 10 checks new records")
     args=p.parse_args()
     print(json.dumps(run(args.results,args.out,db=args.db,
                          live=args.live_ckan,live_limit=args.live_limit,
-                         live_offset=args.live_offset),indent=2))
+                         live_offset=args.live_offset,
+                         check_cleared=args.check_cleared),indent=2))
 
 if __name__=="__main__":
     main()
