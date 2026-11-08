@@ -15,6 +15,7 @@ import gta_facility_dossiers as dossiers
 import gta_facility_role_review as role_review
 import gta_toronto_permit_evidence as permit_evidence
 import gta_toronto_permit_acceptance as permit_acceptance
+import gta_toronto_dossier_source_overlay as verified_overlay
 from v6_daily_pipeline import find_workspace,choose_database
 
 
@@ -43,6 +44,7 @@ def execute(workspace=None, *, results=None, as_of=None, max_age_days=180):
     # manual runner, and never block the graph if the local source DB is absent.
     permit_status = None
     permit_acceptance_status = None
+    permit_overlay_status = None
     permit_db = None
     if (folder/permit_evidence.DAILY_CSV).is_file():
         try:
@@ -57,6 +59,10 @@ def execute(workspace=None, *, results=None, as_of=None, max_age_days=180):
         # have ever been requested. Cannot promote commercial readiness.
         permit_acceptance_status=permit_acceptance.run(
             permit_dir/permit_evidence.LIVE_BATCH_DIR,permit_dir)
+        # Source proof can only be attached to a research dossier after the
+        # accepted CSV hash, source gate, exact permit ID and civic site agree.
+        permit_overlay_status=verified_overlay.run(
+            dossier_dir,permit_dir,dossier_dir)
     result = {
         "mode":"MANUAL_OFFLINE_EVIDENCE_REVIEW_ONLY",
         "as_of":date.isoformat(),
@@ -94,6 +100,15 @@ def execute(workspace=None, *, results=None, as_of=None, max_age_days=180):
             False if permit_acceptance_status is None else
             permit_acceptance_status["official_source_sample_gate_passed"]),
         "toronto_commercial_production_accepted":False,
+        "toronto_dossiers_with_exact_city_permit_evidence":(
+            0 if permit_overlay_status is None else
+            permit_overlay_status["toronto_dossiers_with_exact_checked_permit_source"]),
+        "toronto_permit_stage_disagreements_requiring_review":(
+            0 if permit_overlay_status is None else
+            permit_overlay_status["source_stage_difference_to_archived_project_summary"]),
+        "toronto_permit_dossier_source_overlay_csv":(
+            "" if permit_overlay_status is None else
+            str(dossier_dir/verified_overlay.OUTPUT_CSV)),
         "verified_open_supplier_contracts":0,
         "buyers_verified":0,
         "outreach_authorized":False,
