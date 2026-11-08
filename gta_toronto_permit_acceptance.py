@@ -29,12 +29,14 @@ MIN_DISTINCT_PROJECTS=15
 MIN_DISTINCT_PHYSICAL_SITES=10
 CLEARED_FIELDS=(
     "source_key","project_id","permit_num","revision_num",
+    "source_licence_attribution","source_licence_url",
     "checked_at_utc","cleared_status","completed_date","cleared_address",
     "cleared_official_query","source_evidence_status","buyer_verified",
     "open_contract_verified","research_action",
 )
 FIELDNAMES=(
     "source_key","project_id","permit_num","revision_num",
+    "source_licence_attribution","source_licence_url",
     "live_checked_at_utc","source_status","source_address","source_query_url",
     "record_validation","stage_evidence_scope","buyer_verified",
     "open_supplier_contract_verified","research_action",
@@ -234,6 +236,8 @@ def run(batches_dir, out=None, *, as_of=None, days=SOURCE_DAYS_MAX):
         records.append({
             "source_key":key,"project_id":row["project_id"],
             "permit_num":row["permit_num"],"revision_num":row["revision_num"],
+            "source_licence_attribution":permits.TORONTO_LICENSE,
+            "source_licence_url":permits.TORONTO_LICENSE_URL,
             "live_checked_at_utc":checked.isoformat(),
             "source_status":row["remote_record_status"],
             "source_address":row["remote_record_address"],
@@ -248,6 +252,8 @@ def run(batches_dir, out=None, *, as_of=None, days=SOURCE_DAYS_MAX):
         cleared_history.append({
             "source_key":key,"project_id":row["project_id"],
             "permit_num":row["permit_num"],"revision_num":row["revision_num"],
+            "source_licence_attribution":permits.TORONTO_LICENSE,
+            "source_licence_url":permits.TORONTO_LICENSE_URL,
             "checked_at_utc":checked.isoformat(),
             "cleared_status":row["cleared_record_status"],
             "completed_date":row["cleared_completed_date"],
@@ -290,6 +296,9 @@ def run(batches_dir, out=None, *, as_of=None, days=SOURCE_DAYS_MAX):
         "official_source_sample_gate_passed":sample_gate,
         "field_human_reviewer_approved":False,
         "buyer_and_open_procurement_verified":False,
+        "source_licence_attribution":permits.TORONTO_LICENSE,
+        "source_licence_url":permits.TORONTO_LICENSE_URL,
+        "source_disclaimer":"Independent research; no City of Toronto endorsement.",
         "commercial_production_accepted":False,
         "user_outreach_authorized":False,
         "caveats":[
