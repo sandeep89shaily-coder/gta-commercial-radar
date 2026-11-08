@@ -317,6 +317,12 @@ def run(batches_dir, out=None, *, as_of=None, days=SOURCE_DAYS_MAX):
     out.mkdir(parents=True,exist_ok=True)
     graph.write_csv(out/OUTPUT_CSV,records,FIELDNAMES)
     graph.write_csv(out/CLEARED_HISTORY_CSV,cleared_history,CLEARED_FIELDS)
+    # Bind a subsequent dossier overlay to the exact accepted CSV bytes.
+    # This is file tamper detection, NOT a City-issued digital signature.
+    result["accepted_active_csv_sha256"]=hashlib.sha256(
+        (out/OUTPUT_CSV).read_bytes()).hexdigest()
+    result["accepted_cleared_csv_sha256"]=hashlib.sha256(
+        (out/CLEARED_HISTORY_CSV).read_bytes()).hexdigest()
     (out/OUTPUT_JSON).write_text(json.dumps(result,indent=2),encoding="utf-8")
     return result
 
