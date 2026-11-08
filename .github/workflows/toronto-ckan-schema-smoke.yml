@@ -2,8 +2,6 @@ name: Toronto CKAN source schema smoke (PR only)
 on:
   pull_request:
     paths:
-      - 'gta_toronto_ckan_schema_probe.py'
-      - 'gta_toronto_permit_evidence.py'
       - '.github/workflows/toronto-ckan-schema-smoke.yml'
   workflow_dispatch:
 
