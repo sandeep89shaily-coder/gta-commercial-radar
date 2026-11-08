@@ -268,6 +268,40 @@ class TorontoPermitRecordAuditTests(unittest.TestCase):
             self.assertFalse(sample["official_source_sample_gate_passed"])
             self.assertFalse(sample["commercial_production_accepted"])
 
+    def test_live_evidence_minimizes_private_builder_and_description_fields(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);write_daily(root,[daily(keys="26 265617 BLD|00")])
+            def with_extra_unneeded_fields(url):
+                data=fake_ckan(url)
+                if "datastore_search" in url:
+                    item=data["result"]["records"][0]
+                    item["BUILDER_NAME"]="Example Individual Full Name"
+                    item["OWNER_NAME"]="Another Example Individual"
+                    item["CONTACT_EMAIL"]="private@example.test"
+                    item["DESCRIPTION"]="Free text with private phone 416-555-9999"
+                    item["WORK"]="Interior Alterations"
+                return data
+            result=permits.run(root,live=True,live_limit=1,
+                               fetch=with_extra_unneeded_fields)
+            saved=json.loads(Path(result["immutable_live_batch_file"]).read_text())
+            record=saved["original_public_ckan_rows_by_source_key"][
+                "26 265617 BLD|00"]
+            for k in ("BUILDER_NAME","OWNER_NAME","CONTACT_EMAIL","DESCRIPTION"):
+                self.assertNotIn(k,record)
+            self.assertIn("STATUS",record)
+            self.assertIn("PERMIT_NUM",record)
+            self.assertTrue(saved["personal_data_fields_excluded_from_evidence"])
+            self.assertEqual(saved["source_evidence_fields_only"],
+                             list(permits.PUBLIC_EVIDENCE_FIELDS))
+            self.assertNotIn("private@example.test",json.dumps(saved))
+            self.assertNotIn("Example Individual Full Name",json.dumps(saved))
+            reviewed=acceptance.run(Path(result["immutable_live_batch_file"]).parent,
+                                    root/"acceptance",
+                                    as_of=__import__("datetime").datetime.now(
+                                        __import__("datetime").timezone.utc))
+            self.assertEqual(reviewed["recent_unique_exact_ckan_source_records"],1)
+            self.assertFalse(reviewed["commercial_production_accepted"])
+
     def test_unexpected_resource_id_fails_without_falling_back_to_wrong_dataset(self):
         with tempfile.TemporaryDirectory() as folder:
             root=Path(folder);write_daily(root,[daily(keys="26 265617 BLD|00")])
