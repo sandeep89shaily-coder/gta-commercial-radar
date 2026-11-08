@@ -50,6 +50,7 @@ HOLD = {
     "HISTORICAL_SOURCE_DATE_REVIEW_ONLY",
     "SOURCE_DATE_UNVERIFIED_REVIEW_ONLY",
     "IDENTITY_REPAIR_REQUIRED",
+    "STATUS_HOLD_OR_REVOCATION_RECHECK_ONLY",
 }
 UNSAFE_RELATIONSHIP = {"DIFFERENT_UNITS_NOT_SAME_TENANT"}
 CONTEXT_ONLY = {
@@ -67,6 +68,8 @@ PRIORITY_ORDER = {
 ACTION_DESCRIPTIONS = {
     "RECHECK_HISTORICAL_OR_TERMINAL_STATUS":
         "Review original authority record for current lifecycle; do not present as new procurement.",
+    "RECHECK_BLOCKED_APPLICATION_STATUS":
+        "Confirm whether a refused, on-hold or revocation-pending municipal permit has become active again.",
     "REPAIR_SITE_IDENTITY":
         "Confirm exact physical site city, number, road and suite from an individual primary record.",
     "VERIFY_INDIVIDUAL_OFFICIAL_RECORD":
@@ -108,6 +111,8 @@ def source_record_quality(event):
         return "NO_STABLE_SOURCE_URL"
     if level == "RECORD_URL_NOT_LIVE_CHECKED":
         return "INDIVIDUAL_SOURCE_REFERENCE_NOT_RECHECKED"
+    if level == "DERIVED_ERO_NOTICE_URL_NOT_LIVE_RECHECKED":
+        return "DERIVED_ERO_NOTICE_POINTER_RECHECK_REQUIRED"
     return "DATASET_OR_PORTAL_REFERENCE_NOT_INDIVIDUAL_VERIFICATION"
 
 
@@ -148,6 +153,8 @@ def task_codes(event, quality, related_count):
     if tier in HOLD or tier.startswith("HISTORICAL_"):
         if tier == "IDENTITY_REPAIR_REQUIRED":
             return ["REPAIR_SITE_IDENTITY", "VERIFY_INDIVIDUAL_OFFICIAL_RECORD"]
+        if tier == "STATUS_HOLD_OR_REVOCATION_RECHECK_ONLY":
+            return ["RECHECK_BLOCKED_APPLICATION_STATUS"]
         return ["RECHECK_HISTORICAL_OR_TERMINAL_STATUS"]
     codes = []
     if not event.get("site_id"):
@@ -382,8 +389,16 @@ def run(graph_dir, out=None, *, html_limit=200):
         "dossiers_with_unverified_cross_source_context":sum(
             int(r["cross_source_context_events"])>0 for r in all_dossiers),
         "site_identities_missing":sum(not r["site_id"] for r in all_dossiers),
-        "exact_individual_source_rechecks_required":sum(
-            r["source_url_quality"] != "INDIVIDUAL_SOURCE_REFERENCE_NOT_RECHECKED"
+        "individual_source_rechecks_required":len(all_dossiers),
+        "direct_or_derived_record_pointer_present":sum(
+            r["source_url_quality"] in {
+                "INDIVIDUAL_SOURCE_REFERENCE_NOT_RECHECKED",
+                "DERIVED_ERO_NOTICE_POINTER_RECHECK_REQUIRED"}
+            for r in all_dossiers),
+        "portal_or_dataset_only_source_links":sum(
+            r["source_url_quality"] == "DATASET_OR_PORTAL_REFERENCE_NOT_INDIVIDUAL_VERIFICATION"
+            for r in all_dossiers),
+        "no_source_links":sum(r["source_url_quality"] == "NO_STABLE_SOURCE_URL"
             for r in all_dossiers),
         "manual_verification_tasks":len(tasks),
         "verified_open_supplier_contracts":0,"verified_buyers":0,
