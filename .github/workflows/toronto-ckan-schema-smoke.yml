@@ -1,8 +1,5 @@
-name: Toronto CKAN source schema smoke (PR only)
+name: Toronto CKAN source schema smoke (manual only)
 on:
-  pull_request:
-    paths:
-      - '.github/workflows/toronto-ckan-schema-smoke.yml'
   workflow_dispatch:
 
 # No schedule, credentials, production collection, source scraping or contacts.
