@@ -261,6 +261,93 @@ class FacilityIntelligenceTests(unittest.TestCase):
                 links=list(csv.DictReader(f))
             self.assertEqual(links[0]["relationship_verified"],"NO")
 
+    def test_real_export_toronto_missing_exact_link_uses_portal_without_proof(self):
+        # Real 2026-11-07 export shape: 220 YONGE ST M5B; no exact URL.
+        row,reason=graph.adapt("radar",{
+            "project_id":"toronto_active_building_permits:26 265617",
+            "source_id":"toronto_active_building_permits",
+            "source_keys":"26 265617 HVA|00 | 26 265617 BLD|00",
+            "observation":"FIRST_OBSERVED",
+            "first_seen_local":"2026-11-07","city":"Toronto",
+            "address":"220 YONGE ST M5B",
+            "description":"Interior Alterations Proposed interior alterations to existing tenant retail space.",
+            "current_source_status":"Pending Parent Folder Review",
+            "stage_from_local_status":"PRE_APPROVAL",
+            "source_record_date":"2026-11-05",
+            "record_source_url":"",
+            "official_source_portal_url":"https://open.toronto.ca/",
+            "official_source_portal_basis":"OFFICIAL_SOURCE_LANDING_PAGE_NOT_PROJECT_PROOF"
+        },as_of=__import__("datetime").date(2026,11,8))
+        self.assertIsNone(reason)
+        self.assertEqual(row["site_address"],"220 yonge st")
+        self.assertEqual(row["stage_label"],"Pending Parent Folder Review")
+        self.assertEqual(row["source_lookup_key"],"26 265617 HVA|00 | 26 265617 BLD|00")
+        self.assertEqual(row["source_url"],"https://open.toronto.ca/")
+        self.assertEqual(row["url_evidence_level"],"SOURCE_REFERENCE_NOT_RECORD_SPECIFIC")
+        self.assertIn("INDIVIDUAL_SOURCE_RECORD_RECHECK_REQUIRED",row["verification_required"])
+        self.assertEqual(row["buyer_verified"],"NO")
+
+    def test_real_export_ero_source_id_derived_notice_remains_location_unknown(self):
+        row,reason=graph.adapt("radar",{
+            "project_id":"ero_gta_environmental_instruments:026-0989",
+            "source_id":"ero_gta_environmental_instruments",
+            "source_keys":"026-0989","observation":"FIRST_OBSERVED",
+            "first_seen_local":"2026-11-07","city":"Ontario","address":"",
+            "description":"Environmental Compliance Approval (air) ERO 026-0989",
+            "current_source_status":"Proposal","source_record_date":"2026-11-06",
+            "record_source_url":"",
+            "official_source_portal_url":"https://ero.ontario.ca/search"
+        },as_of=__import__("datetime").date(2026,11,8))
+        self.assertIsNone(reason)
+        self.assertEqual(row["source_url"],"https://ero.ontario.ca/notice/026-0989")
+        self.assertEqual(row["url_evidence_level"],"DERIVED_ERO_NOTICE_URL_NOT_LIVE_RECHECKED")
+        self.assertIn("DERIVED_OFFICIAL_NOTICE_URL_NOT_LIVE_VERIFIED",
+                      row["verification_required"])
+        self.assertEqual(row["site_id"],"")
+        self.assertEqual(row["review_tier"],"IDENTITY_REPAIR_REQUIRED")
+
+    def test_real_export_on_hold_refusal_and_pending_revocation_cannot_rank_active(self):
+        # Previous CSV had 8 Application On Hold, 2 Refusal Notice,
+        # and 2 Revocation Pending municipal status rows.
+        examples=[
+            ("26 265686","Application On Hold","BLOCKED_OR_INACTIVE"),
+            ("26 263884","Refusal Notice","PRE_APPROVAL"),
+            ("15 253524","Revocation Pending","PRE_APPROVAL"),
+        ]
+        for permit,status,generic in examples:
+            with self.subTest(status=status):
+                row,reason=graph.adapt("radar",{
+                    "project_id":"toronto_active_building_permits:"+permit,
+                    "source_id":"toronto_active_building_permits",
+                    "observation":"RECORD_CHANGED","city":"Toronto",
+                    "address":"29 JUTLAND RD M8Z",
+                    "description":"Commercial alteration",
+                    "current_source_status":status,
+                    "stage_from_local_status":generic,
+                    "source_record_date":"2026-11-06",
+                    "official_source_portal_url":"https://open.toronto.ca/"
+                },as_of=__import__("datetime").date(2026,11,8))
+                self.assertIsNone(reason)
+                self.assertEqual(row["stage_label"],status)
+                self.assertEqual(row["review_tier"],"STATUS_HOLD_OR_REVOCATION_RECHECK_ONLY")
+                self.assertIn("MUNICIPAL_STATUS_ON_HOLD_OR_REVOCATION_RECHECK",
+                              row["verification_required"])
+                self.assertEqual(row["procurement_status"],"UNKNOWN")
+
+    def test_ero_url_is_not_derived_from_untrusted_non_ero_key(self):
+        for ident in ("026-0989;bad", "026-0989/../bad", "other", "026-098"):
+            with self.subTest(ident=ident):
+                row,_=graph.adapt("radar",{
+                    "project_id":"ero_gta_environmental_instruments:"+ident,
+                    "source_id":"ero_gta_environmental_instruments",
+                    "source_keys":ident,"observation":"FIRST_OBSERVED",
+                    "city":"Ontario","address":"",
+                    "source_record_date":"2026-11-06",
+                    "official_source_portal_url":"https://ero.ontario.ca/search"
+                },as_of=__import__("datetime").date(2026,11,8))
+                self.assertEqual(row["source_url"],"https://ero.ontario.ca/search")
+                self.assertEqual(row["url_evidence_level"],"SOURCE_REFERENCE_NOT_RECORD_SPECIFIC")
+
     def test_incomplete_and_duplicate_rows_not_false_projects(self):
         with tempfile.TemporaryDirectory() as temp:
             path=Path(temp)
