@@ -530,11 +530,14 @@ class TorontoPermitRecordAuditTests(unittest.TestCase):
             self.assertEqual(row["final_evidence_level"],
                              "REMOVED_FROM_ACTIVE_EXACT_CLEARED_RECORD_REVIEW")
             self.assertEqual(row["buyer_verified"],"NO")
+            self.assertEqual(row["source_licence_attribution"],permits.TORONTO_LICENSE)
+            self.assertEqual(row["source_licence_url"],permits.TORONTO_LICENSE_URL)
             stored=json.loads(Path(summary["immutable_live_batch_file"]).read_text())
             original=stored["original_public_cleared_rows_by_source_key"][
                 "26 265617 BLD|00"]
             self.assertEqual(original["COMPLETED_DATE"],"2026-11-04")
             self.assertEqual(stored["cleared_resource_id"],permits.CLEARED_RESOURCE_HINT)
+            self.assertEqual(stored["source_licence_attribution"],permits.TORONTO_LICENSE)
             verified=acceptance.run(
                 Path(summary["immutable_live_batch_file"]).parent,
                 root/"verification",as_of=__import__("datetime").datetime.now(
