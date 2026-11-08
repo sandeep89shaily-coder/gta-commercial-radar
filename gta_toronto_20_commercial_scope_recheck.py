@@ -51,6 +51,17 @@ def clean_scope(value):
     value=PHONE.sub("[phone redacted]",value)
     return value[:600]
 
+def parse_city_estimate(value):
+    """Only a genuine numeric City cost. CKAN also contains instruction text."""
+    text=graph.clean(value).replace(",", "").replace("$", "")
+    if not re.fullmatch(r"\\d+(?:\\.\\d{1,2})?",text):
+        return None
+    number=float(text)
+    if not (0 < number < 100_000_000_000):
+        return None
+    return int(number) if number.is_integer() else number
+
+
 def run(out,fetch=permit._get_payload):
     sample=fixture_validation.validate_fixture(fixture_validation.FIXTURE)
     # Fixture validation returns original rows; only exact source-key requests.
@@ -70,10 +81,11 @@ def run(out,fetch=permit._get_payload):
         work_field,work=source_text(raw,WORK_FIELDS)
         scope_field,scope=source_text(raw,DESCRIPTION_FIELDS)
         value_field,value=source_text(raw,COST_FIELDS)
+        value=parse_city_estimate(value)
         # Exact original address/ID is necessary to report associated scope.
         # A source record with mismatching site may not be attached to Radar.
         if not (exact and address_match):
-            scope="";value=""
+            scope="";value=None
         projection={
             "permit_num":permit_num,"revision":revision,
             "site":city_address,"status":graph.clean(raw.get("STATUS")),
@@ -107,8 +119,8 @@ def run(out,fetch=permit._get_payload):
             x["exact_ckan_identity_verified"]=="YES" and
             x["archived_civic_address_compatible"]=="YES" for x in records),
         "rows_with_scope_text":sum(bool(x["scope_summary_unverified"]) for x in records),
-        "rows_with_city_estimated_cost":sum(bool(x["city_estimated_construction_cost_cad"])
-                                           for x in records),
+        "rows_with_city_estimated_cost":sum(
+            x["city_estimated_construction_cost_cad"] is not None for x in records),
         "vendor_or_tenant_buyer_verified":0,
         "supplier_contracts_open_verified":0,
         "no_personal_builder_fields_exported":True,
