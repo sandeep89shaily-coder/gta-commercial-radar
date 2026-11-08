@@ -53,7 +53,8 @@ AUDIT_FIELDS=(
     "local_payload_sha256","local_record_status","local_record_address",
     "local_address_comparison","local_status_comparison",
     "remote_status","remote_record_status","remote_record_address",
-    "remote_address_comparison","remote_query_url","remote_retrieved_at",
+    "remote_address_comparison","remote_stage_comparison",
+    "remote_query_url","remote_retrieved_at",
     "final_evidence_level","individual_record_retrieved_live",
     "record_is_a_verified_open_supplier_contract","buyer_verified",
     "review_blockers",
@@ -65,8 +66,19 @@ PROJECT_FIELDS=(
     "project_review_status","source_permit_evidence_summary",
     "source_provenance","verified_open_contract","buyer_verified",
 )
-ALLOW_LIVE_STATES={"LIVE_EXACT_KEY_MATCH_OFFICIAL_DATASET",
-                   "LIVE_EXACT_KEY_MATCH_SNAPSHOT_STAGE_DIFFERENT"}
+# Verification selection is *stratified*, not a leaderboard and not proof of
+# buyer availability. Recheck a mix of municipal stages, including blocked ones.
+REVIEW_STAGE={
+    "BLOCKED": ("on hold","refusal notice","revocation pending","cancellation pending",
+                "suspended","violation"),
+    "ISSUED": ("permit issued","revision issued","issuance pending","ready for issuance",
+               "forwarded for issuance"),
+    "INSPECTION": ("inspection","work not started"),
+    "PREPARATION": ("under review","not started","application acceptable",
+                    "application received","pending parent folder review",
+                    "examiner's notice sent","response received"),
+}
+STAGE_SEQUENCE=("ISSUED","PREPARATION","INSPECTION","BLOCKED","OTHER")
 
 def clean(value):
     return graph.clean(value)
@@ -228,6 +240,86 @@ def _remote_record(permit_num,revision,resource_id,fetch):
         return "AMBIGUOUS_OR_NONEXACT_CKAN_PERMIT_MATCH",{},url
     return "LIVE_EXACT_KEY_MATCH_OFFICIAL_DATASET",matched[0],url
 
+def _stage_bucket(value):
+    status=clean(value).lower()
+    for name, patterns in REVIEW_STAGE.items():
+        if status in patterns:
+            return name
+    return "OTHER"
+
+
+def _recent_date(value):
+    # ISO source-record date is evidence of event date, not first publication.
+    value=clean(value)
+    try:
+        return dt.date.fromisoformat(value[:10]).toordinal()
+    except ValueError:
+        return 0
+
+
+def choose_live_recheck_sample(audit, projects, limit=MAX_LIVE):
+    """Fair bounded sample: diverse stages and projects, recent source first.
+
+    Never claim a project is checked if only one of its revision keys was
+    queried. This samples *records*, not source-complete facilities.
+    """
+    limit=max(0,min(int(limit),MAX_LIVE))
+    if not limit:
+        return []
+    metadata={p["project_id"]:p for p in projects}
+    by_stage=defaultdict(list)
+    for row in audit:
+        source=metadata.get(row["project_id"],{})
+        stage=_stage_bucket(source.get("current_source_status",""))
+        by_stage[stage].append((
+            row, _recent_date(source.get("source_record_date",""))
+        ))
+    for rows in by_stage.values():
+        rows.sort(key=lambda item:(
+            -item[1], item[0]["permit_type"]!="BLD",
+            item[0]["project_id"],item[0]["source_key"]
+        ))
+    selected=[]
+    used_ids=set()
+    used_projects=set()
+    # Stage coverage first: verify at least one source record per status tier.
+    for stage in STAGE_SEQUENCE:
+        if len(selected)>=limit:
+            break
+        if by_stage[stage]:
+            row,_=by_stage[stage].pop(0)
+            selected.append(row)
+            used_ids.add(row["source_key"])
+            used_projects.add(row["project_id"])
+    # Then maximize distinct projects; after that remaining records from
+    # multi-permit folders may be checked, explicitly labelled partial.
+    remaining=[
+        (STAGE_SEQUENCE.index(stage),r,when)
+        for stage,items in by_stage.items()
+        for r,when in items if r["source_key"] not in used_ids
+    ]
+    remaining.sort(key=lambda item:(
+        -item[2],item[0],item[1]["permit_type"]!="BLD",
+        item[1]["project_id"],item[1]["source_key"]
+    ))
+    for _,row,_ in remaining:
+        if len(selected)>=limit:
+            break
+        if row["project_id"] in used_projects:
+            continue
+        selected.append(row)
+        used_ids.add(row["source_key"])
+        used_projects.add(row["project_id"])
+    for _,row,_ in remaining:
+        if len(selected)>=limit:
+            break
+        if row["source_key"] in used_ids:
+            continue
+        selected.append(row)
+        used_ids.add(row["source_key"])
+    return selected
+
+
 def _audit_row(project,ident,permit_num,rev,local,export_status,export_address):
     state,seen,date,digest,raw_status,raw_address,checks=_local_verdict(
         (permit_num,rev),local,export_address,export_status)
@@ -250,7 +342,8 @@ def _audit_row(project,ident,permit_num,rev,local,export_status,export_address):
         "local_status_comparison":comp[1] if len(comp)>1 else "",
         "remote_status":"NOT_REQUESTED_MANUAL_LIVE_ONLY",
         "remote_record_status":"","remote_record_address":"",
-        "remote_address_comparison":"","remote_query_url":"","remote_retrieved_at":"",
+        "remote_address_comparison":"","remote_stage_comparison":"",
+        "remote_query_url":"","remote_retrieved_at":"",
         "final_evidence_level":"SOURCE_SNAPSHOT_EXACT_KEY_NOT_LIVE_CHECKED" if
              state=="LOCAL_EXACT_PERMIT_REVISION_PAYLOAD_MATCH_NOT_LIVE_RECHECKED" else
              "UNVERIFIED_SOURCE_RECORD_ID",
@@ -319,11 +412,9 @@ def run(results, out=None, *, db=None, live=False, live_limit=10,
         try:
             resource_id,metadata_modified=_resource(fetch)
             live_status="OFFICIAL_CKAN_RESOURCE_RESOLVED"
-            # Prefer BLD constituent first, then first-seen project order. Do
-            # not query a random historical record and call all 151 verified.
-            selected=sorted(audit,key=lambda x:(
-                x["permit_type"]!="BLD",
-                x["project_id"],x["source_key"]))[:live_limit]
+            # Stratify stage classes and prefer the most recently source-dated
+            # records, with distinct projects before secondary constituent keys.
+            selected=choose_live_recheck_sample(audit,all_projects,live_limit)
             stamp=(as_of.isoformat() if isinstance(as_of,(dt.date,dt.datetime))
                    else str(as_of) if as_of else
                    dt.datetime.now(dt.timezone.utc).isoformat())
@@ -338,11 +429,25 @@ def run(results, out=None, *, db=None, live=False, live_limit=10,
                     if record:
                         row["remote_record_status"]=clean(record.get("STATUS"))
                         row["remote_record_address"]=_official_status_address(record)
+                        original_stage=clean(next((
+                            source.get("current_source_status","") for source,_ in parsed_projects
+                            if source.get("project_id")==row["project_id"]), ""))
+                        remote_stage=row["remote_record_status"]
+                        row["remote_stage_comparison"]=(
+                            "REMOTE_STATUS_MISSING_RECHECK" if not remote_stage else
+                            "STATUS_CHANGED_SINCE_EXPORTED_GROUP" if original_stage and
+                                remote_stage!=original_stage else
+                            "MATCHES_EXPORTED_GROUP_STATUS" if original_stage else
+                            "NO_EXPORTED_GROUP_STATUS_FOR_COMPARISON"
+                        )
                         exported = graph.normalize_address(
                             next((p.get("address","") for p,ks in parsed_projects
                                   if p.get("project_id")==row["project_id"]), ""))[0]
                         previous = graph.normalize_address(row["local_record_address"])[0]
                         current = row["remote_record_address"]
+                        if not remote_stage:
+                            row["final_evidence_level"]="LIVE_ROW_STAGE_UNVERIFIED"
+                            row["review_blockers"]+=";REMOTE_STATUS_MISSING"
                         if not current:
                             row["remote_address_comparison"]="LIVE_CITY_RECORD_ADDRESS_MISSING"
                             row["final_evidence_level"]="LIVE_ROW_ADDRESS_UNVERIFIED"
@@ -352,9 +457,13 @@ def run(results, out=None, *, db=None, live=False, live_limit=10,
                             row["final_evidence_level"]="REVIEW_SOURCE_ADDRESS_CONFLICT"
                         else:
                             row["remote_address_comparison"]="ADDRESS_COMPATIBLE_WITH_AVAILABLE_SNAPSHOTS"
-                            row["final_evidence_level"]="OFFICIAL_CKAN_EXACT_KEY_LIVE_RECHECKED"
+                            row["final_evidence_level"]=(
+                                "OFFICIAL_CKAN_EXACT_KEY_LIVE_RECHECKED" if remote_stage else
+                                "LIVE_ROW_STAGE_UNVERIFIED")
                         row["individual_record_retrieved_live"]="YES"
                         row["review_blockers"]+=";OFFICIAL_CKAN_ROW_DOES_NOT_PROVE_BUYER_OR_OPEN_CONTRACT"
+                        if row["remote_stage_comparison"]=="STATUS_CHANGED_SINCE_EXPORTED_GROUP":
+                            row["review_blockers"]+=";ARCHIVED_PROJECT_STATUS_DIFFERS_FROM_LIVE_CONSTITUENT"
                     else:
                         row["final_evidence_level"]="LIVE_RECORD_MISSING_OR_AMBIGUOUS_MANUAL_REVIEW"
                 except (ValueError,OSError,TimeoutError,sqlite3.Error) as exc:
@@ -414,6 +523,7 @@ def run(results, out=None, *, db=None, live=False, live_limit=10,
         "local_record_payloads_matched":sum(r["local_snapshot_status"]==
             "LOCAL_EXACT_PERMIT_REVISION_PAYLOAD_MATCH_NOT_LIVE_RECHECKED" for r in audit),
         "live_requested":live_requested,
+        "live_selection_policy":"STAGE_DIVERSITY_THEN_RECENT_SOURCE_DATE_THEN_DISTINCT_PROJECTS;ONE_RECORD_DOES_NOT_VERIFY_WHOLE_PROJECT",
         "live_status":live_status,
         "live_record_queries_attempted":live_checked,
         "live_queries_failed":sum(
