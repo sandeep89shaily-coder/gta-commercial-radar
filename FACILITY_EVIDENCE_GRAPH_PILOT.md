@@ -51,6 +51,38 @@ Inspected a previously supplied `GTA_RADAR_RESULTS` archive, without a fresh Win
 
 These counts are a **previous export snapshot**, not a new run, and not a claim that today's full collector/database was checked.
 
+## Next layer: per-event commercial evidence dossiers
+
+A **second offline processor** now turns a facility graph into distinct `one source event = one possible work package` investigative dossiers. Never merge ERO equipment replacement, a planning addition and a business licence into one "confirmed opportunity" just because the street address matches.
+
+- `gta_facility_dossiers.py` consumes facility event and link CSVs. It assigns investigative priority (equipment-specific, activation, general application), and separately holds dated historical/withdrawn/unverifiable records.
+- `GTA_RADAR_EVIDENCE_DOSSIERS.csv` contains source IDs, site and organization clues, evidence dates and URLs, potential customer segments, blockers, and explicit **NO** fields for verified open contracts, buyers and outreach authorization.
+- `GTA_RADAR_EVIDENCE_DOSSIERS.jsonl` contains one structured dossier per event and related records as **unverified same-site context**, not proof of the same project or tenant.
+- `GTA_RADAR_DOSSIER_VERIFICATION_TASKS.csv` gives a precise human worklist: source record recheck, scope/timeline, current procurement, buying authority, public business contact, actual opening (if relevant), and same-project identity.
+- `GTA_RADAR_EVIDENCE_DOSSIERS.html` is a safe escaped research browser; invalid source links and spreadsheet formula injection are blocked.
+
+The dossiers *cannot* become a certified sales opportunity through this offline stage. It intentionally does not guess contacts or assert open purchase orders. Verified procurement needs independently checked actual source documents, purchasing authority and procurement-stage evidence.
+
+### Isolated one-click review (manual acceptance only)
+
+`RUN_FACILITY_EVIDENCE_REVIEW.bat` runs **only** the shared graph and dossier processors using existing `GTA_RADAR_RESULTS` snapshots. It does not start a collector, schedule any action, communicate with companies, or spend AI funds. No action is required from the user during code development.
+
+For a future controlled acceptance:
+
+```powershell
+py -3 gta_facility_review_run.py --workspace "%USERPROFILE%\Desktop\new data" --as-of 2026-11-08
+```
+
+Both output directories are isolated beneath `GTA_RADAR_RESULTS`: `FACILITY_INTELLIGENCE_PILOT` and `FACILITY_DOSSIER_PILOT`. The runner refuses to create a misleading empty report if none of the four underlying source exports exists.
+
+### Real export quality constraint
+
+In the previously uploaded November 7 Radar archive, only **13** of the **161** daily project IDs were found as exact IDs in `GTA_RADAR_PROJECT_OPPORTUNITIES.csv`; of those, just **one** had a populated operator value. These are historical snapshot counts, *not current live verification*. We will not join company names or buying authorities to a facility solely on address/name similarity. Dossiers therefore expose a **company/operator evidence gap** instead of pretending those associations are verified.
+
+### Technical acceptance
+
+Automated regressions: **21** shared graph checks, **17** dossier checks and **4** end-to-end manual runner checks; the full existing GitHub cross-platform test suite must pass as well. Passing synthetic tests does not verify actual match precision or business value. The next real validation should sample actual facility joins, historical exclusions and role identification against original official records, then benchmark supplier actionability before merging.
+
 ## Anti-false-positive gates
 
 - The same civic address **is not** proof of the same tenant, company, project or buyer.
