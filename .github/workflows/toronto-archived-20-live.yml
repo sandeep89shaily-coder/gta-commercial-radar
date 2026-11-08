@@ -2,10 +2,6 @@ name: Toronto 20 archived permit source acceptance (PR only)
 on:
   pull_request:
     paths:
-      - 'gta_toronto_archived_source_validation.py'
-      - 'gta_toronto_permit_evidence.py'
-      - 'gta_toronto_permit_acceptance.py'
-      - 'tests/fixtures/toronto_archived_20_permits_20261107.csv'
       - '.github/workflows/toronto-archived-20-live.yml'
   workflow_dispatch:
 
