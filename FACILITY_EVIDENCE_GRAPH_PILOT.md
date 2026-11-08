@@ -79,9 +79,20 @@ Both output directories are isolated beneath `GTA_RADAR_RESULTS`: `FACILITY_INTE
 
 In the previously uploaded November 7 Radar archive, only **13** of the **161** daily project IDs were found as exact IDs in `GTA_RADAR_PROJECT_OPPORTUNITIES.csv`; of those, just **one** had a populated operator value. These are historical snapshot counts, *not current live verification*. We will not join company names or buying authorities to a facility solely on address/name similarity. Dossiers therefore expose a **company/operator evidence gap** instead of pretending those associations are verified.
 
+### Company/operator/contractor role hints from existing research
+
+`gta_facility_role_review.py` provides a deliberately narrow way to reuse prior `GTA_RADAR_PROJECT_OPPORTUNITIES.csv` research without falsely identifying purchasers:
+
+- **Exact local project-ID match only** to the core Radar event. Reject research rows whose project identity is merely `ADDRESS_CONTEXT_ONLY` or another weak address-level match. Never carry role hints from a shared building into the industrial/activation project automatically.
+- Extract only explicitly named role fields: applicant, builder, owner, tenant, operator, developer, contractor, plus existing operator/developer research hints. No fuzzy company matching, inferred buyer authority or personal contact harvesting.
+- Preserve the research field and original project-record reference, **but mark all names `SOURCE_ROLE_EVIDENCE_REQUIRED` and role/buyer/contact/procurement verification `NO`**. A source URL or project-ID join is not itself documentary proof of the named role.
+- Output `GTA_RADAR_EXACT_PROJECT_ROLE_HINTS_TO_VERIFY.csv` and `GTA_RADAR_EXACT_PROJECT_ROLE_HINTS_STATUS.json`, linked to each dossier via its stable `dossier_id`.
+
+The combined manual runner includes this role audit if its existing research CSV is present; otherwise it reports **no role research**, not fabricated company coverage.
+
 ### Technical acceptance
 
-Automated regressions: **21** shared graph checks, **17** dossier checks and **4** end-to-end manual runner checks; the full existing GitHub cross-platform test suite must pass as well. Passing synthetic tests does not verify actual match precision or business value. The next real validation should sample actual facility joins, historical exclusions and role identification against original official records, then benchmark supplier actionability before merging.
+Automated regressions: **21** shared graph checks, **17** dossier checks, **11** exact-ID role-hint checks and **4** end-to-end manual runner checks; the full existing GitHub cross-platform test suite must pass as well. Passing synthetic tests does not verify actual match precision or business value. The next real validation should sample actual facility joins, historical exclusions and role identification against original official records, then benchmark supplier actionability before merging.
 
 ## Anti-false-positive gates
 
