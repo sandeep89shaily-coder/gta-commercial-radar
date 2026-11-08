@@ -203,5 +203,50 @@ class IndustrialReviewCursorTests(unittest.TestCase):
             self.assertEqual(prior[0]["review_status"],"MANUAL_REVIEW_REQUIRED")
             self.assertEqual(summary["carried_forward_source_recheck_holds"],0)
 
+
+    def test_success_audit_without_parsed_payload_does_not_poison_cursor(self):
+        with tempfile.TemporaryDirectory() as td:
+            out=Path(td)
+            cards=sample_cards()
+            chosen=[]
+            def missing_payload(selected,max_notices):
+                chosen.extend(selected)
+                return [],[{"ero_number":no,"status":"DETAIL_RETRIEVED"}
+                          for no in selected]
+            with patch.object(pilot,"read_radar_ero",return_value=cards):
+                status=pilot.run(out,db=out/"unused.sqlite",fetch_official=True,
+                                 fetch_limit=1,official_fetcher=missing_payload)
+            self.assertEqual(len(chosen),1)
+            self.assertEqual(status["official_fetch_audit"][0]["status"],"DETAIL_REJECTED")
+            self.assertEqual(status["official_fetch_audit"][0]["reason"],
+                             "SUCCESS_AUDIT_WITHOUT_VALID_SOURCE_PAYLOAD")
+            self.assertEqual(status["ero_detail_successes_total"],0)
+            state=cursor.load(out,cards)
+            self.assertEqual(state["notices"][chosen[0]]["status"],"DETAIL_REJECTED")
+            self.assertIn(chosen[0],cursor.select(cards,state,10))
+
+    def test_mismatched_fetched_record_never_marks_source_retrieved(self):
+        with tempfile.TemporaryDirectory() as td:
+            out=Path(td)
+            cards=sample_cards()
+            seen=[]
+            def wrong_payload(selected,max_notices):
+                seen.extend(selected)
+                no=next(iter(selected))
+                record={"ero_number":no,"official_notice_url":
+                            "https://ero.ontario.ca/notice/999-9999",
+                        "content_provenance":"FETCHED_EXACT_ERO_OFFICIAL_NOTICE",
+                        "proposal_details":"Install a new industrial boiler at this site.",
+                        "site_address":"2714 Bristol Circle","city":"Oakville"}
+                return [record],[{"ero_number":no,"status":"DETAIL_RETRIEVED"}]
+            with patch.object(pilot,"read_radar_ero",return_value=cards):
+                status=pilot.run(out,db=out/"unused.sqlite",fetch_official=True,
+                                 fetch_limit=1,official_fetcher=wrong_payload)
+            self.assertEqual(status["official_notice_excerpts_loaded"],0)
+            self.assertEqual(status["equipment_change_candidates"],0)
+            self.assertEqual(status["official_fetch_audit"][0]["status"],"DETAIL_REJECTED")
+            self.assertEqual(status["ero_detail_successes_total"],0)
+            self.assertIn(seen[0],cursor.select(cards,cursor.load(out,cards),10))
+
 if __name__=="__main__":
     unittest.main()
