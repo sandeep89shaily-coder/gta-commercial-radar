@@ -318,14 +318,42 @@ def run(out, *, db=None, notice_csv=None, results=None, fetch_official=False,
             from gta_ero_notice_detail import fetch_notice_details
             fetched, fetch_audit = (official_fetcher or fetch_notice_details)(
                 chosen, max_notices=len(chosen))
+            # Bind each successful fetch audit to ONE parseable official-source
+            # payload. An HTTP success flag without a record (or a mismatched
+            # notice ID/URL) cannot silently advance the persistent cursor.
+            successful_audit_ids = {
+                r.get("ero_number") for r in fetch_audit
+                if r.get("status") == "DETAIL_RETRIEVED"
+            }
+            accepted_fetched = set()
             for record in fetched:
-                if _number(record.get("ero_number")) and record["ero_number"] not in notices:
-                    notices[record["ero_number"]] = record
-            # Only a successfully parsed exact notice clears a pending hold.
-            # A robots denial, invalid URL, or partial HTTP/HTML failure leaves
-            # existing evidence visible but explicitly NOT current.
-            refreshed = set(notices).intersection(chosen)
-            failed_recheck_ids = set(chosen) - refreshed
+                number = _number(record.get("ero_number"))
+                if (number not in chosen or number not in successful_audit_ids
+                    or number in accepted_fetched
+                    or not _official_notice(record.get("official_notice_url"),number)
+                    or record.get("official_notice_url") !=
+                       chosen[number].get("official_notice_url")
+                    or record.get("content_provenance") !=
+                       "FETCHED_EXACT_ERO_OFFICIAL_NOTICE"
+                    or not _str(record.get("proposal_details"))
+                    or not _str(record.get("site_address"))
+                    or not _str(record.get("city"))):
+                    continue
+                accepted_fetched.add(number)
+                if number not in notices:
+                    notices[number] = record
+            # Audit/payload disagreements are failed retrievals, not verified
+            # successes. Preserve the original audit failure for traceability.
+            fetch_audit = [
+                dict(item,status="DETAIL_REJECTED",
+                     reason="SUCCESS_AUDIT_WITHOUT_VALID_SOURCE_PAYLOAD")
+                if item.get("status") == "DETAIL_RETRIEVED"
+                   and item.get("ero_number") not in accepted_fetched
+                else item for item in fetch_audit
+            ]
+            # Even when an archived manual excerpt is present, an unsuccessful
+            # official refresh cannot clear a source-change hold.
+            failed_recheck_ids = set(chosen) - accepted_fetched
             cursor.update(visited,chosen,fetch_audit)
             cursor.save(out,visited)
         else:
