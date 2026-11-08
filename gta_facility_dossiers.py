@@ -30,7 +30,7 @@ DOSSIER_FIELDS = (
     "source_record_id", "site_id", "city", "site_address", "site_unit",
     "organization_mention", "organization_role_unverified",
     "source_event_date", "radar_first_seen_at", "source_age_days",
-    "source_url", "source_url_quality", "source_record_hash",
+    "source_lookup_key", "source_url", "source_url_quality", "source_record_hash",
     "signal_type", "source_stage", "source_scope", "source_description",
     "possible_customer_segments", "cross_source_context_events",
     "cross_source_context_status", "source_families_at_civic_site",
@@ -239,6 +239,7 @@ def build_dossier(event, events_by_id, site_links):
         "source_event_date": event.get("source_date",""),
         "radar_first_seen_at": event.get("radar_first_seen_at",""),
         "source_age_days": event.get("source_age_days",""),
+        "source_lookup_key": event.get("source_lookup_key",""),
         "source_url": graph.https(event.get("source_url","")),
         "source_url_quality": quality,
         "source_record_hash": event.get("record_hash",""),
@@ -272,6 +273,7 @@ def build_dossier(event, events_by_id, site_links):
             "event_id": event["event_id"],
             "source_id": event.get("source_id",""),
             "source_record_id": event.get("source_record_id",""),
+            "source_lookup_key": row["source_lookup_key"],
             "source_record_hash": event.get("record_hash",""),
             "url": row["source_url"], "url_quality": quality,
             "source_event_date": row["source_event_date"],
@@ -356,15 +358,25 @@ def run(graph_dir, out=None, *, html_limit=200):
         for detail in details:
             handle.write(json.dumps(detail,ensure_ascii=False)+"\n")
     columns = ("city", "site_address", "organization_mention","signal_type",
-               "source_event_date", "research_priority","commercial_readiness",
-               "cross_source_context_events", "recommended_research_action")
+               "source_event_date", "source_lookup_key", "research_priority",
+               "commercial_readiness","cross_source_context_events",
+               "recommended_research_action")
     table_rows = []
     for d in all_dossiers[:max(0,min(int(html_limit),1000))]:
         safe_url = graph.https(d["source_url"])
         tds = "".join("<td>"+html.escape(graph.clean(d[k]))+"</td>" for k in columns)
+        quality = d["source_url_quality"]
+        label = (
+            "Official search / dataset — NOT individual evidence" if
+            quality == "DATASET_OR_PORTAL_REFERENCE_NOT_INDIVIDUAL_VERIFICATION"
+            else "Derived ERO notice URL — VERIFY" if
+            quality == "DERIVED_ERO_NOTICE_POINTER_RECHECK_REQUIRED"
+            else "Individual record URL — VERIFY"
+        )
         link = ("<td><a target='_blank' rel='noopener noreferrer' href='"+
-                html.escape(safe_url,quote=True)+"'>Source</a></td>" if safe_url
-                else "<td>Not available</td>")
+                html.escape(safe_url,quote=True)+"'>"+
+                html.escape(label)+"</a></td>" if safe_url
+                else "<td>No source link: lookup required</td>")
         table_rows.append("<tr>"+tds+link+"</tr>")
     (out/REPORT_HTML).write_text(
         "<!doctype html><html><head><meta charset='utf-8'>"
