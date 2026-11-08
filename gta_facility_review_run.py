@@ -14,6 +14,7 @@ import gta_facility_intelligence as graph
 import gta_facility_dossiers as dossiers
 import gta_facility_role_review as role_review
 import gta_toronto_permit_evidence as permit_evidence
+import gta_toronto_permit_acceptance as permit_acceptance
 from v6_daily_pipeline import find_workspace,choose_database
 
 
@@ -41,6 +42,7 @@ def execute(workspace=None, *, results=None, as_of=None, max_age_days=180):
     # A separate exact-record layer: never fetch live data in the combined
     # manual runner, and never block the graph if the local source DB is absent.
     permit_status = None
+    permit_acceptance_status = None
     permit_db = None
     if (folder/permit_evidence.DAILY_CSV).is_file():
         try:
@@ -48,9 +50,13 @@ def execute(workspace=None, *, results=None, as_of=None, max_age_days=180):
             permit_db = choose_database(workspace_root)
         except (FileNotFoundError,OSError,ValueError):
             permit_db = None
+        permit_dir=folder/"TORONTO_PERMIT_EVIDENCE_PILOT"
         permit_status = permit_evidence.run(
-            folder, folder/"TORONTO_PERMIT_EVIDENCE_PILOT",
-            db=permit_db, live=False)
+            folder,permit_dir,db=permit_db,live=False)
+        # Offline evidence inventory, even when no explicit City rechecks
+        # have ever been requested. Cannot promote commercial readiness.
+        permit_acceptance_status=permit_acceptance.run(
+            permit_dir/permit_evidence.LIVE_BATCH_DIR,permit_dir)
     result = {
         "mode":"MANUAL_OFFLINE_EVIDENCE_REVIEW_ONLY",
         "as_of":date.isoformat(),
@@ -81,6 +87,13 @@ def execute(workspace=None, *, results=None, as_of=None, max_age_days=180):
         "toronto_permit_evidence_status_file":(
             "" if permit_status is None else
             str(folder/"TORONTO_PERMIT_EVIDENCE_PILOT"/permit_evidence.AUDIT_JSON)),
+        "toronto_saved_live_source_records":(
+            0 if permit_acceptance_status is None else
+            permit_acceptance_status["recent_unique_exact_ckan_source_records"]),
+        "toronto_source_sample_gate_passed":(
+            False if permit_acceptance_status is None else
+            permit_acceptance_status["official_source_sample_gate_passed"]),
+        "toronto_commercial_production_accepted":False,
         "verified_open_supplier_contracts":0,
         "buyers_verified":0,
         "outreach_authorized":False,
