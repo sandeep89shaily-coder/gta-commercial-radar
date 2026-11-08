@@ -104,7 +104,9 @@ The *source sample evidence gate* requires at least **20** recent unique permit
 revision records, **15** distinct project folders, **10** distinct physical
 street addresses and at least **2** municipal status categories. Hashes and
 source key, query URL, reported status, physical address and original saved
-CKAN row must agree. A pass means *sampled original-source evidence present
+CKAN row must agree. Any recent malformed batch or source integrity failure
+blocks this gate even when twenty other records pass. The local saved hashes
+are not City digital signatures. A pass means *sampled original-source evidence present
 for further review*, **not** independent government authenticity, opening,
 occupancy, vendor selection or production commercial acceptance.
 `commercial_production_accepted` remains **false** and `user_outreach_authorized`
