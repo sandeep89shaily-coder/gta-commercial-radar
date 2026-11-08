@@ -39,7 +39,7 @@ The bounded replayable source checker is:
 | Facility | Public-facing role | Channel | Explicit uncertainty |
 | --- | --- | --- | --- |
 | 568 Passmore Ave | Colliers broker Newton Leung for Beedie Passworks | +1 416-791-7202; newton.leung@colliers.com; https://www.passworksbybeedie.com/ | Broker markets space, not proven buyer of the $500,000 proposed interior improvements |
-| 77 King St W | Cadillac Fairview CF Connect and TD Centre guest services | cfconnect@cadillacfairview.com; +1 416-864-6448; https://assets.cadillacfairview.com/m/3a2c1e7e091cda96/original/Accessibility-Policy.pdf | Building services and owner association, not verified purchaser of the plumbing revision |
+| 77 King St W | Cadillac Fairview Tenant Projects Department | tdcprojects@cadillacfairview.com; +1 416-869-1144; https://assets.cadillacfairview.com/m/4ed6e2dbbf5194b6/original/TDC-Contruction-Manual-March-2025-1.pdf | Actual landlord tenant-improvement review route, **not** confirmed purchaser of the plumbing revision |
 | 5160 Yonge St | GWL Realty Advisors, leasing contact Amanda Barker | +1 647-676-8035; Amanda.Barker@gwlra.com; https://gwlraleasing.com/building/5160-yonge-street/ | Office leasing agent, not verified purchaser of HVAC work |
 
 The complete 12-route provenance file is machine-readable and tested in `tests/test_toronto_20_commercial_review.py`. It never fills buyer or open procurement flags from an address-level property or brokerage contact.
