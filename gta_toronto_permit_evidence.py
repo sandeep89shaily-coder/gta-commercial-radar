@@ -167,6 +167,7 @@ def _local_verdict(record, evidence, expected_address, expected_status):
                   "NO_UNAMBIGUOUS_STAGE_COMPARISON")
     state = ("LOCAL_RECORD_INACTIVE_HISTORY" if not evidence["active"] else
              "LOCAL_RECORD_ADDRESS_CONFLICT" if addr_check=="SOURCE_ADDRESS_CONFLICT" else
+             "LOCAL_RECORD_ADDRESS_MISSING_REVIEW" if addr_check=="SOURCE_ADDRESS_MISSING" else
              "LOCAL_EXACT_PERMIT_REVISION_PAYLOAD_MATCH_NOT_LIVE_RECHECKED")
     return state, evidence["first_seen"],evidence["source_date"],evidence["sha256"],status,addr,addr_check+";"+status_check
 
@@ -323,25 +324,34 @@ def run(results, out=None, *, db=None, live=False, live_limit=10,
             selected=sorted(audit,key=lambda x:(
                 x["permit_type"]!="BLD",
                 x["project_id"],x["source_key"]))[:live_limit]
-            stamp=(as_of or dt.datetime.now(dt.timezone.utc)).isoformat()
+            stamp=(as_of.isoformat() if isinstance(as_of,(dt.date,dt.datetime))
+                   else str(as_of) if as_of else
+                   dt.datetime.now(dt.timezone.utc).isoformat())
             for row in selected:
+                live_checked += 1
                 try:
                     state,record,url=_remote_record(row["permit_num"],
                         row["revision_num"],resource_id,fetch)
                     row["remote_query_url"]=url
                     row["remote_retrieved_at"]=stamp
-                    live_checked+=1
                     row["remote_status"]=state
                     if record:
                         row["remote_record_status"]=clean(record.get("STATUS"))
                         row["remote_record_address"]=_official_status_address(record)
-                        prev=graph.normalize_address(row["local_record_address"])[0]
-                        current=row["remote_record_address"]
-                        if prev and current and prev!=current:
-                            row["remote_address_comparison"]="LIVE_LOCAL_ADDRESS_CONFLICT"
+                        exported = graph.normalize_address(
+                            next((p.get("address","") for p,ks in parsed_projects
+                                  if p.get("project_id")==row["project_id"]), ""))[0]
+                        previous = graph.normalize_address(row["local_record_address"])[0]
+                        current = row["remote_record_address"]
+                        if not current:
+                            row["remote_address_comparison"]="LIVE_CITY_RECORD_ADDRESS_MISSING"
+                            row["final_evidence_level"]="LIVE_ROW_ADDRESS_UNVERIFIED"
+                        elif (exported and exported!=current) or (
+                                previous and previous!=current):
+                            row["remote_address_comparison"]="LIVE_ADDRESS_CONTRADICTS_ARCHIVED_SOURCE"
                             row["final_evidence_level"]="REVIEW_SOURCE_ADDRESS_CONFLICT"
                         else:
-                            row["remote_address_comparison"]="NO_LOCAL_ADDRESS_CONFLICT_FOUND"
+                            row["remote_address_comparison"]="ADDRESS_COMPATIBLE_WITH_AVAILABLE_SNAPSHOTS"
                             row["final_evidence_level"]="OFFICIAL_CKAN_EXACT_KEY_LIVE_RECHECKED"
                         row["individual_record_retrieved_live"]="YES"
                         row["review_blockers"]+=";OFFICIAL_CKAN_ROW_DOES_NOT_PROVE_BUYER_OR_OPEN_CONTRACT"
@@ -406,6 +416,8 @@ def run(results, out=None, *, db=None, live=False, live_limit=10,
         "live_requested":live_requested,
         "live_status":live_status,
         "live_record_queries_attempted":live_checked,
+        "live_queries_failed":sum(
+            row["remote_status"].startswith("LIVE_CKAN_QUERY_ERROR_") for row in audit),
         "live_exact_record_payloads_received":sum(r["individual_record_retrieved_live"]=="YES"
                                                   for r in audit),
         "metadata_resource_id":resource_id,
