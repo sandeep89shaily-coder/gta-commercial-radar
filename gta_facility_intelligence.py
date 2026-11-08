@@ -327,10 +327,10 @@ def adapt(family, row):
                          first(row, "observation") not in {"FIRST_OBSERVED", "RECORD_CHANGED"})
     if closed:
         tier = "HISTORICAL_OR_TERMINAL_REVIEW_ONLY"
-    elif archived_baseline:
-        tier = "HISTORICAL_PLANNING_BASELINE_SITE_CONTEXT_ONLY"
     elif not site:
         tier = "IDENTITY_REPAIR_REQUIRED"
+    elif archived_baseline:
+        tier = "HISTORICAL_PLANNING_BASELINE_SITE_CONTEXT_ONLY"
     elif scope == "EXPLICIT_EQUIPMENT_CHANGE":
         tier = "EQUIPMENT_CHANGE_RESEARCH"
     elif family == "activation":
