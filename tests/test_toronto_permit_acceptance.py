@@ -2,6 +2,7 @@
 from __future__ import annotations
 import csv
 import datetime as dt
+import hashlib
 import json
 import tempfile
 import unittest
@@ -14,18 +15,30 @@ import gta_toronto_permit_acceptance as gate
 AS_OF=dt.datetime(2026,11,8,15,0,tzinfo=dt.timezone.utc)
 
 
+def original_public_row(item):
+    number,street,kind=item["remote_record_address"].split(" ",2)
+    return {"PERMIT_NUM":item["permit_num"],
+            "REVISION_NUM":item["revision_num"],
+            "STREET_NUM":number,
+            "STREET_NAME":street.upper(),
+            "STREET_TYPE":kind.upper(),
+            "STREET_DIRECTION":"",
+            "STATUS":item["remote_record_status"]}
+
+
 def row(n, *, project=None, status="Permit Issued",
-        address="220 yonge st", quality="OFFICIAL_CKAN_EXACT_KEY_LIVE_RECHECKED",
+        address=None, quality="OFFICIAL_CKAN_EXACT_KEY_LIVE_RECHECKED",
         query=None):
     folder=f"26 {200000+n:06d}"
     permit=folder+" BLD"
     project=project or permits.SOURCE+":"+folder
+    address=address or f"{200+n} yonge st"
     filters=json.dumps({"PERMIT_NUM":permit,"REVISION_NUM":"00"},
                        separators=(",",":"))
     query=query or permits.API+"datastore_search?"+urlencode({
         "resource_id":permits.RESOURCE_HINT,"filters":filters,"limit":3
     })
-    return {
+    item={
         "project_id":project,"source_key":permit+"|00",
         "permit_num":permit,"revision_num":"00",
         "individual_record_retrieved_live":"YES",
@@ -38,6 +51,10 @@ def row(n, *, project=None, status="Permit Issued",
         "buyer_verified":"NO",
         "record_is_a_verified_open_supplier_contract":"NO",
     }
+    original=original_public_row(item)
+    canonical=json.dumps(original,sort_keys=True,ensure_ascii=False,separators=(",",":"))
+    item["remote_payload_sha256"]=hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+    return item
 
 
 def batch(folder,rows,*,suffix="A",stamp=None,resource=None):
@@ -53,7 +70,11 @@ def batch(folder,rows,*,suffix="A",stamp=None,resource=None):
             x.get("individual_record_retrieved_live")=="YES" for x in rows),
         "commercial_buyer_verified":False,
         "open_supplier_contracts_verified":0,
-        "audit_records":rows
+        "audit_records":rows,
+        "original_public_ckan_rows_by_source_key":{
+            item["source_key"]:original_public_row(item)
+            for item in rows
+        }
     }
     path=folder/("TORONTO_CKAN_EXACT_CHECK_"+suffix+"_OFFSET_0.json")
     path.write_text(json.dumps(payload,indent=2),encoding="utf-8")
@@ -124,7 +145,7 @@ class TorontoSourceAcceptanceTests(unittest.TestCase):
 
     def test_malicious_query_host_or_mismatched_id_rejected(self):
         valid=row(1)
-        self.assertEqual(gate._classify(valid),
+        self.assertEqual(gate._classify(valid,original_public_row(valid)),
                          "EXACT_OFFICIAL_SOURCE_ROW_WITH_ARCHIVED_ADDRESS_COMPATIBLE")
         for url in ("http://ckan0.cf.opendata.inter.prod-toronto.ca/query",
                     "https://evil.example/api/3/action/datastore_search",
@@ -134,7 +155,7 @@ class TorontoSourceAcceptanceTests(unittest.TestCase):
                         urlencode({"bad":"wrong"})):
             with self.subTest(url=url):
                 altered=dict(valid,remote_query_url=url)
-                self.assertEqual(gate._classify(altered),
+                self.assertEqual(gate._classify(altered,original_public_row(altered)),
                                  "REMOTE_QUERY_PROVENANCE_INVALID")
 
     def test_missing_remote_status_address_or_conflict_rejected(self):
@@ -148,14 +169,45 @@ class TorontoSourceAcceptanceTests(unittest.TestCase):
             ({"individual_record_retrieved_live":"NO"},"NOT_ACTUALLY_RETRIEVED"),
         ]:
             with self.subTest(data=data):
-                self.assertEqual(gate._classify(dict(row(1),**data)),reason)
+                changed=dict(row(1),**data)
+                self.assertEqual(gate._classify(changed,original_public_row(changed)),reason)
 
     def test_buying_authority_inferred_from_permit_is_rejected(self):
-        self.assertEqual(gate._classify(dict(row(1),buyer_verified="YES")),
+        original=row(1)
+        self.assertEqual(gate._classify(dict(original,buyer_verified="YES"),
+                         original_public_row(original)),
                          "UNEXPECTED_BUYER_VERIFICATION_CLAIM")
-        self.assertEqual(gate._classify(dict(row(1),
-            record_is_a_verified_open_supplier_contract="YES")),
+        self.assertEqual(gate._classify(dict(original,
+            record_is_a_verified_open_supplier_contract="YES"),
+            original_public_row(original)),
             "UNEXPECTED_OPEN_CONTRACT_CLAIM")
+
+    def test_original_public_record_hash_or_identity_cannot_be_mutated(self):
+        valid=row(2)
+        orig=original_public_row(valid)
+        self.assertEqual(gate._classify(valid,orig),
+                         "EXACT_OFFICIAL_SOURCE_ROW_WITH_ARCHIVED_ADDRESS_COMPATIBLE")
+        modified=dict(orig,STATUS="Revoked")
+        self.assertEqual(gate._classify(valid,modified),
+                         "ORIGINAL_PUBLIC_SOURCE_ROW_HASH_MISMATCH")
+        modified=dict(orig,PERMIT_NUM="26 999999 BLD")
+        self.assertEqual(gate._classify(valid,modified),
+                         "ORIGINAL_PUBLIC_SOURCE_ROW_HASH_MISMATCH")
+        altered=dict(valid,remote_payload_sha256="0"*64)
+        self.assertEqual(gate._classify(altered,orig),
+                         "ORIGINAL_PUBLIC_SOURCE_ROW_HASH_MISMATCH")
+
+    def test_multiple_projects_same_physical_address_not_broad_sample(self):
+        with tempfile.TemporaryDirectory() as root:
+            p=Path(root);b=p/"batches"
+            batch(b,[row(i,address="220 yonge st",status="Permit Issued")
+                     for i in range(10)],suffix="A")
+            batch(b,[row(i,address="220 yonge st",status="Inspection")
+                     for i in range(10,20)],suffix="B")
+            s=gate.run(b,p/"out",as_of=AS_OF)
+            self.assertEqual(s["recent_unique_exact_ckan_source_records"],20)
+            self.assertEqual(s["distinct_physical_sites_rechecked"],1)
+            self.assertFalse(s["official_source_sample_gate_passed"])
 
     def test_stale_evidence_batch_not_counted_as_recent(self):
         with tempfile.TemporaryDirectory() as root:
