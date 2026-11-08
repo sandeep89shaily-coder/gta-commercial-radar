@@ -43,6 +43,18 @@ CLEARED_RESOURCE_HINT="a96c0ba4-3026-402b-b09d-5b1268b8f810"
 OFFICIAL_CLEARED_DATASET="https://open.toronto.ca/dataset/building-permits-cleared-permits/"
 TORONTO_LICENSE="Contains information licensed under the Open Government Licence – Toronto."
 TORONTO_LICENSE_URL="https://open.toronto.ca/open-data-licence/"
+# Explicit minimal public-record fields. No applicant/owner/builder names,
+# telephone, email, complete postal codes or free-text description in saved
+# third-party CKAN evidence. This is NOT the entire raw public source payload.
+PUBLIC_EVIDENCE_FIELDS=(
+    "PERMIT_NUM","REVISION_NUM","PERMIT_TYPE",
+    "STREET_NUM","STREET_NAME","STREET_TYPE","STREET_DIRECTION",
+    "STATUS","APPLICATION_DATE","ISSUED_DATE","COMPLETED_DATE","WORK",
+)
+
+
+def minimized_public_record(record):
+    return {key:record[key] for key in PUBLIC_EVIDENCE_FIELDS if key in record}
 
 # Example original keys: "26 265617 HVA|00 | 26 265617 BLD|00".
 KEY=re.compile(r"^(?P<folder>\d{2} \d{6}) (?P<type>[A-Z]{3})\|(?P<rev>\d{2})$")
@@ -466,13 +478,14 @@ def run(results, out=None, *, db=None, live=False, live_limit=10,
                     row["remote_retrieved_at"]=stamp
                     row["remote_status"]=state
                     if record:
-                        # Preserve the original public CKAN row in its batch.
-                        # A hash of unpreserved text is not auditable evidence.
+                        # Preserve a reproducible allowlisted CKAN source-row
+                        # projection. Never store personal contact/builder fields.
+                        evidence_record=minimized_public_record(record)
                         canonical=json.dumps(
-                            record,sort_keys=True,ensure_ascii=False,separators=(",",":"))
+                            evidence_record,sort_keys=True,ensure_ascii=False,separators=(",",":"))
                         row["remote_payload_sha256"]=hashlib.sha256(
                             canonical.encode("utf-8")).hexdigest()
-                        remote_public_rows[row["source_key"]]=record
+                        remote_public_rows[row["source_key"]]=evidence_record
                         row["remote_record_status"]=clean(record.get("STATUS"))
                         row["remote_record_address"]=_official_status_address(record)
                         original_stage=clean(next((
@@ -531,11 +544,12 @@ def run(results, out=None, *, db=None, live=False, live_limit=10,
                                         cleared_resource_id,fetch)
                                     row["cleared_query_url"]=clear_url
                                     if clear_record:
-                                        original=json.dumps(clear_record,sort_keys=True,
+                                        cleared_evidence=minimized_public_record(clear_record)
+                                        original=json.dumps(cleared_evidence,sort_keys=True,
                                             ensure_ascii=False,separators=(",",":"))
                                         row["cleared_payload_sha256"]=hashlib.sha256(
                                             original.encode("utf-8")).hexdigest()
-                                        cleared_public_rows[row["source_key"]]=clear_record
+                                        cleared_public_rows[row["source_key"]]=cleared_evidence
                                         row["cleared_record_status"]=clean(
                                             clear_record.get("STATUS"))
                                         cleared_addr=_official_status_address(clear_record)
@@ -654,6 +668,8 @@ def run(results, out=None, *, db=None, live=False, live_limit=10,
             "audit_records":selected_rows,
             "original_public_ckan_rows_by_source_key":remote_public_rows,
             "original_public_cleared_rows_by_source_key":cleared_public_rows,
+            "source_evidence_fields_only":list(PUBLIC_EVIDENCE_FIELDS),
+            "personal_data_fields_excluded_from_evidence":True,
             "cleared_resource_id":cleared_resource_id,
         }
         with path.open("x",encoding="utf-8") as outstream:
@@ -717,6 +733,7 @@ def run(results, out=None, *, db=None, live=False, live_limit=10,
             "Cleared records, if found, are historical/non-active research only and not commercial buying leads.",
             "Multiple BLD/HVA/PLB permit records in a project group may have different statuses; never collapse into one verified stage.",
             "Live mode is opt-in and capped; missing/unqueried records stay unverified.",
+            "Saved official CKAN source evidence is a field-allowlisted projection; personal name/contact and free-text descriptions are excluded.",
             "No buyers, organizations, contact details, procurement or business opening is verified here.",
         ],
         "outputs":{"permit_records_csv":str(out/AUDIT_CSV),
