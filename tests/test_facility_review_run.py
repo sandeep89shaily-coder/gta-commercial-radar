@@ -73,6 +73,8 @@ class ManualReviewRunnerTests(unittest.TestCase):
             self.assertEqual(output["verified_open_supplier_contracts"],0)
             self.assertEqual(output["toronto_constituent_permit_keys_found"],0)
             self.assertEqual(output["toronto_exact_local_permit_payloads_matched"],0)
+            self.assertEqual(output["toronto_permit_audit_status"],
+                             "NO_TORONTO_PERMITS_IN_EXISTING_EXPORT")
             self.assertTrue((results/"TORONTO_PERMIT_EVIDENCE_PILOT"/
                              "GTA_RADAR_TORONTO_PERMIT_EVIDENCE_STATUS.json").is_file())
             self.assertEqual(output["unverified_company_role_hints"],1)
