@@ -44,6 +44,48 @@ The bounded replayable source checker is:
 
 The complete 12-route provenance file is machine-readable and tested in `tests/test_toronto_20_commercial_review.py`. It never fills buyer or open procurement flags from an address-level property or brokerage contact.
 
+### Actual supplier-access checks, still NOT open-contract proof
+
+**250 Front Street West — CBC:** CBC/Radio-Canada's official supplier guide says
+that procurement requirements of **CAD 500,000 or more** generally use an **open
+bid solicitation on MERX**, while lower-value purchases are usually
+invitation-only. A City building-permit construction estimate of **CAD 900,000**
+is NOT necessarily CBC's procurement value and is NOT evidence of a currently
+published tender. CBC's general supply-management channel is
+`supplym@cbc.ca`. Primary sources:
+https://cbc.radio-canada.ca/en/working-with-us/partners-and-suppliers/want-to-be-a-supplier
+and
+https://cbc.radio-canada.ca/en/working-with-us/partners-and-suppliers/faq.
+
+An independent February **2026** substantial-performance certificate at this
+address names a contractor for the **separate CBC New TR Rooms** job. That is
+**not** the same as the November studio-conversion permit and cannot be
+presented as an awarded or unawarded contract on the current project.
+https://certificates.link2build.ca/Search/Detail/bc21f1a3-42ec-4405-a27f-b409011d3e56
+
+**77 King Street West — TD Centre:** Cadillac Fairview's official construction
+manual and tenant guide identify **Tenant Projects**
+`tdcprojects@cadillacfairview.com`, **416-869-1144**, as the site-specific
+landlord drawing and work-approval route. They also require contractor
+prequalification/third-party certification for work at the centre. These are
+**access and prequalification rules**, not confirmation that this plumbing
+revision is being tendered, or that a particular subcontractor can still bid.
+https://assets.cadillacfairview.com/m/4ed6e2dbbf5194b6/original/TDC-Contruction-Manual-March-2025-1.pdf
+
+**568 Passmore Avenue — Passworks:** the official Beedie site identifies a
+developer-built industrial complex and Colliers' leasing team. A June 2026 CWB
+site-certification report names **Beedie Industrial as the general contractor
+for base-building construction** at the campus; this does NOT establish the
+GC or award status of the specific **CAD 500,000 warehouse office/partition
+fit-out** permit. The tenant, fit-out project manager and purchasing entity
+still require original-record research.
+https://www.cwbgroup.org/directory/job-site-visits/63585540-746e-f111-ab0e-70a8a5ab66e3
+and https://www.passworksbybeedie.com/
+
+This research is intended for **business-development intelligence** and
+pre-qualification planning, never unsolicited outreach without verified
+authority, permitted contact purpose and supplier-fit checks.
+
 ## Implemented offline production-safety research layer
 
 `gta_toronto_20_commercial_review.py` joins official City exact-key/physical-site source records to only the specifically recorded public business routes. It produces:
