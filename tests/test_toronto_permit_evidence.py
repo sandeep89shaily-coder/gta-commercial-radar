@@ -535,6 +535,38 @@ class TorontoPermitRecordAuditTests(unittest.TestCase):
                 "26 265617 BLD|00"]
             self.assertEqual(original["COMPLETED_DATE"],"2026-11-04")
             self.assertEqual(stored["cleared_resource_id"],permits.CLEARED_RESOURCE_HINT)
+            verified=acceptance.run(
+                Path(summary["immutable_live_batch_file"]).parent,
+                root/"verification",as_of=__import__("datetime").datetime.now(
+                    __import__("datetime").timezone.utc))
+            self.assertEqual(verified["recent_distinct_exact_cleared_history_records"],1)
+            self.assertEqual(verified["recent_unique_exact_ckan_source_records"],0)
+            self.assertEqual(verified["integrity_or_source_mismatch_rejection_count"],0)
+            self.assertFalse(verified["commercial_production_accepted"])
+            with (root/"verification"/acceptance.CLEARED_HISTORY_CSV).open(
+                    encoding="utf-8-sig",newline="") as fh:
+                historical=next(csv.DictReader(fh))
+            self.assertEqual(historical["cleared_status"],"Closed")
+            self.assertEqual(historical["open_contract_verified"],"NO")
+
+    def test_cleared_source_hash_mutation_fails_historical_verification(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);write_daily(root,[daily(keys="26 265617 BLD|00")])
+            fetch,_=self._active_then_cleared_mock()
+            s=permits.run(root,live=True,check_cleared=True,
+                          live_limit=1,fetch=fetch)
+            batch=Path(s["immutable_live_batch_file"])
+            saved=json.loads(batch.read_text())
+            saved["original_public_cleared_rows_by_source_key"][
+                "26 265617 BLD|00"]["STATUS"]="Cancelled"
+            batch.write_text(json.dumps(saved),encoding="utf-8")
+            result=acceptance.run(batch.parent,root/"acceptance",
+                                  as_of=__import__("datetime").datetime.now(
+                                      __import__("datetime").timezone.utc))
+            self.assertEqual(result["recent_distinct_exact_cleared_history_records"],0)
+            self.assertEqual(result["rejected_or_unproven_counts"][
+                "CLEARED_SOURCE_ROW_HASH_MISMATCH"],1)
+            self.assertFalse(result["official_source_sample_gate_passed"])
 
     def test_cleared_address_conflict_never_matches_same_facility(self):
         with tempfile.TemporaryDirectory() as folder:
