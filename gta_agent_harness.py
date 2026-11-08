@@ -86,7 +86,8 @@ def evidence_gate(record):
         identity = item.get("page_identity")
         if (isinstance(url, str) and url.startswith("https://")
                 and identity in (EXACT_IDENTITY, CONTEXT_ONLY)):
-            accepted[url] = identity
+            if url not in accepted or identity == EXACT_IDENTITY:
+                accepted[url] = identity
     exact = sum(label == EXACT_IDENTITY for label in accepted.values())
     status = ("EXACT_ID_SOURCE_REVIEW_ONLY" if exact else
               "PROJECT_CONTEXT_REVIEW_ONLY" if accepted else
@@ -267,8 +268,8 @@ def run(results, out=None, *, candidates=None, paid=False, max_projects=3,
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("--results", required=True,
-                   help="Existing GTA_RADAR_RESULTS directory")
+    p.add_argument("--results", help="Existing GTA_RADAR_RESULTS directory")
+    p.add_argument("--workspace", help="Existing Desktop/new data workspace (auto-detected by default)")
     p.add_argument("--out", help="Separate harness review output folder")
     p.add_argument("--candidates", help="Optional explicit existing canonical CSV")
     p.add_argument("--paid", action="store_true",
@@ -276,7 +277,10 @@ def main():
     p.add_argument("--max-projects", type=int, default=3)
     args = p.parse_args()
     try:
-        result = run(args.results, args.out, candidates=args.candidates,
+        from v6_daily_pipeline import find_workspace
+        results = (Path(args.results) if args.results else
+                   find_workspace(args.workspace) / "GTA_RADAR_RESULTS")
+        result = run(results, args.out, candidates=args.candidates,
                      paid=args.paid, max_projects=args.max_projects)
     except Exception as exc:
         print(json.dumps({"status": "FAILED_SAFE", "error": type(exc).__name__,
@@ -285,7 +289,7 @@ def main():
     print(json.dumps({
         "status": result["status"],
         "review_folder": str(Path(args.out) if args.out else
-                             Path(args.results) / "AGENT_HARNESS_REVIEW"),
+                             results / "AGENT_HARNESS_REVIEW"),
         "metrics": result.get("metrics", {}),
         "paid_attempts": result.get("executor", {}).get("attempted", 0),
         "production_promotion": False,
