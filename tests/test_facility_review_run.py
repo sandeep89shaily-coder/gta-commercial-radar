@@ -14,7 +14,7 @@ import gta_facility_dossiers as dossier
 
 def daily_csv(path, rows):
     with path.open("w",encoding="utf-8-sig",newline="") as f:
-        fields=("project_id","observation","source_id","city","address",
+        fields=("project_id","observation","source_id","source_keys","city","address",
                 "description","source_record_date","first_seen_local",
                 "record_source_url","current_source_status")
         w=csv.DictWriter(f,fieldnames=fields)
@@ -71,6 +71,10 @@ class ManualReviewRunnerTests(unittest.TestCase):
             self.assertFalse(output["new_records_published_claimed"])
             self.assertFalse(output["outreach_authorized"])
             self.assertEqual(output["verified_open_supplier_contracts"],0)
+            self.assertEqual(output["toronto_constituent_permit_keys_found"],0)
+            self.assertEqual(output["toronto_exact_local_permit_payloads_matched"],0)
+            self.assertTrue((results/"TORONTO_PERMIT_EVIDENCE_PILOT"/
+                             "GTA_RADAR_TORONTO_PERMIT_EVIDENCE_STATUS.json").is_file())
             self.assertEqual(output["unverified_company_role_hints"],1)
             self.assertEqual(output["role_hints_verified"],0)
             self.assertEqual(csv_path.read_bytes(),before)
