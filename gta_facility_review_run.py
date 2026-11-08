@@ -13,7 +13,8 @@ from pathlib import Path
 import gta_facility_intelligence as graph
 import gta_facility_dossiers as dossiers
 import gta_facility_role_review as role_review
-from v6_daily_pipeline import find_workspace
+import gta_toronto_permit_evidence as permit_evidence
+from v6_daily_pipeline import find_workspace,choose_database
 
 
 def execute(workspace=None, *, results=None, as_of=None, max_age_days=180):
@@ -37,6 +38,19 @@ def execute(workspace=None, *, results=None, as_of=None, max_age_days=180):
     dossier_status = dossiers.run(graph_dir,dossier_dir)
     role_status = role_review.run(
         graph_dir,folder/"GTA_RADAR_PROJECT_OPPORTUNITIES.csv",dossier_dir)
+    # A separate exact-record layer: never fetch live data in the combined
+    # manual runner, and never block the graph if the local source DB is absent.
+    permit_status = None
+    permit_db = None
+    if (folder/permit_evidence.DAILY_CSV).is_file():
+        try:
+            workspace_root = Path(find_workspace(workspace)) if workspace is not None else folder.parent
+            permit_db = choose_database(workspace_root)
+        except (FileNotFoundError,OSError,ValueError):
+            permit_db = None
+        permit_status = permit_evidence.run(
+            folder, folder/"TORONTO_PERMIT_EVIDENCE_PILOT",
+            db=permit_db, live=False)
     result = {
         "mode":"MANUAL_OFFLINE_EVIDENCE_REVIEW_ONLY",
         "as_of":date.isoformat(),
@@ -49,6 +63,18 @@ def execute(workspace=None, *, results=None, as_of=None, max_age_days=180):
         "manual_evidence_tasks":dossier_status["manual_verification_tasks"],
         "unverified_company_role_hints":role_status["role_hints"],
         "role_hints_verified":0,
+        "toronto_permit_audit_status":(
+            "NOT_RUN_MISSING_DAILY_EXPORT" if permit_status is None else
+            "LOCAL_SOURCE_RECORDS_RECONCILED_NOT_LIVE_RECHECKED"),
+        "toronto_constituent_permit_keys_found":(
+            0 if permit_status is None else
+            permit_status["distinct_original_constituent_keys"]),
+        "toronto_exact_local_permit_payloads_matched":(
+            0 if permit_status is None else
+            permit_status["local_record_payloads_matched"]),
+        "toronto_permit_evidence_status_file":(
+            "" if permit_status is None else
+            str(folder/"TORONTO_PERMIT_EVIDENCE_PILOT"/permit_evidence.AUDIT_JSON)),
         "verified_open_supplier_contracts":0,
         "buyers_verified":0,
         "outreach_authorized":False,
