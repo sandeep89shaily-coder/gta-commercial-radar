@@ -55,7 +55,7 @@ AUDIT_FIELDS=(
     "local_address_comparison","local_status_comparison",
     "remote_status","remote_record_status","remote_record_address",
     "remote_address_comparison","remote_stage_comparison",
-    "remote_query_url","remote_retrieved_at",
+    "remote_payload_sha256","remote_query_url","remote_retrieved_at",
     "final_evidence_level","individual_record_retrieved_live",
     "record_is_a_verified_open_supplier_contract","buyer_verified",
     "review_blockers",
@@ -342,6 +342,7 @@ def _audit_row(project,ident,permit_num,rev,local,export_status,export_address):
         "remote_status":"NOT_REQUESTED_MANUAL_LIVE_ONLY",
         "remote_record_status":"","remote_record_address":"",
         "remote_address_comparison":"","remote_stage_comparison":"",
+        "remote_payload_sha256":"",
         "remote_query_url":"","remote_retrieved_at":"",
         "final_evidence_level":"SOURCE_SNAPSHOT_EXACT_KEY_NOT_LIVE_CHECKED" if
              state=="LOCAL_EXACT_PERMIT_REVISION_PAYLOAD_MATCH_NOT_LIVE_RECHECKED" else
@@ -409,6 +410,7 @@ def run(results, out=None, *, db=None, live=False, live_limit=10,
     live_status="NOT_REQUESTED"
     resource_id=""
     metadata_modified=""
+    remote_public_rows={}
     if live_requested and audit and live_limit>0:
         try:
             resource_id,metadata_modified=_resource(fetch)
@@ -429,6 +431,13 @@ def run(results, out=None, *, db=None, live=False, live_limit=10,
                     row["remote_retrieved_at"]=stamp
                     row["remote_status"]=state
                     if record:
+                        # Preserve the original public CKAN row in its batch.
+                        # A hash of unpreserved text is not auditable evidence.
+                        canonical=json.dumps(
+                            record,sort_keys=True,ensure_ascii=False,separators=(",",":"))
+                        row["remote_payload_sha256"]=hashlib.sha256(
+                            canonical.encode("utf-8")).hexdigest()
+                        remote_public_rows[row["source_key"]]=record
                         row["remote_record_status"]=clean(record.get("STATUS"))
                         row["remote_record_address"]=_official_status_address(record)
                         original_stage=clean(next((
@@ -538,6 +547,7 @@ def run(results, out=None, *, db=None, live=False, live_limit=10,
             "commercial_buyer_verified":False,
             "open_supplier_contracts_verified":0,
             "audit_records":selected_rows,
+            "original_public_ckan_rows_by_source_key":remote_public_rows,
         }
         with path.open("x",encoding="utf-8") as outstream:
             json.dump(batch,outstream,indent=2)
