@@ -1,0 +1,37 @@
+name: Toronto 20 archived permit source acceptance (PR only)
+on:
+  pull_request:
+    paths:
+      - 'gta_toronto_archived_source_validation.py'
+      - 'gta_toronto_permit_evidence.py'
+      - 'gta_toronto_permit_acceptance.py'
+      - 'tests/fixtures/toronto_archived_20_permits_20261107.csv'
+      - '.github/workflows/toronto-archived-20-live.yml'
+  workflow_dispatch:
+
+# Two isolated ten-key City CKAN batches; no Radar collector, schedule, tokens,
+# user databases, paid AI, contact scraping, or external communications.
+permissions:
+  contents: read
+concurrency:
+  group: toronto-archived-20-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  original-record-verification:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify twenty archived exact permit keys against official public City active and cleared CKAN
+        run: python gta_toronto_archived_source_validation.py --out toronto_archive_evidence
+      - name: Save exact-source evidence and outstanding verification gaps
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: toronto-20-original-permit-source-evidence
+          path: toronto_archive_evidence/
+          if-no-files-found: warn
