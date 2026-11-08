@@ -1,0 +1,35 @@
+name: Toronto 20 commercial qualification report (PR only)
+on:
+  pull_request:
+    paths:
+      - 'gta_toronto_20_commercial_review.py'
+      - 'research/toronto_20_city_exact_scope_20261108.json'
+      - 'research/toronto_20_public_business_contact_routes_20261108.json'
+      - '.github/workflows/toronto-20-commercial-qualification.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: toronto-20-qualification-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  generate-qualification:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Generate research-only City-scope and public-contact qualification
+        run: python gta_toronto_20_commercial_review.py --out toronto_20_commercial_qualification
+      - name: Preserve CSV contact audit and evidence limitations
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: toronto-20-commercial-qualification-research
+          path: toronto_20_commercial_qualification/
+          if-no-files-found: error
