@@ -111,3 +111,12 @@ The original 5/5 official source-parsing acceptance from the November 7 uploaded
 - Added mocked end-to-end regression for an ERO Proposal-to-Decision change followed by HTTP failure, plus unaffected previous evidence and retry behavior.
 
 **Acceptance remains pending:** no fresh authorized 10-notice live run in this checkpoint, no confirmation of current equipment purchasing or buyers, and no automatic commercial promotion. Production manual daily launcher and shared AI budget unchanged. This is a source safety fix on the draft branch.
+
+
+## November 8 source-payload acceptance hardening
+
+The bounded manual ERO fetch now reconciles the fetcher's `DETAIL_RETRIEVED` audit with an **actual parsed source record** for the selected notice. The record must carry the exact selected official HTTPS notice URL, the source parser's explicit official-fetch provenance, a nonempty proposal, site address, and site city. Invalid or missing payloads become `DETAIL_REJECTED` with `SUCCESS_AUDIT_WITHOUT_VALID_SOURCE_PAYLOAD`, rather than contaminating the permanent review cursor.
+
+This closes an important audit/results split: a source might appear checked in the cursor even though its usable evidence was absent, causing subsequent manual runs to skip that notice. Rejected items remain retryable; original evidence rows remain available and changed-source holds remain in force. Also reject URL query/fragment suffixes when importing stored source evidence.
+
+Regression checks include successful audit with no payload and source ID/URL disagreement. This is **not** a new live ERO acceptance run and does not establish an open contract.
