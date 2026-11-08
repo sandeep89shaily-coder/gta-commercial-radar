@@ -190,7 +190,10 @@ def run(batches_dir, out=None, *, as_of=None, days=SOURCE_DAYS_MAX):
     projects={r["project_id"] for r in records}
     physical_sites={r["source_address"] for r in records}
     stage_buckets={permits._stage_bucket(r["source_status"]) for r in records}
-    sample_gate=(len(records)>=MIN_SOURCE_RECORDS and
+    integrity_rejections=sum(count for reason,count in rejected.items()
+                             if reason not in {"OUTSIDE_RECENT_VERIFICATION_WINDOW"})
+    sample_gate=(integrity_rejections==0 and
+                 len(records)>=MIN_SOURCE_RECORDS and
                  len(projects)>=MIN_DISTINCT_PROJECTS and
                  len(physical_sites)>=MIN_DISTINCT_PHYSICAL_SITES and
                  len(stage_buckets)>=2 and
@@ -209,6 +212,7 @@ def run(batches_dir, out=None, *, as_of=None, days=SOURCE_DAYS_MAX):
         "distinct_physical_sites_rechecked":len(physical_sites),
         "source_stage_buckets_covered":sorted(stage_buckets),
         "rejected_or_unproven_counts":dict(sorted(rejected.items())),
+        "integrity_or_source_mismatch_rejection_count":integrity_rejections,
         "source_sample_threshold":MIN_SOURCE_RECORDS,
         "distinct_project_threshold":MIN_DISTINCT_PROJECTS,
         "distinct_physical_site_threshold":MIN_DISTINCT_PHYSICAL_SITES,
@@ -222,6 +226,7 @@ def run(batches_dir, out=None, *, as_of=None, days=SOURCE_DAYS_MAX):
             "The City dataset may be updated on a different schedule from the building-permit status application.",
             "An exact original record and matching address do not identify tenant, supplier, buyer or available project work.",
             "No human original-record review, procurement, licensing or buyer attestation is accepted here.",
+            "Even if twenty records match, any recent malformed batch, identity conflict or untrusted response blocks the source sample gate until reviewed.",
             "Only bounded exact-record batches with preserved original public CKAN rows and matching hashes count.",
             "Saved local source rows and hashes can still be falsified; acceptance is not independent City attestation.",
             "Malformed and stale verification batches cannot inflate the accepted source count.",
