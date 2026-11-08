@@ -16,7 +16,6 @@ import gta_facility_role_review as role_review
 import gta_toronto_permit_evidence as permit_evidence
 import gta_toronto_permit_acceptance as permit_acceptance
 import gta_toronto_dossier_source_overlay as verified_overlay
-import gta_commercial_site_qualification as commercial_site
 from v6_daily_pipeline import find_workspace,choose_database
 
 
@@ -41,12 +40,6 @@ def execute(workspace=None, *, results=None, as_of=None, max_age_days=180):
     dossier_status = dossiers.run(graph_dir,dossier_dir)
     role_status = role_review.run(
         graph_dir,folder/"GTA_RADAR_PROJECT_OPPORTUNITIES.csv",dossier_dir)
-    # The source-backed commercial research overlay is independent of source
-    # acceptance. Contacts are PUBLIC CHANNELS, never verified permit buyers.
-    commercial_status = commercial_site.run(
-        dossier_dir/dossiers.DOSSIERS_CSV,
-        commercial_site.DEFAULT_RESEARCH,
-        dossier_dir/"COMMERCIAL_QUALIFICATION_PILOT")
     # A separate exact-record layer: never fetch live data in the combined
     # manual runner, and never block the graph if the local source DB is absent.
     permit_status = None
@@ -82,13 +75,6 @@ def execute(workspace=None, *, results=None, as_of=None, max_age_days=180):
         "manual_evidence_tasks":dossier_status["manual_verification_tasks"],
         "unverified_company_role_hints":role_status["role_hints"],
         "role_hints_verified":0,
-        "commercial_site_research_matches":(
-            commercial_status["exact_project_and_civic_site_matches"]),
-        "commercial_public_business_contact_channels":(
-            commercial_status["public_business_contact_channels_identified"]),
-        "commercial_permit_buyers_verified":0,
-        "commercial_open_contracts_verified":0,
-        "commercial_qualification_csv":commercial_status["output_csv"],
         "toronto_permit_audit_status":(
             "NOT_RUN_MISSING_DAILY_EXPORT" if permit_status is None else
             "NO_TORONTO_PERMITS_IN_EXISTING_EXPORT" if not
