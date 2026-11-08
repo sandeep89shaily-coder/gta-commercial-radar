@@ -20,12 +20,19 @@ import gta_toronto_permit_evidence as permits
 
 OUTPUT_JSON="GTA_RADAR_TORONTO_SOURCE_ACCEPTANCE.json"
 OUTPUT_CSV="GTA_RADAR_TORONTO_ACCEPTANCE_RECORDS.csv"
+CLEARED_HISTORY_CSV="GTA_RADAR_TORONTO_CLEARED_HISTORY_VERIFICATION.csv"
 BATCH_MAX=1000
 BATCH_MAX_BYTES=2_000_000
 SOURCE_DAYS_MAX=7
 MIN_SOURCE_RECORDS=20
 MIN_DISTINCT_PROJECTS=15
 MIN_DISTINCT_PHYSICAL_SITES=10
+CLEARED_FIELDS=(
+    "source_key","project_id","permit_num","revision_num",
+    "checked_at_utc","cleared_status","completed_date","cleared_address",
+    "cleared_official_query","source_evidence_status","buyer_verified",
+    "open_contract_verified","research_action",
+)
 FIELDNAMES=(
     "source_key","project_id","permit_num","revision_num",
     "live_checked_at_utc","source_status","source_address","source_query_url",
@@ -49,6 +56,12 @@ def _read_batch(path):
         raise ValueError("Unrecognized official source dataset")
     rows=data.get("audit_records")
     original_rows=data.get("original_public_ckan_rows_by_source_key")
+    cleared_rows=data.get("original_public_cleared_rows_by_source_key",{})
+    cleared_id=data.get("cleared_resource_id","")
+    if not isinstance(cleared_rows,dict) or len(cleared_rows)>permits.MAX_LIVE:
+        raise ValueError("Saved historical City cleared source rows are unbounded")
+    if cleared_rows and cleared_id!=permits.CLEARED_RESOURCE_HINT:
+        raise ValueError("Unrecognized City cleared-permit dataset provenance")
     if not isinstance(rows,list) or len(rows)>permits.MAX_LIVE:
         raise ValueError("Evidence batch is not bounded to ten records")
     if not isinstance(original_rows,dict) or len(original_rows)>permits.MAX_LIVE:
@@ -62,10 +75,10 @@ def _read_batch(path):
         raise ValueError("Evidence retrieval time missing or malformed") from exc
     if checked.tzinfo is None:
         raise ValueError("Evidence retrieval timestamp must be timezone aware")
-    return checked.astimezone(dt.timezone.utc),rows,original_rows
+    return checked.astimezone(dt.timezone.utc),rows,original_rows,cleared_rows
 
 
-def _validate_remote_url(url,permit_num,revision):
+def _validate_remote_url(url,permit_num,revision,resource=None):
     """Check the exact query metadata, never trust an arbitrary 'official URL'."""
     try:
         parsed=urlsplit(url)
@@ -74,7 +87,7 @@ def _validate_remote_url(url,permit_num,revision):
             parsed.path!="/api/3/action/datastore_search"):
             return False
         qs=parse_qs(parsed.query)
-        if qs.get("resource_id")!=[permits.RESOURCE_HINT]:
+        if qs.get("resource_id")!=[resource or permits.RESOURCE_HINT]:
             return False
         if len(qs.get("filters",[]))!=1:
             return False
@@ -88,7 +101,7 @@ def _validate_remote_url(url,permit_num,revision):
         return False
 
 
-def _classify(row, original=None):
+def _classify(row, original=None, original_cleared=None):
     key=graph.clean(row.get("source_key",""))
     match=permits.KEY.fullmatch(key)
     if not match:
@@ -100,6 +113,40 @@ def _classify(row, original=None):
     expected_project=permits.SOURCE+":"+match["folder"]
     if row.get("project_id")!=expected_project:
         return "SOURCE_PROJECT_FOLDER_CONFLICT"
+    if (row.get("remote_status")==
+            "NOT_PRESENT_IN_ACTIVE_DATASTORE_NOT_PROOF_OF_CLOSURE" and
+            row.get("cleared_lookup_status")==
+            "EXACT_KEY_FOUND_IN_OFFICIAL_CLEARED_SINCE_2017"):
+        if row.get("buyer_verified")!="NO" or (
+                row.get("record_is_a_verified_open_supplier_contract")!="NO"):
+            return "UNEXPECTED_CLEARED_COMMERCIAL_VERIFICATION_CLAIM"
+        if (row.get("final_evidence_level")!=
+                "REMOVED_FROM_ACTIVE_EXACT_CLEARED_RECORD_REVIEW"):
+            return "CLEARED_SOURCE_LEVEL_CONFLICT"
+        if row.get("cleared_address_comparison")!="MATCHES_ARCHIVED_SITE":
+            return "CLEARED_SITE_IDENTITY_MISMATCH"
+        if not _validate_remote_url(
+                row.get("cleared_query_url",""),permit,revision,
+                permits.CLEARED_RESOURCE_HINT):
+            return "CLEARED_QUERY_PROVENANCE_INVALID"
+        if not isinstance(original_cleared,dict):
+            return "ORIGINAL_CLEARED_SOURCE_ROW_NOT_SAVED"
+        serialized=json.dumps(original_cleared,sort_keys=True,
+                              ensure_ascii=False,separators=(",",":"))
+        digest=hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+        if row.get("cleared_payload_sha256")!=digest:
+            return "CLEARED_SOURCE_ROW_HASH_MISMATCH"
+        if (graph.clean(original_cleared.get("PERMIT_NUM"))!=permit or
+                graph.clean(original_cleared.get("REVISION_NUM"))!=revision):
+            return "CLEARED_SOURCE_RECORD_KEY_CONFLICT"
+        if (row.get("cleared_record_status")!=
+                graph.clean(original_cleared.get("STATUS")) or
+            row.get("cleared_record_address")!=
+                permits._official_status_address(original_cleared) or
+            row.get("cleared_completed_date")!=
+                graph.clean(original_cleared.get("COMPLETED_DATE"))):
+            return "CLEARED_SOURCE_STATUS_DATE_OR_ADDRESS_CONFLICT"
+        return "EXACT_CLEARED_HISTORICAL_SOURCE_NOT_ACTIVE"
     if row.get("individual_record_retrieved_live")!="YES":
         return "NOT_ACTUALLY_RETRIEVED"
     if row.get("remote_status")!="LIVE_EXACT_KEY_MATCH_OFFICIAL_DATASET":
@@ -152,11 +199,12 @@ def run(batches_dir, out=None, *, as_of=None, days=SOURCE_DAYS_MAX):
     if len(files)>BATCH_MAX:
         raise ValueError("Too many saved CKAN batches to review safely")
     recent={}
+    recent_cleared={}
     rejected=Counter()
     total_records=0
     for path in files:
         try:
-            checked,rows,original_rows=_read_batch(path)
+            checked,rows,original_rows,original_cleared_rows=_read_batch(path)
         except (ValueError,OSError,UnicodeError,json.JSONDecodeError) as exc:
             rejected["MALFORMED_OR_UNTRUSTED_BATCH"]+=1
             continue
@@ -165,7 +213,15 @@ def run(batches_dir, out=None, *, as_of=None, days=SOURCE_DAYS_MAX):
             continue
         for row in rows:
             total_records+=1
-            state=_classify(row,original_rows.get(row.get("source_key","")))
+            state=_classify(row,
+                            original_rows.get(row.get("source_key","")),
+                            original_cleared_rows.get(row.get("source_key","")))
+            if state=="EXACT_CLEARED_HISTORICAL_SOURCE_NOT_ACTIVE":
+                key=row["source_key"]
+                previous=recent_cleared.get(key)
+                if previous is None or checked>previous[0]:
+                    recent_cleared[key]=(checked,row)
+                continue
             if state!="EXACT_OFFICIAL_SOURCE_ROW_WITH_ARCHIVED_ADDRESS_COMPATIBLE":
                 rejected[state]+=1
                 continue
@@ -186,6 +242,20 @@ def run(batches_dir, out=None, *, as_of=None, days=SOURCE_DAYS_MAX):
             "stage_evidence_scope":"PUBLIC_CKAN_DATASET_STATUS_AS_RETRIEVED_NOT_CURRENT_INSPECTION_OR_APPROVAL",
             "buyer_verified":"NO","open_supplier_contract_verified":"NO",
             "research_action":"Manually verify City permit status and independently establish project buyer/procurement",
+        })
+    cleared_history=[]
+    for key,(checked,row) in sorted(recent_cleared.items(),key=lambda i:i[0]):
+        cleared_history.append({
+            "source_key":key,"project_id":row["project_id"],
+            "permit_num":row["permit_num"],"revision_num":row["revision_num"],
+            "checked_at_utc":checked.isoformat(),
+            "cleared_status":row["cleared_record_status"],
+            "completed_date":row["cleared_completed_date"],
+            "cleared_address":row["cleared_record_address"],
+            "cleared_official_query":row["cleared_query_url"],
+            "source_evidence_status":"EXACT_CLEARED_HISTORICAL_SOURCE_NOT_ACTIVE",
+            "buyer_verified":"NO","open_contract_verified":"NO",
+            "research_action":"Historical/cleared permit: verify actual lifecycle; do not market as a fresh supplier contract",
         })
     projects={r["project_id"] for r in records}
     physical_sites={r["source_address"] for r in records}
@@ -208,6 +278,7 @@ def run(batches_dir, out=None, *, as_of=None, days=SOURCE_DAYS_MAX):
         "batch_files_rejected_or_unreadable":rejected["MALFORMED_OR_UNTRUSTED_BATCH"],
         "recheck_row_attempts_in_eligible_batches":total_records,
         "recent_unique_exact_ckan_source_records":len(records),
+        "recent_distinct_exact_cleared_history_records":len(cleared_history),
         "distinct_project_folders_rechecked":len(projects),
         "distinct_physical_sites_rechecked":len(physical_sites),
         "source_stage_buckets_covered":sorted(stage_buckets),
@@ -232,9 +303,11 @@ def run(batches_dir, out=None, *, as_of=None, days=SOURCE_DAYS_MAX):
             "Malformed and stale verification batches cannot inflate the accepted source count.",
         ],
         "records_csv":str(out/OUTPUT_CSV),
+        "cleared_history_csv":str(out/CLEARED_HISTORY_CSV),
     }
     out.mkdir(parents=True,exist_ok=True)
     graph.write_csv(out/OUTPUT_CSV,records,FIELDNAMES)
+    graph.write_csv(out/CLEARED_HISTORY_CSV,cleared_history,CLEARED_FIELDS)
     (out/OUTPUT_JSON).write_text(json.dumps(result,indent=2),encoding="utf-8")
     return result
 
