@@ -28,6 +28,9 @@ class ArchivedTorontoSourceValidationTests(unittest.TestCase):
         self.assertIn("Refusal Notice",{r["current_source_status"] for r in records})
         self.assertIn("Permit Issued",{r["current_source_status"] for r in records})
         self.assertTrue(all(len(permit.split_source_keys(r)[0])==1 for r in records))
+        self.assertEqual(sum(len(permit.split_source_keys({
+            "project_id":r["project_id"],"source_keys":r["full_source_keys"]
+        })[0]) for r in records),44)
 
     @staticmethod
     def mocked_official_api(*,missing_active=None, cleared=True, contradict=None):
@@ -106,6 +109,17 @@ class ArchivedTorontoSourceValidationTests(unittest.TestCase):
             self.assertEqual(result["active_open_supplier_contracts_verified"],0)
             self.assertFalse(result["actual_current_buyer_verified"])
             self.assertTrue((root/historical.REPORT_NAME).is_file())
+            handoff=result["dossier_evidence_handoff"]
+            self.assertEqual(handoff["original_project_folders"],20)
+            self.assertEqual(handoff["full_original_constituent_permit_keys"],44)
+            self.assertEqual(handoff["research_dossiers"],20)
+            self.assertEqual(handoff["dossiers_with_exact_checked_permit"],20)
+            self.assertEqual(handoff["verified_constituents_in_multi_permit_folders"],13)
+            self.assertEqual(handoff["project_summary_vs_individual_permit_stage_differences"],0)
+            self.assertEqual(handoff["blocked_city_permit_stages"],1)
+            self.assertFalse(handoff["commercial_production_accepted"])
+            self.assertTrue((root/"FACILITY_DOSSIER_PILOT"/
+                             "GTA_RADAR_TORONTO_DOSSIER_SOURCE_EVIDENCE.csv").is_file())
             self.assertEqual(len(list((root/"TORONTO_PERMIT_EVIDENCE_PILOT"/
                     permit.LIVE_BATCH_DIR).glob("*.json"))),2)
 
