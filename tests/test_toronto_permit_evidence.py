@@ -280,6 +280,53 @@ class TorontoPermitRecordAuditTests(unittest.TestCase):
             self.assertTrue(result["local_snapshot_state"].startswith("LOCAL_SQLITE_UNAVAILABLE"))
             self.assertEqual(result["local_record_payloads_matched"],0)
 
+    def test_local_source_missing_address_cannot_prove_same_project_site(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);db=root/"radar.sqlite"
+            missing=payload()
+            missing["STREET_NUM"]=""
+            missing["STREET_NAME"]=""
+            create_db(db,[("26 265617 BLD|00",missing,1)])
+            write_daily(root,[daily(keys="26 265617 BLD|00")])
+            summary=permits.run(root,db=db)
+            self.assertEqual(summary["local_record_payloads_matched"],0)
+            with (root/"TORONTO_PERMIT_EVIDENCE_PILOT"/permits.AUDIT_CSV).open(
+                    encoding="utf-8-sig",newline="") as f:
+                row=next(csv.DictReader(f))
+            self.assertEqual(row["local_snapshot_status"],
+                             "LOCAL_RECORD_ADDRESS_MISSING_REVIEW")
+
+    def test_live_city_record_address_conflict_is_flagged(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);write_daily(root,[daily(keys="26 265617 BLD|00")])
+            def fetched(url):
+                data=fake_ckan(url)
+                if "datastore_search" in url:
+                    data["result"]["records"][0]["STREET_NAME"]="BAY"
+                return data
+            out=permits.run(root,live=True,live_limit=1,fetch=fetched)
+            self.assertEqual(out["live_record_queries_attempted"],1)
+            with (root/"TORONTO_PERMIT_EVIDENCE_PILOT"/permits.AUDIT_CSV).open(
+                    encoding="utf-8-sig",newline="") as f:
+                row=next(csv.DictReader(f))
+            self.assertEqual(row["final_evidence_level"],"REVIEW_SOURCE_ADDRESS_CONFLICT")
+            self.assertEqual(row["remote_address_comparison"],
+                             "LIVE_ADDRESS_CONTRADICTS_ARCHIVED_SOURCE")
+            self.assertEqual(row["buyer_verified"],"NO")
+
+    def test_failed_live_circuit_counts_attempt_and_no_verified_result(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);write_daily(root,[daily(keys="26 265617 BLD|00")])
+            def flaky(url):
+                if "datastore_search" in url:
+                    raise TimeoutError("Source unavailable")
+                return fake_ckan(url)
+            out=permits.run(root,live=True,live_limit=1,fetch=flaky)
+            self.assertEqual(out["live_record_queries_attempted"],1)
+            self.assertEqual(out["live_queries_failed"],1)
+            self.assertEqual(out["live_exact_record_payloads_received"],0)
+            self.assertEqual(out["verified_open_contracts"],0)
+
     def test_missing_daily_file_is_error_not_zero_opportunities(self):
         with tempfile.TemporaryDirectory() as folder:
             with self.assertRaises(FileNotFoundError):
