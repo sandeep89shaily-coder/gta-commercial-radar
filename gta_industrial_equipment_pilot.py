@@ -27,6 +27,7 @@ TARGET_CITIES = frozenset({
     "cambridge", "kitchener", "waterloo", "guelph", "st. catharines",
     "st catharines", "niagara falls", "welland", "grimsby", "lincoln",
     "barrie", "innisfil", "new tecumseth",
+    "bradford west gwillimbury", "niagara-on-the-lake",
 })
 
 ERO_SOURCE = "ero_gta_environmental_instruments"
