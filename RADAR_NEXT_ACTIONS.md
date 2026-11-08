@@ -1,5 +1,17 @@
 # Radar Next Actions — checkpoint 2026-11-08
 
+## Pilot delivery priority — owner direction 2026-11-08
+
+The core goal is to **ship bounded, verified pilot capability**, not keep tested modules indefinitely in draft. Latest Linux/Windows Radar test workflows on PRs #152, #153, #154 and #155 are all green; green CI alone does not establish source or buyer validation.
+
+1. **Industrial equipment PR #152 — first controlled release candidate.** Preserve successful 5/5 official notice parsing and 2 distinct equipment signals from the third live ZIP. Run a wider capped, permission-checked live evidence sample; cross-check equipment change, location, stage and old/new notices, then measure supplier relevance and duplicates. Keep buyer/open-contract fields unverified. Move from draft only after specific acceptance checks, and merge manual pilot only (not scheduled sales automation).
+2. **Commercial opening / activation PR #153 — second controlled candidate, parallel evidence lane.** Run its read-only pilot against the real current Radar SQLite on Windows; audit at least 20 individual source records, rejection counts and 10 source-backed dossiers, distinguishing licence issuance, permitting, occupancy and actual opening. No tenant assumption from same address. Merge isolated manual pilot after a passing real acceptance, before claiming opening predictions.
+3. **Shared facility graph PR #155 — enabling dependency, not a reason to block pilots.** Maintain exact-ID/unit/site protections and source-age distinctions. Integrate reused components via reviewed incremental work, not by merging 126 commits into production without dependency tests. Its 20 Toronto permit sample is verified; its buyer and procurement validation is not.
+4. **AI harness PR #154 — defer promotion until pilot signals are accepted.** Run free/no-spend actual-data preflight, validate shared US$0.25/day budget, lock, safe resume and evidence gating. No new autonomous outreach, daily scheduling or paid research path.
+
+**Release policy:** Draft is a review state, not proof of broken software. Promote a *manual, isolated pilot* once code CI, permitted live source sampling and auditable rejection/hold handling pass. Production daily workflow and commercial lead claims require stronger separate gates. Do not conflate a tested pilot with 10 qualified sales opportunities or two paying customers.
+
+
 ## P0 — Close the source-import safety checkpoint (draft PR #155)
 1. Confirm all GitHub CI jobs green at latest branch head, not merely an earlier successful workflow. Verify the isolated 20-row qualification CSV and status JSON still reproduce the 20/14/12/11 counts; never infer new live customer value from these fixed-source fixtures.
 2. Verify missing/invalid source permit key, exact-revision filters, resource ID, source site or source validation marker cause fail-closed import and no output files. This is research evidence reconciliation, not official cryptographic authentication.
