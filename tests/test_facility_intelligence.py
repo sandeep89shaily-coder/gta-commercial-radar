@@ -282,7 +282,7 @@ class FacilityIntelligenceTests(unittest.TestCase):
         self.assertEqual(row["site_address"],"220 yonge st")
         self.assertEqual(row["stage_label"],"Pending Parent Folder Review")
         self.assertEqual(row["source_lookup_key"],"26 265617 HVA|00 | 26 265617 BLD|00")
-        self.assertEqual(row["source_url"],"https://open.toronto.ca/")
+        self.assertEqual(row["source_url"],graph.TORONTO_PERMIT_STATUS_SEARCH)
         self.assertEqual(row["url_evidence_level"],"SOURCE_REFERENCE_NOT_RECORD_SPECIFIC")
         self.assertIn("INDIVIDUAL_SOURCE_RECORD_RECHECK_REQUIRED",row["verification_required"])
         self.assertEqual(row["buyer_verified"],"NO")
