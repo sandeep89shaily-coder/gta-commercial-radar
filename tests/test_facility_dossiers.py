@@ -280,6 +280,28 @@ class FacilityDossierTests(unittest.TestCase):
             self.assertNotIn("<script>",page)
             self.assertNotIn("href=\"javascript:",page)
 
+    def test_blocked_permit_creates_status_review_not_sales_tasks(self):
+        a=event(source_family="radar",source_id="toronto_active_building_permits",
+                source_record_id="26 265686",stage_label="Application On Hold",
+                review_tier="STATUS_HOLD_OR_REVOCATION_RECHECK_ONLY")
+        row,detail,tasks=dossiers.build_dossier(a,{a["event_id"]:a},{})
+        self.assertEqual(row["commercial_readiness"],"HOLD_NOT_COMMERCIALLY_ACTIVE")
+        self.assertEqual(row["research_priority"],"HOLD_HISTORY_OR_INCOMPLETE_IDENTITY")
+        self.assertEqual([t["task_code"] for t in tasks],
+                         ["RECHECK_BLOCKED_APPLICATION_STATUS"])
+        self.assertEqual(row["verified_open_contract"],"NO")
+
+    def test_derived_ero_pointer_is_not_confused_with_live_source_verification(self):
+        a=event(url_evidence_level="DERIVED_ERO_NOTICE_URL_NOT_LIVE_RECHECKED")
+        row,detail,tasks=dossiers.build_dossier(a,{a["event_id"]:a},{})
+        self.assertEqual(row["source_url_quality"],
+                         "DERIVED_ERO_NOTICE_POINTER_RECHECK_REQUIRED")
+        self.assertIn("EXACT_INDIVIDUAL_OFFICIAL_RECORD_NOT_RECHECKED",
+                      row["readiness_blockers"])
+        self.assertIn("VERIFY_INDIVIDUAL_OFFICIAL_RECORD",
+                      [t["task_code"] for t in tasks])
+        self.assertEqual(row["buyer_verified"],"NO")
+
     def test_missing_or_corrupted_source_still_reports_research_not_sale_ready(self):
         a=event(source_url="",organization="",source_date="",
                 review_tier="SOURCE_DATE_UNVERIFIED_REVIEW_ONLY")
