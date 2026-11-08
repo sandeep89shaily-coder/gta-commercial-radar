@@ -1,8 +1,5 @@
-name: Toronto 20 archived permit source acceptance (PR only)
+name: Toronto 20 archived permit source acceptance (manual only)
 on:
-  pull_request:
-    paths:
-      - '.github/workflows/toronto-archived-20-live.yml'
   workflow_dispatch:
 
 # Two isolated ten-key City CKAN batches; no Radar collector, schedule, tokens,
