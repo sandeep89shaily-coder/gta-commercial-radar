@@ -39,6 +39,18 @@ Outputs are isolated under `GTA_RADAR_RESULTS/FACILITY_INTELLIGENCE_PILOT/`:
 
 The official data, pilot exports and production daily runner are **never modified**. No DeepSeek calls, emails, automated outreach, scheduled runs or change to PRs #152/#153.
 
+## November 8: field-schema audit from an existing Radar export
+
+Inspected a previously supplied `GTA_RADAR_RESULTS` archive, without a fresh Windows run:
+
+- `GTA_RADAR_COLLECTION_MASTER.csv`: **1,640** rows, of which **1,517** are application-ID records and **123** are project-only signals. **1,391** rows were labelled `UNCHANGED`; they must not become newly discovered sales leads solely due to graph import. A historic planning application can still provide site context.
+- `GTA_RADAR_DAILY_NEW_DEVELOPMENTS.csv`: **161** new/changed rows. Some Brampton permit records carry `city=Peel`, so facility matching derives **Brampton** from the known official source identifier, explicitly labelled as a source-jurisdiction interpretation. If configured source jurisdiction and explicit city contradict one another, site joining is refused.
+- Toronto permit civic addresses may include just the first three postcode characters, e.g. `220 YONGE ST M5B`. The normalization removes that postal prefix, but never changes a street number.
+- A bounded Oakville planning description names `Pinty's Delicious Foods - 2714 Bristol Circle` with the structured address blank. Such address extraction is allowed as **description-only unverified context** only when unique; multi-application snippets with multiple addresses are not auto-linked.
+- A source date older than **180 days**, unknown/future source date, or historical planning baseline cannot be promoted into a fresh actionable opportunity simply because Radar has just seen it.
+
+These counts are a **previous export snapshot**, not a new run, and not a claim that today's full collector/database was checked.
+
 ## Anti-false-positive gates
 
 - The same civic address **is not** proof of the same tenant, company, project or buyer.
