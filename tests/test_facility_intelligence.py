@@ -348,6 +348,38 @@ class FacilityIntelligenceTests(unittest.TestCase):
                 self.assertEqual(row["source_url"],"https://ero.ontario.ca/search")
                 self.assertEqual(row["url_evidence_level"],"SOURCE_REFERENCE_NOT_RECORD_SPECIFIC")
 
+    def test_missing_pilot_inputs_explicitly_reported_not_silent_zero_coverage(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            results=__import__("pathlib").Path(tmp)
+            with (results/"GTA_RADAR_DAILY_NEW_DEVELOPMENTS.csv").open(
+                    "w",encoding="utf-8",newline="") as f:
+                csv.writer(f).writerow(["project_id","source_id","observation"])
+            summary=graph.run(results,as_of="2026-11-08")
+            self.assertTrue(summary["source_exports_present"]["radar"])
+            self.assertFalse(summary["source_exports_present"]["industrial"])
+            self.assertFalse(summary["source_exports_present"]["activation"])
+            self.assertIn("industrial",summary["source_exports_missing"])
+            self.assertEqual(summary["source_event_count"],0)
+            self.assertEqual(summary["verified_open_supplier_contracts"],0)
+
+    def test_incompatible_source_csv_schema_refuses_false_zero_report(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            results=__import__("pathlib").Path(tmp)
+            (results/"GTA_RADAR_DAILY_NEW_DEVELOPMENTS.csv").write_text(
+                "site_address,operator\\n100 Queen St,Example Inc\\n",encoding="utf-8")
+            with self.assertRaisesRegex(ValueError,"Unexpected source CSV schema"):
+                graph.run(results,as_of="2026-11-08")
+            self.assertFalse((results/"FACILITY_INTELLIGENCE_PILOT"/
+                              graph.OUTPUT_STATUS).exists())
+
+    def test_input_data_decoding_failure_does_not_report_no_candidates(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            results=__import__("pathlib").Path(tmp)
+            (results/"GTA_RADAR_DAILY_NEW_DEVELOPMENTS.csv").write_bytes(
+                b"project_id,source_id,observation\\n" + bytes([0xff,0xfe,0xff]))
+            with self.assertRaisesRegex(ValueError,"Unreadable source CSV"):
+                graph.run(results,as_of="2026-11-08")
+
     def test_incomplete_and_duplicate_rows_not_false_projects(self):
         with tempfile.TemporaryDirectory() as temp:
             path=Path(temp)
