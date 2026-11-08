@@ -70,7 +70,8 @@ PROJECT_FIELDS=(
 # Verification selection is *stratified*, not a leaderboard and not proof of
 # buyer availability. Recheck a mix of municipal stages, including blocked ones.
 REVIEW_STAGE={
-    "BLOCKED": ("on hold","refusal notice","revocation pending","cancellation pending",
+    "BLOCKED": ("on hold","application on hold","permit on hold",
+                "refusal notice","revocation pending","cancellation pending",
                 "suspended","violation"),
     "ISSUED": ("permit issued","revision issued","issuance pending","ready for issuance",
                "forwarded for issuance"),
