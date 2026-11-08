@@ -1,8 +1,14 @@
 name: Radar tests
 on:
   push:
-    branches: [main, 'dev/**', 'feature/**']
+    branches: [main]
   pull_request:
+
+# Keep only the newest test run for the same branch or PR.
+concurrency:
+  group: radar-tests-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   unit:
     strategy:
