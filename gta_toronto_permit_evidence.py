@@ -32,6 +32,7 @@ DAILY_CSV="GTA_RADAR_DAILY_NEW_DEVELOPMENTS.csv"
 AUDIT_CSV="GTA_RADAR_TORONTO_PERMIT_EXACT_RECORD_AUDIT.csv"
 PROJECT_CSV="GTA_RADAR_TORONTO_PROJECT_PERMIT_RECONCILIATION.csv"
 AUDIT_JSON="GTA_RADAR_TORONTO_PERMIT_EVIDENCE_STATUS.json"
+LIVE_BATCH_DIR="LIVE_VERIFICATION_BATCHES"
 PACKAGE="building-permits-active-permits"
 RESOURCE_HINT="6d0229af-bc54-46de-9c2b-26759b01dd05"
 API="https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action/"
@@ -510,6 +511,37 @@ def run(results, out=None, *, db=None, live=False, live_limit=10,
     projects.sort(key=lambda r:r["project_id"])
     audit.sort(key=lambda r:(r["project_id"],r["source_key"]))
     out.mkdir(parents=True,exist_ok=True)
+    batch_file=""
+    if live_requested and live_checked:
+        # Preserve evidence from each explicitly opted-in bounded verification.
+        # The normal CSV is a latest-run view and may be overwritten, whereas
+        # these batches cannot overwrite one another or be silently reclassified.
+        stamped=dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+        batch_folder=out/LIVE_BATCH_DIR
+        batch_folder.mkdir(parents=True,exist_ok=True)
+        path=batch_folder/("TORONTO_CKAN_EXACT_CHECK_"+stamped+
+                           "_OFFSET_"+str(int(live_offset))+".json")
+        selected_rows=[
+            {field:row.get(field,"") for field in AUDIT_FIELDS}
+            for row in audit if row["remote_status"]!="NOT_REQUESTED_MANUAL_LIVE_ONLY"
+        ]
+        batch={
+            "mode":"BOUNDED_EXPLICIT_PUBLIC_TORONTO_CKAN_QUERIES",
+            "retrieved_at_utc":dt.datetime.now(dt.timezone.utc).isoformat(),
+            "resource_id":resource_id,
+            "source_dataset":OFFICIAL_DATASET,
+            "offset":int(live_offset),
+            "requested_limit":int(live_limit),
+            "attempted_records":live_checked,
+            "records_with_exact_live_key":sum(
+                row["individual_record_retrieved_live"]=="YES" for row in selected_rows),
+            "commercial_buyer_verified":False,
+            "open_supplier_contracts_verified":0,
+            "audit_records":selected_rows,
+        }
+        with path.open("x",encoding="utf-8") as outstream:
+            json.dump(batch,outstream,indent=2)
+        batch_file=str(path)
     graph.write_csv(out/AUDIT_CSV,audit,AUDIT_FIELDS)
     graph.write_csv(out/PROJECT_CSV,projects,PROJECT_FIELDS)
     status={
@@ -535,6 +567,7 @@ def run(results, out=None, *, db=None, live=False, live_limit=10,
             min(int(live_offset)+len(choose_live_recheck_sample(
                 audit,all_projects,live_limit,live_offset)),len(audit))
             if live_requested else None),
+        "immutable_live_batch_file":batch_file,
         "live_selection_policy":"STAGE_DIVERSITY_THEN_RECENT_SOURCE_DATE_THEN_DISTINCT_PROJECTS;ONE_RECORD_DOES_NOT_VERIFY_WHOLE_PROJECT",
         "live_status":live_status,
         "live_record_queries_attempted":live_checked,
