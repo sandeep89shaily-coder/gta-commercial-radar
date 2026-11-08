@@ -366,7 +366,7 @@ class FacilityIntelligenceTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             results=__import__("pathlib").Path(tmp)
             (results/"GTA_RADAR_DAILY_NEW_DEVELOPMENTS.csv").write_text(
-                "site_address,operator\\n100 Queen St,Example Inc\\n",encoding="utf-8")
+                "site_address,operator\n100 Queen St,Example Inc\n",encoding="utf-8")
             with self.assertRaisesRegex(ValueError,"Unexpected source CSV schema"):
                 graph.run(results,as_of="2026-11-08")
             self.assertFalse((results/"FACILITY_INTELLIGENCE_PILOT"/
@@ -376,7 +376,7 @@ class FacilityIntelligenceTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             results=__import__("pathlib").Path(tmp)
             (results/"GTA_RADAR_DAILY_NEW_DEVELOPMENTS.csv").write_bytes(
-                b"project_id,source_id,observation\\n" + bytes([0xff,0xfe,0xff]))
+                b"project_id,source_id,observation\n" + bytes([0xff,0xfe,0xff]))
             with self.assertRaisesRegex(ValueError,"Unreadable source CSV"):
                 graph.run(results,as_of="2026-11-08")
 
