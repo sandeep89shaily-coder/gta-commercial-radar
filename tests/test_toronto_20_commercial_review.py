@@ -125,7 +125,7 @@ class CommercialDossierResearchTests(unittest.TestCase):
                             and not r["open_supplier_package_verified"]
                             and not r["outreach_authorized"] for r in extra))
         self.assertEqual({r["contact_role_type"] for r in extra},
-                         {"PROPERTY_MANAGEMENT_CONTACT","LEASING_BROKER_ONLY"})
+                         {"TENANT_PROJECTS_REVIEW_CHANNEL","LEASING_BROKER_ONLY"})
 
     def test_real_commit_data_produces_noncommercial_research_reports(self):
         with tempfile.TemporaryDirectory() as folder:
