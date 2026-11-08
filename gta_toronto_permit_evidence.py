@@ -41,6 +41,8 @@ OFFICIAL_STATUS=graph.TORONTO_PERMIT_STATUS_SEARCH
 CLEARED_PACKAGE="building-permits-cleared-permits"
 CLEARED_RESOURCE_HINT="a96c0ba4-3026-402b-b09d-5b1268b8f810"
 OFFICIAL_CLEARED_DATASET="https://open.toronto.ca/dataset/building-permits-cleared-permits/"
+TORONTO_LICENSE="Contains information licensed under the Open Government Licence – Toronto."
+TORONTO_LICENSE_URL="https://open.toronto.ca/open-data-licence/"
 
 # Example original keys: "26 265617 HVA|00 | 26 265617 BLD|00".
 KEY=re.compile(r"^(?P<folder>\d{2} \d{6}) (?P<type>[A-Z]{3})\|(?P<rev>\d{2})$")
@@ -53,6 +55,7 @@ REQUIRED={"project_id","source_id","source_keys","address",
 AUDIT_FIELDS=(
     "project_id","source_key","permit_num","revision_num","permit_type",
     "raw_city_dataset_url","official_lookup_url",
+    "source_licence_attribution","source_licence_url",
     "local_snapshot_status","local_source_first_seen_at","local_source_date",
     "local_payload_sha256","local_record_status","local_record_address",
     "local_address_comparison","local_status_comparison",
@@ -70,7 +73,8 @@ PROJECT_FIELDS=(
     "local_records_missing","local_record_stage_count",
     "local_statuses","live_records_matched","live_records_checked",
     "cleared_exact_record_matches","project_review_status","source_permit_evidence_summary",
-    "source_provenance","verified_open_contract","buyer_verified",
+    "source_provenance","source_licence_attribution",
+    "source_licence_url","verified_open_contract","buyer_verified",
 )
 # Verification selection is *stratified*, not a leaderboard and not proof of
 # buyer availability. Recheck a mix of municipal stages, including blocked ones.
@@ -350,6 +354,8 @@ def _audit_row(project,ident,permit_num,rev,local,export_status,export_address):
         "permit_type":permit_num.split()[-1],
         "raw_city_dataset_url":OFFICIAL_DATASET,
         "official_lookup_url":OFFICIAL_STATUS,
+        "source_licence_attribution":TORONTO_LICENSE,
+        "source_licence_url":TORONTO_LICENSE_URL,
         "local_snapshot_status":state,"local_source_first_seen_at":seen,
         "local_source_date":date,"local_payload_sha256":digest,
         "local_record_status":raw_status,"local_record_address":raw_address,
@@ -404,6 +410,8 @@ def run(results, out=None, *, db=None, live=False, live_limit=10,
                 "project_review_status":"INVALID_SOURCE_KEY_REVIEW_REQUIRED",
                 "source_permit_evidence_summary":why,
                 "source_provenance":"EXISTING_RADAR_CSV_NOT_LIVE_RECHECKED",
+                "source_licence_attribution":TORONTO_LICENSE,
+                "source_licence_url":TORONTO_LICENSE_URL,
                 "verified_open_contract":"NO","buyer_verified":"NO"})
             continue
         parsed_projects.append((p,keys))
@@ -608,6 +616,8 @@ def run(results, out=None, *, db=None, live=False, live_limit=10,
             "project_review_status":result,
             "source_permit_evidence_summary":"BUNDLE_OF_DISTINCT_PERMIT_REVISIONS_NOT_A_SINGLE_PERMIT",
             "source_provenance":"OFFICIAL_RADAR_SNAPSHOT_OR_EXPLICIT_PUBLIC_CKAN_QUERY",
+            "source_licence_attribution":TORONTO_LICENSE,
+            "source_licence_url":TORONTO_LICENSE_URL,
             "verified_open_contract":"NO","buyer_verified":"NO",
         })
     projects.sort(key=lambda r:r["project_id"])
@@ -639,6 +649,8 @@ def run(results, out=None, *, db=None, live=False, live_limit=10,
                 row["individual_record_retrieved_live"]=="YES" for row in selected_rows),
             "commercial_buyer_verified":False,
             "open_supplier_contracts_verified":0,
+            "source_licence_attribution":TORONTO_LICENSE,
+            "source_licence_url":TORONTO_LICENSE_URL,
             "audit_records":selected_rows,
             "original_public_ckan_rows_by_source_key":remote_public_rows,
             "original_public_cleared_rows_by_source_key":cleared_public_rows,
@@ -691,6 +703,9 @@ def run(results, out=None, *, db=None, live=False, live_limit=10,
         "metadata_resource_id":resource_id,
         "metadata_resource_last_modified_not_proof_of_row_publication":metadata_modified,
         "verified_buyers":0,"verified_open_contracts":0,
+        "source_licence_attribution":TORONTO_LICENSE,
+        "source_licence_url":TORONTO_LICENSE_URL,
+        "source_disclaimer":"Not an official City of Toronto product or endorsement.",
         "unverified_portal_not_individual_record":OFFICIAL_STATUS,
         "limitations":[
             "Local collector SQLite is a historical source snapshot, not live permit verification.",
