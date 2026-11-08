@@ -94,6 +94,31 @@ The combined manual runner includes this role audit if its existing research CSV
 
 Automated regressions: **21** shared graph checks, **17** dossier checks, **11** exact-ID role-hint checks and **4** end-to-end manual runner checks; the full existing GitHub cross-platform test suite must pass as well. Passing synthetic tests does not verify actual match precision or business value. The next real validation should sample actual facility joins, historical exclusions and role identification against original official records, then benchmark supplier actionability before merging.
 
+## November 8: actual archive source-link and municipal-status audit
+
+This audit was performed directly against the user's **previous November 7** `GTA_RADAR_RESULTS (13).zip` contents, **not** by running the current desktop collector:
+
+| Snapshot family | Record count | Exact source URL populated | Required evidence action |
+| --- | ---: | ---: | --- |
+| Toronto active building permits | **151** | **0** | Preserve permit keys, link to City's official **permit-status search** page, label link as a portal/search and require exact permit verification |
+| Toronto development applications | **4** | **4** | Exact-ID official ArcGIS query (not yet live rechecked) |
+| Brampton building permits | **2** | **2** | Exact-ID official ArcGIS query (not yet live rechecked); region label `Peel` derives city via source jurisdiction |
+| ERO notices | **4** | **0** | Derive official notice URL from a strict `NNN-NNNN` ERO ID only; label **DERIVED_ERO_NOTICE_URL_NOT_LIVE_RECHECKED**; source snapshots have no verified civic site |
+| **Total** | **161** | **6** | **151 portal-only, 6 existing exact-record URLs, 4 derived ERO notice addresses** in the latest graph logic, subject to a live acceptance run |
+
+Toronto issued `Application On Hold` **8** times, `Refusal Notice` **2** times, and `Revocation Pending` **2** times in this snapshot. The old `stage_from_local_status` collapsed some of these to broad labels such as `PRE_APPROVAL`; that is now fixed by using **`current_source_status`** when available. These records are assigned `STATUS_HOLD_OR_REVOCATION_RECHECK_ONLY` and cannot enter an active sales-research tier without checking whether the City's status has changed. The hold is not a false assertion of permanent cancellation.
+
+City of Toronto's own public status glossary explains the distinction between issued, inspection, on-hold, refused and revoked permits:
+https://www.toronto.ca/services-payments/building-construction/building-permit/after-you-apply-for-a-building-permit/search-the-status-of-a-building-permit-application/
+
+**Crucial constraint:** the portal is a place to search a specific permit number, not the individual permit proof. A derived ERO URL is a plausible original-record pointer, NOT evidence the page was fetched. The HTML, CSV, and dossier blockers explicitly distinguish these levels. The pilot does **not** independently claim source completeness, actual first publication, unawarded purchasing, or buyer roles.
+
+The graph now fails closed on incompatible or corrupt input CSVs, explicitly lists missing pilot/source exports and bounds high-density same-building relationships to the **200 most recent events**, recording when older pairing is skipped. No missing or broken feed is silently represented as complete zero opportunities.
+
+### Next prerequisite before any production merge
+
+The immediate unresolved work is **live exact-record retrieval for Toronto permits**, source-by-source accuracy validation of the graph/dossiers, and actual commercial-stage and buyer evidence. A generic permit-status search page is a suitable manual verification route, not a substitute for a primary evidence-linked customer dossier. These remain separate from the existing industrial and activation draft PRs and no live desktop run is required today.
+
 ## Anti-false-positive gates
 
 - The same civic address **is not** proof of the same tenant, company, project or buyer.
