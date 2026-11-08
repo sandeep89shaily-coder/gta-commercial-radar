@@ -4,6 +4,7 @@ import unittest
 from pathlib import Path
 
 from gta_industrial_equipment_pilot import TARGET_CITIES, equipment_changes
+from gta_ero_notice_detail import CITY_ALIASES
 
 FIXTURE = Path(__file__).resolve().parents[1] / (
     "research/ero_industrial_ten_official_source_scope_labels_20261108.json"
@@ -44,6 +45,12 @@ class EROTenPublicSourceLabelsTests(unittest.TestCase):
         self.assertEqual(set(positives), {"026-1152", "026-1155"})
         self.assertEqual(false_positives, [],
             "Source scope/renewal cannot be auto-converted to new equipment orders")
+
+    def test_source_verified_southern_ontario_municipalities_are_in_scope(self):
+        self.assertIn("bradford west gwillimbury", TARGET_CITIES)
+        self.assertIn("niagara-on-the-lake", TARGET_CITIES)
+        self.assertEqual(CITY_ALIASES["town of bradford west gwillimbury"],
+                         "Bradford West Gwillimbury")
 
     def test_physical_site_gate_rejects_mobile_and_outside_locations(self):
         by_id = {r["ero_number"]: r for r in self.data}
