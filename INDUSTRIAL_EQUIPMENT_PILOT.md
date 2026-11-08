@@ -120,3 +120,17 @@ The bounded manual ERO fetch now reconciles the fetcher's `DETAIL_RETRIEVED` aud
 This closes an important audit/results split: a source might appear checked in the cursor even though its usable evidence was absent, causing subsequent manual runs to skip that notice. Rejected items remain retryable; original evidence rows remain available and changed-source holds remain in force. Also reject URL query/fragment suffixes when importing stored source evidence.
 
 Regression checks include successful audit with no payload and source ID/URL disagreement. This is **not** a new live ERO acceptance run and does not establish an open contract.
+
+
+## November 8 independent ten-notice source-scope review
+
+A separate manual public-source review examined **ten actual ERO notice pages**, with exact original links and conservative human labels in `research/ero_industrial_ten_official_source_scope_labels_20261108.json`. It is a separate review of public source content, **not** a new automated fetch of ten notices from the user's local `radar.sqlite`, and the short excerpts in the fixture are representative/condensed, not raw HTML.
+
+- **2 explicit physical changes:** Pinty's Oakville dust-collector → scrubber replacement (026-1152) and Burlington's two human cremation units (026-1155). These were already known; they are **not** two newly discovered buyers.
+- **3 equipment-scope-only applications:** Re-Eco Toronto (shredder, hammermills, electrostatic precipitator and dust collection), Forest Ready Mix Bradford (dust collection, filter, boiler), and Genaire Niagara-on-the-Lake (HVAC/testing/heating equipment). Equipment listed for a new ECA is **not by itself proof of new purchase or installation**; no action may be invented.
+- **2 non-equipment-change administration/capacity items:** Korzite Guelph proposed production-limit increase; Linamar/Cemtol Guelph operational-flexibility renewal.
+- **3 non-fixed-site/out-of-area controls:** Miller Paving's mobile asphalt unit and notices at Woodstock and Dresden. Do not map corporate address to physical project location.
+
+The test file `tests/test_industrial_ten_source_labels.py` protects the separation between a concrete physical equipment event and a generic equipment listing or renewal. Source review also exposed two excluded-but-in-scope cities: official ERO describes Forest Ready Mix in **Town of Bradford West Gwillimbury**, and Genaire in **Niagara-on-the-Lake**. The city gate now includes both, and the Bradford ERO municipality label is normalized to the canonical city name.
+
+**Research conclusion:** ten official notices examined, only two explicit physical equipment-change signals. The acceptance target of ten *distinct verified equipment changes* is **not met**. Zero independently verified buyer decisions or open supplier packages. The automated notice parsing and city-gate improvements require their newest CI matrix pass; broader local Windows source acceptance is still pending. Do not merge or market as a full commercial product solely from this review.
