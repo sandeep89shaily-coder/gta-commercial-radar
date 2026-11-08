@@ -169,8 +169,9 @@ class TorontoSourceAcceptanceTests(unittest.TestCase):
             ({"individual_record_retrieved_live":"NO"},"NOT_ACTUALLY_RETRIEVED"),
         ]:
             with self.subTest(data=data):
-                changed=dict(row(1),**data)
-                self.assertEqual(gate._classify(changed,original_public_row(changed)),reason)
+                original=row(1)
+                changed=dict(original,**data)
+                self.assertEqual(gate._classify(changed,original_public_row(original)),reason)
 
     def test_buying_authority_inferred_from_permit_is_rejected(self):
         original=row(1)
