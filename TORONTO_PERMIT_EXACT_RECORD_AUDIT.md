@@ -61,6 +61,81 @@ Under `GTA_RADAR_RESULTS/TORONTO_PERMIT_EVIDENCE_PILOT/`:
 - `GTA_RADAR_TORONTO_PROJECT_PERMIT_RECONCILIATION.csv`: one row per Radar project folder, with constituent counts, stage conflicts and outstanding checks.
 - `GTA_RADAR_TORONTO_PERMIT_EVIDENCE_STATUS.json`: exactly which sources could be inspected; missing database, metadata failure and unqueried records remain visible.
 
+## November 8 development continuation — repeatable verification and acceptance
+
+A hard-coded ten-record sample could never validate twenty records if successive runs
+always queried the same ten. The optional source checker now offers
+`--live-offset` to inspect **different** permitted records in bounded batches:
+
+```powershell
+# FUTURE human-authorized pilot acceptance ONLY; do not run during development.
+py -3 gta_toronto_permit_evidence.py --results "PATH_TO_EXISTING_GTA_RADAR_RESULTS" --live-ckan --live-limit 10 --live-offset 0
+py -3 gta_toronto_permit_evidence.py --results "PATH_TO_EXISTING_GTA_RADAR_RESULTS" --live-ckan --live-limit 10 --live-offset 10
+```
+
+The selector is deterministic for one unchanged export: first represent each
+available City status category, then prefer recent source-event dates, prioritize
+`BLD` within equally dated project folders, and select **different project folders**
+before checking second permits at the same site. **Source event date is not an
+official publication date.** The generated manifest records the attempted source
+IDs, selection policy, original source metadata and next offset.
+
+Every explicitly opted-in City query session preserves a **new unique JSON file**
+under `TORONTO_PERMIT_EVIDENCE_PILOT/LIVE_VERIFICATION_BATCHES/`, including each
+original publicly returned CKAN row, its canonical SHA-256, the exact filtered
+query URL, the source-record stage/address, and whether the historic exported
+stage differed. Older batch files are never overwritten by a new batch, even
+though the latest CSV and top-level status JSON are replaced. A saved hash is a
+tamper-evident local research checksum, **not** a cryptographic City signature
+or third-party authenticity attestation.
+
+`gta_toronto_permit_acceptance.py` reads these saved evidence batches **offline**
+and creates two additional research audit files:
+
+- `GTA_RADAR_TORONTO_SOURCE_ACCEPTANCE.json`: counts recent exact unique City
+  permit/revision rows, independent project folders, physical sites and stage
+  categories, rejects malformed/stale/contradictory/untrusted records, and
+  explains why release is still blocked.
+- `GTA_RADAR_TORONTO_ACCEPTANCE_RECORDS.csv`: exact primary-source evidence
+  for repeatable spot-checking, with every buyer and supplier-contract claim
+  explicitly `NO`.
+
+The *source sample evidence gate* requires at least **20** recent unique permit
+revision records, **15** distinct project folders, **10** distinct physical
+street addresses and at least **2** municipal status categories. Hashes and
+source key, query URL, reported status, physical address and original saved
+CKAN row must agree. A pass means *sampled original-source evidence present
+for further review*, **not** independent government authenticity, opening,
+occupancy, vendor selection or production commercial acceptance.
+`commercial_production_accepted` remains **false** and `user_outreach_authorized`
+remains **false**, regardless of this source gate.
+
+The combined manual offline review can summarize *previously saved* City batches,
+but **never starts** an opt-in CKAN request or creates a schedule.
+
+### Existing November 7 archive: reproducible baseline, not new collection
+
+The user-supplied ZIP was locally inspected without running Radar's collector:
+- Archive SHA-256:
+  `decf2df6d535018a2f0c280c3127f4391de3a4a74d420c77b5cce509932486ea`
+- Included daily CSV SHA-256:
+  `a4d0f1ee098e30dd504dcb7aa00e8ee13471ba396e874e8748473f7ca118b13d`
+- **151** Toronto project-folder records; **220** unique valid original
+  permit/revision references, no malformed mixed-folder keys; **46** folders
+  containing more than one original source record.
+- Source date relative to November 8: **67** within 7 days, **28** 8–30 days,
+  **34** 31–180 days, **22** older than 180 days. These are **source dates,
+  not guaranteed first-publication dates**.
+- Stages include 38 `Inspection`, 22 `Permit Issued`, 20 `Under Review`,
+  8 `Application On Hold`, 2 `Refusal Notice`, 2
+  `Revocation Pending`. None of these proves buying intent.
+- **0** Toronto direct permit-record URLs in that daily export; the original
+  collector `radar.sqlite` was **not included** in the ZIP; **0 live official
+  CKAN rows** were independently fetched in this development session.
+
+These numbers are historical snapshots and **not** claims of current open
+supplier contracts, citywide permit coverage, or buyer verification.
+
 ## Acceptance before promotion
 
 - CI: strict ID parsing, source SQLite read-only, payload-key matching, cross-address conflict, multiple permit stages, inactive history, failure isolation, network opt-in, bounded queries and explicit zero verified buyers/contracts.
