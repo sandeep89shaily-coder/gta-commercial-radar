@@ -113,14 +113,28 @@ class CommercialDossierResearchTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,"Unverified"):
             module.build(invalid,[])
 
+    def test_new_leasing_contacts_not_specific_permit_buyers(self):
+        contacts=module.load(module.CONTACTS,"rows")
+        ids={"toronto_active_building_permits:26 265861",
+             "toronto_active_building_permits:25 259055",
+             "toronto_active_building_permits:26 230833"}
+        extra=[r for r in contacts if r["project_id"] in ids]
+        self.assertEqual(len(extra),3)
+        self.assertTrue(all(r["site_organization_association_verified"] for r in extra))
+        self.assertTrue(all(not r["project_specific_purchasing_authority_verified"]
+                            and not r["open_supplier_package_verified"]
+                            and not r["outreach_authorized"] for r in extra))
+        self.assertEqual({r["contact_role_type"] for r in extra},
+                         {"PROPERTY_MANAGEMENT_CONTACT","LEASING_BROKER_ONLY"})
+
     def test_real_commit_data_produces_noncommercial_research_reports(self):
         with tempfile.TemporaryDirectory() as folder:
             p=Path(folder)
             status=module.run(out=p)
             self.assertEqual(status["original_city_source_checked_permit_count"],20)
             self.assertEqual(status["numeric_city_construction_estimates"],14)
-            self.assertEqual(status["public_business_routes_with_site_match"],9)
-            self.assertEqual(status["projects_with_public_business_routes"],8)
+            self.assertEqual(status["public_business_routes_with_site_match"],12)
+            self.assertEqual(status["projects_with_public_business_routes"],11)
             self.assertEqual(status["project_buyers_verified"],0)
             self.assertEqual(status["open_supplier_packages_verified"],0)
             self.assertFalse(status["outreach_authorized"])
