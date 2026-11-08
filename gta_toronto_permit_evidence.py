@@ -1,0 +1,443 @@
+"""Toronto permit/revision evidence audit for existing GTA Radar daily exports.
+
+Runs OFFLINE by default. When an existing Radar SQLite database is supplied it
+reconciles exact permit+revision keys against the original official CKAN snapshot
+stored by Radar, read-only. Optional --live-ckan performs a bounded, explicitly
+requested check of *individual permit/revision records* against Toronto's public
+CKAN DataStore. No schedule, AI, outreach or production collector modifications.
+
+An exact matching CKAN row proves only what the published dataset reported on
+the retrieval date. It does NOT prove permit approval, current inspection outcome,
+tenant identity, purchasing authority, live contract availability or opening.
+"""
+from __future__ import annotations
+
+import argparse
+import csv
+import datetime as dt
+import hashlib
+import json
+import re
+import sqlite3
+from collections import Counter, defaultdict
+from contextlib import closing
+from pathlib import Path
+from urllib.parse import urlencode, urlsplit
+from urllib.request import Request, HTTPRedirectHandler, build_opener
+
+import gta_facility_intelligence as graph
+
+SOURCE="toronto_active_building_permits"
+DAILY_CSV="GTA_RADAR_DAILY_NEW_DEVELOPMENTS.csv"
+AUDIT_CSV="GTA_RADAR_TORONTO_PERMIT_EXACT_RECORD_AUDIT.csv"
+PROJECT_CSV="GTA_RADAR_TORONTO_PROJECT_PERMIT_RECONCILIATION.csv"
+AUDIT_JSON="GTA_RADAR_TORONTO_PERMIT_EVIDENCE_STATUS.json"
+PACKAGE="building-permits-active-permits"
+RESOURCE_HINT="6d0229af-bc54-46de-9c2b-26759b01dd05"
+API="https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action/"
+OFFICIAL_DATASET="https://open.toronto.ca/dataset/building-permits-active-permits/"
+OFFICIAL_STATUS=graph.TORONTO_PERMIT_STATUS_SEARCH
+
+# Example original keys: "26 265617 HVA|00 | 26 265617 BLD|00".
+KEY=re.compile(r"^(?P<folder>\d{2} \d{6}) (?P<type>[A-Z]{3})\|(?P<rev>\d{2})$")
+FOLDER=re.compile(r"^\d{2} \d{6}$")
+MAX_KEYS_PER_PROJECT=12
+MAX_LIVE=10
+MAX_RESPONSE_BYTES=1_500_000
+REQUIRED={"project_id","source_id","source_keys","address",
+          "current_source_status","observation"}
+AUDIT_FIELDS=(
+    "project_id","source_key","permit_num","revision_num","permit_type",
+    "raw_city_dataset_url","official_lookup_url",
+    "local_snapshot_status","local_source_first_seen_at","local_source_date",
+    "local_payload_sha256","local_record_status","local_record_address",
+    "local_address_comparison","local_status_comparison",
+    "remote_status","remote_record_status","remote_record_address",
+    "remote_address_comparison","remote_query_url","remote_retrieved_at",
+    "final_evidence_level","individual_record_retrieved_live",
+    "record_is_a_verified_open_supplier_contract","buyer_verified",
+    "review_blockers",
+)
+PROJECT_FIELDS=(
+    "project_id","permit_folder","source_key_count","local_records_matched",
+    "local_records_missing","local_record_stage_count",
+    "local_statuses","live_records_matched","live_records_checked",
+    "project_review_status","source_permit_evidence_summary",
+    "source_provenance","verified_open_contract","buyer_verified",
+)
+ALLOW_LIVE_STATES={"LIVE_EXACT_KEY_MATCH_OFFICIAL_DATASET",
+                   "LIVE_EXACT_KEY_MATCH_SNAPSHOT_STAGE_DIFFERENT"}
+
+def clean(value):
+    return graph.clean(value)
+
+def split_source_keys(project):
+    """Fail closed on malformed, mixed-folder or excessive constituent IDs."""
+    expected=clean(project.get("project_id",""))
+    root=expected.removeprefix(SOURCE+":")
+    if not expected.startswith(SOURCE+":") or not FOLDER.fullmatch(root):
+        return [],"INVALID_PROJECT_FOLDER_ID"
+    string=clean(project.get("source_keys"))
+    if not string:
+        return [],"NO_CONSTITUENT_PERMIT_KEYS"
+    tokens=re.split(r"\s+\|\s+",string)
+    if len(tokens)>MAX_KEYS_PER_PROJECT:
+        return [],"TOO_MANY_KEYS_REQUIRE_MANUAL_REVIEW"
+    records=[];seen=set()
+    for token in tokens:
+        match=KEY.fullmatch(token)
+        if not match or match["folder"] != root:
+            return [],"MALFORMED_OR_DIFFERENT_FOLDER_KEY"
+        permit_num=match["folder"]+" "+match["type"]
+        revision=match["rev"]
+        ident=permit_num+"|"+revision
+        if ident in seen:
+            return [],"DUPLICATE_CONSTITUENT_KEYS"
+        seen.add(ident)
+        records.append((ident,permit_num,revision))
+    if not records:
+        return [],"NO_CONSTITUENT_PERMIT_KEYS"
+    return records,""
+
+def _official_status_address(raw):
+    addr=clean(" ".join(clean(raw.get(field)) for field in
+        ("STREET_NUM","STREET_NAME","STREET_TYPE","STREET_DIRECTION")))
+    return graph.normalize_address(addr)[0]
+
+def _local_read(db, record_keys):
+    """Reads latest records, including inactive history, without mutating SQLite."""
+    path=Path(db)
+    if not path.is_file():
+        raise FileNotFoundError("Existing Radar SQLite missing: "+str(path))
+    answers={}
+    with closing(sqlite3.connect(path.resolve().as_uri()+"?mode=ro",
+                                 uri=True,timeout=8)) as con:
+        con.execute("PRAGMA query_only=ON")
+        for ident in sorted(set(record_keys)):
+            row=con.execute(
+                """SELECT c.record_key,c.first_seen_at,c.source_date,c.active,
+                          v.payload_json
+                   FROM records_current c JOIN record_versions v
+                   ON v.source_id=c.source_id AND v.record_key=c.record_key
+                   AND v.version_id=(
+                      SELECT MAX(v2.version_id) FROM record_versions v2
+                      WHERE v2.source_id=c.source_id AND v2.record_key=c.record_key
+                   )
+                   WHERE c.source_id=? AND c.record_key=?
+                   LIMIT 2""",(SOURCE,ident)).fetchall()
+            if len(row)>1:
+                answers[ident]={"error":"DUPLICATE_DATABASE_RECORD_KEY"}
+                continue
+            if not row:continue
+            key,seen,date,active,payload=row[0]
+            try:
+                parsed=json.loads(payload)
+            except (TypeError,ValueError):
+                answers[ident]={"error":"INVALID_STORED_JSON"}
+                continue
+            if not isinstance(parsed,dict):
+                answers[ident]={"error":"STORED_PAYLOAD_NOT_OBJECT"}
+                continue
+            answers[ident]={
+                "raw":parsed,"active":bool(active),"first_seen":clean(seen),
+                "source_date":clean(date),
+                "sha256":hashlib.sha256(payload.encode("utf-8")).hexdigest(),
+            }
+    return answers
+
+def _local_verdict(record, evidence, expected_address, expected_status):
+    if evidence is None:
+        return "LOCAL_SOURCE_KEY_NOT_FOUND","", "", "", "", "", ""
+    if "error" in evidence:
+        return evidence["error"], "", "", "", "", "", ""
+    raw=evidence["raw"]
+    permit_num,rev=record
+    if clean(raw.get("PERMIT_NUM"))!=permit_num or clean(raw.get("REVISION_NUM"))!=rev:
+        return "LOCAL_KEY_PAYLOAD_MISMATCH","","","","","",""
+    addr=_official_status_address(raw)
+    status=clean(raw.get("STATUS"))
+    if not addr:
+        addr_check="SOURCE_ADDRESS_MISSING"
+    elif expected_address and expected_address!=addr:
+        addr_check="SOURCE_ADDRESS_CONFLICT"
+    else:
+        addr_check="STREET_MATCHES_EXISTING_RADAR_EXPORT" if expected_address else "NO_EXPORT_ADDRESS_TO_COMPARE"
+    status_check=("STAGE_MATCHES_EXPORT" if status==expected_status else
+                  "STAGE_DIFFERS_FROM_EXPORT_REVIEW_REQUIRED" if status and expected_status else
+                  "NO_UNAMBIGUOUS_STAGE_COMPARISON")
+    state = ("LOCAL_RECORD_INACTIVE_HISTORY" if not evidence["active"] else
+             "LOCAL_RECORD_ADDRESS_CONFLICT" if addr_check=="SOURCE_ADDRESS_CONFLICT" else
+             "LOCAL_EXACT_PERMIT_REVISION_PAYLOAD_MATCH_NOT_LIVE_RECHECKED")
+    return state, evidence["first_seen"],evidence["source_date"],evidence["sha256"],status,addr,addr_check+";"+status_check
+
+def _get_payload(url):
+    """Fixed official CKAN host, no redirect, bounded JSON, network opt-in only."""
+    parsed=urlsplit(url)
+    if parsed.scheme!="https" or parsed.netloc!="ckan0.cf.opendata.inter.prod-toronto.ca":
+        raise ValueError("Public Toronto CKAN API host only")
+    if not parsed.path.startswith("/api/3/action/"):
+        raise ValueError("Public Toronto CKAN action endpoint only")
+    class NoRedirect(HTTPRedirectHandler):
+        def redirect_request(self,req,fp,code,msg,headers,newurl):
+            return None
+    opener=build_opener(NoRedirect)
+    req=Request(url,headers={"Accept":"application/json",
+        "User-Agent":"GTARadarManualRecordEvidenceAudit/1.0"})
+    with opener.open(req,timeout=18) as response:
+        if response.status!=200:raise ValueError("CKAN returned non-200 HTTP status")
+        raw=response.read(MAX_RESPONSE_BYTES+1)
+    if len(raw)>MAX_RESPONSE_BYTES:
+        raise ValueError("CKAN response exceeded fixed byte limit")
+    return json.loads(raw)
+
+def _official_action(operation,values,fetch=_get_payload):
+    if operation not in ("package_show","datastore_search"):
+        raise ValueError("CKAN operation not permitted")
+    url=API+operation+"?"+urlencode(values)
+    data=fetch(url)
+    if not isinstance(data,dict) or data.get("success") is not True:
+        raise ValueError("Official CKAN API did not return a successful result")
+    result=data.get("result")
+    if not isinstance(result,dict):
+        raise ValueError("Unexpected CKAN result schema")
+    return result,url
+
+def _resource(fetch):
+    metadata,_=_official_action("package_show",{"id":PACKAGE},fetch)
+    if metadata.get("name")!=PACKAGE:
+        raise ValueError("Unexpected Toronto dataset package identity")
+    for res in metadata.get("resources",[]):
+        if (res.get("id")==RESOURCE_HINT and res.get("datastore_active") is True):
+            return RESOURCE_HINT,clean(res.get("last_modified"))
+    raise ValueError("Expected active Toronto permit DataStore resource unavailable; no fallback to wrong dataset")
+
+def _remote_record(permit_num,revision,resource_id,fetch):
+    params={"resource_id":resource_id,"filters":json.dumps({
+        "PERMIT_NUM":permit_num,"REVISION_NUM":revision},separators=(",",":")),"limit":3}
+    result,url=_official_action("datastore_search",params,fetch)
+    records=result.get("records")
+    if not isinstance(records,list):
+        raise ValueError("Toronto CKAN returned no records array")
+    matched=[r for r in records if isinstance(r,dict)
+             and clean(r.get("PERMIT_NUM"))==permit_num
+             and clean(r.get("REVISION_NUM"))==revision]
+    if len(matched)!=1 or len(records)!=1:
+        if not records:
+            return "NOT_PRESENT_IN_ACTIVE_DATASTORE_NOT_PROOF_OF_CLOSURE",{},url
+        return "AMBIGUOUS_OR_NONEXACT_CKAN_PERMIT_MATCH",{},url
+    return "LIVE_EXACT_KEY_MATCH_OFFICIAL_DATASET",matched[0],url
+
+def _audit_row(project,ident,permit_num,rev,local,export_status,export_address):
+    state,seen,date,digest,raw_status,raw_address,checks=_local_verdict(
+        (permit_num,rev),local,export_address,export_status)
+    comp=checks.split(";") if checks else []
+    blockers=["NOT_LIVE_RECHECKED","BUYER_NOT_VERIFIED","PROCUREMENT_NOT_VERIFIED"]
+    if state!="LOCAL_EXACT_PERMIT_REVISION_PAYLOAD_MATCH_NOT_LIVE_RECHECKED":
+        blockers.append(state)
+    if "STAGE_DIFFERS_FROM_EXPORT_REVIEW_REQUIRED" in comp:
+        blockers.append("LOCAL_STAGE_DIFFERS_FROM_ARCHIVED_EXPORT")
+    return {
+        "project_id":project["project_id"],"source_key":ident,
+        "permit_num":permit_num,"revision_num":rev,
+        "permit_type":permit_num.split()[-1],
+        "raw_city_dataset_url":OFFICIAL_DATASET,
+        "official_lookup_url":OFFICIAL_STATUS,
+        "local_snapshot_status":state,"local_source_first_seen_at":seen,
+        "local_source_date":date,"local_payload_sha256":digest,
+        "local_record_status":raw_status,"local_record_address":raw_address,
+        "local_address_comparison":comp[0] if comp else "",
+        "local_status_comparison":comp[1] if len(comp)>1 else "",
+        "remote_status":"NOT_REQUESTED_MANUAL_LIVE_ONLY",
+        "remote_record_status":"","remote_record_address":"",
+        "remote_address_comparison":"","remote_query_url":"","remote_retrieved_at":"",
+        "final_evidence_level":"SOURCE_SNAPSHOT_EXACT_KEY_NOT_LIVE_CHECKED" if
+             state=="LOCAL_EXACT_PERMIT_REVISION_PAYLOAD_MATCH_NOT_LIVE_RECHECKED" else
+             "UNVERIFIED_SOURCE_RECORD_ID",
+        "individual_record_retrieved_live":"NO",
+        "record_is_a_verified_open_supplier_contract":"NO",
+        "buyer_verified":"NO","review_blockers":";".join(blockers)
+    }
+
+def run(results, out=None, *, db=None, live=False, live_limit=10,
+        fetch=_get_payload, as_of=None):
+    results=Path(results)
+    source=results/DAILY_CSV
+    rows=graph.read_csv(source,REQUIRED) if source.is_file() else None
+    if rows is None:
+        raise FileNotFoundError("Existing daily Radar CSV required: "+str(source))
+    out=Path(out) if out is not None else results/"TORONTO_PERMIT_EVIDENCE_PILOT"
+    if out.resolve()==results.resolve():
+        raise ValueError("Output must not overwrite Radar source folder")
+    if not 0<=int(live_limit)<=MAX_LIVE:
+        raise ValueError("Bounded live query limit must be 0.."+str(MAX_LIVE))
+    all_projects=[r for r in rows if clean(r.get("source_id"))==SOURCE]
+    audit=[];projects=[];failures=Counter();parsed_projects=[]
+    keyset=set()
+    for p in all_projects:
+        keys,why=split_source_keys(p)
+        if why:
+            failures[why]+=1
+            projects.append({"project_id":p.get("project_id",""),
+                "permit_folder":p.get("project_id","").removeprefix(SOURCE+":"),
+                "source_key_count":0,"local_records_matched":0,
+                "local_records_missing":0,"local_record_stage_count":0,
+                "local_statuses":"","live_records_matched":0,
+                "live_records_checked":0,
+                "project_review_status":"INVALID_SOURCE_KEY_REVIEW_REQUIRED",
+                "source_permit_evidence_summary":why,
+                "source_provenance":"EXISTING_RADAR_CSV_NOT_LIVE_RECHECKED",
+                "verified_open_contract":"NO","buyer_verified":"NO"})
+            continue
+        parsed_projects.append((p,keys))
+        keyset.update(key for key,_,_ in keys)
+    local={}
+    db_state="NO_LOCAL_SQLITE_PROVIDED"
+    if db is not None:
+        try:
+            local=_local_read(db,keyset)
+            db_state="LOCAL_SQLITE_READ_ONLY"
+        except (FileNotFoundError,sqlite3.Error) as exc:
+            db_state="LOCAL_SQLITE_UNAVAILABLE_"+type(exc).__name__
+    evidence={}
+    for p,keys in parsed_projects:
+        export_address=graph.normalize_address(p.get("address",""))[0]
+        export_status=clean(p.get("current_source_status"))
+        keyed=[]
+        for ident,permit,revision in keys:
+            row=_audit_row(p,ident,permit,revision,local.get(ident),
+                           export_status,export_address)
+            keyed.append(row)
+            audit.append(row)
+        evidence[p["project_id"]]=keyed
+    live_requested=bool(live)
+    live_checked=0
+    live_status="NOT_REQUESTED"
+    resource_id=""
+    metadata_modified=""
+    if live_requested and audit and live_limit>0:
+        try:
+            resource_id,metadata_modified=_resource(fetch)
+            live_status="OFFICIAL_CKAN_RESOURCE_RESOLVED"
+            # Prefer BLD constituent first, then first-seen project order. Do
+            # not query a random historical record and call all 151 verified.
+            selected=sorted(audit,key=lambda x:(
+                x["permit_type"]!="BLD",
+                x["project_id"],x["source_key"]))[:live_limit]
+            stamp=(as_of or dt.datetime.now(dt.timezone.utc)).isoformat()
+            for row in selected:
+                try:
+                    state,record,url=_remote_record(row["permit_num"],
+                        row["revision_num"],resource_id,fetch)
+                    row["remote_query_url"]=url
+                    row["remote_retrieved_at"]=stamp
+                    live_checked+=1
+                    row["remote_status"]=state
+                    if record:
+                        row["remote_record_status"]=clean(record.get("STATUS"))
+                        row["remote_record_address"]=_official_status_address(record)
+                        prev=graph.normalize_address(row["local_record_address"])[0]
+                        current=row["remote_record_address"]
+                        if prev and current and prev!=current:
+                            row["remote_address_comparison"]="LIVE_LOCAL_ADDRESS_CONFLICT"
+                            row["final_evidence_level"]="REVIEW_SOURCE_ADDRESS_CONFLICT"
+                        else:
+                            row["remote_address_comparison"]="NO_LOCAL_ADDRESS_CONFLICT_FOUND"
+                            row["final_evidence_level"]="OFFICIAL_CKAN_EXACT_KEY_LIVE_RECHECKED"
+                        row["individual_record_retrieved_live"]="YES"
+                        row["review_blockers"]+=";OFFICIAL_CKAN_ROW_DOES_NOT_PROVE_BUYER_OR_OPEN_CONTRACT"
+                    else:
+                        row["final_evidence_level"]="LIVE_RECORD_MISSING_OR_AMBIGUOUS_MANUAL_REVIEW"
+                except (ValueError,OSError,TimeoutError,sqlite3.Error) as exc:
+                    row["remote_status"]="LIVE_CKAN_QUERY_ERROR_"+type(exc).__name__
+                    row["final_evidence_level"]="LIVE_RECHECK_FAILED_MANUAL_REVIEW"
+            live_status="QUERIED_BOUNDED_OFFICIAL_CKAN"
+        except (ValueError,OSError,TimeoutError) as exc:
+            live_status="RESOURCE_LOOKUP_UNAVAILABLE_"+type(exc).__name__
+    elif live_requested:
+        live_status="NO_KEYS_OR_ZERO_LIMIT"
+    for p,keys in parsed_projects:
+        rows_for=evidence[p["project_id"]]
+        localmatched=[r for r in rows_for if r["local_snapshot_status"]==
+                      "LOCAL_EXACT_PERMIT_REVISION_PAYLOAD_MATCH_NOT_LIVE_RECHECKED"]
+        statuses={r["local_record_status"] for r in rows_for if r["local_record_status"]}
+        livehits=[r for r in rows_for if r["final_evidence_level"]==
+                  "OFFICIAL_CKAN_EXACT_KEY_LIVE_RECHECKED"]
+        problems=any(r["local_snapshot_status"] not in {
+            "LOCAL_EXACT_PERMIT_REVISION_PAYLOAD_MATCH_NOT_LIVE_RECHECKED"
+        } for r in rows_for)
+        result=("SOURCE_DATA_CONFLICT_OR_INCOMPLETE_REVIEW" if db is not None and problems else
+            "LOCAL_SNAPSHOT_MULTIPLE_DISTINCT_PERMIT_STAGES" if len(statuses)>1 else
+            "LOCAL_SNAPSHOT_EXACT_KEY_MATCH_UNRECHECKED" if localmatched and
+                len(localmatched)==len(rows_for) else
+            "NO_LOCAL_SNAPSHOT_OR_INDIVIDUAL_RECHECK")
+        if livehits and len(livehits)==len(rows_for):
+            result="ALL_CONSTITUENTS_EXACT_LIVE_DATASET_MATCH_NOT_BUYER_PROOF"
+        projects.append({
+            "project_id":p["project_id"],
+            "permit_folder":p["project_id"].removeprefix(SOURCE+":"),
+            "source_key_count":len(keys),
+            "local_records_matched":len(localmatched),
+            "local_records_missing":len(rows_for)-len(localmatched),
+            "local_record_stage_count":len(statuses),
+            "local_statuses":";".join(sorted(statuses)),
+            "live_records_matched":len(livehits),
+            "live_records_checked":sum(r["individual_record_retrieved_live"]=="YES" for r in rows_for),
+            "project_review_status":result,
+            "source_permit_evidence_summary":"BUNDLE_OF_DISTINCT_PERMIT_REVISIONS_NOT_A_SINGLE_PERMIT",
+            "source_provenance":"OFFICIAL_RADAR_SNAPSHOT_OR_EXPLICIT_PUBLIC_CKAN_QUERY",
+            "verified_open_contract":"NO","buyer_verified":"NO",
+        })
+    projects.sort(key=lambda r:r["project_id"])
+    audit.sort(key=lambda r:(r["project_id"],r["source_key"]))
+    out.mkdir(parents=True,exist_ok=True)
+    graph.write_csv(out/AUDIT_CSV,audit,AUDIT_FIELDS)
+    graph.write_csv(out/PROJECT_CSV,projects,PROJECT_FIELDS)
+    status={
+        "mode":"LOCAL_SNAPSHOT_ONLY" if not live_requested else "BOUNDED_OPTIONAL_LIVE_CKAN_RECHECK",
+        "as_of":clean(as_of or dt.datetime.now(dt.timezone.utc).isoformat()),
+        "total_daily_rows":len(rows),
+        "toronto_project_groups":len(all_projects),
+        "valid_toronto_permit_groups":len(parsed_projects),
+        "distinct_original_constituent_keys":len(keyset),
+        "invalid_project_group_reasons":dict(sorted(failures.items())),
+        "local_snapshot_state":db_state,
+        "local_record_payloads_matched":sum(r["local_snapshot_status"]==
+            "LOCAL_EXACT_PERMIT_REVISION_PAYLOAD_MATCH_NOT_LIVE_RECHECKED" for r in audit),
+        "live_requested":live_requested,
+        "live_status":live_status,
+        "live_record_queries_attempted":live_checked,
+        "live_exact_record_payloads_received":sum(r["individual_record_retrieved_live"]=="YES"
+                                                  for r in audit),
+        "metadata_resource_id":resource_id,
+        "metadata_resource_last_modified_not_proof_of_row_publication":metadata_modified,
+        "verified_buyers":0,"verified_open_contracts":0,
+        "unverified_portal_not_individual_record":OFFICIAL_STATUS,
+        "limitations":[
+            "Local collector SQLite is a historical source snapshot, not live permit verification.",
+            "City CKAN exact-row response is source publication evidence, not live construction or purchase intent.",
+            "Toronto status portal is updated as of the previous business day and can differ from CKAN.",
+            "Not present in active CKAN does not prove closed; check the separately cleared archive and official status portal.",
+            "Multiple BLD/HVA/PLB permit records in a project group may have different statuses; never collapse into one verified stage.",
+            "Live mode is opt-in and capped; missing/unqueried records stay unverified.",
+            "No buyers, organizations, contact details, procurement or business opening is verified here.",
+        ],
+        "outputs":{"permit_records_csv":str(out/AUDIT_CSV),
+                   "projects_csv":str(out/PROJECT_CSV)},
+    }
+    (out/AUDIT_JSON).write_text(json.dumps(status,indent=2),encoding="utf-8")
+    return status
+
+def main():
+    p=argparse.ArgumentParser(description=__doc__)
+    p.add_argument("--results",type=Path,required=True)
+    p.add_argument("--out",type=Path)
+    p.add_argument("--db",type=Path,help="Existing collector radar.sqlite, opened strictly read-only")
+    p.add_argument("--live-ckan",action="store_true",
+                   help="Opt-in: at most 10 official CKAN exact permit/revision queries")
+    p.add_argument("--live-limit",type=int,default=10)
+    args=p.parse_args()
+    print(json.dumps(run(args.results,args.out,db=args.db,
+                         live=args.live_ckan,live_limit=args.live_limit),indent=2))
+
+if __name__=="__main__":
+    main()
