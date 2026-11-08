@@ -261,7 +261,7 @@ class FacilityDossierTests(unittest.TestCase):
             self.assertEqual(before,{(g/name).name:(g/name).read_bytes() for name in
                     (graph.OUTPUT_EVENTS,graph.OUTPUT_LINKS)})
 
-    def test_csv_formula_injection_is_neutralized_without_changing_jsonl_facts(self):
+    def test_csv_formula_injection_stays_neutralized_across_exports(self):
         with tempfile.TemporaryDirectory() as root:
             p=Path(root);g=p/"graph";out=p/"dossier"
             a=event(description="=HYPERLINK(\"https://bad.example\",\"CLICK\")",
@@ -274,7 +274,8 @@ class FacilityDossierTests(unittest.TestCase):
             self.assertTrue(row["organization_mention"].startswith("'+"))
             self.assertTrue(row["site_address"].startswith("'@"))
             facts=json.loads((out/dossiers.DOSSIERS_JSONL).read_text().splitlines()[0])
-            self.assertTrue(facts["primary_source_event"]["source_record_description"].startswith("="))
+            # Graph CSV already neutralizes this untrusted value on write.
+            self.assertTrue(facts["primary_source_event"]["source_record_description"].startswith("'="))
             page=(out/dossiers.REPORT_HTML).read_text()
             self.assertNotIn("<script>",page)
             self.assertNotIn("href=\"javascript:",page)
