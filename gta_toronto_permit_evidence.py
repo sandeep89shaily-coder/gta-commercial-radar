@@ -60,7 +60,7 @@ AUDIT_FIELDS=(
     "remote_address_comparison","remote_stage_comparison",
     "remote_payload_sha256","remote_query_url","remote_retrieved_at",
     "cleared_lookup_status","cleared_record_status","cleared_record_address",
-    "cleared_completed_date","cleared_payload_sha256","cleared_query_url",
+    "cleared_address_comparison","cleared_completed_date","cleared_payload_sha256","cleared_query_url",
     "final_evidence_level","individual_record_retrieved_live",
     "record_is_a_verified_open_supplier_contract","buyer_verified",
     "review_blockers",
@@ -362,6 +362,7 @@ def _audit_row(project,ident,permit_num,rev,local,export_status,export_address):
         "remote_query_url":"","remote_retrieved_at":"",
         "cleared_lookup_status":"NOT_REQUESTED",
         "cleared_record_status":"","cleared_record_address":"",
+        "cleared_address_comparison":"",
         "cleared_completed_date":"","cleared_payload_sha256":"","cleared_query_url":"",
         "final_evidence_level":"SOURCE_SNAPSHOT_EXACT_KEY_NOT_LIVE_CHECKED" if
              state=="LOCAL_EXACT_PERMIT_REVISION_PAYLOAD_MATCH_NOT_LIVE_RECHECKED" else
@@ -529,14 +530,30 @@ def run(results, out=None, *, db=None, live=False, live_limit=10,
                                         cleared_public_rows[row["source_key"]]=clear_record
                                         row["cleared_record_status"]=clean(
                                             clear_record.get("STATUS"))
-                                        row["cleared_record_address"]=(
-                                            _official_status_address(clear_record))
+                                        cleared_addr=_official_status_address(clear_record)
+                                        row["cleared_record_address"]=cleared_addr
                                         row["cleared_completed_date"]=clean(
                                             clear_record.get("COMPLETED_DATE"))
-                                        row["cleared_lookup_status"]=(
-                                            "EXACT_KEY_FOUND_IN_OFFICIAL_CLEARED_SINCE_2017")
-                                        row["final_evidence_level"]=(
-                                            "REMOVED_FROM_ACTIVE_EXACT_CLEARED_RECORD_REVIEW")
+                                        exported_addr=graph.normalize_address(next((
+                                            source.get("address","") for source,_ in parsed_projects
+                                            if source.get("project_id")==row["project_id"]), ""))[0]
+                                        previous_addr=graph.normalize_address(
+                                            row["local_record_address"])[0]
+                                        if not cleared_addr:
+                                            row["cleared_address_comparison"]="CLEARED_ADDRESS_MISSING"
+                                            row["cleared_lookup_status"]="CLEARED_SITE_UNVERIFIED"
+                                            row["final_evidence_level"]="CLEARED_SITE_IDENTITY_UNVERIFIED"
+                                        elif (exported_addr and cleared_addr!=exported_addr) or (
+                                                previous_addr and cleared_addr!=previous_addr):
+                                            row["cleared_address_comparison"]="CLEARED_ADDRESS_CONFLICT"
+                                            row["cleared_lookup_status"]="CLEARED_SITE_CONFLICT_REVIEW"
+                                            row["final_evidence_level"]="CLEARED_SOURCE_ADDRESS_CONFLICT"
+                                        else:
+                                            row["cleared_address_comparison"]="MATCHES_ARCHIVED_SITE"
+                                            row["cleared_lookup_status"]=(
+                                                "EXACT_KEY_FOUND_IN_OFFICIAL_CLEARED_SINCE_2017")
+                                            row["final_evidence_level"]=(
+                                                "REMOVED_FROM_ACTIVE_EXACT_CLEARED_RECORD_REVIEW")
                                         row["review_blockers"]+=(
                                             ";CLEARED_SOURCE_REQUIRES_MANUAL_LIFECYCLE_CONFIRMATION")
                                     elif clear_state=="AMBIGUOUS_OR_NONEXACT_CKAN_PERMIT_MATCH":
@@ -680,6 +697,7 @@ def run(results, out=None, *, db=None, live=False, live_limit=10,
             "City CKAN exact-row response is source publication evidence, not live construction or purchase intent.",
             "Toronto status portal is updated as of the previous business day and can differ from CKAN.",
             "Not present in active CKAN does not prove closed; optional cleared-since-2017 exact match provides historical lifecycle evidence.",
+            "Exact ID in the cleared dataset still requires address reconciliation; conflicts are never promoted as confirmed same site.",
             "Not found in active OR cleared datasets is not proof of a cancellation, closure or absence.",
             "Cleared records, if found, are historical/non-active research only and not commercial buying leads.",
             "Multiple BLD/HVA/PLB permit records in a project group may have different statuses; never collapse into one verified stage.",
