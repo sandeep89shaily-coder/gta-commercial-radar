@@ -102,11 +102,43 @@ class FacilityIntelligenceTests(unittest.TestCase):
                             graph.normalize_address("12714 Bristol Cir")[0])
 
     def test_unknown_or_region_only_city_cannot_join(self):
-        p,why=event("radar",city="Peel")
+        p,why=event("radar",city="Peel",source_id="unrecognized_regional_feed")
         self.assertIsNone(why)
         self.assertEqual(p["site_id"],"")
         self.assertEqual(p["review_tier"],"IDENTITY_REPAIR_REQUIRED")
         self.assertIn("SITE_ADDRESS_OR_CITY_UNVERIFIED",p["verification_required"])
+
+    def test_configured_source_can_recover_brampton_city_not_tenant_identity(self):
+        row,reason=event("radar",source_id="brampton_building_permits",
+                         city="Peel",address="7535 Financial Dr, Brampton, ON,")
+        self.assertIsNone(reason)
+        self.assertEqual(row["city"],"Brampton")
+        self.assertEqual(row["site_address"],"7535 financial dr")
+        self.assertEqual(row["site_identity_status"],
+                         "SOURCE_JURISDICTION_CITY_NOT_INDEPENDENTLY_CHECKED")
+        self.assertIn("CITY_DERIVED_FROM_CONFIGURED_SOURCE_JURISDICTION",
+                      row["verification_required"])
+
+    def test_conflicting_city_and_source_jurisdiction_prevents_join(self):
+        row,_=event("radar",source_id="brampton_building_permits",
+                    city="Toronto",address="7535 Financial Dr")
+        self.assertEqual(row["site_id"],"")
+        self.assertIn("SOURCE_CITY_CONFLICT",row["verification_required"])
+
+    def test_toronto_permit_partial_postal_does_not_poison_site_key(self):
+        row,_=event("radar",address="220 YONGE ST M5B")
+        self.assertEqual(row["site_address"],"220 yonge st")
+
+    def test_aggregated_planning_descriptions_do_not_create_false_site_matches(self):
+        row,_=event("planning",description=(
+            "Featured Application: City File: OZS-1. Location 100 Queen St. "
+            "Featured Application: City File: OZS-2. Location 200 King St."))
+        self.assertEqual(row["site_id"],"")
+        self.assertEqual(row["review_tier"],"IDENTITY_REPAIR_REQUIRED")
+
+    def test_zero_address_is_a_placeholder_not_a_site(self):
+        row,_=event("planning",description="Location 0 Edvac Drive: no municipal address")
+        self.assertEqual(row["site_id"],"")
 
     def test_different_unit_cannot_verify_same_tenant(self):
         a,_=event("activation")
