@@ -1,5 +1,6 @@
 """Commercial review must never convert a source permit into a sales-ready buyer."""
 import tempfile
+import json
 import unittest
 from pathlib import Path
 
@@ -126,6 +127,36 @@ class CommercialDossierResearchTests(unittest.TestCase):
                             and not r["outreach_authorized"] for r in extra))
         self.assertEqual({r["contact_role_type"] for r in extra},
                          {"TENANT_PROJECTS_REVIEW_CHANNEL","LEASING_BROKER_ONLY"})
+
+
+    def test_city_scope_fixture_provenance_is_exact_and_all_rows_pass(self):
+        records=module.load(module.SCOPES,"records")
+        self.assertEqual(len(records),20)
+        self.assertTrue(all(module.validated_city_scope(r) for r in records))
+
+    def test_city_scope_import_refuses_forged_or_mismatched_source(self):
+        original=module.load(module.SCOPES,"records")
+        variants=[
+            dict(original[0],source_lookup_validation="UNVERIFIED"),
+            dict(original[0],project_id="toronto_active_building_permits:26 999999"),
+            dict(original[0],permit_key="26 265617 HVA|00"),
+            dict(original[0],source_url=original[0]["source_url"].replace(
+                "6d0229af-bc54-46de-9c2b-26759b01dd05","00000000-0000-0000-0000-000000000000")),
+            dict(original[0],source_url=original[0]["source_url"].replace(
+                "26%20265617%20BLD","26%20265618%20BLD")),
+            dict(original[0],source_url="https://example.com/api/3/action/datastore_search"),
+        ]
+        for candidate in variants:
+            with self.subTest(candidate=candidate):
+                with self.assertRaises(ValueError):
+                    module.validated_city_scope(candidate)
+                with tempfile.TemporaryDirectory() as folder:
+                    p=Path(folder)
+                    scope=p/"tampered_scope.json"
+                    scope.write_text(json.dumps({"records":[candidate]+original[1:]}),encoding="utf-8")
+                    with self.assertRaises(ValueError):
+                        module.run(scope=scope,out=p/"output")
+                    self.assertFalse((p/"output").exists())
 
     def test_real_commit_data_produces_noncommercial_research_reports(self):
         with tempfile.TemporaryDirectory() as folder:
