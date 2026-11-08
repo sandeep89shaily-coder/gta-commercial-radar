@@ -70,6 +70,13 @@ REVIEW_FIELDS = (
     "source_url", "review_tier", "procurement_status", "buyer_verified",
     "opening_confirmed", "verification_required",
 )
+# Public official search page; users must search the permit number manually.
+# This is NOT a deep link to or independent verification of the specific record.
+TORONTO_PERMIT_STATUS_SEARCH = (
+    "https://www.toronto.ca/services-payments/building-construction/"
+    "building-permit/after-you-apply-for-a-building-permit/"
+    "search-the-status-of-a-building-permit-application/"
+)
 SOURCE_CITY = {
     "toronto_active_building_permits": "Toronto",
     "toronto_development_applications": "Toronto",
@@ -244,6 +251,8 @@ def adapt(family, row, *, as_of=None, max_age_days=180):
         observed = first(row, "first_seen_local")
         source_url = first(row, "record_source_url")
         source_portal_url = first(row, "official_source_portal_url")
+        if source_id == "toronto_active_building_permits":
+            source_portal_url = TORONTO_PERMIT_STATUS_SEARCH
         source_lookup_key = first(row, "source_keys") or key
         project = key
         signal = "MUNICIPAL_PERMIT_OR_PROJECT_ACTIVITY"
