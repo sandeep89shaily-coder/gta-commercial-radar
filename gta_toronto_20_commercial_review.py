@@ -13,7 +13,7 @@ import csv
 import json
 from collections import Counter, defaultdict
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlsplit
 
 import gta_facility_intelligence as graph
 
@@ -181,12 +181,43 @@ def build(scope_rows,contact_rows):
     return outputs,safe_contacts,dict(exclusions)
 
 
+
+def validated_city_scope(row):
+    """Fail closed on a mismatched source lookup; never synthesize City verification."""
+    import re
+    project=graph.clean(row.get("project_id",""))
+    key=graph.clean(row.get("permit_key",""))
+    match=re.fullmatch(r"(\\d{2} \\d{6}) ([A-Z]{3})\\|(\\d{2})",key)
+    if not match or project!="toronto_active_building_permits:"+match.group(1):
+        raise ValueError("City permit project ID and exact revision key mismatch")
+    if row.get("source_lookup_validation")!="EXACT_PERMIT_AND_REVISION_AND_CIVIC_ADDRESS_MATCH_CITY_DATASET":
+        raise ValueError("City exact permit source lookup validation missing")
+    if graph.clean(row.get("city","")).lower()!="toronto" or not graph.normalize_address(row.get("site_address",""))[0]:
+        raise ValueError("City exact permit site missing or incompatible")
+    url=graph.clean(row.get("source_url",""))
+    parsed=urlsplit(url)
+    if parsed.scheme!="https" or parsed.hostname!="ckan0.cf.opendata.inter.prod-toronto.ca" or parsed.path!="/api/3/action/datastore_search":
+        raise ValueError("City permit lookup URL is not the official exact-record endpoint")
+    params=parse_qs(parsed.query,keep_blank_values=True)
+    if set(params)!={"resource_id","filters","limit"} or any(len(v)!=1 for v in params.values()):
+        raise ValueError("City exact-record lookup parameters invalid")
+    if params["resource_id"][0]!="6d0229af-bc54-46de-9c2b-26759b01dd05" or params["limit"][0]!="3":
+        raise ValueError("City permit source resource or row limit unexpected")
+    try:
+        filters=json.loads(params["filters"][0])
+    except (TypeError,ValueError) as exc:
+        raise ValueError("City exact-record lookup filters malformed") from exc
+    if filters!={"PERMIT_NUM":match.group(1)+" "+match.group(2),"REVISION_NUM":match.group(3)}:
+        raise ValueError("City permit source URL does not match imported ID/revision")
+    return True
+
 def run(scope=SCOPES,contacts=CONTACTS,out=None):
     scope_rows=load(scope,"records")
     contact_rows=load(contacts,"rows")
     # Source JSON contract uses different but explicit field names. No fuzzy.
     clean_scope=[]
     for x in scope_rows:
+        validated_city_scope(x)
         clean_scope.append({
             "project_id":x["project_id"],
             "permit_key":x["permit_key"],
