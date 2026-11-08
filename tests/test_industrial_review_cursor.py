@@ -122,5 +122,86 @@ class IndustrialReviewCursorTests(unittest.TestCase):
             self.assertEqual(summary["ero_detail_successes_total"],2)
             self.assertEqual(summary["prior_equipment_candidates_preserved"],2)
 
+
+    def test_changed_notice_failed_recheck_holds_prior_equipment_signal(self):
+        with tempfile.TemporaryDirectory() as td:
+            out=Path(td)
+            cards=sample_cards()
+            old_notice=cards["026-1152"]
+            existing={
+                "signal_id":"pintys-physical-replace",
+                "ero_number":"026-1152",
+                "official_notice_url":old_notice["official_notice_url"],
+                "site_address":"2714 Bristol Circle",
+                "city":"Oakville",
+                "equipment":"Dust collection",
+                "action":"REPLACEMENT",
+                "replacement_equipment":"Scrubber",
+                "notice_stage":"Proposal",
+                "review_status":"MANUAL_REVIEW_REQUIRED",
+                "procurement_status":"UNKNOWN",
+                "buyer_verified":"NO",
+            }
+            with (out/pilot.OUTPUT).open("w",encoding="utf-8",newline="") as f:
+                writer=csv.DictWriter(f,fieldnames=list(existing))
+                writer.writeheader()
+                writer.writerow(existing)
+            cursor.save(out,{"version":1,"notices":{
+                "026-1152":{"status":"DETAIL_RETRIEVED",
+                            "card_fingerprint":cursor.fingerprint(old_notice)}
+            }})
+            cards["026-1152"]["notice_stage"]="Decision"
+            captured=[]
+            def failed_fetch(selected,max_notices):
+                captured.extend(selected)
+                return [],[{"ero_number":no,"status":"DETAIL_REJECTED",
+                           "reason":"HTTP_503"} for no in selected]
+            with patch.object(pilot,"read_radar_ero",return_value=cards):
+                summary=pilot.run(out,db=out/"unused.sqlite",fetch_official=True,
+                                  fetch_limit=1,official_fetcher=failed_fetch)
+            self.assertEqual(captured,["026-1152"])
+            signals=pilot._read_csv(out/pilot.OUTPUT)
+            self.assertEqual(len(signals),1)
+            self.assertEqual(signals[0]["review_status"],"SOURCE_CHANGED_OR_RECHECK_FAILED_HOLD")
+            self.assertEqual(signals[0]["procurement_status"],"UNKNOWN")
+            self.assertEqual(signals[0]["buyer_verified"],"NO")
+            self.assertEqual(summary["carried_forward_source_recheck_holds"],1)
+            self.assertIn("Evidence status",(out/pilot.HTML).read_text(encoding="utf-8"))
+            # A previously failed notice must remain retryable, not falsely complete.
+            retry=cursor.load(out,cards)
+            self.assertIn("026-1152",cursor.select(cards,retry,10))
+
+    def test_failed_unchanged_notice_recheck_does_not_hide_prior_evidence(self):
+        with tempfile.TemporaryDirectory() as td:
+            out=Path(td)
+            cards=sample_cards()
+            existing={
+                "signal_id":"old-replacement","ero_number":"026-1152",
+                "official_notice_url":"https://ero.ontario.ca/notice/026-1152",
+                "site_address":"2714 Bristol Circle","city":"Oakville",
+                "equipment":"Dust collection","action":"REPLACEMENT",
+                "review_status":"MANUAL_REVIEW_REQUIRED",
+                "notice_stage":"Proposal","procurement_status":"UNKNOWN",
+                "buyer_verified":"NO",
+            }
+            with (out/pilot.OUTPUT).open("w",encoding="utf-8",newline="") as f:
+                w=csv.DictWriter(f,fieldnames=list(existing))
+                w.writeheader()
+                w.writerow(existing)
+            cursor.save(out,{"version":1,"notices":{
+                "026-1152":{"status":"DETAIL_RETRIEVED",
+                            "card_fingerprint":cursor.fingerprint(cards["026-1152"])}
+            }})
+            # Re-fetch another notice; the unchanged old source keeps its
+            # existing review-only status rather than being marked new.
+            def recheck(selected,max_notices):
+                return [],[{"ero_number":no,"status":"DETAIL_REJECTED"} for no in selected]
+            with patch.object(pilot,"read_radar_ero",return_value=cards):
+                summary=pilot.run(out,db=out/"unused.sqlite",fetch_official=True,
+                                  fetch_limit=1,official_fetcher=recheck)
+            prior=pilot._read_csv(out/pilot.OUTPUT)
+            self.assertEqual(prior[0]["review_status"],"MANUAL_REVIEW_REQUIRED")
+            self.assertEqual(summary["carried_forward_source_recheck_holds"],0)
+
 if __name__=="__main__":
     unittest.main()
