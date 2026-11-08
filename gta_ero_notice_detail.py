@@ -28,6 +28,7 @@ CITY_ALIASES = {
     "scarborough": "Toronto", "east york": "Toronto",
     "downsview": "Toronto", "york": "Toronto",
     "st catharines": "St Catharines",
+    "town of bradford west gwillimbury": "Bradford West Gwillimbury",
 }
 
 def exact_ero_url(number, url):
