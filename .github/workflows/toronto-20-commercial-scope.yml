@@ -1,0 +1,29 @@
+name: Toronto 20 permit commercial scope evidence (PR-only)
+on:
+  pull_request:
+    paths:
+      - 'gta_toronto_20_commercial_scope_recheck.py'
+      - '.github/workflows/toronto-20-commercial-scope.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  exact-city-scope:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Bounded 20 exact official Toronto CKAN permit scope lookups
+        run: python gta_toronto_20_commercial_scope_recheck.py --out toronto_20_exact_scope_evidence.json
+      - name: Save exact-source research evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: toronto-20-exact-scope-evidence
+          path: toronto_20_exact_scope_evidence.json
+          if-no-files-found: warn
