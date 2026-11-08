@@ -63,6 +63,12 @@ REVIEW_FIELDS = (
     "source_url", "review_tier", "procurement_status", "buyer_verified",
     "opening_confirmed", "verification_required",
 )
+SOURCE_CITY = {
+    "toronto_active_building_permits": "Toronto",
+    "toronto_business_licences": "Toronto",
+    "brampton_building_permits": "Brampton",
+    "mississauga_issued_building_permits": "Mississauga",
+}
 KNOWN_CITIES = {
     "toronto","brampton","mississauga","hamilton","burlington","oakville",
     "vaughan","kitchener","markham","oshawa","milton","halton hills",
@@ -147,12 +153,14 @@ def normalized_city(value):
 
 def normalize_address(value):
     """Return conservative normalized civic street key and unit; no geocoding."""
-    addr = clean(value)
+    addr = clean(value).strip(" ,;")
     if not addr:
         return "", ""
     if re.search(r"\b(?:p\.?\s*o\.?\s*box|mailing\s+address|lot\s+\d+\s+concession)\b", addr, re.I):
         return "", ""
-    addr = CANADIAN_POSTAL.sub("", addr)
+    addr = CANADIAN_POSTAL.sub("", addr).strip(" ,;")
+    # Toronto's active-permit feed sometimes has only the first postal triplet.
+    addr = re.sub(r"\s+[A-Za-z]\d[A-Za-z]$", "", addr).strip(" ,;")
     addr = re.sub(r",?\s+(?:Toronto|Brampton|Mississauga|Oakville|Burlington|"
                   r"Vaughan|Hamilton|Kitchener|Markham|Oshawa|Milton|Guelph|Ontario|ON|Canada)"
                   r"(?:\s*,?\s*(?:Ontario|ON|Canada))?\s*$", "", addr, flags=re.I)
@@ -166,7 +174,7 @@ def normalize_address(value):
     address = " ".join(parts)
     address = re.sub(r"[^a-z0-9 -]", "", address)
     address = clean(address)
-    if not re.match(r"^\d{1,6}[a-z]?\s+[a-z0-9]", address):
+    if not re.match(r"^[1-9]\d{0,5}[a-z]?\s+[a-z0-9]", address):
         return "", ""
     if len(address) > 110:
         return "", ""
@@ -235,11 +243,17 @@ def adapt(family, row):
         buyer = "NO"
         opened = "UNKNOWN"
         evidence_hash = first(row, "source_record_sha256")
-        if not address:
-            # Preserve site clues but DO NOT call the address structured/verified.
-            match = CIVIC_EMBEDDED.search(description)
-            if match:
-                address = match.group(1)
+        if not address and len(description) <= 1200:
+            # A city index can contain MULTIPLE unrelated applications; never
+            # attribute its first street address to every file number.
+            matches = list(CIVIC_EMBEDDED.finditer(description))
+            unique = {normalize_address(m.group(1))[0] for m in matches}
+            unique.discard("")
+            if (len(unique) == 1 and
+                    description.lower().count("featured application") <= 1 and
+                    description.lower().count("city file:") <= 1 and
+                    "no municipal address" not in description.lower()):
+                address = matches[0].group(1)
                 scope = "PLANNING_DESCRIPTION_ADDRESS_UNVERIFIED"
     elif family == "industrial":
         source_id = "ero_gta_environmental_instruments"
@@ -289,7 +303,12 @@ def adapt(family, row):
         return None, "UNSUPPORTED_SOURCE_FAMILY"
     if not key or not source_id:
         return None, "MISSING_SOURCE_IDENTITY"
-    city = normalized_city(city)
+    explicit_city = normalized_city(city)
+    jurisdiction_city = SOURCE_CITY.get(source_id, "")
+    city_conflict = bool(explicit_city and jurisdiction_city and
+                         explicit_city != jurisdiction_city)
+    city_derived = not explicit_city and bool(jurisdiction_city)
+    city = "" if city_conflict else (explicit_city or jurisdiction_city)
     civic, unit = normalize_address(address)
     if not civic or not city:
         site = ""
@@ -298,6 +317,7 @@ def adapt(family, row):
         site = site_id(city, civic)
         site_status = ("DESCRIPTION_ONLY_UNVERIFIED_ADDRESS" if
                        scope == "PLANNING_DESCRIPTION_ADDRESS_UNVERIFIED" else
+                       "SOURCE_JURISDICTION_CITY_NOT_INDEPENDENTLY_CHECKED" if city_derived else
                        "STRUCTURED_CIVIC_ADDRESS_NOT_INDEPENDENTLY_GEOCODED")
     url = https(source_url)
     evidence_level = ("RECORD_URL_NOT_LIVE_CHECKED" if url and family in {"radar", "industrial"} else
@@ -325,6 +345,10 @@ def adapt(family, row):
         blockers.append("SOURCE_DATE_NOT_VERIFIED")
     if not site:
         blockers.append("SITE_ADDRESS_OR_CITY_UNVERIFIED")
+    if city_conflict:
+        blockers.append("SOURCE_CITY_CONFLICT")
+    if city_derived:
+        blockers.append("CITY_DERIVED_FROM_CONFIGURED_SOURCE_JURISDICTION")
     if site_status == "DESCRIPTION_ONLY_UNVERIFIED_ADDRESS":
         blockers.append("ADDRESS_EXTRACTED_FROM_DESCRIPTION_ONLY")
     if closed:
