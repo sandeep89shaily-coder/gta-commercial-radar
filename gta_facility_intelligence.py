@@ -37,7 +37,7 @@ OUTPUT_STATUS = "GTA_RADAR_FACILITY_INTELLIGENCE_STATUS.json"
 EVENT_FIELDS = (
     "event_id", "source_family", "source_id", "source_record_id",
     "source_url", "url_evidence_level", "record_hash", "source_date",
-    "radar_first_seen_at", "city", "site_address", "site_unit", "site_id",
+    "radar_first_seen_at", "source_age_days", "city", "site_address", "site_unit", "site_id",
     "site_identity_status", "organization", "organization_role", "project_id",
     "signal_type", "stage_label", "source_status", "description",
     "scope_specificity", "supplier_segments_possible", "procurement_status",
@@ -65,6 +65,7 @@ REVIEW_FIELDS = (
 )
 SOURCE_CITY = {
     "toronto_active_building_permits": "Toronto",
+    "toronto_development_applications": "Toronto",
     "toronto_business_licences": "Toronto",
     "brampton_building_permits": "Brampton",
     "mississauga_issued_building_permits": "Mississauga",
@@ -197,8 +198,9 @@ def read_csv(path):
         return []
 
 
-def adapt(family, row):
+def adapt(family, row, *, as_of=None, max_age_days=180):
     """All fields have explicit provenance. Never promote contact/name hints."""
+    as_of = as_of or dt.datetime.now(dt.timezone.utc).date()
     if family == "radar":
         if first(row, "observation") not in {"FIRST_OBSERVED", "RECORD_CHANGED"}:
             return None, "NOT_NEW_OR_CHANGED"
@@ -323,6 +325,11 @@ def adapt(family, row):
     evidence_level = ("RECORD_URL_NOT_LIVE_CHECKED" if url and family in {"radar", "industrial"} else
                       "SOURCE_REFERENCE_NOT_RECORD_SPECIFIC" if url else "SOURCE_URL_MISSING")
     closed = bool(TERMINAL.search(stage))
+    source_day = iso_day(event_date)
+    source_age = ((as_of - dt.date.fromisoformat(source_day)).days
+                  if source_day else None)
+    source_date_unusable = source_age is None or source_age < -1
+    stale = source_age is not None and source_age > max_age_days
     archived_baseline = (family == "planning" and
                          first(row, "observation") not in {"FIRST_OBSERVED", "RECORD_CHANGED"})
     if closed:
@@ -331,6 +338,10 @@ def adapt(family, row):
         tier = "IDENTITY_REPAIR_REQUIRED"
     elif archived_baseline:
         tier = "HISTORICAL_PLANNING_BASELINE_SITE_CONTEXT_ONLY"
+    elif stale:
+        tier = "HISTORICAL_SOURCE_DATE_REVIEW_ONLY"
+    elif source_date_unusable:
+        tier = "SOURCE_DATE_UNVERIFIED_REVIEW_ONLY"
     elif scope == "EXPLICIT_EQUIPMENT_CHANGE":
         tier = "EQUIPMENT_CHANGE_RESEARCH"
     elif family == "activation":
@@ -345,8 +356,12 @@ def adapt(family, row):
         blockers.append("NO_SOURCE_URL")
     elif evidence_level == "SOURCE_REFERENCE_NOT_RECORD_SPECIFIC":
         blockers.append("INDIVIDUAL_SOURCE_RECORD_RECHECK_REQUIRED")
-    if not iso_day(event_date):
+    if not source_day:
         blockers.append("SOURCE_DATE_NOT_VERIFIED")
+    if source_age is not None and source_age < -1:
+        blockers.append("FUTURE_SOURCE_DATE_RECHECK")
+    if stale:
+        blockers.append("SOURCE_DATE_OLDER_THAN_RESEARCH_WINDOW")
     if not observed:
         blockers.append("RADAR_FIRST_OBSERVED_TIMESTAMP_MISSING")
     if archived_baseline:
@@ -365,8 +380,10 @@ def adapt(family, row):
         "event_id":event_id(family, source_id, key),
         "source_family":family, "source_id":source_id, "source_record_id":key,
         "source_url":url, "url_evidence_level":evidence_level,
-        "record_hash":evidence_hash, "source_date":iso_day(event_date),
-        "radar_first_seen_at":observed, "city":city,
+        "record_hash":evidence_hash, "source_date":source_day,
+        "radar_first_seen_at":observed,
+        "source_age_days":str(source_age) if source_age is not None else "",
+        "city":city,
         "site_address":civic, "site_unit":unit, "site_id":site,
         "site_identity_status":site_status,
         "organization":organization, "organization_role":role,
@@ -464,8 +481,12 @@ def write_csv(path, rows, fields):
         writer.writerows(rows)
 
 
-def run(results, out=None, *, max_events=100000):
+def run(results, out=None, *, max_events=100000, as_of=None, max_age_days=180):
     results=Path(results)
+    as_of = (dt.date.fromisoformat(as_of) if isinstance(as_of, str) else
+             as_of or dt.datetime.now(dt.timezone.utc).date())
+    max_events = max(1, min(int(max_events), 100000))
+    max_age_days = max(1, min(int(max_age_days), 3650))
     out=Path(out) if out is not None else results/"FACILITY_INTELLIGENCE_PILOT"
     # A post-processing layer must never overwrite the source results.
     out.mkdir(parents=True, exist_ok=True)
@@ -478,7 +499,7 @@ def run(results, out=None, *, max_events=100000):
         rows=read_csv(results/filename)
         input_counts[family]=len(rows)
         for row in rows[:max_events]:
-            event,reason=adapt(family,row)
+            event,reason=adapt(family,row,as_of=as_of,max_age_days=max_age_days)
             if event:
                 ingested.append(event)
             else:
@@ -516,6 +537,7 @@ def run(results, out=None, *, max_events=100000):
         "</tr>"+html_rows+"</table></body></html>",encoding="utf-8")
     status={
         "mode":"OFFLINE_POSTPROCESS_READ_ONLY_SOURCES_NO_AI_NO_LIVE_FETCH",
+        "as_of":as_of.isoformat(), "max_age_days":max_age_days,
         "source_rows_seen":input_counts, "source_event_count":len(events),
         "sites_with_civic_identity":len(profiles),
         "source_records_without_safe_site":sum(not e["site_id"] for e in events),
@@ -550,8 +572,11 @@ def main():
     parser.add_argument("--results",type=Path,required=True,help="Existing GTA_RADAR_RESULTS folder")
     parser.add_argument("--out",type=Path,help="Separate reporting folder")
     parser.add_argument("--max-events",type=int,default=100000)
+    parser.add_argument("--as-of",help="Reference date YYYY-MM-DD")
+    parser.add_argument("--max-age-days",type=int,default=180)
     args=parser.parse_args()
-    print(json.dumps(run(args.results,args.out,max_events=args.max_events),indent=2))
+    print(json.dumps(run(args.results,args.out,max_events=args.max_events,
+                         as_of=args.as_of,max_age_days=args.max_age_days),indent=2))
 
 
 if __name__=="__main__":
