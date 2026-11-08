@@ -113,8 +113,8 @@ TERMINAL = re.compile(
 # "Refusal Notice" and "Revocation Pending" are not necessarily final
 # decisions; they still must NOT be presented as active supplier leads.
 ON_HOLD = re.compile(
-    r"\b(?:on hold|refusal notice|revocation pending|blocked or inactive|"
-    r"under appeal|stop work|suspended|suspension)\b", re.I,
+    r"\b(?:on hold|refusal notice|revocation pending|cancellation pending|"
+    r"blocked or inactive|under appeal|stop work|suspended|suspension|violation)\b", re.I,
 )
 ERO_NUMBER = re.compile(r"^\d{3}-\d{4}$")
 FUTURE_WORDS = re.compile(
