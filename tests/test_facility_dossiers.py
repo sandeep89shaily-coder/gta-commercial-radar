@@ -302,6 +302,32 @@ class FacilityDossierTests(unittest.TestCase):
                       [t["task_code"] for t in tasks])
         self.assertEqual(row["buyer_verified"],"NO")
 
+    def test_html_labels_portal_as_search_not_individual_source_evidence(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp);g=root/"graph";out=root/"dossiers"
+            a=event(
+                source_family="radar",
+                source_id="toronto_active_building_permits",
+                source_record_id="26 265617",
+                source_url="https://www.toronto.ca/services-payments/building-construction/building-permit/after-you-apply-for-a-building-permit/search-the-status-of-a-building-permit-application/",
+                source_lookup_key="26 265617 BLD|00",
+                url_evidence_level="SOURCE_REFERENCE_NOT_RECORD_SPECIFIC",
+                review_tier="GENERAL_PROJECT_REVIEW"
+            )
+            write_graph(g,[a],[])
+            status=dossiers.run(g,out)
+            self.assertEqual(status["portal_or_dataset_only_source_links"],1)
+            self.assertEqual(status["direct_or_derived_record_pointer_present"],0)
+            text=(out/dossiers.REPORT_HTML).read_text()
+            self.assertIn("Official search / dataset",text)
+            self.assertIn("NOT individual evidence",text)
+            self.assertIn("26 265617 BLD|00",text)
+            with (out/dossiers.DOSSIERS_CSV).open(
+                    encoding="utf-8-sig",newline="") as f:
+                row=next(csv.DictReader(f))
+            self.assertEqual(row["source_lookup_key"],"26 265617 BLD|00")
+            self.assertEqual(row["buyer_verified"],"NO")
+
     def test_missing_or_corrupted_source_still_reports_research_not_sale_ready(self):
         a=event(source_url="",organization="",source_date="",
                 review_tier="SOURCE_DATE_UNVERIFIED_REVIEW_ONLY")
