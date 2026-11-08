@@ -32,7 +32,17 @@ The bounded replayable source checker is:
 
 ## Public business contact routes
 
-`research/toronto_20_public_business_contact_routes_20261108.json` holds **9 company-published work channels spanning 8 exact project IDs**, including first-party documentation on Menkes, Commerce Court/QuadReal, Cloverdale/QuadReal, Rexall real estate, Medallion leasing, Cadillac Fairview, CBC supplier registration, Colliers leasing and Brookfield property management. Each entry links to original public corporate source and is explicitly **NOT** a verified buyer or unawarded contract. Generic phone/email channels and named professional real-estate/leasing staff are independent routes to research, not grounds for outreach or personal-contact claims.
+`research/toronto_20_public_business_contact_routes_20261108.json` holds **12 company-published work channels spanning 11 exact project IDs**, including first-party documentation on Menkes, Commerce Court/QuadReal, Cloverdale/QuadReal, Rexall real estate, Medallion leasing, Cadillac Fairview, CBC supplier registration, Colliers leasing, GWL Realty Advisors and Brookfield property management. Three newly researched site-specific channels are Colliers/Beedie at **568 Passmore Ave**, Cadillac Fairview at **77 King St W**, and GWL Realty Advisors at **5160 Yonge St**. All three are leasing or property-service channels, **not** project purchasing-authority verification. Each entry links to original public corporate source and is explicitly **NOT** a verified buyer or unawarded contract. Generic phone/email channels and named professional real-estate/leasing staff are independent routes to research, not grounds for outreach or personal-contact claims.
+
+### Contacts confirmed on business-published pages (8 November research)
+
+| Facility | Public-facing role | Channel | Explicit uncertainty |
+| --- | --- | --- | --- |
+| 568 Passmore Ave | Colliers broker Newton Leung for Beedie Passworks | +1 416-791-7202; newton.leung@colliers.com; https://www.passworksbybeedie.com/ | Broker markets space, not proven buyer of the $500,000 proposed interior improvements |
+| 77 King St W | Cadillac Fairview CF Connect and TD Centre guest services | cfconnect@cadillacfairview.com; +1 416-864-6448; https://assets.cadillacfairview.com/m/3a2c1e7e091cda96/original/Accessibility-Policy.pdf | Building services and owner association, not verified purchaser of the plumbing revision |
+| 5160 Yonge St | GWL Realty Advisors, leasing contact Amanda Barker | +1 647-676-8035; Amanda.Barker@gwlra.com; https://gwlraleasing.com/building/5160-yonge-street/ | Office leasing agent, not verified purchaser of HVAC work |
+
+The complete 12-route provenance file is machine-readable and tested in `tests/test_toronto_20_commercial_review.py`. It never fills buyer or open procurement flags from an address-level property or brokerage contact.
 
 ## Implemented offline production-safety research layer
 
