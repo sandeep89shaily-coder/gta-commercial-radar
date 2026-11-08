@@ -81,13 +81,18 @@ official publication date.** The generated manifest records the attempted source
 IDs, selection policy, original source metadata and next offset.
 
 Every explicitly opted-in City query session preserves a **new unique JSON file**
-under `TORONTO_PERMIT_EVIDENCE_PILOT/LIVE_VERIFICATION_BATCHES/`, including each
-original publicly returned CKAN row, its canonical SHA-256, the exact filtered
-query URL, the source-record stage/address, and whether the historic exported
-stage differed. Older batch files are never overwritten by a new batch, even
-though the latest CSV and top-level status JSON are replaced. A saved hash is a
-tamper-evident local research checksum, **not** a cryptographic City signature
-or third-party authenticity attestation.
+under `TORONTO_PERMIT_EVIDENCE_PILOT/LIVE_VERIFICATION_BATCHES/`. It preserves
+a **strict allowlisted projection of the original publicly returned CKAN row**,
+the projection's canonical SHA-256, exact filtered query URL, source stage/address
+and any historic-export discrepancy. The retained source columns are:
+`PERMIT_NUM`, `REVISION_NUM`, `PERMIT_TYPE`, four street-address components,
+`STATUS`, application/issued/completed dates and `WORK`.
+The audit deliberately excludes `BUILDER_NAME`, applicant/owner names, emails,
+telephone numbers and free-text `DESCRIPTION` to minimize potential personal
+information. This saved projection does **not** establish a person's identity or
+authority to purchase. Older batch files are never overwritten by the next
+batch. A saved hash is a tamper-evident local checksum of **these preserved
+columns**, not a City signature or an independently certified full raw record.
 
 `gta_toronto_permit_acceptance.py` reads these saved evidence batches **offline**
 and creates two additional research audit files:
@@ -114,6 +119,59 @@ remains **false**, regardless of this source gate.
 
 The combined manual offline review can summarize *previously saved* City batches,
 but **never starts** an opt-in CKAN request or creates a schedule.
+
+### Toronto active-to-cleared lifecycle: optional and conservative
+
+The City maintains two **distinct** permit datasets:
+
+- Active permits: `building-permits-active-permits`, known public DataStore
+  resource `6d0229af-bc54-46de-9c2b-26759b01dd05`.
+- Cleared permits (since 2017): `building-permits-cleared-permits`, known public
+  DataStore resource `a96c0ba4-3026-402b-b09d-5b1268b8f810`.
+
+Sources:
+https://open.toronto.ca/dataset/building-permits-active-permits/ and
+https://open.toronto.ca/dataset/building-permits-cleared-permits/
+
+A permit **not found in active** is never automatically classified as closed.
+Only in a separate, explicitly opted-in `--live-ckan --check-cleared` run
+can the checker resolve and search the specific **cleared since-2017** resource.
+It requires the exact original permit/revision keys and matches the resulting
+cleared source address back to Radar's original project. Unrecognized CKAN
+resource IDs or contradictory/missing site addresses fail closed.
+
+For **future** controlled verification (not needed for code development):
+
+```powershell
+py -3 gta_toronto_permit_evidence.py --results "PATH_TO_EXISTING_GTA_RADAR_RESULTS" --live-ckan --check-cleared --live-limit 10 --live-offset 0
+```
+
+At most **ten active records** plus up to **ten additional cleared lookups** can
+be made in one explicit session, with resource identity checked first.
+A cleared exact source row is recorded with `COMPLETED_DATE`, original status,
+address, source URL, minimized source-record hash and explicit historical
+classification. It is **not** a newly available sales lead. Not found in either
+source stays **status unresolved**, rather than being called cancelled.
+
+`gta_toronto_permit_acceptance.py` now produces a distinct historical evidence
+ledger `GTA_RADAR_TORONTO_CLEARED_HISTORY_VERIFICATION.csv`. It verifies the
+preserved cleared-source projection and checksum, then excludes historical
+records from the **active** sample count without conflating a legitimate
+historical lookup with a corrupt source response. Contradictory cleared
+records remain acceptance blockers.
+
+### Licence and redistribution safeguards
+
+The City permits commercial reuse subject to the
+[Open Government Licence – Toronto](https://open.toronto.ca/open-data-licence/).
+Toronto-derived audit and acceptance CSV/JSON outputs carry the attribution:
+
+**Contains information licensed under the Open Government Licence – Toronto.**
+
+Do not use City logos/crests or imply the City endorses GTA Radar. The licence
+does not grant rights to personal information; the evidence projection therefore
+excludes potentially identifying builder/applicant/contact fields. Other
+Radar sources have their own licence requirements and must be assessed separately.
 
 ### Existing November 7 archive: reproducible baseline, not new collection
 
