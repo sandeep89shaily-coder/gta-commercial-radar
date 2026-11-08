@@ -93,6 +93,7 @@ def _official_notice(url, number):
         p.scheme == "https" and p.hostname == "ero.ontario.ca"
         and p.username is None and p.password is None and p.port in (None, 443)
         and p.path.rstrip("/") == "/notice/" + number
+        and not p.query and not p.fragment
     )
 
 def _number(value):
