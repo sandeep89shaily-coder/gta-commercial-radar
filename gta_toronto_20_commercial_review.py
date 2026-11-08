@@ -187,7 +187,7 @@ def validated_city_scope(row):
     import re
     project=graph.clean(row.get("project_id",""))
     key=graph.clean(row.get("permit_key",""))
-    match=re.fullmatch(r"(\\d{2} \\d{6}) ([A-Z]{3})\\|(\\d{2})",key)
+    match=re.fullmatch(r"(\d{2} \d{6}) ([A-Z]{3})\|(\d{2})",key)
     if not match or project!="toronto_active_building_permits:"+match.group(1):
         raise ValueError("City permit project ID and exact revision key mismatch")
     if row.get("source_lookup_validation")!="EXACT_PERMIT_AND_REVISION_AND_CIVIC_ADDRESS_MATCH_CITY_DATASET":
