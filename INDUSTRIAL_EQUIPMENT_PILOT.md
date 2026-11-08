@@ -99,3 +99,15 @@ The reviewed correction now emits **one replacement event** with `equipment=Dust
 The fifth notice, Five Star Farms `026-1160`, was incorrectly rejected for a missing site city. Its site-address section has an extra **Lots 9 & 10, Concession 1** line before **Kingsville, ON**. The parser now searches within that labelled address section for the actual city, and the target-area gate correctly excludes Kingsville as out of scope.
 
 No verified purchasing opportunity or proven project join was established. These fixes require a fresh live check before production acceptance.
+
+
+## November 8 continuation — source-change hold protection (PR #152)
+
+The original 5/5 official source-parsing acceptance from the November 7 uploaded ZIP is preserved; no new live source claim is made here. The manual run now explicitly marks a **carried-forward** equipment row `SOURCE_CHANGED_OR_RECHECK_FAILED_HOLD` when its notice changes stage/source publication fingerprint but the new official detail has not been successfully recovered, or when an attempted exact-notice refresh fails (HTTP, source restriction or parser failure). Its buyer and procurement statuses stay `NO`/`UNKNOWN`.
+
+- A successfully rechecked source still replaces earlier findings as before; a page with no supported equipment text does not leave an obsolete old finding.
+- An unchanged previously verified notice can be carried forward as historical review evidence, not a fresh lead; the new status JSON counts `carried_forward_source_recheck_holds` and the HTML report shows **Evidence status**.
+- The review cursor keeps failed IDs retryable; it does not mark failed requests as completed.
+- Added mocked end-to-end regression for an ERO Proposal-to-Decision change followed by HTTP failure, plus unaffected previous evidence and retry behavior.
+
+**Acceptance remains pending:** no fresh authorized 10-notice live run in this checkpoint, no confirmation of current equipment purchasing or buyers, and no automatic commercial promotion. Production manual daily launcher and shared AI budget unchanged. This is a source safety fix on the draft branch.
