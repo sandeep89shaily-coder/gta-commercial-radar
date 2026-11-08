@@ -210,6 +210,22 @@ class TorontoSourceAcceptanceTests(unittest.TestCase):
             self.assertEqual(s["distinct_physical_sites_rechecked"],1)
             self.assertFalse(s["official_source_sample_gate_passed"])
 
+    def test_integrity_failure_blocks_gate_even_with_twenty_good_records(self):
+        with tempfile.TemporaryDirectory() as root:
+            p=Path(root);b=p/"batches"
+            batch(b,[row(i,status="Permit Issued") for i in range(10)],suffix="A")
+            batch(b,[row(i,status="Inspection") for i in range(10,20)],suffix="B")
+            bad=batch(b,[row(20)],suffix="C")
+            data=json.loads(bad.read_text())
+            data["original_public_ckan_rows_by_source_key"][
+                data["audit_records"][0]["source_key"]]["STATUS"]="INVALIDATED"
+            bad.write_text(json.dumps(data),encoding="utf-8")
+            report=gate.run(b,p/"out",as_of=AS_OF)
+            self.assertEqual(report["recent_unique_exact_ckan_source_records"],20)
+            self.assertEqual(report["integrity_or_source_mismatch_rejection_count"],1)
+            self.assertFalse(report["official_source_sample_gate_passed"])
+            self.assertFalse(report["commercial_production_accepted"])
+
     def test_stale_evidence_batch_not_counted_as_recent(self):
         with tempfile.TemporaryDirectory() as root:
             p=Path(root);b=p/"batches"
