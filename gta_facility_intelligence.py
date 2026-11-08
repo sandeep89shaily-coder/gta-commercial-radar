@@ -33,6 +33,13 @@ OUTPUT_LINKS = "GTA_RADAR_FACILITY_SOURCE_LINKS.csv"
 OUTPUT_REVIEW = "GTA_RADAR_FACILITY_COMMERCIAL_REVIEW.csv"
 OUTPUT_HTML = "GTA_RADAR_FACILITY_INTELLIGENCE.html"
 OUTPUT_STATUS = "GTA_RADAR_FACILITY_INTELLIGENCE_STATUS.json"
+REQUIRED_INPUT_FIELDS = {
+    "radar": {"project_id", "source_id", "observation"},
+    "planning": {"canonical_id", "record_kind", "city"},
+    "industrial": {"ero_number", "signal_id", "site_address"},
+    "activation": {"source_id", "source_record_key", "municipality"},
+}
+SITE_LINK_CAP = 200
 
 EVENT_FIELDS = (
     "event_id", "source_family", "source_id", "source_record_id",
@@ -197,12 +204,22 @@ def event_id(family, source, key):
     return hashlib.sha256((family+"|"+source+"|"+key).encode("utf-8")).hexdigest()[:20]
 
 
-def read_csv(path):
-    try:
-        with Path(path).open("r", encoding="utf-8-sig", newline="") as f:
-            return list(csv.DictReader(f))
-    except (FileNotFoundError, UnicodeError, csv.Error):
+def read_csv(path, required_fields=()):
+    path = Path(path)
+    if not path.is_file():
         return []
+    try:
+        with path.open("r", encoding="utf-8-sig", newline="") as f:
+            reader = csv.DictReader(f)
+            columns = set(reader.fieldnames or [])
+            missing = set(required_fields) - columns
+            if missing:
+                raise ValueError("Unexpected source CSV schema in "+path.name+
+                                 "; missing: "+", ".join(sorted(missing)))
+            return list(reader)
+    except (UnicodeError, csv.Error) as exc:
+        raise ValueError("Unreadable source CSV "+path.name+
+                         "; refusing to silently report zero records") from exc
 
 
 def adapt(family, row, *, as_of=None, max_age_days=180):
@@ -450,11 +467,14 @@ def relationships(events):
             by_site[e["site_id"]].append(e)
     links = []
     for site, group in sorted(by_site.items()):
-        group.sort(key=lambda x:x["event_id"])
-        # Bounded link generation: 1000 records at one building would otherwise
-        # produce half a million relationship rows.
-        for pos,left in enumerate(group[:200]):
-            for right in group[pos+1:200]:
+        # Prefer recent evidence when a facility has more than the bounded
+        # number of events. Excluded older site records remain in event CSV.
+        group.sort(key=lambda x:(x["source_date"],x["radar_first_seen_at"],
+                                 x["event_id"]), reverse=True)
+        # An active multi-tenant site can have thousands of permits. Never
+        # produce a misleading unbounded quadratic relationship export.
+        for pos,left in enumerate(group[:SITE_LINK_CAP]):
+            for right in group[pos+1:SITE_LINK_CAP]:
                 if left["source_family"]==right["source_family"]:
                     continue
                 if (left["site_identity_status"]=="DESCRIPTION_ONLY_UNVERIFIED_ADDRESS" or
@@ -546,8 +566,11 @@ def run(results, out=None, *, max_events=100000, as_of=None, max_age_days=180):
     ingested=[]
     exclusions=Counter()
     input_counts={}
+    inputs_present={}
     for family,filename in INPUTS:
-        rows=read_csv(results/filename)
+        source_file = results/filename
+        inputs_present[family] = source_file.is_file()
+        rows=read_csv(source_file, REQUIRED_INPUT_FIELDS[family])
         input_counts[family]=len(rows)
         for row in rows[:max_events]:
             event,reason=adapt(family,row,as_of=as_of,max_age_days=max_age_days)
@@ -569,6 +592,7 @@ def run(results, out=None, *, max_events=100000, as_of=None, max_age_days=180):
     events=sorted(by_id.values(),key=lambda x:(x["source_date"],x["event_id"]),reverse=True)
     links=relationships(events)
     profiles=facility_profiles(events,links)
+    site_sizes=Counter(e["site_id"] for e in events if e["site_id"])
     write_csv(out/OUTPUT_EVENTS,events,EVENT_FIELDS)
     write_csv(out/OUTPUT_FACILITIES,profiles,FACILITY_FIELDS)
     write_csv(out/OUTPUT_LINKS,links,LINK_FIELDS)
@@ -589,7 +613,14 @@ def run(results, out=None, *, max_events=100000, as_of=None, max_age_days=180):
     status={
         "mode":"OFFLINE_POSTPROCESS_READ_ONLY_SOURCES_NO_AI_NO_LIVE_FETCH",
         "as_of":as_of.isoformat(), "max_age_days":max_age_days,
-        "source_rows_seen":input_counts, "source_event_count":len(events),
+        "source_rows_seen":input_counts,
+        "source_exports_present":inputs_present,
+        "source_exports_missing":[k for k,present in inputs_present.items() if not present],
+        "source_event_count":len(events),
+        "site_relationship_link_cap":SITE_LINK_CAP,
+        "sites_exceeding_link_cap":sum(size>SITE_LINK_CAP for size in site_sizes.values()),
+        "older_site_events_not_pairwise_linked_due_cap":sum(
+            max(0,size-SITE_LINK_CAP) for size in site_sizes.values()),
         "sites_with_civic_identity":len(profiles),
         "source_records_without_safe_site":sum(not e["site_id"] for e in events),
         "cross_source_civic_relationships":len(links),
