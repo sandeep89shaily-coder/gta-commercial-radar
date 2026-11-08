@@ -300,10 +300,19 @@ def run(out, *, db=None, notice_csv=None, results=None, fetch_official=False,
     fetch_audit = []
     visited = None
     chosen = {}
+    # Preserve the pre-attempt source fingerprints so failed or policy-blocked
+    # refreshes cannot leave an older proposal looking like a current signal.
+    changed_notice_ids = set()
+    failed_recheck_ids = set()
     previous_signals = _read_csv(out / OUTPUT) if fetch_official else []
     if fetch_official:
         import gta_industrial_review_cursor as cursor
         visited = cursor.load(out,cards)
+        changed_notice_ids = {
+            no for no,card in cards.items()
+            if (prior := visited.get("notices",{}).get(no))
+            and prior.get("card_fingerprint") != cursor.fingerprint(card)
+        }
         chosen = cursor.select(cards,visited,fetch_limit)
         if chosen:
             from gta_ero_notice_detail import fetch_notice_details
@@ -312,6 +321,11 @@ def run(out, *, db=None, notice_csv=None, results=None, fetch_official=False,
             for record in fetched:
                 if _number(record.get("ero_number")) and record["ero_number"] not in notices:
                     notices[record["ero_number"]] = record
+            # Only a successfully parsed exact notice clears a pending hold.
+            # A robots denial, invalid URL, or partial HTTP/HTML failure leaves
+            # existing evidence visible but explicitly NOT current.
+            refreshed = set(notices).intersection(chosen)
+            failed_recheck_ids = set(chosen) - refreshed
             cursor.update(visited,chosen,fetch_audit)
             cursor.save(out,visited)
         else:
@@ -379,7 +393,18 @@ def run(out, *, db=None, notice_csv=None, results=None, fetch_official=False,
              if _number(row.get("ero_number")) not in updated_notice_ids
              and _number(row.get("ero_number"))
              and _official_notice(row.get("official_notice_url",""),row["ero_number"])]
+    held_prior_count = 0
     for old in prior:
+        number = old["ero_number"]
+        card = cards.get(number,{})
+        if number in failed_recheck_ids or number in changed_notice_ids or (
+            card and _str(card.get("notice_stage")).casefold() !=
+            _str(old.get("notice_stage")).casefold()
+        ):
+            old["review_status"] = "SOURCE_CHANGED_OR_RECHECK_FAILED_HOLD"
+            old["procurement_status"] = "UNKNOWN"
+            old["buyer_verified"] = "NO"
+            held_prior_count += 1
         if not old.get("site_address") or not old.get("city"):
             continue
         if old.get("same_site_history_status")=="UNVERIFIED_DESCRIPTION_ONLY_SITE_CONTEXT":
@@ -405,7 +430,7 @@ def run(out, *, db=None, notice_csv=None, results=None, fetch_official=False,
     rows = "".join(
         "<tr>" + "".join("<td>" + html.escape(str(s.get(key, ""))) + "</td>"
                             for key in ("ero_number", "proponent", "city", "equipment",
-                                        "action", "replacement_equipment", "official_excerpt", "project_match_status")) +
+                                        "action", "replacement_equipment", "official_excerpt", "project_match_status", "review_status")) +
         "</tr>" for s in signals
     )
     (out / HTML).write_text(
@@ -416,7 +441,7 @@ def run(out, *, db=None, notice_csv=None, results=None, fetch_official=False,
         "<p>These are source-text change candidates, not verified orders, open bids, "
         "or proven company/project matches. Each finding needs official notice recheck.</p>"
         "<table><tr><th>ERO</th><th>Proponent</th><th>City</th><th>Equipment</th>"
-        "<th>Action</th><th>Replacement with</th><th>Source excerpt</th><th>Project link</th></tr>" + rows +
+        "<th>Action</th><th>Replacement with</th><th>Source excerpt</th><th>Project link</th><th>Evidence status</th></tr>" + rows +
         "</table></body></html>", encoding="utf-8"
     )
     summary = {
@@ -430,6 +455,7 @@ def run(out, *, db=None, notice_csv=None, results=None, fetch_official=False,
         "equipment_change_candidates": len(signals),
         "new_equipment_candidates_this_run": new_signal_count,
         "prior_equipment_candidates_preserved": len(prior),
+        "carried_forward_source_recheck_holds": held_prior_count,
         "ero_detail_successes_total": (
             __import__("gta_industrial_review_cursor").reviewed_count(visited)
             if visited is not None else 0),
