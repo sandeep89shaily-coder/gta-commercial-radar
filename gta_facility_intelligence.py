@@ -231,7 +231,7 @@ def adapt(family, row):
         organization = ""
         role = "UNKNOWN"
         description = first(row, "description")
-        stage = first(row, "status")
+        stage = first(row, "current_status", "status")
         scope = "PLANNING_APPLICATION"
         segments = ""
         event_date = first(row, "date")
@@ -323,8 +323,12 @@ def adapt(family, row):
     evidence_level = ("RECORD_URL_NOT_LIVE_CHECKED" if url and family in {"radar", "industrial"} else
                       "SOURCE_REFERENCE_NOT_RECORD_SPECIFIC" if url else "SOURCE_URL_MISSING")
     closed = bool(TERMINAL.search(stage))
+    archived_baseline = (family == "planning" and
+                         first(row, "observation") not in {"FIRST_OBSERVED", "RECORD_CHANGED"})
     if closed:
         tier = "HISTORICAL_OR_TERMINAL_REVIEW_ONLY"
+    elif archived_baseline:
+        tier = "HISTORICAL_PLANNING_BASELINE_SITE_CONTEXT_ONLY"
     elif not site:
         tier = "IDENTITY_REPAIR_REQUIRED"
     elif scope == "EXPLICIT_EQUIPMENT_CHANGE":
@@ -343,6 +347,10 @@ def adapt(family, row):
         blockers.append("INDIVIDUAL_SOURCE_RECORD_RECHECK_REQUIRED")
     if not iso_day(event_date):
         blockers.append("SOURCE_DATE_NOT_VERIFIED")
+    if not observed:
+        blockers.append("RADAR_FIRST_OBSERVED_TIMESTAMP_MISSING")
+    if archived_baseline:
+        blockers.append("PLANNING_BASELINE_NOT_NEW_DISCOVERY")
     if not site:
         blockers.append("SITE_ADDRESS_OR_CITY_UNVERIFIED")
     if city_conflict:
@@ -438,7 +446,9 @@ def facility_profiles(events, links):
             "latest_source_date":dates[-1] if dates else "",
             "organization_mentions_unverified":";".join(values)[:900],
             "signal_types":";".join(sorted({x["signal_type"] for x in group})),
-            "cross_source_civic_matches":len(related),
+            "cross_source_civic_matches":sum(
+                x["relationship"] != "DIFFERENT_UNITS_NOT_SAME_TENANT"
+                for x in related),
             "unit_conflicts":sum(x["relationship"]=="DIFFERENT_UNITS_NOT_SAME_TENANT" for x in related),
             "status":"SITE_HISTORY_NOT_VERIFIED_PROJECT_OR_COMPANY_GRAPH",
             "verification_required":"Confirm exact facility, tenant/operator, stage, purchasing authority",
@@ -509,7 +519,11 @@ def run(results, out=None, *, max_events=100000):
         "source_rows_seen":input_counts, "source_event_count":len(events),
         "sites_with_civic_identity":len(profiles),
         "source_records_without_safe_site":sum(not e["site_id"] for e in events),
-        "cross_source_candidate_links":len(links),
+        "cross_source_civic_relationships":len(links),
+        "cross_source_candidate_links":sum(
+            link["relationship"] != "DIFFERENT_UNITS_NOT_SAME_TENANT" for link in links),
+        "unit_conflicts_blocked":sum(
+            link["relationship"] == "DIFFERENT_UNITS_NOT_SAME_TENANT" for link in links),
         "cross_source_links_verified_as_same_project":0,
         "verified_open_supplier_contracts":0,
         "verified_buyers":0, "verified_business_openings":0,
