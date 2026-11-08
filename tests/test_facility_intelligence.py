@@ -183,6 +183,32 @@ class FacilityIntelligenceTests(unittest.TestCase):
         self.assertEqual(row["radar_first_seen_at"],"2026-11-08T09:00:00-05:00")
         self.assertEqual(row["procurement_status"],"UNKNOWN")
 
+    def test_historical_source_date_cannot_be_relabelled_fresh(self):
+        row,why=graph.adapt("radar",{
+            "project_id":"T:OLD","observation":"FIRST_OBSERVED",
+            "source_id":"toronto_active_building_permits","city":"Toronto",
+            "address":"100 Queen Street","source_record_date":"2019-07-02",
+            "first_seen_local":"2026-11-08T08:30:00-05:00",
+            "description":"Historical tenant fit-out",
+        },as_of=__import__("datetime").date(2026,11,8))
+        self.assertIsNone(why)
+        self.assertEqual(row["review_tier"],"HISTORICAL_SOURCE_DATE_REVIEW_ONLY")
+        self.assertIn("SOURCE_DATE_OLDER_THAN_RESEARCH_WINDOW",
+                      row["verification_required"])
+        self.assertGreater(int(row["source_age_days"]),180)
+        self.assertEqual(row["procurement_status"],"UNKNOWN")
+
+    def test_source_date_missing_does_not_become_new_publication(self):
+        row,_=graph.adapt("industrial",{
+            "ero_number":"026-1152","signal_id":"a",
+            "city":"Oakville","site_address":"2714 Bristol Circle",
+            "notice_stage":"Proposal","radar_first_seen_at":"2026-11-08T09:00:00Z",
+        },as_of=__import__("datetime").date(2026,11,8))
+        self.assertEqual(row["review_tier"],"SOURCE_DATE_UNVERIFIED_REVIEW_ONLY")
+        self.assertIn("SOURCE_DATE_NOT_VERIFIED",row["verification_required"])
+        self.assertEqual(row["source_date"],"")
+        self.assertEqual(row["opening_confirmed"],"UNKNOWN")
+
     def test_normalizing_pob_and_missing_city_remains_in_audit(self):
         a,_=event("radar",address="PO Box 110")
         self.assertEqual(a["site_id"],"")
