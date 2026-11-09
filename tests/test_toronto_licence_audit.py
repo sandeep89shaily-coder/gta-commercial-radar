@@ -41,6 +41,7 @@ class TorontoLicenceAuditTests(unittest.TestCase):
                                  "2026-11-09"))
                     con.execute("INSERT INTO record_versions VALUES (?,?,?,?)",
                                 (i,"toronto_business_licences",key,json.dumps(payload)))
+                con.commit()
             out=analyze(db,as_of=dt.date(2026,11,9),limit=100)
             self.assertEqual(out["active_records_in_ledger"],3)
             self.assertEqual(out["metric_counts"]["recent_active_target_even_without_site"],2)
