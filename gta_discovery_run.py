@@ -75,17 +75,29 @@ def execute(workspace=None,*,runner=None,preflight=None,list_builder=None,integr
         unified=(integrator or run_integrated_intelligence)(
             results,allow_paid=outcome.returncode==0)
         record["integrated_intelligence"]={
-            k:unified.get(k) for k in ("status","failed_stages","combined_records",
-               "combined_csv","combined_html","pdfs_captured_in_union",
+            k:unified.get(k) for k in ("status","failed_stages","blocked_sources",
+               "combined_records","combined_csv","combined_html","pdfs_captured_in_union",
                "new_source_dated_project_candidates","deepseek_shared_ceiling_usd")}
-        record["meeting_document_pipeline_complete"]=unified.get("status")=="INTEGRATED_REVIEW_READY"
+        # An inaccessible optional municipal source is a coverage warning,
+        # not a failed collector or a failed completed intelligence review.
+        # Actual FAILED processing stages still fail the run.
+        review_status=unified.get("status")
+        blocked_only=(review_status=="PARTIAL_REVIEW_REQUIRED"
+                      and bool(unified.get("blocked_sources"))
+                      and not unified.get("failed_stages"))
+        record["meeting_document_pipeline_complete"]=(
+            review_status=="INTEGRATED_REVIEW_READY" or blocked_only)
+        record["review_source_coverage_partial"]=blocked_only
     except Exception as exc:
         record["meeting_document_pipeline_complete"]=False
         record["integrated_intelligence"]={"status":"FAILED",
             "error":type(exc).__name__+": "+str(exc)[:250]}
     record["completed"]=outcome.returncode==0 and record["meeting_document_pipeline_complete"]
-    record["status"]=("INTEGRATED_INTELLIGENCE_READY" if record["completed"] else
-                      "INTEGRATED_PARTIAL_REVIEW_REQUIRED")
+    record["status"]=(
+        "INTEGRATED_INTELLIGENCE_READY_WITH_BLOCKED_SOURCES"
+        if record["completed"] and record.get("review_source_coverage_partial")
+        else "INTEGRATED_INTELLIGENCE_READY" if record["completed"]
+        else "INTEGRATED_PARTIAL_REVIEW_REQUIRED")
     record["finished"]=dt.datetime.now().astimezone().isoformat()
     save()
     print("PROJECTS TO REVIEW:",listing["new_or_changed_source_records"],flush=True)

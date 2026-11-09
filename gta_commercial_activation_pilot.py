@@ -68,6 +68,12 @@ def event_date(value):
 def physical_site(raw,source):
  if source=="toronto_active_building_permits":
   addr=text(" ".join(get(raw,k) for k in ("STREET_NUM","STREET_NAME","STREET_TYPE","STREET_DIRECTION")))
+ elif source=="toronto_business_licences":
+  # City of Toronto MLS file uses these published source-field names, not
+  # the synthetic ADDRESS field used in the original pilot's fixture.
+  addr=get(raw,"LICENCE ADDRESS LINE 1","LICENSE ADDRESS LINE 1",
+           "LICENCE_ADDRESS_LINE_1","LICENSE_ADDRESS_LINE_1",
+           "ADDRESS","BUSINESS_ADDRESS")
  else:addr=get(raw,"ADDRESS","BUSINESS_ADDRESS")
  unit=get(raw,"UNIT_NO","UNIT","SUITE")
  if not addr or re.search(r"p\.?\s*o\.?\s*box|mailing address",addr,re.I):return "",""
@@ -116,13 +122,16 @@ def classify(record,as_of,window_days):
  status=get(raw,"STATUS","LICENCE_STATUS","STATUSDESC")
  category=get(raw,"CATEGORY","LICENCE_CATEGORY")
  if kind=="licence":
-  if TERMINAL.search(status) or RENEWAL.search(status+" "+get(raw,"TRANSACTION_TYPE","LICENCE_TYPE")):
+  # A cancellation date is first-party evidence even when the source has no
+  # generic STATUS column; do not mistake the Last Record Update for issuance.
+  cancelled=get(raw,"CANCEL DATE","CANCEL_DATE","CANCELDATE")
+  if cancelled or TERMINAL.search(status) or RENEWAL.search(status+" "+get(raw,"TRANSACTION_TYPE","LICENCE_TYPE")):
    return None,"TERMINAL_OR_RENEWED_LICENCE"
   sector=next((name for pat,name in LICENCE_TYPES if re.search(pat,category,re.I)),None)
   if not sector:return None,"NON_TARGET_LICENCE"
-  when=event_date(get(raw,"LICENCE_ISSUED_DATE","ISSUED_DATE","DATE_ISSUED"))
+  when=event_date(get(raw,"LICENCE_ISSUED_DATE","ISSUED_DATE","DATE_ISSUED","ISSUED"))
   stage="LICENCE_ISSUED_NOT_OPENING_CONFIRMED"
-  name=get(raw,"OPERATING_NAME","CLIENT_NAME")
+  name=get(raw,"OPERATING_NAME","OPERATING NAME","CLIENT_NAME","CLIENT NAME")
   excerpt=category
  else:
   if TERMINAL.search(status):return None,"CLOSED_CANCELLED_OR_TERMINAL_PERMIT"
@@ -188,10 +197,17 @@ def run(db,out,*,as_of=None,window_days=120,max_per_source=40000):
  window_days=max(1,min(int(window_days),365))
  records,counts=read_snapshots(db,max_per_source)
  results=[];excluded={}
+ per_source={source:{"rows_read":counts.get(source,0),
+                     "candidates":0,"excluded_counts":{}} for source in SOURCES}
  for rec in records:
   row,reason=classify(rec,as_of,window_days)
-  if row:results.append(row)
-  else:excluded[reason]=excluded.get(reason,0)+1
+  src=per_source[rec["source"]]
+  if row:
+   results.append(row)
+   src["candidates"]+=1
+  else:
+   excluded[reason]=excluded.get(reason,0)+1
+   src["excluded_counts"][reason]=src["excluded_counts"].get(reason,0)+1
  add_site_links(results)
  results.sort(key=lambda x:(x["source_event_date"],x["source_id"],x["source_record_key"]),reverse=True)
  out=Path(out);out.mkdir(parents=True,exist_ok=True)
@@ -212,6 +228,7 @@ def run(db,out,*,as_of=None,window_days=120,max_per_source=40000):
   "as_of":as_of.isoformat(),"window_days":window_days,
   "source_rows_read":counts,"source_rows_total_read":len(records),
   "activation_review_candidates":len(results),
+  "source_diagnostics":per_source,
   "same_site_cross_source_rows":sum(r["same_site_link_status"]=="SAME_CIVIC_SITE_TENANT_UNVERIFIED" for r in results),
   "excluded_counts":dict(sorted(excluded.items())),
   "verified_openings":0,"verified_opening_dates":0,"verified_buyers":0,"verified_open_supplier_contracts":0,
