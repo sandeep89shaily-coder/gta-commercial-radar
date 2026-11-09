@@ -220,7 +220,7 @@ class ActivationPilotTests(unittest.TestCase):
                     con.execute("INSERT INTO record_versions VALUES (?,?,?,?)",
                                 (i,"toronto_business_licences",key,json.dumps(raw)))
                 con.commit()
-                con.close()
+            con.close()
             records,counts=p.read_snapshots(db,2,as_of=TODAY,window_days=120)
             selected=[r for r in records if r["source"]=="toronto_business_licences"]
             self.assertEqual(counts["toronto_business_licences"],2)
