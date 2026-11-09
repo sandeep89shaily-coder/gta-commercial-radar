@@ -93,6 +93,9 @@ def analyze(db, *, limit=40000, as_of=None, window_days=120):
                 "raw":raw,"first_seen":str(seen or ""),"sha":""},
                 as_of,window_days)
             exclusions[reason if reason else "ACCEPTED"] += 1
+        # Windows keeps the SQLite file locked while a SELECT cursor lives,
+        # even if the connection has left its context manager.
+        cursor.close()
 
     return {
         "source":SOURCE,
