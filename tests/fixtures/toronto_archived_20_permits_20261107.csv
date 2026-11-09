@@ -1,0 +1,21 @@
+project_id,source_id,source_keys,address,current_source_status,source_record_date,observation,full_source_keys
+toronto_active_building_permits:26 265617,toronto_active_building_permits,26 265617 BLD|00,220 YONGE ST M5B,Pending Parent Folder Review,2026-11-05,FIRST_OBSERVED,26 265617 HVA|00 | 26 265617 BLD|00 | 26 265617 PLB|00
+toronto_active_building_permits:26 263884,toronto_active_building_permits,26 263884 BLD|00,29 JUTLAND RD M8Z,Refusal Notice,2026-11-02,RECORD_CHANGED,26 263884 BLD|00
+toronto_active_building_permits:26 265225,toronto_active_building_permits,26 265225 BLD|00,333 BAY ST,Issuance Pending,2026-11-04,RECORD_CHANGED,26 265225 BLD|00 | 26 265225 HVA|00
+toronto_active_building_permits:26 265599,toronto_active_building_permits,26 265599 BLD|00,199 BAY ST,Application Acceptable,2026-11-05,FIRST_OBSERVED,26 265599 PLB|00 | 26 265599 HVA|00 | 26 265599 BLD|00
+toronto_active_building_permits:26 265861,toronto_active_building_permits,26 265861 BLD|00,568 PASSMORE AVE,Application Acceptable,2026-11-05,FIRST_OBSERVED,26 265861 PLB|00 | 26 265861 HVA|00 | 26 265861 BLD|00
+toronto_active_building_permits:26 265943,toronto_active_building_permits,26 265943 BLD|00,4711 YONGE ST M2N,Application Acceptable,2026-11-05,FIRST_OBSERVED,26 265943 PLB|00 | 26 265943 BLD|00 | 26 265943 HVA|00
+toronto_active_building_permits:26 266215,toronto_active_building_permits,26 266215 BLD|00,945 MIDDLEFIELD RD M1V,Application Acceptable,2026-11-05,FIRST_OBSERVED,26 266215 BLD|00 | 26 266215 HVA|00 | 26 266215 PLB|00
+toronto_active_building_permits:26 266229,toronto_active_building_permits,26 266229 BLD|00,250 THE EAST MALL M9B,Application Acceptable,2026-11-05,FIRST_OBSERVED,26 266229 HVA|00 | 26 266229 PLB|00 | 26 266229 BLD|00
+toronto_active_building_permits:26 230833,toronto_active_building_permits,26 230833 HVA|01,5160 YONGE ST M2N,Application Acceptable,2026-11-05,FIRST_OBSERVED,26 230833 HVA|01
+toronto_active_building_permits:26 265928,toronto_active_building_permits,26 265928 BLD|00,673 YONGE ST M4Y,Application Acceptable,2026-11-05,FIRST_OBSERVED,26 265928 BLD|00
+toronto_active_building_permits:26 266222,toronto_active_building_permits,26 266222 BLD|00,33 BAY ST M5J,Application Acceptable,2026-11-05,FIRST_OBSERVED,26 266222 BLD|00
+toronto_active_building_permits:26 265156,toronto_active_building_permits,26 265156 PLB|00,74 VICTORIA ST M5C,Application Acceptable,2026-11-04,RECORD_CHANGED,26 265156 PLB|00
+toronto_active_building_permits:26 123421,toronto_active_building_permits,26 123421 DRN|00,128 SHEPPARD AVE W M2N,Permit Issued,2026-11-03,RECORD_CHANGED,26 123421 DRN|00 | 26 123421 PLB|00
+toronto_active_building_permits:26 237243,toronto_active_building_permits,26 237243 BLD|00,300 CONSILIUM PL M1H,Permit Issued,2026-11-05,RECORD_CHANGED,26 237243 PLB|00 | 26 237243 HVA|00 | 26 237243 BLD|00 | 26 237243 FSU|00
+toronto_active_building_permits:26 245005,toronto_active_building_permits,26 245005 BLD|00,45 WICKSTEED AVE,Permit Issued,2026-11-05,RECORD_CHANGED,26 245005 PLB|00 | 26 245005 BLD|00 | 26 245005 HVA|00
+toronto_active_building_permits:26 247517,toronto_active_building_permits,26 247517 PLB|00,434 DUNDAS ST W M5T,Permit Issued,2026-11-05,RECORD_CHANGED,26 247517 PLB|00 | 26 247517 HVA|00
+toronto_active_building_permits:26 255822,toronto_active_building_permits,26 255822 BLD|00,1455 O'CONNOR DR M4B,Permit Issued,2026-11-05,RECORD_CHANGED,26 255822 BLD|00 | 26 255822 HVA|00 | 26 255822 PLB|00
+toronto_active_building_permits:26 262684,toronto_active_building_permits,26 262684 BLD|00,250 FRONT ST W M5V,Permit Issued,2026-11-05,RECORD_CHANGED,26 262684 BLD|00 | 26 262684 HVA|00 | 26 262684 PLB|00
+toronto_active_building_permits:24 107964,toronto_active_building_permits,24 107964 HVA|02,975 COLLEGE ST M6H,Revision Issued,2026-11-05,RECORD_CHANGED,24 107964 HVA|02
+toronto_active_building_permits:25 259055,toronto_active_building_permits,25 259055 PLB|01,77 KING ST W,Revision Issued,2026-11-05,RECORD_CHANGED,25 259055 PLB|01
