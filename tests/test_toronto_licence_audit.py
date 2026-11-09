@@ -1,6 +1,7 @@
 """Small read-only regression for aggregate Toronto licence diagnostics."""
 import datetime as dt
 import json
+from contextlib import closing
 import sqlite3
 import tempfile
 import unittest
@@ -12,7 +13,7 @@ class TorontoLicenceAuditTests(unittest.TestCase):
     def test_aggregate_audit_never_emits_business_identity(self):
         with tempfile.TemporaryDirectory() as td:
             db=Path(td)/"radar.sqlite"
-            with sqlite3.connect(db) as con:
+            with closing(sqlite3.connect(db)) as con:
                 con.executescript("""
                     CREATE TABLE records_current(
                         source_id TEXT, record_key TEXT, first_seen_at TEXT,
