@@ -68,6 +68,12 @@ def event_date(value):
 def physical_site(raw,source):
  if source=="toronto_active_building_permits":
   addr=text(" ".join(get(raw,k) for k in ("STREET_NUM","STREET_NAME","STREET_TYPE","STREET_DIRECTION")))
+ elif source=="toronto_business_licences":
+  # City of Toronto MLS file uses these published source-field names, not
+  # the synthetic ADDRESS field used in the original pilot's fixture.
+  addr=get(raw,"LICENCE ADDRESS LINE 1","LICENSE ADDRESS LINE 1",
+           "LICENCE_ADDRESS_LINE_1","LICENSE_ADDRESS_LINE_1",
+           "ADDRESS","BUSINESS_ADDRESS")
  else:addr=get(raw,"ADDRESS","BUSINESS_ADDRESS")
  unit=get(raw,"UNIT_NO","UNIT","SUITE")
  if not addr or re.search(r"p\.?\s*o\.?\s*box|mailing address",addr,re.I):return "",""
@@ -116,13 +122,16 @@ def classify(record,as_of,window_days):
  status=get(raw,"STATUS","LICENCE_STATUS","STATUSDESC")
  category=get(raw,"CATEGORY","LICENCE_CATEGORY")
  if kind=="licence":
-  if TERMINAL.search(status) or RENEWAL.search(status+" "+get(raw,"TRANSACTION_TYPE","LICENCE_TYPE")):
+  # A cancellation date is first-party evidence even when the source has no
+  # generic STATUS column; do not mistake the Last Record Update for issuance.
+  cancelled=get(raw,"CANCEL DATE","CANCEL_DATE","CANCELDATE")
+  if cancelled or TERMINAL.search(status) or RENEWAL.search(status+" "+get(raw,"TRANSACTION_TYPE","LICENCE_TYPE")):
    return None,"TERMINAL_OR_RENEWED_LICENCE"
   sector=next((name for pat,name in LICENCE_TYPES if re.search(pat,category,re.I)),None)
   if not sector:return None,"NON_TARGET_LICENCE"
-  when=event_date(get(raw,"LICENCE_ISSUED_DATE","ISSUED_DATE","DATE_ISSUED"))
+  when=event_date(get(raw,"LICENCE_ISSUED_DATE","ISSUED_DATE","DATE_ISSUED","ISSUED"))
   stage="LICENCE_ISSUED_NOT_OPENING_CONFIRMED"
-  name=get(raw,"OPERATING_NAME","CLIENT_NAME")
+  name=get(raw,"OPERATING_NAME","OPERATING NAME","CLIENT_NAME","CLIENT NAME")
   excerpt=category
  else:
   if TERMINAL.search(status):return None,"CLOSED_CANCELLED_OR_TERMINAL_PERMIT"
