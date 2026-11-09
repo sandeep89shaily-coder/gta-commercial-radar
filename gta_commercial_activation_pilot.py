@@ -90,28 +90,59 @@ def normalized(address):
   s=re.sub(r"\b"+source+r"\b",target,s)
  s=re.sub(r"[^a-z0-9 ]"," ",s)
  return " ".join(s.split())
-def read_snapshots(db,limit=40000):
+def read_snapshots(db,limit=40000,*,as_of=None,window_days=120):
+ """Read full Toronto licence population BEFORE capping eligible issue events.
+
+ Other official permit sources retain their established source-date read caps.
+ Toronto licence selection uses the source's ISSUED field, not the stored
+ LAST_RECORD_UPDATE/source_date and never treats a renewal as new opening.
+ """
  db=Path(db)
  if not db.is_file():raise FileNotFoundError("Existing Radar sqlite not found: "+str(db))
  cap=max(1,min(int(limit),100000))
+ as_of=as_of or dt.datetime.now(dt.timezone.utc).date()
  results=[];counts={}
- with closing(sqlite3.connect(db.resolve().as_uri()+"?mode=ro",uri=True,timeout=10)) as con:
-  for source in SOURCES:
-   records=con.execute("""SELECT c.record_key,c.first_seen_at,c.source_date,v.payload_json
+ query="""SELECT c.record_key,c.first_seen_at,c.source_date,v.payload_json
      FROM records_current c JOIN record_versions v
      ON v.source_id=c.source_id AND v.record_key=c.record_key
      AND v.version_id=(SELECT MAX(x.version_id) FROM record_versions x
                        WHERE x.source_id=c.source_id AND x.record_key=c.record_key)
-     WHERE c.source_id=? AND c.active=1
-     ORDER BY c.source_date DESC,c.record_key DESC LIMIT ?""",(source,cap)).fetchall()
-   counts[source]=len(records)
-   for key,seen,source_date,payload in records:
-    try:raw=json.loads(payload)
-    except (TypeError,ValueError):continue
-    if isinstance(raw,dict):
-     results.append({"source":source,"key":text(key),"first_seen":text(seen),
-       "source_date":text(source_date),"raw":raw,
-       "sha":hashlib.sha256(payload.encode("utf-8")).hexdigest()})
+     WHERE c.source_id=? AND c.active=1"""
+ with closing(sqlite3.connect(db.resolve().as_uri()+"?mode=ro",uri=True,timeout=20)) as con:
+  for source in SOURCES:
+   if source=="toronto_business_licences":
+    # Do not LIMIT by source_date: the first 40k rows are mostly old
+    # contractor/taxicab updates, ahead of recently ISSUED food licences.
+    eligible=[]
+    with closing(con.execute(query,(source,))) as cursor:
+     for key,seen,source_date,payload in cursor:
+      try:raw=json.loads(payload)
+      except (TypeError,ValueError):continue
+      if not isinstance(raw,dict):continue
+      record={"source":source,"key":text(key),"first_seen":text(seen),
+              "source_date":text(source_date),"raw":raw,
+              "sha":hashlib.sha256(payload.encode("utf-8")).hexdigest()}
+      row,_=classify(record,as_of,window_days)
+      if row:eligible.append((row["source_event_date"],record["key"],record))
+    # Apply limit only AFTER determining relevant recent physical-site
+    # issue events, retaining newest issue dates deterministically.
+    eligible.sort(key=lambda item:(item[0],item[1]),reverse=True)
+    selected=[item[2] for item in eligible[:cap]]
+    results.extend(selected)
+    counts[source]=len(selected)
+   else:
+    with closing(con.execute(query+
+       " ORDER BY c.source_date DESC,c.record_key DESC LIMIT ?",
+       (source,cap))) as cursor:
+     rows=cursor.fetchall()
+    counts[source]=len(rows)
+    for key,seen,source_date,payload in rows:
+     try:raw=json.loads(payload)
+     except (TypeError,ValueError):continue
+     if isinstance(raw,dict):
+      results.append({"source":source,"key":text(key),"first_seen":text(seen),
+        "source_date":text(source_date),"raw":raw,
+        "sha":hashlib.sha256(payload.encode("utf-8")).hexdigest()})
  return results,counts
 def classify(record,as_of,window_days):
  source=record["source"]
@@ -195,7 +226,7 @@ def run(db,out,*,as_of=None,window_days=120,max_per_source=40000):
  as_of=(dt.datetime.now(dt.timezone.utc).date() if as_of is None else
         dt.date.fromisoformat(as_of) if isinstance(as_of,str) else as_of)
  window_days=max(1,min(int(window_days),365))
- records,counts=read_snapshots(db,max_per_source)
+ records,counts=read_snapshots(db,max_per_source,as_of=as_of,window_days=window_days)
  results=[];excluded={}
  per_source={source:{"rows_read":counts.get(source,0),
                      "candidates":0,"excluded_counts":{}} for source in SOURCES}
@@ -227,6 +258,7 @@ def run(db,out,*,as_of=None,window_days=120,max_per_source=40000):
   "mode":"OFFLINE_RADAR_SNAPSHOTS_READ_ONLY_NO_LIVE_FETCH_NO_PAID_AI",
   "as_of":as_of.isoformat(),"window_days":window_days,
   "source_rows_read":counts,"source_rows_total_read":len(records),
+  "toronto_licence_selection":"FULL_ACTIVE_LEDGER_SCANNED_RECENT_ISSUED_ELIGIBLE_BEFORE_LIMIT",
   "activation_review_candidates":len(results),
   "source_diagnostics":per_source,
   "same_site_cross_source_rows":sum(r["same_site_link_status"]=="SAME_CIVIC_SITE_TENANT_UNVERIFIED" for r in results),
@@ -236,7 +268,7 @@ def run(db,out,*,as_of=None,window_days=120,max_per_source=40000):
    "Building permits and inspections are not occupancy certificates",
    "Addresses do not establish common tenants or the same commercial project",
    "No live source or contact verification; no AI, outreach, or scheduled changes",
-   "Source-per-city read limit may truncate coverage; only Toronto licences and Toronto/Brampton/Mississauga permits"],
+   "Other permit source read limits may truncate coverage; Toronto licences are screened across the full active ledger first"],
   "csv":str(out/CSV_NAME),"html":str(out/HTML_NAME)}
  (out/STATUS_NAME).write_text(json.dumps(summary,indent=2),encoding="utf-8")
  return summary
