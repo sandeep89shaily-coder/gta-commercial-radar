@@ -197,10 +197,17 @@ def run(db,out,*,as_of=None,window_days=120,max_per_source=40000):
  window_days=max(1,min(int(window_days),365))
  records,counts=read_snapshots(db,max_per_source)
  results=[];excluded={}
+ per_source={source:{"rows_read":counts.get(source,0),
+                     "candidates":0,"excluded_counts":{}} for source in SOURCES}
  for rec in records:
   row,reason=classify(rec,as_of,window_days)
-  if row:results.append(row)
-  else:excluded[reason]=excluded.get(reason,0)+1
+  src=per_source[rec["source"]]
+  if row:
+   results.append(row)
+   src["candidates"]+=1
+  else:
+   excluded[reason]=excluded.get(reason,0)+1
+   src["excluded_counts"][reason]=src["excluded_counts"].get(reason,0)+1
  add_site_links(results)
  results.sort(key=lambda x:(x["source_event_date"],x["source_id"],x["source_record_key"]),reverse=True)
  out=Path(out);out.mkdir(parents=True,exist_ok=True)
@@ -221,6 +228,7 @@ def run(db,out,*,as_of=None,window_days=120,max_per_source=40000):
   "as_of":as_of.isoformat(),"window_days":window_days,
   "source_rows_read":counts,"source_rows_total_read":len(records),
   "activation_review_candidates":len(results),
+  "source_diagnostics":per_source,
   "same_site_cross_source_rows":sum(r["same_site_link_status"]=="SAME_CIVIC_SITE_TENANT_UNVERIFIED" for r in results),
   "excluded_counts":dict(sorted(excluded.items())),
   "verified_openings":0,"verified_opening_dates":0,"verified_buyers":0,"verified_open_supplier_contracts":0,
