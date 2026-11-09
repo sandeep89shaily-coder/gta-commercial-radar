@@ -177,4 +177,60 @@ class ActivationPilotTests(unittest.TestCase):
             self.assertTrue((root/"pilot"/p.HTML_NAME).is_file())
             self.assertTrue((root/"pilot"/p.STATUS_NAME).is_file())
 
+
+    def test_recent_licence_recovered_beyond_source_date_cap(self):
+        # The 2026-11-09 real ledger put 40k older taxi/contractor
+        # updates ahead of all food/garage licence categories.
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp);db=root/"radar.sqlite"
+            with sqlite3.connect(db) as con:
+                con.executescript("""
+                    CREATE TABLE records_current(
+                      source_id TEXT,record_key TEXT,first_seen_at TEXT,
+                      source_date TEXT,active INTEGER);
+                    CREATE TABLE record_versions(
+                      version_id INTEGER PRIMARY KEY,source_id TEXT,
+                      record_key TEXT,payload_json TEXT);
+                """)
+                examples=[
+                    ("TAXI-1","2026-11-09",{
+                        "CATEGORY":"TAXICAB OWNER","ISSUED":"2026-11-08",
+                        "LICENCE_ADDRESS_LINE_1":"100 Bay Street"}),
+                    ("OLD-FOOD","2026-11-08",{
+                        "CATEGORY":"EATING OR DRINKING ESTABLISHMENT",
+                        "ISSUED":"2018-01-01",
+                        "LICENCE_ADDRESS_LINE_1":"110 Bay Street"}),
+                    ("FOOD-CANCELLED","2026-11-07",{
+                        "CATEGORY":"EATING OR DRINKING ESTABLISHMENT",
+                        "ISSUED":"2026-11-07","CANCEL_DATE":"2026-11-09",
+                        "LICENCE_ADDRESS_LINE_1":"120 Bay Street"}),
+                    ("FOOD-NEW","2020-01-01",{
+                        "CATEGORY":"EATING OR DRINKING ESTABLISHMENT",
+                        "ISSUED":"2026-11-08","CANCEL_DATE":"",
+                        "OPERATING_NAME":"New Cafe",
+                        "LICENCE_ADDRESS_LINE_1":"130 Bay Street"}),
+                    ("GARAGE-NEW","2019-01-01",{
+                        "CATEGORY":"PUBLIC GARAGE","ISSUED":"2026-11-06",
+                        "LICENCE_ADDRESS_LINE_1":"140 Bay Street"})
+                ]
+                for i,(key,source_date,raw) in enumerate(examples,1):
+                    con.execute("INSERT INTO records_current VALUES (?,?,?,?,1)",
+                                ("toronto_business_licences",key,
+                                 "2026-11-09T10:00:00Z",source_date))
+                    con.execute("INSERT INTO record_versions VALUES (?,?,?,?)",
+                                (i,"toronto_business_licences",key,json.dumps(raw)))
+                con.commit()
+            con.close()
+            records,counts=p.read_snapshots(db,2,as_of=TODAY,window_days=120)
+            selected=[r for r in records if r["source"]=="toronto_business_licences"]
+            self.assertEqual(counts["toronto_business_licences"],2)
+            self.assertEqual([r["key"] for r in selected],
+                             ["FOOD-NEW","GARAGE-NEW"])
+            status=p.run(db,root/"pilot",as_of=TODAY,max_per_source=2)
+            self.assertEqual(status["source_diagnostics"]["toronto_business_licences"]["candidates"],2)
+            self.assertEqual(status["toronto_licence_selection"],
+                             "FULL_ACTIVE_LEDGER_SCANNED_RECENT_ISSUED_ELIGIBLE_BEFORE_LIMIT")
+            self.assertEqual(status["verified_openings"],0)
+            self.assertEqual(status["verified_buyers"],0)
+
 if __name__=="__main__":unittest.main()
