@@ -84,3 +84,38 @@ Retained: five historical exact-permit research samples, sourced public
 business-contact channels and downloadable CSV. Neither the page nor the
 sample implies these contacts are project buyers or that procurement is open.
 No changes to the collector, AI budget, scheduling or prospect data.
+
+## Ten-project Southern Ontario PDF sample — November 10, 2026
+
+The public site now provides an **email-entry → PDF download** experience for
+a 12-page in-browser report, rather than a CSV/Excel download. The download
+is generated locally by `docs/sample-report.js` without third-party scripts
+or external calls. A separate, polished 13-page version was authored for the
+conversation and can be used as the official PDF design reference.
+
+The project mix comes from the user's November 9 Radar results ZIP plus the
+repository's Toronto exact-permit/contact research:
+- Toronto: 3 projects (Commerce Court, Menkes 4711 Yonge, Cloverdale Mall)
+- Peel: 2 (Mississauga industrial application, Brampton industrial permit)
+- Halton: 3 (Burlington Dream Summit project, Oakville Pinty's ERO,
+  Burlington equipment installation ERO)
+- Waterloo Region: 1 (Waterloo cafe tenant permit)
+- Niagara: 1 (St. Catharines exhaust collector record)
+
+This demonstrates projects in **seven municipalities** across five regional
+groupings. The marketing copy says Radar monitors sources across 16 Southern
+Ontario municipalities, but actual per-city coverage and fresh records vary.
+Ten selected 2026 project examples are **not** presented as ten new leads
+discovered today, nor as open supplier contracts. St. Catharines has weaker
+collector-only identity evidence and is explicitly marked.
+
+**Important email privacy and functionality limitation:** The form currently
+checks only email syntax locally, then generates the PDF. It **does not collect,
+store, send, or retain the entered address**, and the page explicitly states
+this. A real opt-in lead capture service / CRM endpoint with clear notice
+and privacy policy must be connected before the email gate is marketed as
+a signup or lead-generation form. Never silently claim an email was received.
+Do not add a hidden third-party service without permission and details.
+
+The old CSV download code and buttons were retired. No collector,
+database, paid AI or scheduling behavior was changed.
