@@ -13,6 +13,7 @@ from pathlib import Path
 import gta_facility_intelligence as graph
 import gta_facility_dossiers as dossiers
 import gta_facility_role_review as role_review
+import gta_authorized_application_identity_join as official_identity
 import gta_toronto_permit_evidence as permit_evidence
 import gta_toronto_permit_acceptance as permit_acceptance
 import gta_toronto_dossier_source_overlay as verified_overlay
@@ -40,6 +41,10 @@ def execute(workspace=None, *, results=None, as_of=None, max_age_days=180):
     dossier_status = dossiers.run(graph_dir,dossier_dir)
     role_status = role_review.run(
         graph_dir,folder/"GTA_RADAR_PROJECT_OPPORTUNITIES.csv",dossier_dir)
+    # Authorized municipal CSV roles are kept in a separate review overlay.
+    # This is a deterministic offline comparison, not a project merge or
+    # independent verification of the source, roles or procurement stage.
+    official_identity_status = official_identity.run(folder, dossier_dir, today=date)
     # A separate exact-record layer: never fetch live data in the combined
     # manual runner, and never block the graph if the local source DB is absent.
     permit_status = None
@@ -75,6 +80,16 @@ def execute(workspace=None, *, results=None, as_of=None, max_age_days=180):
         "manual_evidence_tasks":dossier_status["manual_verification_tasks"],
         "unverified_company_role_hints":role_status["role_hints"],
         "role_hints_verified":0,
+        "authorized_application_identity_overlay":official_identity_status["status"],
+        "authorized_application_role_candidates_review_only":
+            official_identity_status.get("candidate_role_links",0),
+        "authorized_application_role_holds":
+            official_identity_status.get("held_records",0),
+        "authorized_application_roles_verified":0,
+        "authorized_application_role_review_csv":
+            official_identity_status.get("output_csv",""),
+        "authorized_application_identity_holds_csv":
+            official_identity_status.get("holds_csv",""),
         "toronto_permit_audit_status":(
             "NOT_RUN_MISSING_DAILY_EXPORT" if permit_status is None else
             "NO_TORONTO_PERMITS_IN_EXISTING_EXPORT" if not
