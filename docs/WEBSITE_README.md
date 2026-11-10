@@ -1,43 +1,53 @@
-# GTA Commercial Radar — Public website
+# GTA Commercial Radar — Customer-first website V2
 
-The public marketing site is a single, responsive static page in `docs/index.html`.
-It is **separate from the Python collection system** and contains no collector
-credentials, databases, private contacts, API keys or paid AI integrations.
+## Goal: turn relevant service providers into paying intelligence pilots
 
-## Preview
-Open `docs/index.html` directly in Chrome, Edge or Firefox. It uses only
-local CSS and JavaScript; no NPM, build step, fonts or third-party tracking.
+The website in `docs/index.html` now sells a concrete benefit to
+**commercial HVAC/mechanical contractors, fire protection companies,
+security integrators, industrial equipment suppliers, and commercial
+insurance sales teams**:
 
-## Publish through GitHub Pages
+> Find early signals of facilities planning changes that may create a need
+> for your company's services.
 
-1. Merge the website PR into `main`.
-2. Visit repository **Settings → Pages → Build and deployment**.
-3. Choose **Deploy from a branch**, branch **main**, folder **/docs**, Save.
-4. GitHub Pages will normally publish at
-   `https://sandeep89shaily-coder.github.io/gta-commercial-radar/`.
-   Only call this a live site after Pages confirms the URL and deployment.
+The page intentionally follows one continuous buyer journey:
 
-## Before announcing the site publicly
+1. **Customer problem** — don't discover projects only after a referral or
+   overcrowded bid announcement.
+2. **Industry selection** — choose what you sell; the page instantly changes
+   examples, supplier fit, wording, and sample CTA to your sales vertical.
+3. **Product deliverable** — see the exact fields in a weekly project brief:
+   site, scope, stage, potential supplier fit, source context, buyer
+   verification gap, and next action.
+4. **Method and trust** — evidence first; licences and permits are not
+   confirmed open contracts or buyer permissions.
+5. **Sample request** — choose your industry and GTA territory to generate
+   a tailored request. This currently **copies** a ready-to-send message,
+   and does NOT pretend to submit a form or collect personal information.
 
-- **Add a real business enquiry channel.** No public email/domain or form
-  submission endpoint was supplied, so the current "Copy pilot enquiry"
-  control copies a draft; it does not submit customer information.
-- Verify the project-example copy, scope and sourcing references with the
-  latest official project records before presenting any as currently open.
-- Confirm business name, branding, domain, privacy policy and terms before
-  collecting contact information or using a custom domain.
-- Sample numbers 144 and 26 are explicitly labelled historical November 9,
-  2026 Radar run counts, *not* live monitored numbers.
-- Avoid claiming that a permit, licence or ERO notice confirms a sale, an
-  operating business, a new purchasing authority, or an available contract.
+### Testing and preview
 
-## Website sections
+Open `docs/index.html` locally in a browser. It needs no build step or
+third-party CSS/JS and includes responsive mobile layout and keyboard-accessible
+industry selectors. Manual browser tests verified tab changes, sample request
+generation and 390px-wide mobile fit without horizontal scrolling.
 
-- Hero with sample intelligence panel
-- Development, facility activation and equipment-intelligence features
-- Three demonstrative public-record insights
-- Four-stage evidence and verification methodology
-- Target customer sectors
-- Pilot enquiry CTA (copy-only pending real contact channel)
+### Publishing with GitHub Pages
 
-No automation or collector changes accompany this marketing site.
+1. Merge the website revision into `main`.
+2. In repository **Settings → Pages**, choose **Deploy from a branch**,
+   branch `main`, folder `/docs`.
+3. Confirm the Pages deployment URL before advertising it.
+
+### One launch dependency
+
+The business has not supplied a public email address, intake endpoint or
+branded domain. The request action stays copy-only until an actual contact
+channel is explicitly provided and verified. Do not claim a submission worked
+or silently discard visitor details.
+
+The example snippets are November 9, 2026 historical source-linked research
+leads, not real-time confirmation, won bids, open contracts or paying customers.
+The two source-review counts (144 changed and 26 first observed) are explicitly
+dated historical results. Nothing in this website changes the collector, AI
+budget, database or recurring scheduling.
