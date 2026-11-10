@@ -86,6 +86,9 @@ class ManualReviewRunnerTests(unittest.TestCase):
                              "GTA_RADAR_TORONTO_PERMIT_EVIDENCE_STATUS.json").is_file())
             self.assertEqual(output["unverified_company_role_hints"],1)
             self.assertEqual(output["role_hints_verified"],0)
+            self.assertEqual(output["authorized_application_identity_overlay"],
+                             "ASSISTED_OFFICIAL_EXPORT_MISSING")
+            self.assertEqual(output["authorized_application_roles_verified"],0)
             self.assertEqual(csv_path.read_bytes(),before)
             self.assertEqual(role_file.read_bytes(),role_before)
             self.assertTrue((results/"FACILITY_INTELLIGENCE_PILOT"/graph.OUTPUT_EVENTS).is_file())
@@ -98,6 +101,46 @@ class ManualReviewRunnerTests(unittest.TestCase):
             self.assertEqual(row["city"],"Brampton")
             self.assertEqual(row["source_event_date"],"2026-11-06")
             self.assertEqual(row["outreach_authorized"],"NO")
+
+    def test_authorized_roles_overlay_reconciles_only_exact_id_and_site(self):
+        with tempfile.TemporaryDirectory() as temp:
+            results=Path(temp)
+            daily_csv(results/"GTA_RADAR_DAILY_NEW_DEVELOPMENTS.csv", [{
+                "project_id":"sample:site","observation":"FIRST_OBSERVED",
+                "source_id":"brampton_building_permits","city":"Brampton",
+                "address":"7535 Financial Drive",
+                "description":"Review-only unrelated site",
+                "source_record_date":"2026-11-03","first_seen_local":"2026-11-04",
+                "current_source_status":"Permit Issued",
+            }])
+            imported=results/"GTA_RADAR_OFFICIAL_CSV_IMPORT_APPLICATIONS.csv"
+            official=results/"GTA_RADAR_ADDITIONAL_CITY_GIS_APPLICATIONS.csv"
+            with imported.open("w",encoding="utf-8-sig",newline="") as fp:
+                row={
+                    "city":"Kitchener","application_id":"ZBA-26-018",
+                    "address":"100 King Street","project_id":"OFFICIAL_EXPORT:KITCHENER:ZBA-26-018",
+                    "source_url":"https://www.arcgis.com/home/item.html?id=one",
+                    "provenance":"USER_SUPPLIED_OFFICIAL_EXPORT_NOT_INDEPENDENTLY_AUTHENTICATED",
+                    "applicant_name_unverified":"Factory Example Ltd",
+                }
+                writer=csv.DictWriter(fp,fieldnames=list(row))
+                writer.writeheader();writer.writerow(row)
+            with official.open("w",encoding="utf-8-sig",newline="") as fp:
+                row={
+                    "city":"Kitchener","application_id":"ZBA-26-018",
+                    "address":"100 King St","project_id":"GIS:KITCHENER:ZBA-26-018",
+                }
+                writer=csv.DictWriter(fp,fieldnames=list(row))
+                writer.writeheader();writer.writerow(row)
+            originals=(imported.read_bytes(),official.read_bytes())
+            report=runner.execute(results=results,as_of="2026-11-10")
+            self.assertEqual(report["authorized_application_role_candidates_review_only"],1)
+            self.assertEqual(report["authorized_application_role_holds"],0)
+            self.assertEqual(report["authorized_application_roles_verified"],0)
+            self.assertTrue(Path(report["authorized_application_role_review_csv"]).is_file())
+            self.assertEqual((imported.read_bytes(),official.read_bytes()),originals)
+            self.assertEqual(report["buyers_verified"],0)
+            self.assertFalse(report["outreach_authorized"])
 
     def test_invalid_reference_date_rejected(self):
         with tempfile.TemporaryDirectory() as temp:
