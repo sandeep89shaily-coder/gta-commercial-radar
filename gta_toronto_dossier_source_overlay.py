@@ -40,7 +40,7 @@ FIELDS=(
 )
 REQUIRED_DOSSIERS={
     "dossier_id","event_id","source_family","source_id","source_record_id",
-    "source_lookup_key","city","site_address","source_stage",
+    "source_lookup_key","city","site_address","site_unit","source_stage",
 }
 REQUIRED_ACCEPTANCE={
     "source_key","project_id","permit_num","revision_num",
@@ -208,8 +208,16 @@ def run(dossier_dir,permit_dir,out=None,*,as_of=None,age_days=7):
             city=graph.normalized_city(d.get("city",""))
             source_site,source_unit=graph.normalize_address(
                 record.get("source_address",""))
-            archived_site,archived_unit=graph.normalize_address(
+            archived_site,inline_unit=graph.normalize_address(
                 d.get("site_address",""))
+            # Production dossiers store the normalized civic street and unit
+            # in separate columns. Checking site_address alone silently loses
+            # the suite, even though the same building may host many tenants.
+            dossier_unit=str(d.get("site_unit") or "").strip().upper()
+            if dossier_unit and inline_unit and dossier_unit!=inline_unit:
+                problems["INCONSISTENT_ARCHIVED_DOSSIER_UNIT"]+=1
+                continue
+            archived_unit=dossier_unit or inline_unit
             if city!="Toronto" or not source_site or source_site!=archived_site:
                 problems["EXACT_PERMIT_SITE_OR_CITY_CONFLICT"]+=1
                 continue
