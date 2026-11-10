@@ -26,7 +26,9 @@ SOURCE={
 FIELDS=("project_id","city","application_id","address","description","application_type",
         "current_status","source_record_date","source_record_date_basis","source_url",
         "first_seen_local","observation","changed_fields","commercial_fit",
-        "provenance","verification_required")
+        "provenance","verification_required","applicant_name_unverified",
+        "property_owner_unverified","planning_reviewer_unverified",
+        "role_source_fields")
 STATUS="GTA_RADAR_OFFICIAL_CSV_IMPORT_STATUS.json"
 ALL="GTA_RADAR_OFFICIAL_CSV_IMPORT_APPLICATIONS.csv"
 NEW="GTA_RADAR_OFFICIAL_CSV_IMPORT_NEW_OR_CHANGED.csv"
@@ -89,6 +91,24 @@ def _parse(city,row):
  if not (desc or addr):return None
  if not (re.search(r"[A-Za-z]",ident) or re.search(r"[/.-]",ident)):
   return None
+ # Explicit roles from *public source fields* in a manually supplied export.
+ # Never conflate a Kitchener applicant/owner or York Region review lead with
+ # the buyer or a contractor for a specific supplier package.
+ applicant=_pick(row,"APPLICANT")[:250] if city=="Kitchener" else ""
+ owner=_pick(row,"PROPERTY_OWNER")[:250] if city=="Kitchener" else ""
+ if city=="Kitchener":
+  reviewer=_pick(row,"ISSUED_BY")[:250]
+  role_fields="KITCHENER:APPLICANT|PROPERTY_OWNER|ISSUED_BY"
+ elif city=="Vaughan":
+  local=_pick(row,"LOCALLEAD")[:120]
+  regional=_pick(row,"REGIONALLEAD")[:120]
+  reviewer="; ".join(x for x in (
+      "Local review lead: "+local if local else "",
+      "Regional review lead: "+regional if regional else "") if x)
+  role_fields="YORK_REGION:LOCALLEAD|REGIONALLEAD_NOT_PROJECT_BUYERS"
+ else:
+  reviewer=""
+  role_fields="NO_ROLE_FIELDS_EXTRACTED"
  proj="OFFICIAL_EXPORT:"+city.upper()+":"+re.sub(r"\s+","",ident.upper())
  return dict(project_id=proj,city=city,application_id=ident,address=addr,
   description=desc[:1000],application_type=kind,current_status=state,
@@ -97,7 +117,9 @@ def _parse(city,row):
   source_url=SOURCE[city],
   commercial_fit=("COMMERCIAL_TEXT_MATCH_REVIEW" if COMMERCIAL.search(desc+" "+kind) else "UNCLASSIFIED_REVIEW"),
   provenance="USER_SUPPLIED_OFFICIAL_EXPORT_NOT_INDEPENDENTLY_AUTHENTICATED",
-  verification_required="Confirm official export origin, exact application number, current stage and original publication date")
+  verification_required="Confirm export origin, exact file ID, named roles, current stage and original publication date; no purchasing authority verified",
+  applicant_name_unverified=applicant,property_owner_unverified=owner,
+  planning_reviewer_unverified=reviewer,role_source_fields=role_fields)
 def _write(path,rows):
  with path.open("w",encoding="utf-8-sig",newline="") as f:
   w=csv.DictWriter(f,fieldnames=FIELDS,extrasaction="ignore")
@@ -154,7 +176,14 @@ def run(results,*,today=None):
                  else "ASSISTED_EXPORT_COLLECTED",
                  source_rows_scanned=len(rows),application_id_rows=len(parsed),
                  new_or_changed=sum(x["city"]==city for x in changed),
-                 file_sha256=hashlib.sha256(path.read_bytes()).hexdigest())
+                 file_sha256=hashlib.sha256(path.read_bytes()).hexdigest(),
+                 rows_with_named_applicant=sum(bool(x.get("applicant_name_unverified"))
+                     for x in parsed.values()),
+                 rows_with_named_property_owner=sum(bool(x.get("property_owner_unverified"))
+                     for x in parsed.values()),
+                 rows_with_planning_reviewer=sum(bool(x.get("planning_reviewer_unverified"))
+                     for x in parsed.values()),
+                 purchaser_verified=0,original_publication_dates_verified=0)
   except (ValueError,UnicodeError,OSError,csv.Error) as err:
    status["status"]="REJECTED"
    status["error"]=type(err).__name__+":"+str(err)[:130]
@@ -164,7 +193,8 @@ def run(results,*,today=None):
  report={"source_status":stats,"application_id_rows":len(allrows),
     "new_or_changed":len(changed),"automated_source_recovered":0,
     "source_authenticity_verified":False,
-    "warning":"Official-labelled CSVs placed manually in official_exports; content schema checked but publisher provenance is not authenticated. No city is promoted to verified automatic coverage."}
+    "purchasing_authorities_verified":0,"publication_dates_verified":0,
+    "warning":"Official-labelled CSVs placed manually in official_exports; source-role fields are provisional and publisher provenance is not authenticated. No review staff/applicant becomes a purchaser; no city is promoted to verified automatic coverage."}
  (root/STATUS).write_text(json.dumps(report,indent=2),encoding="utf-8")
  if modified!=original:
   temp=ledger_path.with_suffix(".tmp")
