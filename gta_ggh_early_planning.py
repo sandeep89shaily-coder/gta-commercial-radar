@@ -218,7 +218,7 @@ def _write(path,rows):
    writer.writerow({k:("'"+v if isinstance(v,str) and v.startswith(("=","+","-","@"))
      else v) for k,v in row.items() if k in FIELDS})
 
-def run(results,*,today=None,sources=None,fetcher=None,pdf_fetcher=None):
+def run(results,*,today=None,sources=None,fetcher=None,pdf_fetcher=None,gis_fetcher=None):
  root=Path(results);root.mkdir(parents=True,exist_ok=True)
  today=(today or dt.date.today()).isoformat()
  catalog=sources if sources is not None else SOURCES
@@ -231,7 +231,8 @@ def run(results,*,today=None,sources=None,fetcher=None,pdf_fetcher=None):
         "new_or_changed":0,"commercial_text_matches":0,"source_date_verified_rows":0}
   try:
    if city=="Barrie" and "gispublic.barrie.ca" in url:
-    found=_barrie_gis(url)
+    # Injectable for offline regression. The default remains policy-checked.
+    found=_barrie_gis(url,gis_fetcher)
    else:
     html=(fetcher or _fetch)(url)
     if city in SIX_CITY_SOURCES:
