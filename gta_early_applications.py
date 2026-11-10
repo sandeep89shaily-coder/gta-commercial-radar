@@ -23,7 +23,7 @@ SOURCES = {
     "Brampton":"https://planning.brampton.ca/CitizenAccess/Default.aspx",
     "Mississauga":"https://www.mississauga.ca/services-and-programs/planning-and-development/development-applications/active-development-applications/",
     "Hamilton":"https://www.hamilton.ca/build-invest-grow/planning-development/planning-applications/where-development-happening-hamilton",
-    "Burlington":"https://www.burlington.ca/Modules/News/en/Development",
+    "Burlington":"https://www.burlington.ca/news-and-notices/news-views/current-development-projects/",
     "Oakville":"https://www.oakville.ca/business-development/planning-development/active-development-applications/",
     "Vaughan":"https://www.vaughan.ca/residential/building-and-construction/vaughans-planning-process",
     "Kitchener":"https://app2.kitchener.ca/appdocs/GISImages/GIS_Web_External/GIS_Metadata_Open_Data/Planning_Applications_Active.html",
