@@ -157,6 +157,10 @@ def run(dossier_dir,permit_dir,out=None,*,as_of=None,age_days=7):
                 r.get("source_id")==permits.SOURCE]
     enabled,reason,accepted=_source_gate(permit_dir)
     by_project=defaultdict(list)
+    # Even a previously accepted export can contain contradictory duplicated
+    # constituent keys; never pick one source record arbitrarily.
+    accepted_key_counts=Counter((r.get("project_id",""),r.get("source_key",""))
+                                for r in accepted)
     for accepted_row in accepted:
         by_project[accepted_row.get("project_id","")].append(accepted_row)
     out_rows=[]
@@ -184,6 +188,14 @@ def run(dossier_dir,permit_dir,out=None,*,as_of=None,age_days=7):
             if key not in valid_keys:
                 problems["CITY_SOURCE_KEY_NOT_IN_ORIGINAL_PROJECT"]+=1
                 continue
+            if accepted_key_counts[(d["source_record_id"],key)]!=1:
+                problems["DUPLICATE_ACCEPTED_CITY_CONSTITUENT_KEY"]+=1
+                continue
+            # The source key must describe the SAME permit and revision as
+            # the fields in the publisher-filtered query, not a sibling key.
+            if key != (record.get("permit_num","")+"|"+record.get("revision_num","")):
+                problems["ACCEPTED_CITY_RECORD_KEY_COMPONENT_CONFLICT"]+=1
+                continue
             if (record.get("record_validation")!=SOURCE_EVIDENCE or
                 record.get("buyer_verified")!="NO" or
                 record.get("open_supplier_contract_verified")!="NO" or
@@ -193,10 +205,17 @@ def run(dossier_dir,permit_dir,out=None,*,as_of=None,age_days=7):
                 problems["ACCEPTED_CITY_RECORD_PROVENANCE_FAILED"]+=1
                 continue
             city=graph.normalized_city(d.get("city",""))
-            source_site=graph.normalize_address(record.get("source_address",""))[0]
-            archived_site=graph.normalize_address(d.get("site_address",""))[0]
+            source_site,source_unit=graph.normalize_address(
+                record.get("source_address",""))
+            archived_site,archived_unit=graph.normalize_address(
+                d.get("site_address",""))
             if city!="Toronto" or not source_site or source_site!=archived_site:
                 problems["EXACT_PERMIT_SITE_OR_CITY_CONFLICT"]+=1
+                continue
+            # Same building is insufficient evidence of the same suite or
+            # tenant. An explicit unit on just one side is also ambiguous.
+            if source_unit!=archived_unit:
+                problems["EXACT_PERMIT_UNIT_CONFLICT"]+=1
                 continue
             try:
                 checked=dt.datetime.fromisoformat(
