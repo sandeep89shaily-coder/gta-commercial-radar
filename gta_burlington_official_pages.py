@@ -26,8 +26,12 @@ def _valid_url(url):
     try:
         p = urlparse(url)
         return (p.scheme == "https" and p.hostname in ("burlington.ca","www.burlington.ca")
-                and p.path.startswith("/en/news/current-development-projects/")
-                and p.path.endswith(".aspx") and not p.query and not p.fragment
+                and ((p.path.startswith("/en/news/current-development-projects/")
+                       and p.path.endswith(".aspx")) or
+                     (p.path.startswith("/news-and-notices/posts/current-development-projects/")
+                      and bool(re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*/",
+                         p.path.split("/news-and-notices/posts/current-development-projects/",1)[1]))))
+                and not p.query and not p.fragment
                 and not p.username and not p.password and p.port in (None,443))
     except ValueError:
         return False
