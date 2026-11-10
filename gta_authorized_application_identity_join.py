@@ -48,7 +48,7 @@ REQUIRED = {
     "five_city_official": {"city", "application_id", "address", "project_id"},
     "additional_official_gis": {"city", "application_id", "address", "project_id"},
     "early_applications": {"city", "application_id", "project_id"},
-    "planning_master": {"city", "application_id", "canonical_id", "record_kind"},
+    "planning_master": {"city", "canonical_id", "record_kind"},
 }
 PLACEHOLDER = {"", "n/a", "unknown", "none", "not verified", "tbd", "null"}
 TERMINAL = re.compile(r"\b(?:withdrawn|cancelled|canceled|refused|rejected|"
