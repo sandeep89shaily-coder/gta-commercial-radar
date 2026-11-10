@@ -69,3 +69,18 @@ live web-connected feed; current production Radar is manually run.
 The page continues to include five actual permit and business-contact source
 routes, source-linked evidence and a downloadable historical sample CSV.
 Public business contact routes are not presented as project buying authority.
+
+## Editorial positioning update (November 9)
+
+After customer-feedback review, the public page now takes a restrained,
+research-led position: **“A clearer view of what’s taking shape.”** The
+website should create confidence through well-chosen examples rather than
+repeating daily lead-generation slogans. Daily monitoring remains a real
+part of the service, now explained through an editorial field note instead
+of being the headline. The Nov 9 counts are documented precisely (26 first
+observed + 118 updated = 144 source records; Toronto only on that run).
+
+Retained: five historical exact-permit research samples, sourced public
+business-contact channels and downloadable CSV. Neither the page nor the
+sample implies these contacts are project buyers or that procurement is open.
+No changes to the collector, AI budget, scheduling or prospect data.
