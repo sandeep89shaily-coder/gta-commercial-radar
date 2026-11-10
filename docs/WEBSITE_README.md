@@ -1,53 +1,52 @@
-# GTA Commercial Radar — Customer-first website V2
+# GTA Commercial Radar — Customer-facing website V3
 
-## Goal: turn relevant service providers into paying intelligence pilots
+## What it sells
 
-The website in `docs/index.html` now sells a concrete benefit to
-**commercial HVAC/mechanical contractors, fire protection companies,
-security integrators, industrial equipment suppliers, and commercial
-insurance sales teams**:
+**Projects. Companies. Contacts.** A practical sales lead research service for
+GTA mechanical/HVAC, fire protection, security, industrial equipment, facility
+services, and commercial insurance teams.
 
-> Find early signals of facilities planning changes that may create a need
-> for your company's services.
+The public site at `docs/index.html` shows five **actual source-backed**
+Toronto commercial projects with real corporate/property contact channels,
+city permit stages, project scope, official project links, supplier fit, and
+specific recommended follow-ups. Visitors can filter by sector and download
+these five historical examples as a CSV without signing in.
 
-The page intentionally follows one continuous buyer journey:
+## Evidence and contact standard
 
-1. **Customer problem** — don't discover projects only after a referral or
-   overcrowded bid announcement.
-2. **Industry selection** — choose what you sell; the page instantly changes
-   examples, supplier fit, wording, and sample CTA to your sales vertical.
-3. **Product deliverable** — see the exact fields in a weekly project brief:
-   site, scope, stage, potential supplier fit, source context, buyer
-   verification gap, and next action.
-4. **Method and trust** — evidence first; licences and permits are not
-   confirmed open contracts or buyer permissions.
-5. **Sample request** — choose your industry and GTA territory to generate
-   a tailored request. This currently **copies** a ready-to-send message,
-   and does NOT pretend to submit a form or collect personal information.
+The examples were grounded in
+`research/toronto_20_city_exact_scope_20261108.json` and
+`research/toronto_20_public_business_contact_routes_20261108.json`, last
+checked November 8, 2026. Contact links are public business/property/leasing
+channels, **not** verified project purchasing decision-makers or open bid
+invites. Municipal construction values are estimated permit costs, not
+supplier contract values. Roles are accurately labelled and primary evidence
+links included. Do not redistribute the lists as confirmed sales-ready
+contracts.
 
-### Testing and preview
+The first website overstated the value of anonymous research fields. This
+revision gives visitors actual usable commercial context and a contact route,
+without inventing bidding availability.
 
-Open `docs/index.html` locally in a browser. It needs no build step or
-third-party CSS/JS and includes responsive mobile layout and keyboard-accessible
-industry selectors. Manual browser tests verified tab changes, sample request
-generation and 390px-wide mobile fit without horizontal scrolling.
+## Verified browser QA
 
-### Publishing with GitHub Pages
+Tested desktop 1440px and mobile 390px with a headless Chromium browser:
+zero JavaScript exceptions, no horizontal viewport overflow, five visible
+cards, security filter yields four cards, and CSV download generates
+`GTA_Radar_Sample_Contacts_Nov_2026.csv`.
 
-1. Merge the website revision into `main`.
-2. In repository **Settings → Pages**, choose **Deploy from a branch**,
-   branch `main`, folder `/docs`.
-3. Confirm the Pages deployment URL before advertising it.
+## Publishing
 
-### One launch dependency
+Merge website PR, then GitHub repository Settings → Pages → Deploy from a
+branch, `main`, `/docs`. Verify deployment before sharing the public URL.
 
-The business has not supplied a public email address, intake endpoint or
-branded domain. The request action stays copy-only until an actual contact
-channel is explicitly provided and verified. Do not claim a submission worked
-or silently discard visitor details.
+## Business contact / conversion
 
-The example snippets are November 9, 2026 historical source-linked research
-leads, not real-time confirmation, won bids, open contracts or paying customers.
-The two source-review counts (144 changed and 26 first observed) are explicitly
-dated historical results. Nothing in this website changes the collector, AI
-budget, database or recurring scheduling.
+We still need a verified business enquiry email or booking endpoint to create
+a **working** Request Sample / Book Demo form. Until then, the website
+intentionally uses real, working CTAs to view the five contact-rich examples
+and download the actual sample dataset. It neither fakes form submissions nor
+collects visitor information. Configure the public business enquiry channel
+before actively promoting the site.
+
+No collector, source data, AI budget, database or scheduled job was changed.
