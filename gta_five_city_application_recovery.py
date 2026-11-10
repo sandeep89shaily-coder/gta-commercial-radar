@@ -39,10 +39,17 @@ def _text(x):
 def _valid_burlington(url):
  try:
   p=urlparse(url)
-  return (p.scheme=="https" and p.hostname in ("www.burlington.ca","burlington.ca")
-     and p.path.startswith("/en/news/current-development-projects/")
-     and p.path.endswith(".aspx") and not p.query and not p.fragment
-     and not p.username and not p.password and p.port in (None,443))
+  if (p.scheme!="https" or p.hostname not in ("www.burlington.ca","burlington.ca")
+      or p.query or p.fragment or p.username or p.password or p.port not in (None,443)):
+   return False
+  legacy=(p.path.startswith("/en/news/current-development-projects/") and
+          p.path.endswith(".aspx"))
+  # Burlington moved from /en/news/.../*.aspx to canonical project posts.
+  # Never treat unrelated news, press releases, or the feed index as projects.
+  prefix="/news-and-notices/posts/current-development-projects/"
+  slug=p.path[len(prefix):] if p.path.startswith(prefix) else ""
+  current=bool(re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*/",slug))
+  return legacy or current
  except ValueError:return False
 
 def _read(path):
@@ -62,27 +69,30 @@ def _write(path,rows):
                for k,v in row.items() if k in FIELDS})
 
 def _burlington_links(root,fetch):
- # Prefer real direct project links from the already-permitted city GIS stage.
+ # Prefer the CURRENT city feed. Older GIS rows may point to legacy .aspx
+ # addresses that now 301-redirect (which our fetcher correctly refuses).
+ # No redirect following, robots bypass, external links or blind crawling.
  urls=[]
- for row in _read(root/GIS):
-  value=_text(row.get("source_url"))
-  if _valid_burlington(value) and value not in urls:
-   urls.append(value)
- # On a failed GIS run, discover on the separate official city index only.
- # Do not use a cached third-party commercial directory as original evidence.
  errors=[]
+ try:
+  html=fetch(BURLINGTON_INDEX)
+  soup=BeautifulSoup(html,"html.parser")
+  main=soup.find("main") or soup
+  for anchor in main.find_all("a",href=True):
+   u=urljoin(BURLINGTON_INDEX,anchor["href"])
+   if _valid_burlington(u) and u not in urls:
+    urls.append(u)
+   if len(urls)>=MAX_BURLINGTON_PAGES:break
+ except Exception as error:
+  errors.append("INDEX:"+type(error).__name__+":"+str(error)[:140])
  if not urls:
-  try:
-   html=fetch(BURLINGTON_INDEX)
-   soup=BeautifulSoup(html,"html.parser")
-   main=soup.find("main") or soup
-   for anchor in main.find_all("a",href=True):
-    u=urljoin(BURLINGTON_INDEX,anchor["href"])
-    if _valid_burlington(u) and u not in urls:urls.append(u)
-    if len(urls)>=MAX_BURLINGTON_PAGES:break
-  except Exception as error:
-   errors.append("INDEX:"+type(error).__name__+":"+str(error)[:140])
- # Sort by location/name only when the original GIS row supplies it.
+  # Historical GI source can still provide official links on dates when the
+  # new index is unavailable; each URL is independently policy-checked.
+  for row in _read(root/GIS):
+   value=_text(row.get("source_url"))
+   if _valid_burlington(value) and value not in urls:
+    urls.append(value)
+   if len(urls)>=MAX_BURLINGTON_PAGES:break
  return urls[:MAX_BURLINGTON_PAGES],errors
 
 def _burlington_records(html,url):
@@ -121,7 +131,7 @@ def _burlington_records(html,url):
      source_record_date="",date_basis="NO_VERIFIED_FIRST_PUBLICATION_DATE",
      provenance="LIVE_OFFICIAL_PROJECT_PAGE_EXPLICIT_FILE_NUMBER",
      commercial_fit="TEXT_MATCH_REVIEW_ONLY" if COMMERCIAL.search(
-        _text(source.get("description"))+" "+source["project_title"]) else "UNCLASSIFIED",
+        scope+" "+_text(source.get("description"))+" "+source["project_title"]) else "UNCLASSIFIED",
      verification_required="Verify municipal applicant, project/permit stage, first posting, open work and current buyer")
   result.append(row)
  return result

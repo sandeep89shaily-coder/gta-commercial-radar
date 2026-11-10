@@ -13,7 +13,7 @@ CSV="GTA_RADAR_THREE_CITY_EARLY_PLANNING_GAPS.csv"
 FIELDS=("city","application_id_candidates","project_only_signals","gis_project_only_signals",
         "source_state","assisted_application_id_rows","assisted_source_status","acceptance","next_action")
 ACTIONS={
- "Burlington":"Exact application number must come from an authorized official notice or file-level export; both public COB Development_Apps GIS layers lack application-ID fields",
+ "Burlington":"Test current official development-project post feed and exact file numbers on two permitted live runs; legacy GIS project-only signals are not application IDs",
  "Vaughan":"Request a permitted public-notice feed / structured PLANit extract; public-notice HTML collection is robots-restricted",
  "Kitchener":"Request a permitted CSV or API export containing APPLICATION_NO; source metadata alone is not an application feed"
 }
