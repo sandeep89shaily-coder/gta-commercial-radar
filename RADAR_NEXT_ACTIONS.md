@@ -1,5 +1,17 @@
 # Radar Next Actions — checkpoint 2026-11-08
 
+## November 10, 2026 — updated priority after current main inspection
+
+The November 8 ordering below is retained as historical rationale, but its PR states are stale: #152–#155 are closed **without merge**. Current main already contains separate related pilot modules. Do not restart completed CKAN work or blindly revive overlapping branches.
+
+1. **P0: source identity safety — PR #170.** Enforce exact unit/suite, constituent permit/revision coherence, and no duplicate accepted evidence keys in the Toronto dossier overlay; run the targeted suite and current full Windows/Linux CI. The result remains **research-only**. Merge the minimal safety patch only if latest-head CI is green. Recheck live original records before asserting any address-level project certainty.
+2. **P1: industrial equipment (first market pilot).** Continue the existing persistent ERO cursor with **up to 10 previously unreviewed/changed** policy-permitted original notices on the next owner's manual Windows session. Preserve the November 7 five-success/two-signal baseline. Audit distinct equipment changes, stage, full original evidence, conflicting historical notice, site, relevance and duplications. Then check actual project-specific purchaser, whether equipment is already procured and supplier usefulness; keep these UNKNOWN until evidenced. Do not promote to an automatically published lead.
+3. **P1 parallel: commercial activation.** Run the existing read-only licence/permit pilot on the actual current Windows `radar.sqlite`; audit at least 20 individual records, rejections and 10 cited facility dossiers. Issued licence, occupancy/inspection and actual physical opening remain distinct. No tenant inferred by address alone.
+4. **P2: complete existing cities first.** Obtain two authorized post-fix live Burlington checks and source-file IDs; use the already prepared unsent Vaughan/Kitchener access request/export lane, do not bypass HTTP/robots. Feed exact-ID/site role comparisons into manual facility review only; require independent original-source proof before considering a buyer verified.
+5. **P3: four-city expansion and AI harness.** Pickering/Niagara Falls/Barrie are experimental registered sources, not new verified production municipalities; Ajax still needs approved API/export access. Evaluate 20 original records per promising city, unique early commercial value, dated source and permissions before adding to daily runner. Keep AI harness optional, no-spend preflight first and shared US$0.25/day cap.
+
+**Not complete:** ten independently sourced, purchasable, actionable opportunities, two paying pilot customers, measured first-observed lead advantage, and full production quality/permission gates. No outreach automation or unverified sourcing claims.
+
 ## Pilot delivery priority — owner direction 2026-11-08
 
 The core goal is to **ship bounded, verified pilot capability**, not keep tested modules indefinitely in draft. Latest Linux/Windows Radar test workflows on PRs #152, #153, #154 and #155 are all green; green CI alone does not establish source or buyer validation.
