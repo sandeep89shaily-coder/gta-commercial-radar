@@ -51,6 +51,8 @@ REQUIRED = {
     "planning_master": {"city", "application_id", "canonical_id", "record_kind"},
 }
 PLACEHOLDER = {"", "n/a", "unknown", "none", "not verified", "tbd", "null"}
+TERMINAL = re.compile(r"\b(?:withdrawn|cancelled|canceled|refused|rejected|"
+                      r"closed|completed|awarded|expired|revoked)\b", re.I)
 EXPECTED_PROVENANCE = "USER_SUPPLIED_OFFICIAL_EXPORT_NOT_INDEPENDENTLY_AUTHENTICATED"
 CITY_SCOPE = {"Vaughan", "Kitchener"}
 REVIEW_ACTION = (
@@ -144,6 +146,12 @@ def reconcile(export_rows, other_sources):
             idx[(entry["city"], entry["application_id"])].append(entry)
             counts["comparison_rows_eligible"] += 1
     matches, holds = [], []
+    # An assisted export should have one row per file ID (the upstream
+    # importer enforces this). Refuse rather than choose among duplicates.
+    export_key_counts = Counter(
+        (normalized_city(x.get("city")), application_key(x.get("application_id")))
+        for x in export_rows
+    )
     def hold(row, reason, entries=(), details=""):
         counts["hold:" + reason] += 1
         holds.append({
@@ -160,6 +168,12 @@ def reconcile(export_rows, other_sources):
         file_id = application_key(row.get("application_id"))
         if city not in CITY_SCOPE or not file_id:
             hold(row, "UNSUPPORTED_CITY_OR_INVALID_APPLICATION_ID")
+            continue
+        if export_key_counts[(city, file_id)] > 1:
+            hold(row, "DUPLICATE_ASSISTED_EXPORT_APPLICATION_ID_REVIEW")
+            continue
+        if TERMINAL.search(clean(row.get("current_status"))):
+            hold(row, "HISTORICAL_OR_TERMINAL_APPLICATION_STATUS")
             continue
         if clean(row.get("provenance")) != EXPECTED_PROVENANCE:
             hold(row, "ASSISTED_SOURCE_PROVENANCE_NOT_ACCEPTED")
