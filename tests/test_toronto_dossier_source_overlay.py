@@ -253,5 +253,41 @@ class TorontoDossierSourceOverlayTests(unittest.TestCase):
             self.assertEqual(result["verified_buyers"],0)
 
 
+    def test_real_dossier_separate_site_unit_blocks_different_tenant(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp)
+            record=dossier(site="220 yonge st")
+            record["site_unit"]="110"
+            d,p=write_inputs(root,source_rows=[record],
+                             verified_rows=[accepted(site="220 yonge st unit 220")])
+            result=overlay.run(d,p,as_of=NOW)
+            self.assertEqual(result["exact_permit_records_linked"],0)
+            self.assertEqual(result["unresolved_matching_reasons"].get(
+                "EXACT_PERMIT_UNIT_CONFLICT"),1)
+
+    def test_real_dossier_separate_site_unit_can_match_identical_suite(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp)
+            record=dossier(site="220 yonge st")
+            record["site_unit"]="110"
+            d,p=write_inputs(root,source_rows=[record],
+                             verified_rows=[accepted(site="220 yonge st suite 110")])
+            result=overlay.run(d,p,as_of=NOW)
+            self.assertEqual(result["exact_permit_records_linked"],1)
+            self.assertEqual(result["verified_buyers"],0)
+
+    def test_conflicting_inline_and_dossier_unit_is_held(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp)
+            record=dossier(site="220 yonge st suite 110")
+            record["site_unit"]="220"
+            d,p=write_inputs(root,source_rows=[record],
+                             verified_rows=[accepted(site="220 yonge st suite 110")])
+            result=overlay.run(d,p,as_of=NOW)
+            self.assertEqual(result["exact_permit_records_linked"],0)
+            self.assertEqual(result["unresolved_matching_reasons"].get(
+                "INCONSISTENT_ARCHIVED_DOSSIER_UNIT"),1)
+
+
 if __name__=="__main__":
     unittest.main()
