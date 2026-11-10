@@ -189,3 +189,18 @@ def test_source_csv_formula_injection_cannot_execute_in_report(tmp_path):
             encoding="utf-8-sig",newline="") as fp:
         result=next(csv.DictReader(fp))
     assert result["applicant_unverified"].startswith("'=HYPERLINK")
+
+
+def test_terminal_status_and_duplicate_assisted_export_ids_always_held():
+    matches, holds, _ = join.reconcile(
+        [export(current_status="Withdrawn")],
+        {"additional_official_gis": [other()]})
+    assert not matches
+    assert holds[0]["reason"] == "HISTORICAL_OR_TERMINAL_APPLICATION_STATUS"
+    row = export()
+    matches, holds, _ = join.reconcile([row, dict(row)],
+                                       {"additional_official_gis": [other()]})
+    assert matches == []
+    assert len(holds) == 2
+    assert all(h["reason"] ==
+               "DUPLICATE_ASSISTED_EXPORT_APPLICATION_ID_REVIEW" for h in holds)
