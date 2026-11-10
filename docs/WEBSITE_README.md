@@ -50,3 +50,22 @@ collects visitor information. Configure the public business enquiry channel
 before actively promoting the site.
 
 No collector, source data, AI budget, database or scheduled job was changed.
+
+## November 9 update — daily opportunities are the primary product
+
+The homepage now leads with **“New commercial opportunities. Every day.”**
+The key product is a concise daily discovery and change briefing, with
+company/contact research added to relevant opportunities. The page has a
+three-step daily model: **first observed**, **changed**, **trade-relevant**.
+
+The November 9 sample is visibly dated: **26 first-observed + 118 changed =
+144 monitored records**. These are *ledger observations*, not necessarily
+newly announced projects or 144 verified sales leads; on that date the source
+coverage was Toronto only. The five contact-rich source dossiers shown below
+are **November 8 historical research examples**, not claimed as November 9
+first-seen items. The website does not assert autonomous scheduling or a
+live web-connected feed; current production Radar is manually run.
+
+The page continues to include five actual permit and business-contact source
+routes, source-linked evidence and a downloadable historical sample CSV.
+Public business contact routes are not presented as project buying authority.
