@@ -193,7 +193,8 @@ def run(dossier_dir,permit_dir,out=None,*,as_of=None,age_days=7):
                 continue
             # The source key must describe the SAME permit and revision as
             # the fields in the publisher-filtered query, not a sibling key.
-            if key != (record.get("permit_num","")+"|"+record.get("revision_num","")):
+            if key != (str(record.get("permit_num") or "")+"|"+
+                       str(record.get("revision_num") or "")):
                 problems["ACCEPTED_CITY_RECORD_KEY_COMPONENT_CONFLICT"]+=1
                 continue
             if (record.get("record_validation")!=SOURCE_EVIDENCE or
