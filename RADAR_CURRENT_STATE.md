@@ -1,5 +1,16 @@
 # Radar Current State — 2026-11-08 (draft PR #155)
 
+## November 10, 2026 — main-branch checkpoint (supersedes the November 8 branch-local snapshot)
+
+- The verified current `main` head before this safety change was `bd96258475c355b54c14ec1028b8d06e93bc124b`. The `Radar tests` workflow completed successfully: [run 42922604522](https://github.com/sandeep89shaily-coder/gta-commercial-radar/actions/runs/42922604522). This is **code regression**, not live supplier/buyer acceptance.
+- PRs #152 (industrial), #153 (activation), #154 (AI harness), #155 (facility graph) were **closed without merging** on November 9. Related manual pilot files now exist on main; source-controlled implementation does not confer pilot acceptance or confirm that those draft PRs were merged. Five older draft PRs #74–#78 remain open. Root `AGENTS.md` is absent; `GTA_RADAR_NORTH_STAR.md`, `GTA_RADAR_RESEARCH_REGISTER.md` and the current release gates remain authoritative.
+- New main features by November 10: canonical Burlington index repair and strict official post validation; permission-gated Vaughan/Kitchener CSV role recovery; manual exact application ID/civic-site role reconciliation; controlled Pickering/Ajax/Niagara Falls/Barrie expansion-readiness audit. All are **source/evidence research**, not a claim of 20-city verified production coverage.
+- The latest available Windows ZIP before the repair showed Burlington redirect, Vaughan 403 and Kitchener robots denial; post-repair two-run official collection acceptance is **still missing**. No bypass or change to the manual daily schedule is authorized.
+- **P0 under review in PR #170:** Toronto permit dossier source overlay previously compared normalized **street only**. It must also enforce exact suite/unit, consistency of `source_key` with permit/revision components, and uniqueness of accepted project/constituent keys. PR #170 implements fail-closed holds and regression tests. Treat this checkpoint as **pending new-commit CI** until its latest head passes on Windows and Linux. No new buying authority or open supplier work may be inferred.
+- The industrial ERO pilot's last user evidence remains 5/5 parsed notices and 2 distinct equipment findings, **0 verified purchasers and 0 verified open packages**; next broader official, permitted manual evidence batch has not been accepted. Toronto 20-record proof remains source/sample-only, not buyer or procurement validation.
+
+**Release boundary:** Preserve working main and the original snapshots. Keep the shared US$0.25/day DeepSeek ceiling, read-only/manual isolated pilots, hold reason provenance, source date versus Radar observation date, no automatic outreach, and independent purchaser/work-package checks. Do not increase advertised municipal coverage or commercial claims without live acceptance.
+
 This checkpoint is branch-local and is **not** production release acceptance. The default branch remains `main`; the canonical strategic scope is `GTA_RADAR_NORTH_STAR.md` and the full source backlog is `GTA_RADAR_RESEARCH_REGISTER.md`.
 
 ## Implemented and demonstrated
