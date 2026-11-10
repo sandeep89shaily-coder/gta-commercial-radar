@@ -13,6 +13,20 @@ import json
 from pathlib import Path
 
 CONTACTS = {
+    "Vaughan": {
+        "email": "developmentplanning@vaughan.ca",
+        "source": "https://www.vaughan.ca/about-city-vaughan/departments/development-and-parks-planning",
+        "blocked": "City public planning notices require a permitted feed or city-approved export; the automated HTTP collector has returned HTTP 403.",
+        "requested": "Current public development applications and notice records with City file number, site address, application type, status, project summary, applicant organization where publishable, and the original public notice/posting date.",
+        "option": "City-approved PLANit/planning application data feed, downloadable official CSV, public notification email registry, or documented permitted repeat-access method. York Region application data is a separate regional review source, not an exact substitute for municipal PLANit.",
+    },
+    "Kitchener": {
+        "email": "gis@kitchener.ca",
+        "source": "https://www.kitchener.ca/council-and-city-administration/data-and-maps/open-data/",
+        "blocked": "City Planning Applications Active ArcGIS layer exposes file IDs and named applicant/owner fields, but Radar's policy-aware automated queries have been robots-denied.",
+        "requested": "Official Planning Applications Active records with APPLICATION_NO, ADDRESS, DESCRIPTION, APPLICANT, PROPERTY_OWNER, STATUS, FOLDERTYPE, ISSUED_BY, INDATE and original public notice date if available.",
+        "option": "A City GeoHub CSV download, approved recurring CSV/GeoJSON export or documented ArcGIS REST API query access consistent with robots policy and open-data licence.",
+    },
     "Richmond Hill": {
         "email": "planning@richmondhill.ca",
         "source": "https://www.richmondhill.ca/en/learn-more/Planning-Development.aspx",
@@ -51,6 +65,8 @@ FIELDS = ("municipality","recipient","official_source","current_blocker",
 GIS_STATUS = "GTA_RADAR_GGH_OFFICIAL_GIS_STATUS.json"
 GGH_STATUS = "GTA_RADAR_GGH_EXPANSION_SOURCE_STATUS.json"
 EXPORT_STATUS = "GTA_RADAR_OFFICIAL_CSV_IMPORT_STATUS.json"
+OTHER_GIS_STATUS = "GTA_RADAR_ADDITIONAL_CITY_GIS_STATUS.json"
+FIVE_CITY_STATUS = "GTA_RADAR_FIVE_CITY_RECOVERY_STATUS.json"
 
 
 def _read(path):
@@ -95,17 +111,32 @@ def run(results, *, today=None):
     gis=_index(_read(root/GIS_STATUS))
     ggh=_index(_read(root/GGH_STATUS))
     exports=_index(_read(root/EXPORT_STATUS))
+    other_gis=_index(_read(root/OTHER_GIS_STATUS))
+    five_city=_index(_read(root/FIVE_CITY_STATUS))
     rows=[]
     for city,data in CONTACTS.items():
-        # A live GIS record is still only application candidates. A success
-        # here does not imply full citywide coverage or verified fresh leads.
-        auto=gis.get(city) if city in ("Richmond Hill","Newmarket") else ggh.get(city)
-        state=(auto or {}).get("state","NO_LIVE_STATUS")
-        count=int((auto or {}).get("application_id_rows",0) or 0)
+        # Keep live official source observations distinct from assisted
+        # exports; neither means a buyer or citywide coverage is verified.
+        if city=="Kitchener":
+            auto=other_gis.get(city,{})
+            state=auto.get("status","NO_LIVE_STATUS")
+            count=(int(auto.get("commercial_candidates",0) or 0)
+                   if state in ("BASELINE_COMPLETE","COLLECTED") else 0)
+        elif city=="Vaughan":
+            # This source status may be from the preceding manual run,
+            # because five-city collection runs after this request packet.
+            auto=five_city.get(city,{})
+            state=auto.get("status","NO_LIVE_STATUS")
+            count=(int(auto.get("application_id_rows_this_stage",0) or 0)
+                   if auto.get("automated_source_recovered_this_stage") else 0)
+        else:
+            auto=gis.get(city) if city in ("Richmond Hill","Newmarket") else ggh.get(city)
+            state=(auto or {}).get("state","NO_LIVE_STATUS")
+            count=int((auto or {}).get("application_id_rows",0) or 0)
         e=exports.get(city,{})
         assisted=e.get("status","MISSING_AUTHORIZED_EXPORT")
         need="REVIEW_SOURCE_ACCESS_AND_REQUEST_PERMITTED_EXPORT"
-        if count and state in ("BASELINE_COMPLETE","COLLECTED"):
+        if count and state in ("BASELINE_COMPLETE","COLLECTED","OFFICIAL_NOTICE_COLLECTION"):
             need="VERIFY_COVERAGE_AND_FIRST_PUBLICATION_DATES"
         elif assisted.startswith("ASSISTED_EXPORT"):
             need="VALIDATE_PUBLISHER_PROVENANCE_AND_REQUEST_RECURRING_FEED"
@@ -156,7 +187,9 @@ def run(results, *, today=None):
         "automated_access_granted_by_municipality":0,
         "municipal_replies_received":0,
         "source_status_read":{GIS_STATUS:bool(gis),GGH_STATUS:bool(ggh),
-                              EXPORT_STATUS:bool(exports)},
+                              EXPORT_STATUS:bool(exports),
+                              OTHER_GIS_STATUS:bool(other_gis),
+                              FIVE_CITY_STATUS:bool(five_city)},
         "request_csv":str(root/CSV),"request_markdown":str(root/MARKDOWN),
         "warning":"This is an unsent request packet. Publisher approval, actual application access, source authenticity, and citywide coverage are not established.",
     }
