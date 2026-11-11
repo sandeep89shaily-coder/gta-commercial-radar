@@ -330,7 +330,7 @@ class IndustrialReviewCursorTests(unittest.TestCase):
         self.assertEqual(cursor.non_instrument_excluded_count(state,cards),1)
         selected=cursor.select({"026-1148":source},state,10)
         self.assertEqual(selected,{})
-        cards["026-1148"]["notice_stage"]="Proposal"
+        cards["026-1148"]["last_updated"]="2026-11-09"
         self.assertEqual(cursor.non_instrument_excluded_count(state,cards),0)
         selected=cursor.select({"026-1148":cards["026-1148"]},state,10)
         self.assertEqual(list(selected),["026-1148"])
