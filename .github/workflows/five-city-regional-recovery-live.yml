@@ -37,7 +37,10 @@ jobs:
           print("FIVE_CITY_LIVE_AUDIT",json.dumps(result,sort_keys=True))
           # A full official GIS export is not required for the live audit.
           # Explicit official-page fetch and file-number parsing probes:
-          for name,url in (("Burlington","https://www.burlington.ca/en/news/current-development-projects/1376-1382-plains-rd-e.aspx"),("Vaughan",VAUGHAN)):
+          for name,url in (
+              ("Burlington","https://www.burlington.ca/news-and-notices/posts/current-development-projects/800-burloak-dr/"),
+              ("Burlington","https://www.burlington.ca/news-and-notices/posts/current-development-projects/burlington-nelson-quarry-extension/"),
+              ("Vaughan",VAUGHAN)):
               item={"city":name,"url":url,"status":"NO_PROVEN_APPLICATION_ID"}
               try:
                   html=_fetch(url)
