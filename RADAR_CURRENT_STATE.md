@@ -1,5 +1,14 @@
 # Radar Current State — 2026-11-08 (draft PR #155)
 
+## November 10 — owner-prioritized municipal and two-pilot integrity checkpoint
+
+User priority is **(3) Burlington/Vaughan/Kitchener reliability first**, followed by **(4) industrial equipment and commercial activation pilots**. The commercial lead-qualification/outreach expansion is not the immediate coding task. See [PRIORITY_3_4_SOURCE_AND_PILOT_GATES_20261110.md](PRIORITY_3_4_SOURCE_AND_PILOT_GATES_20261110.md).
+
+- `gta_five_city_application_recovery.py`: conflicting official pages for one application ID now cause a full identity hold instead of choosing the first page; count only unambiguous application records and protect original first-observed ledger.
+- `gta_industrial_equipment_pilot.py`: a successfully checked latest original ERO notice supersedes archived manual excerpts; failed/changed official rechecks cannot be cleared by a stale manual excerpt and preserve older evidence under HOLD.
+- `gta_commercial_activation_pilot.py`: contradictory inline suite and separately published unit cannot generate a candidate or same-site link.
+- These changes are being regression-tested in an isolated PR; no authorized new live source collection has been run in this GitHub-only checkpoint. Most recent actual Windows sources remain Burlington old-index redirect, Vaughan HTTP 403, Kitchener robots denied. Do not claim full city coverage, equipment procurement, business opening or buyer.
+
 ## November 10, 2026 — main-branch checkpoint (supersedes the November 8 branch-local snapshot)
 
 - The verified current `main` head before this safety change was `bd96258475c355b54c14ec1028b8d06e93bc124b`. The `Radar tests` workflow completed successfully: [run 42922604522](https://github.com/sandeep89shaily-coder/gta-commercial-radar/actions/runs/42922604522). This is **code regression**, not live supplier/buyer acceptance.
