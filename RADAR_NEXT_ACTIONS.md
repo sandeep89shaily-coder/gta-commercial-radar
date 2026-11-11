@@ -1,5 +1,18 @@
 # Radar Next Actions — 2026-11-11
 
+## November 11 — latest tested state after merged PR #173
+
+**Done and verified in code:** safe ZIP14-vs-ZIP15 archive reconciliation (2,833 identical saved source hashes/stages/sites, 1,365 later-only licences), explicit source-age HOLD for parser-discovered undated City IDs, 3/3 original ERO proposal/site/equipment rechecks, and two actually sent approved-method requests to Vaughan/Kitchener offices. [PR #173](https://github.com/sandeep89shaily-coder/gta-commercial-radar/pull/173) passed [4/4 Windows/Linux CI](https://github.com/sandeep89shaily-coder/gta-commercial-radar/actions/runs/43028553192) plus [live City source CI](https://github.com/sandeep89shaily-coder/gta-commercial-radar/actions/runs/43028553034). A weekday email reply-only monitor is active; main Radar remains manual.
+
+**Remaining genuine dependencies by priority:**
+1. Capture two **separate dated owner-side Windows post-fix Burlington official source runs**, with status+ledger+source-page snapshots. Recheck 16 current file IDs and original age; don't treat an unverified first observation after a parser repair as a new public publication.
+2. Process official Vaughan/Kitchener permissions/replies into exact permitted exports. Do not circumvent robots/HTTP 403. Audit record IDs, address, applicant roles, original notice dates.
+3. Complete original record-level checks for 20 activation signals and 10 proposed exact site/unit dossiers. The two saved ZIP hashes matched but municipal originals/tenants and actual openings were not checked.
+4. Next bounded manual ERO pilot cursor: up to 10 unreviewed/changed permitted notices, preserving the 19 previously fetched and three source-confirmed equipment notices; independently validate purchasing authority/open work package before customer promotion.
+5. Only then evaluate supplier conversion, market launch, two paying customers, and broaden geographic claims. Preserve $0.25/day shared DeepSeek cap and no automatic outreach.
+
+[Full source and limitations](PRIORITY_3_4_20261111_VERIFICATION.md).
+
 ## November 11 execution results and remaining blockers (source-only acceptance)
 
 1. **City access:** Vaughan and Kitchener official access requests have been **sent** through the connected Radar Gmail, with a separate weekday reply watch. Continue only with publisher-authorized City planning application exports/official notification subscriptions; there is no grant yet and prior robots/403 blocks remain. Kitchener's official open-data site explicitly supports published CSV downloads; do not assume the blocked API is accessible.
