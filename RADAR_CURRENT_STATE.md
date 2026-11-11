@@ -1,5 +1,15 @@
 # Radar Current State — 2026-11-08 (draft PR #155)
 
+## November 10 owner priority 3+4 — PR #172 merged, verified source sample
+
+**Completed development:** [PR #172](https://github.com/sandeep89shaily-coder/gta-commercial-radar/pull/172) was squash-merged into main at `a141120c078007feb2b0c33cc8befa79c2f67669`. Latest PR-head [cross-platform CI #42952904773](https://github.com/sandeep89shaily-coder/gta-commercial-radar/actions/runs/42952904773) passed all four Windows/Linux Python 3.11/3.12 jobs. [Five-city official live source CI #42952904795](https://github.com/sandeep89shaily-coder/gta-commercial-radar/actions/runs/42952904795) passed, following the prior source sample #42952671824 which showed Burlington **10/10** official current pages parsed, **16** original application-ID candidates, 0 page failures/conflicting IDs, 0 first-baseline newly published alerts and 0 verified commercial leads. Vaughan robots denied; Kitchener not re-collected.
+
+**User November 10 archived actual results (not a fresh Windows collection):** Commercial activation: **4,198** candidate events, **139** same-site cross-source rows, **0** verified business openings. Industrial ERO: **156** ledger cards, **19** prior detail successes, **4** equipment-change findings from **3** distinct original notices, **0** independently verified buyers/open supplier contracts. The newest signals supersede the older two-signal historical checkpoint; do not erase either historical audit.
+
+**Now on main:** Burlington parser handles exact `File Numbers` labels in the current page templates; original-file source validation remains strict. ERO cursor suppresses proven non-site policy bulletins unless publisher card changes. Both existing manual pilot launchers create an isolated **20-source-row activation, 10 distinct facility, and exact ERO notice human-review queue**, all `NOT_YET_RECHECKED`; no source, tenant, purchaser or business opening is promoted. Canonical details: [priority 3+4 continued acceptance](PRIORITY_3_4_CONTINUED_ACCEPTANCE_20261110.md).
+
+**Still incomplete:** two separate owner Windows Burlington collections, publisher-authorized Vaughan and Kitchener source access, independent 20-record/10-dossier human audit, original equipment stage and supplier-package verification, paid pilots. No changes to the manually controlled daily run, original SQLite, automatic outreach, nor shared AI US$0.25/day budget.
+
 ## November 10 continued priority 3 + 4 source acceptance — PR #172
 
 Owner historical November 10 results ZIP was recovered and reviewed: **4,198 commercial activation review candidates**, **139 same-site links**, **zero independently verified openings**; industrial ERO ledger **156 cards**, prior cursor **19 successfully parsed**, **4 equipment findings across 3 distinct original notices**, **0** proven open procurement or specific buyers. Do not replace these with the older November 7 two-signal baseline.
