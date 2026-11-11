@@ -33,6 +33,10 @@ The [source verification rows](evidence/ERO_3_SOURCE_RECHECK_20261111.csv) were 
 
 This closes **source existence, stage, site and equipment change verification for the three already-extracted notices**. It does not verify an open tender, engineering scope, a purchase order, equipment delivery dates, supplier contact, buyer authority or an unawarded commercial package. Environmental comment-period deadlines are **not** equipment bidding deadlines. All remain `buyer_verified=NO`, `supplier_package_available=UNKNOWN`. Recheck stages when next collected because official notices may advance.
 
+### Burlington crematorium: prior same-site withdrawal, current proposal is distinct
+
+The same Burlington site and corporate proponent have [older ERO 025-0947](https://ero.ontario.ca/notice/025-0947), a **different** 2025 application that the company **withdrew**, with the withdrawal decision posted **January 23, 2026**. The **new** [ERO 026-1155](https://ero.ontario.ca/notice/026-1155) was posted **November 6, 2026** and remains separately shown as a **proposal** on the original Registry as checked November 11. Do not conflate the prior historical withdrawal with withdrawal of the current filing, approval of any equipment, commencement of construction or an open supplier purchase. Preserve both ERO IDs for independent scope, owner and buying-process diligence.
+
 ## Two real historical Windows output archives reconciled
 
 The user-supplied original daily result ZIPs `GTA_RADAR_RESULTS (14).zip` (Nov 9) and `GTA_RADAR_RESULTS (15).zip` (Nov 10) contain:
