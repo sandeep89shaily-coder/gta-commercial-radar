@@ -49,7 +49,10 @@ def select(cards,state,limit):
     changed=[];new=[];retry=[]
     for no in sorted(cards,reverse=True):
         old=seen.get(no)
-        if old and old.get("status")=="DETAIL_RETRIEVED":
+        if old and old.get("status") in ("DETAIL_RETRIEVED","NON_INSTRUMENT_BULLETIN"):
+            # A non-industrial policy bulletin is not a failed equipment
+            # extraction. Do not waste every later batch retrying it unless
+            # the publisher changes the card's stage or update timestamp.
             if old.get("card_fingerprint")!=fingerprint(cards[no]):
                 changed.append(no)
         elif old:
@@ -66,7 +69,8 @@ def update(state,cards,audit):
         if no not in cards:
             continue
         if record.get("status") not in {
-            "DETAIL_RETRIEVED","DETAIL_REJECTED","ROBOTS_DISALLOW_NOTICE"
+            "DETAIL_RETRIEVED","DETAIL_REJECTED","ROBOTS_DISALLOW_NOTICE",
+            "NON_INSTRUMENT_BULLETIN"
         }:
             continue
         state.setdefault("notices",{})[no]={
@@ -87,3 +91,13 @@ def save(out,state):
 def reviewed_count(state):
     return sum(v.get("status")=="DETAIL_RETRIEVED"
                for v in state.get("notices",{}).values())
+
+
+def non_instrument_excluded_count(state,cards):
+    """Non-equipment bulletins whose published cards have not changed."""
+    return sum(
+        record.get("status")=="NON_INSTRUMENT_BULLETIN"
+        and number in cards
+        and record.get("card_fingerprint")==fingerprint(cards[number])
+        for number,record in state.get("notices",{}).items()
+    )
