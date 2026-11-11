@@ -293,7 +293,7 @@ class IndustrialReviewCursorTests(unittest.TestCase):
                 w=csv.DictWriter(f,fieldnames=list(old));w.writeheader();w.writerow(old)
             cursor.save(out,{"version":1,"notices":{
                 "026-1152":{"status":"DETAIL_RETRIEVED",
-                            "card_fingerprint":cursor.fingerprint(card)}})
+                            "card_fingerprint":cursor.fingerprint(card)}}})
             card["notice_stage"]="Decision"
             manual=root/"stale.csv"
             row={"ero_number":"026-1152",
