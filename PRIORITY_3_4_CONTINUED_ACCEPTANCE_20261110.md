@@ -1,5 +1,9 @@
 # Priority 3 + 4: source-backed pilot continuation — November 10, 2026
 
+## Release checkpoint: merged PR #172
+
+[PR #172](https://github.com/sandeep89shaily-coder/gta-commercial-radar/pull/172) was merged to main at `a141120c078007feb2b0c33cc8befa79c2f67669` after green [4/4 Windows/Linux CI jobs](https://github.com/sandeep89shaily-coder/gta-commercial-radar/actions/runs/42952904773) and passing [official five-city acceptance workflow](https://github.com/sandeep89shaily-coder/gta-commercial-radar/actions/runs/42952904795). The code is fit for **source-only manual pilot review**, not automatic sales lead publication or a declaration of completed restricted municipal feeds.
+
 **Branch checkpoint: PR #172.** This document supersedes the earlier 8/10-page Burlington GitHub source sample, while preserving historical run manifests, the existing Windows daily runner, and the owner's collected local data.
 
 ## Evidence from prior owner archives (not a new Windows run)
