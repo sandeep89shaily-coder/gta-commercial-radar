@@ -220,14 +220,38 @@ def run(results,*,today=None,fetcher=None):
  # A complete baseline applies per city, preserving any prior successful data
  # if a different city is blocked on the current run.
  unique={}
+ conflicted=set()
+ conflict_city={}
  for row in output:
   pid=row["project_id"]
-  if pid in unique and (unique[pid]["description"],unique[pid]["current_status"])!=(
-      row["description"],row["current_status"]):
-   # Duplicate official file numbers may legitimately appear on multiple
-   # project pages: require manual identity review instead of picking one.
+  if pid in conflicted:
+   continue
+  earlier=unique.get(pid)
+  if earlier is not None:
+   # One application ID can occur on separate project pages or sites.
+   # Even if the text happens to match, a different official page does
+   # not establish that the projects have the same physical identity.
+   if any(earlier.get(k)!=row.get(k) for k in (
+       "record_source_url","description","current_status","address")):
+    conflicted.add(pid)
+    conflict_city[pid]=row["city"]
+    unique.pop(pid,None)
    continue
   unique[pid]=row
+ # Status counts must reflect only ambiguity-free accepted source rows,
+ # not a raw page count which may include conflicting duplicate IDs.
+ for item in statuses:
+  if item["city"] in ("Burlington","Vaughan"):
+   city=item["city"]
+   accepted=sum(r["city"]==city for r in unique.values())
+   held=sum(c==city for c in conflict_city.values())
+   item["application_id_rows_this_stage"]=accepted
+   item["automated_source_recovered_this_stage"]=bool(accepted)
+   item["identity_conflicts_held"]=held
+   if held and item["status"]=="OFFICIAL_PAGE_COLLECTION":
+    item["status"]="PARTIAL_OFFICIAL_PAGE_COLLECTION_IDENTITY_HOLD"
+   elif held and item["status"]=="OFFICIAL_NOTICE_COLLECTION":
+    item["status"]="PARTIAL_OFFICIAL_NOTICE_COLLECTION_IDENTITY_HOLD"
  for row in sorted(unique.values(),key=lambda item:item["project_id"]):
   pid=row["project_id"];city=row["city"]
   fingerprint={k:row[k] for k in ("description","current_status","address","record_source_url")}
@@ -249,6 +273,8 @@ def run(results,*,today=None,fetcher=None):
     "cities_targeted":5,
     "automatic_file_id_rows_this_stage":len(unique),
     "new_or_changed":len(changed),
+    "identity_conflicts_held_count":len(conflicted),
+    "identity_conflicts_held_ids":sorted(conflicted),
     "automatically_recovered_cities":[r["city"] for r in statuses if r.get("automated_source_recovered_this_stage")],
     "verified_citywide_complete":0,
     "verified_new_commercial_leads":0,
