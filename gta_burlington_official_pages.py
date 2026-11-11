@@ -51,7 +51,7 @@ def _parse(html, url):
     inline_tail=""
     for i, raw in enumerate(tokens):
         label=" ".join(raw.split())
-        match=re.fullmatch(r"File Numbers?\\s*:?(?:\\s*(.*))?",label,re.I)
+        match=re.fullmatch(r"File Numbers?\s*:?(?:\s*(.*))?",label,re.I)
         if match:
             section_index=i
             inline_tail=match.group(1) or ""
@@ -63,7 +63,7 @@ def _parse(html, url):
         r"^(?:Public Meetings?|Supporting Documents?|Application Processes?"
         r" and Timeline|Planner on File|Public Engagement|Site Address|"
         r"Applicant|Current Development Projects|Subscribe Back|"
-        r"View (?:Calendar|Full)|Contact Us)\\b",re.I)
+        r"View (?:Calendar|Full)|Contact Us)\b",re.I)
     for piece in tokens[section_index+1:section_index+15]:
         value=" ".join(piece.split())
         if stop.search(value):
