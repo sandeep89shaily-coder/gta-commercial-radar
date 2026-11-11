@@ -46,3 +46,54 @@ def test_path_traversal_rejected(tmp_path):
     result=run(tmp_path)
     assert result["status"]=="NO_VALID_SAVED_APPLICATION_IDS"
     assert result["errors"][0]["error"].endswith("UNSAFE_HTML_FILENAME")
+
+
+def test_new_current_city_post_800_burloak_plain_paragraph_label():
+    url="https://www.burlington.ca/news-and-notices/posts/current-development-projects/800-burloak-dr/"
+    page="""<main><h1>800 Burloak Dr.</h1><h2>Proposed Development</h2>
+    <p>Mixed use eight-storey residential with ground-floor commercial units.</p>
+    <div><p>File Numbers</p><ul>
+    <li>Official Plan Amendment: 505-13/26</li>
+    <li>Zoning By-law Amendment: 520-16/26</li>
+    </ul></div>
+    <div><p>Supporting Documents</p><a href="decision.pdf">
+    Study dated 2020-03-02, case 535-999/24 (unrelated)</a></div>
+    </main>"""
+    rows=_parse(page,url)
+    assert [r["application_id"] for r in rows]==["505-13/26","520-16/26"]
+    assert all(r["source_url"]==url for r in rows)
+
+
+def test_new_current_city_quarry_label_without_heading_markup():
+    url="https://www.burlington.ca/news-and-notices/posts/current-development-projects/burlington-nelson-quarry-extension/"
+    page="""<main><h1>Burlington Nelson Quarry Extension</h1>
+    <h2>Proposed Development</h2><p>Expand quarry operations</p>
+    <div><span>File Numbers</span><span>505-04/20</span>
+    <strong>Application Processes and Timeline</strong><p>
+    Appendix 535-999/23 is NOT a planning file in this section.</p></div>
+    </main>"""
+    rows=_parse(page,url)
+    assert [r["application_id"] for r in rows]==["505-04/20"]
+
+
+def test_burlington_no_file_number_not_synthesized_from_elsewhere():
+    url="https://www.burlington.ca/news-and-notices/posts/current-development-projects/testing/"
+    page="""<main><h1>Development proposal</h1>
+    <h2>Proposed Development</h2><p>Industrial expansion</p>
+    <div><p>File Numbers</p><p>To be assigned</p></div>
+    <h2>Public Meetings</h2><p>Reference 520-123/26 in old notice</p></main>"""
+    import pytest
+    with pytest.raises(ValueError,match="NO_RECOGNIZED_BURLINGTON_FILE_NUMBERS"):
+        _parse(page,url)
+
+
+def test_burlington_unlabelled_number_not_treated_as_application():
+    url="https://www.burlington.ca/news-and-notices/posts/current-development-projects/testing/"
+    page="""<main><h1>Development proposal</h1>
+    <h2>Proposed Development</h2><p>Application 505-13/26</p>
+    <h2>Public Meetings</h2><p>May 10</p></main>"""
+    import pytest
+    with pytest.raises(ValueError,match="NO_FILE_NUMBERS_SECTION"):
+        _parse(page,url)
+
+
