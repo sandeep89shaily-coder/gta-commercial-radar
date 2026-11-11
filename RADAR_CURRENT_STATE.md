@@ -1,5 +1,13 @@
 # Radar Current State — 2026-11-11 (current main release gates)
 
+## November 11 — full manual one-click integration COMPLETED in merged PR #174
+
+**GitHub release code complete:** [PR #174](https://github.com/sandeep89shaily-coder/gta-commercial-radar/pull/174) merged into `main` at `f722cac70c51fb0c14bfdcbe1bb85d2ad35bbc6f`; the final PR-head [four-platform CI run #43031475039](https://github.com/sandeep89shaily-coder/gta-commercial-radar/actions/runs/43031475039) passed all Windows/Linux Python 3.11 and 3.12 jobs. `RUN_GTA_RADAR_TODAY.bat` is the canonical **manual** one-click entrypoint; the two older full-run shortcuts delegate to it. It safely fast-forwards ONLY code with the existing tested `desktop_update.py` origin/dirty/divergent/compile gate, then executes the existing six-stage full orchestrator in one separate Python process. Daily original collection occurs once, industrial ERO remains bounded at 10 permitted notices, commercial activation and facility/official evidence review remain read-only, and the AI harness remains free-only without exceeding the shared US$0.25/day paid AI budget.
+
+**Dated handoff now built in:** `gta_daily_result_archive.py` creates a bounded timestamped review ZIP in the owner's `GTA_RADAR_EXPORTS` folder. It includes source ledger/CSV, reviewed PDF/HTML outputs, industrial and activation manual review and SHA-256 manifest, excludes original `radar.sqlite`, tokens and logs, and labels source verification honestly. A ZIP packaging failure returns nonzero and remains visible in full-run status. All CI tests passed.
+
+**Execution distinction:** Today's **original full owner-side Windows collection has NOT been executed inside this GitHub connector session** (no access to PC's retained `radar.sqlite` and keys). Code and test completion are not a live daily report. The operator must manually launch the installed script to create a current dated ZIP; the assistant should not represent CI fixture runs as daily customer intelligence. Source policies Vaughan/Kitchener and independent buyer/actual opening validation remain external gates. [Operator runbook](RUN_GTA_RADAR_TODAY_20261111.md).
+
 ## November 11 — Today's one-click integration release candidate
 
 User requested "integrate everything time to run for today." The existing six-stage manual `gta_monday_full_run.py` collector+pilot architecture remains preserved. A current-day manual launcher `RUN_GTA_RADAR_TODAY.bat` is being added to update the *installed code only* through the already-tested safe `desktop_update.py` fast-forward gate **before** opening the integrated runner. Existing shortcuts `RUN_TOTAL_INTELLIGENCE_TODAY.bat` and `RUN_ALL_GTA_RADAR_MONDAY.bat` delegate to the same launcher; no schedules, AI budget or Outreach changes.
