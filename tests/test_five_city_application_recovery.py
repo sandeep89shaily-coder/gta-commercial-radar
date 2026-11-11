@@ -144,3 +144,66 @@ def test_conflicting_followup_does_not_replace_successful_identity_ledger(tmp_pa
  third=run(tmp_path,today=dt.date(2026,11,10),fetcher=lambda u:official(u))
  assert third["automatic_file_id_rows_this_stage"]==2
  assert third["new_or_changed"]==0
+
+
+
+def test_repaired_city_parser_backfills_old_undated_file_numbers_without_fresh_alert(tmp_path):
+ # Prior ZIP (Nov 10) had 11 Burlington ledger IDs, but live source (Nov 11)
+ # parsed 16, including a quarry page last publicly dated months earlier.
+ # Missing from an old parser is NOT newly published on the municipal site.
+ page_a="https://www.burlington.ca/news-and-notices/posts/current-development-projects/first/"
+ page_b="https://www.burlington.ca/news-and-notices/posts/current-development-projects/second/"
+ first_page=PAGE
+ extra_page=PAGE.replace("505-10-26 and Zoning 520-11/26",
+                         "505-04/20 and Zoning 520-12/20").replace(
+                         "1376-1382 Plains Road East","Old Quarry Extension")
+ def official(url,include_old):
+  if url==BURLINGTON_INDEX:
+   return "<main><a href='"+page_a+"'>First</a>"+(
+       "<a href='"+page_b+"'>Old but underparsed</a>" if include_old else "")+"</main>"
+  if url==page_a:return first_page
+  if url==page_b:return extra_page
+  raise ValueError("POLICY_DENIED")
+ prior=run(tmp_path,today=dt.date(2026,11,6),
+           fetcher=lambda url:official(url,False))
+ assert prior["automatic_file_id_rows_this_stage"]==2
+ assert prior["new_or_changed"]==0
+ now=run(tmp_path,today=dt.date(2026,11,11),
+         fetcher=lambda url:official(url,True))
+ assert now["automatic_file_id_rows_this_stage"]==4
+ assert now["newly_observed_undated_file_ids_held_for_publication_review"]==2
+ assert now["new_or_changed"]==0
+ with (tmp_path/OUTPUT).open(encoding="utf-8-sig",newline="") as f:
+  rows=list(csv.DictReader(f))
+ assert len([x for x in rows if x["observation"]=="FIRST_OBSERVED_UNDATED_HELD"])==2
+ assert len([x for x in rows if x["observation"]=="UNCHANGED"])==2
+ assert {x["first_seen_local"] for x in rows if
+         x["observation"]=="FIRST_OBSERVED_UNDATED_HELD"}=={"2026-11-11"}
+ with (tmp_path/CHANGES).open(encoding="utf-8-sig",newline="") as f:
+  assert list(csv.DictReader(f))==[]
+ repeat=run(tmp_path,today=dt.date(2026,11,12),
+            fetcher=lambda url:official(url,True))
+ assert repeat["newly_observed_undated_file_ids_held_for_publication_review"]==0
+ assert repeat["new_or_changed"]==0
+
+
+def test_real_observed_changes_remain_reviewable_after_undated_id_hold(tmp_path):
+ page_a="https://www.burlington.ca/news-and-notices/posts/current-development-projects/first/"
+ page_b="https://www.burlington.ca/news-and-notices/posts/current-development-projects/old/"
+ def make(url,changed=False,new=False):
+  if url==BURLINGTON_INDEX:
+   return "<main><a href='"+page_a+"'>A</a>"+(
+    "<a href='"+page_b+"'>Old</a>" if new else "")+"</main>"
+  if url==page_a:return PAGE.replace("25-storey","26-storey") if changed else PAGE
+  if url==page_b:return PAGE.replace("505-10-26 and Zoning 520-11/26",
+     "505-04/20 and Zoning 520-12/20")
+  raise ValueError("BLOCKED")
+ run(tmp_path,today=dt.date(2026,11,6),fetcher=lambda url:make(url))
+ result=run(tmp_path,today=dt.date(2026,11,11),
+            fetcher=lambda url:make(url,changed=True,new=True))
+ assert result["new_or_changed"]==2
+ assert result["newly_observed_undated_file_ids_held_for_publication_review"]==2
+ with (tmp_path/CHANGES).open(encoding="utf-8-sig",newline="") as f:
+  rows=list(csv.DictReader(f))
+ assert len(rows)==2
+ assert all(x["observation"]=="RECORD_CHANGED" for x in rows)
