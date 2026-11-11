@@ -1,4 +1,16 @@
-# Radar Current State — 2026-11-08 (draft PR #155)
+# Radar Current State — 2026-11-11 (current main release gates)
+
+## November 11 — remaining P3/P4 validation and official source access
+
+**Public independent original-source checks:** Three industrial ERO equipment notices **026-1152, 026-1155, 026-1021** are verified against live original Environmental Registry pages as **Proposal** at their exact industrial sites, with specific dust collector/scrubber, two cremation units, and boiler/cooling-tower changes. Exact documentation at [2026-11-11 original verification](PRIORITY_3_4_20261111_VERIFICATION.md) and [ERO evidence CSV](evidence/ERO_3_SOURCE_RECHECK_20261111.csv). **0 buyer identities and 0 unawarded purchase packages independently verified.**
+
+**Municipal access requests sent:** November 11 from the connected `gtaradar18@gmail.com` Gmail account to City of Vaughan Development Planning and City of Kitchener GIS. Both official recipients and sanctioned CSV/GeoJSON access paths are publisher-supported, but **0 replies / 0 access approvals** at checkpoint. Separate weekday Gmail reply watch created; no Radar collection schedule change or restricted crawling.
+
+**Historical original Windows archives reconciled:** November 9 vs November 10 GTA_RADAR_RESULTS ZIPs show **2,833 common exact activation record keys with 2,833 stable source hashes, site and classification**, and **1,365 new-in-output Toronto licence records**, NOT new public notice dates. 4 equipment findings belong to 3 exact ERO notices. Both ZIPs' Burlington official collector is blocked despite their preserved 11-ID official seen ledger; **do not call the archives two successful post-fix runs**. Earlier GitHub source runner remains 10/10 current posts and 16 official IDs.
+
+**Code protection in development:** Reproducible ZIP-to-ZIP evidence reconciliation generates a source-labelled 20-record, 10-facility and ERO queue with no false external verification. The five-city collector now holds *first detected* undated municipal application IDs on a previously baselined city instead of fabricating a fresh application notice after the parser was fixed; observed changes to previously tracked records still appear as changes. CI for this checkpoint is required before merge.
+
+**Unfinished genuine external dependencies:** Two separately dated owner Windows post-fix Burlington collections, actual authorized Vaughan/Kitchener exports, at least 20 verified original municipality record checks and 10 tenant/activation dossiers, fresh bounded ERO cursor sample and independently evidenced buyer/procurement stages. No automatic outreach or paid-AI budget changes.
 
 ## November 10 owner priority 3+4 — PR #172 merged, verified source sample
 
