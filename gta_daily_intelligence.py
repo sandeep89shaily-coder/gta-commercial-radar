@@ -172,7 +172,7 @@ def _build_document_worklist(union_csv, out, seen, *, paid, ai_processor, ranker
 def integrate(results, *, today=None, meeting_pipeline=None, document_discover=None,
               agenda_pipeline=None, verified_reports=None, document_ai=None,
               multicity_capture=None, document_ranker=None,
-              application_monitor=None, gis_monitor=None, other_gis_monitor=None, municipal_monitor=None, toronto_csv_monitor=None, guelph_gis_monitor=None, burlington_gis_monitor=None, burlington_pdf_monitor=None, staged_durham_monitor=None, official_export_monitor=None, regional_early_monitor=None, toronto_capital_monitor=None, regional_detail_monitor=None, regional_document_monitor=None, regional_review_monitor=None, opportunity_lanes_monitor=None, five_city_monitor=None, ggh_expansion_monitor=None, ggh_york_gis_monitor=None, project_ai=None, buyer_ai=None, procurement=None, buyer_batch=None,
+              application_monitor=None, gis_monitor=None, other_gis_monitor=None, municipal_monitor=None, toronto_csv_monitor=None, guelph_gis_monitor=None, burlington_gis_monitor=None, burlington_pdf_monitor=None, staged_durham_monitor=None, official_export_monitor=None, regional_early_monitor=None, toronto_capital_monitor=None, regional_detail_monitor=None, regional_document_monitor=None, regional_review_monitor=None, opportunity_lanes_monitor=None, five_city_monitor=None, ggh_expansion_monitor=None, next_four_monitor=None, ggh_york_gis_monitor=None, project_ai=None, buyer_ai=None, procurement=None, buyer_batch=None,
               graph=None, api_key_check=None, allow_paid=True):
     """Run integrated bounded stages and expose individual failure provenance.
 
@@ -215,6 +215,7 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
     from gta_opportunity_lanes import run as opportunity_lanes_default
     from gta_five_city_application_recovery import run as five_city_default
     from gta_ggh_early_planning import run as ggh_expansion_default
+    from gta_next_four_municipalities import run as next_four_default
     from gta_ggh_york_official_gis import run as ggh_york_gis_default
     from gta_ggh_source_access_recovery import run as ggh_source_access_default
     from gta_markham_circulations import run as markham_default
@@ -269,6 +270,12 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
         (lambda root, *, today=None: {"cities_configured":12,
           "cities_with_application_ids":0,"application_id_rows":0,
           "new_or_changed":0,"source_status":[],"status":"SKIPPED_OFFLINE_TEST"}))
+    next_four_fn = next_four_monitor or (
+        next_four_default if application_monitor is None else
+        (lambda root, *, today=None: {"cities_configured":4,
+            "cities_with_application_ids":0,"application_id_rows":0,
+            "project_only_signals":0,"new_or_changed_review_only":0,
+            "source_status":[],"status":"SKIPPED_OFFLINE_TEST"}))
     regional_early_fn = regional_early_monitor or (
         regional_early_default if application_monitor is None else
         (lambda root, *, today=None: {"authorities_configured":9,
@@ -390,6 +397,11 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
     state["ggh_early_planning_expansion"]={k:ggh_expansion.get(k) for k in
         ("cities_configured","cities_with_application_ids","application_id_rows",
          "new_or_changed","source_status","warning")}
+    next_four=step("next_four_municipalities_notice_pilot",
+        lambda:next_four_fn(root,today=today),required=False)
+    state["next_four_municipalities"]={k:next_four.get(k) for k in
+        ("cities_configured","cities_with_application_ids","application_id_rows",
+         "project_only_signals","new_or_changed_review_only","source_status","warning")}
     ggh_york_gis=step("ggh_richmond_hill_newmarket_official_gis",
         lambda:ggh_york_gis_fn(root,today=today),required=False)
     state["ggh_york_official_gis"]={k:ggh_york_gis.get(k) for k in
@@ -744,6 +756,8 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
         "<a href='GTA_RADAR_CITY_COVERAGE_AUDIT.csv'>Measured coverage by city (not configured links)</a> · "
         "<a href='GTA_RADAR_GGH_EXPANSION_APPLICATIONS.csv'>GGH twelve-city expansion planning application pilot (review only)</a> · "
         "<a href='GTA_RADAR_GGH_EXPANSION_SOURCE_STATUS.json'>GGH expansion source diagnostics</a> · "
+        "<a href='GTA_RADAR_NEXT_FOUR_MUNICIPALITIES_REVIEW.csv'>Ajax, Whitby, Clarington and Brantford new-city review (not accepted leads)</a> · "
+        "<a href='GTA_RADAR_NEXT_FOUR_MUNICIPALITIES_STATUS.json'>Four-city source/access diagnostic</a> · "
         "<a href='GTA_RADAR_GGH_OFFICIAL_GIS_APPLICATIONS.csv'>Richmond Hill and Newmarket official GIS applications</a> · "
         "<a href='GTA_RADAR_GGH_OFFICIAL_GIS_NEW_OR_CHANGED.csv'>Changed York GGH GIS applications</a> · "
         "<a href='GTA_RADAR_GGH_OFFICIAL_GIS_STATUS.json'>York GGH GIS source diagnostics</a> · "
