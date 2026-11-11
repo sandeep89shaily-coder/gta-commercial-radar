@@ -80,7 +80,13 @@ def physical_site(raw,source):
  addr=re.split(r",\s*(?:Toronto|Mississauga|Brampton)\b",addr,maxsplit=1,flags=re.I)[0]
  m=re.search(r"\b(?:unit|suite|ste|#)\s*([A-Za-z0-9-]+)\b",addr,re.I)
  if m:
-  if not unit:unit=m.group(1)
+  inline_unit=m.group(1)
+  # Real licence/permit schemas may supply a unit both inside the civic
+  # address and in a separate UNIT field. Contradictions are unsafe to
+  # assign to any tenant or same-site facility candidate.
+  if unit and unit.strip().upper()!=inline_unit.upper():
+   return "",""
+  unit=unit or inline_unit
   addr=text(addr[:m.start()]+" "+addr[m.end():])
  if not re.match(r"^\d+[A-Za-z]?\s+\w",addr):return "",""
  return addr[:180],unit[:20].upper()

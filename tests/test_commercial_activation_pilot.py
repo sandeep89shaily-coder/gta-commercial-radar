@@ -233,4 +233,22 @@ class ActivationPilotTests(unittest.TestCase):
             self.assertEqual(status["verified_openings"],0)
             self.assertEqual(status["verified_buyers"],0)
 
+
+    def test_address_unit_conflict_drops_candidate_without_tenant_match(self):
+        contradictory=licence(address="100 Queen Street West Suite 101",unit="202")
+        row,reason=p.classify(contradictory,TODAY,120)
+        self.assertIsNone(row)
+        self.assertEqual(reason,"MISSING_PHYSICAL_ADDRESS")
+        self.assertEqual(p.physical_site(contradictory["raw"],
+                                        "toronto_business_licences"),("",""))
+
+    def test_consistent_inline_and_structured_unit_remains_research_only(self):
+        consistent=licence(address="100 Queen Street West Suite 101",unit="101")
+        row,reason=p.classify(consistent,TODAY,120)
+        self.assertIsNone(reason)
+        self.assertEqual(row["site_address"],"100 Queen Street West")
+        self.assertEqual(row["site_unit"],"101")
+        self.assertEqual(row["opening_confirmed"],"NO")
+        self.assertEqual(row["buyer_verified"],"NO")
+
 if __name__=="__main__":unittest.main()

@@ -306,6 +306,7 @@ def run(out, *, db=None, notice_csv=None, results=None, fetch_official=False,
     # refreshes cannot leave an older proposal looking like a current signal.
     changed_notice_ids = set()
     failed_recheck_ids = set()
+    accepted_fetched = set()
     previous_signals = _read_csv(out / OUTPUT) if fetch_official else []
     if fetch_official:
         import gta_industrial_review_cursor as cursor
@@ -342,8 +343,9 @@ def run(out, *, db=None, notice_csv=None, results=None, fetch_official=False,
                     or not _str(record.get("city"))):
                     continue
                 accepted_fetched.add(number)
-                if number not in notices:
-                    notices[number] = record
+                # Fresh policy-checked official source text takes precedence
+                # over any previously saved manual excerpt for the same ID.
+                notices[number] = record
             # Audit/payload disagreements are failed retrievals, not verified
             # successes. Preserve the original audit failure for traceability.
             fetch_audit = [
@@ -363,7 +365,13 @@ def run(out, *, db=None, notice_csv=None, results=None, fetch_official=False,
     projects, site_history = _projects(results)
     signals = []
     site_exclusions = []
+    held_notice_ids = ((failed_recheck_ids | (changed_notice_ids - accepted_fetched))
+                       if fetch_official else set())
     for number, notice in sorted(notices.items()):
+        # A stale manual excerpt cannot clear a source-change or failed
+        # official recheck hold. Preserve old evidence as held instead.
+        if number in held_notice_ids:
+            continue
         # Never infer facility location from the proponent mailing address/name.
         if _str(notice.get("city")).casefold() not in TARGET_CITIES:
             site_exclusions.append({"ero_number": number, "reason": "MISSING_OR_OUT_OF_SCOPE_SITE_CITY"})
@@ -418,7 +426,7 @@ def run(out, *, db=None, notice_csv=None, results=None, fetch_official=False,
     # a source was successfully re-fetched, replace its older findings rather
     # than retaining signals it no longer supports. Never claim these are NEW
     # when they are merely carried forward.
-    updated_notice_ids = set(notices) if fetch_official else set()
+    updated_notice_ids = (set(notices) - held_notice_ids) if fetch_official else set()
     prior = [row for row in previous_signals
              if _number(row.get("ero_number")) not in updated_notice_ids
              and _number(row.get("ero_number"))
@@ -486,6 +494,8 @@ def run(out, *, db=None, notice_csv=None, results=None, fetch_official=False,
         "new_equipment_candidates_this_run": new_signal_count,
         "prior_equipment_candidates_preserved": len(prior),
         "carried_forward_source_recheck_holds": held_prior_count,
+        "unverified_manual_excerpt_ids_held_on_official_recheck": sorted(
+            held_notice_ids & set(notices)),
         "ero_detail_successes_total": (
             __import__("gta_industrial_review_cursor").reviewed_count(visited)
             if visited is not None else 0),

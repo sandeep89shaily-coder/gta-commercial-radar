@@ -1,5 +1,14 @@
 # Radar Next Actions — checkpoint 2026-11-08
 
+## Owner-priority order — November 10: do #3 then #4 before further sales qualification
+
+1. **Three-city reliability:** land the minimal exact-file-identity conflict hold, run full cross-platform tests and use the **next actual manual Windows collection** to evaluate the repaired Burlington canonical feed. Capture two separately dated permitted runs and source-status snapshots. Vaughan/Kitchener must continue their official authorized-export/request lane; no bypass of 403 or robots denial, no unsupported first-publication dates. The acceptance gate still requires exact application IDs, site/unit and original page evidence, not a registered URL or project-only row count.
+2. **Industrial equipment pilot:** apply official-source-over-manual freshness and failed-recheck holds, run targeted/full tests, then continue persistent ERO cursor against up to ten permitted, changed or previously unseen notices. The last 5/5 parsed, 2 findings baseline remains source-only, not buying-intent proof.
+3. **Commercial activation pilot:** reject contradictory address/UNIT identities, run targeted/full tests, and complete the actual read-only Windows SQLite pilot. Inspect 20 original cases, rejection reasons and 10 manually sourced opening/activation dossiers, without treating licence issue as an operating opening.
+4. **After evidence acceptance:** compare source freshness/supplier relevance, then resume qualification and carefully approved outreach work. Do not schedule pilot runs or change US$0.25/day AI ceiling.
+
+Implementation/read-only runbook: [PRIORITY_3_4_SOURCE_AND_PILOT_GATES_20261110.md](PRIORITY_3_4_SOURCE_AND_PILOT_GATES_20261110.md). GitHub code changes and CI do not meet actual live-source or market release criteria.
+
 ## November 10, 2026 — updated priority after current main inspection
 
 The November 8 ordering below is retained as historical rationale, but its PR states are stale: #152–#155 are closed **without merge**. Current main already contains separate related pilot modules. Do not restart completed CKAN work or blindly revive overlapping branches.
