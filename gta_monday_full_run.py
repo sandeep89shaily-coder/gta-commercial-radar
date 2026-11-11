@@ -169,6 +169,8 @@ def main():
     parser.add_argument("--industrial-limit", type=int, default=10)
     parser.add_argument("--skip-collection", action="store_true",
                         help="Explicit historical-only review; cannot claim fresh run")
+    parser.add_argument("--unattended", action="store_true",
+                        help="Accepted for the batch shortcut; controls console pause only")
     args = parser.parse_args()
     try:
         return execute(args.workspace, industrial_limit=args.industrial_limit,
