@@ -259,7 +259,20 @@ def run(results,*,today=None,fetcher=None):
   prior=original.get(pid)
   baseline=not any(k.startswith("OFFICIAL_PAGE:"+city.upper()+":")
                    or k.startswith("OFFICIAL_NOTICE:"+city.upper()+":") for k in original)
-  obs="INITIAL_BASELINE" if baseline else "FIRST_OBSERVED" if not prior else "RECORD_CHANGED" if digest!=prior["digest"] else "UNCHANGED"
+  if baseline:
+   obs="INITIAL_BASELINE"
+  elif prior is None:
+   # Existing Burlington history was previously under-parsed. On the first
+   # post-fix run, old official file numbers become visible in today's fetch.
+   # The site doesn't supply a VERIFIED original public posting date.
+   # Treat these as historical-source backfill until a human checks the
+   # actual notice age; never promote to a newly published project alert.
+   obs=("FIRST_OBSERVED_UNDATED_HELD" if
+        row.get("date_basis") in ("NO_VERIFIED_FIRST_PUBLICATION_DATE",
+                                  "MEETING_DATE_NOT_FIRST_PUBLICATION")
+        else "FIRST_OBSERVED")
+  else:
+   obs="RECORD_CHANGED" if digest!=prior["digest"] else "UNCHANGED"
   row.update(observation=obs,first_seen_local=prior["first_seen_local"] if prior else day)
   if obs in ("FIRST_OBSERVED","RECORD_CHANGED"):changed.append(row)
   updated[pid]={"digest":digest,"first_seen_local":row["first_seen_local"]}
@@ -273,6 +286,9 @@ def run(results,*,today=None,fetcher=None):
     "cities_targeted":5,
     "automatic_file_id_rows_this_stage":len(unique),
     "new_or_changed":len(changed),
+    "newly_observed_undated_file_ids_held_for_publication_review":sum(
+       r["observation"]=="FIRST_OBSERVED_UNDATED_HELD"
+       for r in unique.values()),
     "identity_conflicts_held_count":len(conflicted),
     "identity_conflicts_held_ids":sorted(conflicted),
     "automatically_recovered_cities":[r["city"] for r in statuses if r.get("automated_source_recovered_this_stage")],
