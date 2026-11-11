@@ -260,5 +260,35 @@ class OfficialNoticeDetailTests(unittest.TestCase):
             self.assertEqual(row["radar_first_seen_at"], "2026-11-01T08:00:00Z")
 
 
+
+    def test_explicit_policy_bulletin_without_site_is_not_equipment_notice(self):
+        # The live Windows files contain policy bulletins with no facility.
+        url="https://ero.ontario.ca/notice/026-1118"
+        bulletin="""<html><main><h1>Municipal Road Construction Standards</h1>
+            <p>ERO (Environmental Registry of Ontario) number 026-1118</p>
+            <h2>Bulletin summary</h2><p>General rulemaking only.</p>
+            <h2>Bulletin details</h2><p>No site or equipment proposal.</p>
+            <h2>Supporting materials</h2><p>Regulatory proposal PDF</p>
+        </main></html>"""
+        session=FakeSession(pages={url:bulletin})
+        fetched,audit=detail.fetch_notice_details(
+            {"026-1118":{"official_notice_url":url}},session=session)
+        self.assertEqual(fetched,[])
+        self.assertEqual(len(audit),1)
+        self.assertEqual(audit[0]["status"],"NON_INSTRUMENT_BULLETIN")
+        self.assertEqual(audit[0]["reason"],"BULLETIN_WITHOUT_SITE_OR_PROPOSAL")
+        self.assertIn(url,session.urls)
+
+    def test_missing_stage_with_ambiguous_page_remains_retryable_failure(self):
+        url="https://ero.ontario.ca/notice/026-1118"
+        ambiguous="""<html><h1>Industrial site proposal</h1><p>026-1118</p>
+            <h2>Proposal details</h2><p>Install an industrial boiler.</p>
+            <h2>Site address</h2><p>12 Example Road Oakville, ON</p></html>"""
+        session=FakeSession(pages={url:ambiguous})
+        _,audit=detail.fetch_notice_details(
+            {"026-1118":{"official_notice_url":url}},session=session)
+        self.assertEqual(audit[0]["status"],"DETAIL_REJECTED")
+        self.assertIn("NOTICE_STAGE_MISSING",audit[0]["reason"])
+
 if __name__ == "__main__":
     unittest.main()
