@@ -1,5 +1,13 @@
 # Radar Current State — 2026-11-11 (current main release gates)
 
+## November 11 — Today's one-click integration release candidate
+
+User requested "integrate everything time to run for today." The existing six-stage manual `gta_monday_full_run.py` collector+pilot architecture remains preserved. A current-day manual launcher `RUN_GTA_RADAR_TODAY.bat` is being added to update the *installed code only* through the already-tested safe `desktop_update.py` fast-forward gate **before** opening the integrated runner. Existing shortcuts `RUN_TOTAL_INTELLIGENCE_TODAY.bat` and `RUN_ALL_GTA_RADAR_MONDAY.bat` delegate to the same launcher; no schedules, AI budget or Outreach changes.
+
+The final manual orchestrator now packages the completed day's status, key source files and review-only pilot outputs into a **dated bounded ZIP under `GTA_RADAR_EXPORTS`**, with a SHA-256 file inventory, no original SQLite/secret keys/logs, and an honest freshness/failure label. A ZIP export error is surfaced and blocks a clean full-run exit. See [November 11 manual run instructions](RUN_GTA_RADAR_TODAY_20261111.md).
+
+**Acceptance boundary:** New code and CI alone cannot execute today's user-local Windows collection; the retained original `radar.sqlite`, live data sources, and API settings stay on the PC. Official-source GitHub smoke checks prove only source-specific network access, never a full user run. Preserve 16-city source restrictions and original records. The work needs Windows/Linux CI at the PR head before declaring this a tested release.
+
 ## November 11 — P3/P4 verification and historical-run reconciliation merged
 
 [PR #173](https://github.com/sandeep89shaily-coder/gta-commercial-radar/pull/173) **merged** at `a59a72bbd3208b7a63ef19ce9478d0ea6b12ee6c`. All four Windows/Linux Python 3.11/3.12 jobs passed in [Radar CI #43028553192](https://github.com/sandeep89shaily-coder/gta-commercial-radar/actions/runs/43028553192); bounded official five-city source acceptance passed in [#43028553034](https://github.com/sandeep89shaily-coder/gta-commercial-radar/actions/runs/43028553034).
