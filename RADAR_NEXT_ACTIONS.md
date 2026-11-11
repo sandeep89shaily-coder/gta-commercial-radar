@@ -1,5 +1,14 @@
 # Radar Next Actions — checkpoint 2026-11-08
 
+## Follow-through on priorities 3 and 4 after merged PR #171 — November 10
+
+1. **Burlington two-run acceptance:** The official GitHub sample yielded 13 file-ID candidates in 8/10 pages; the other two returned `NO_FILE_NUMBERS_SECTION`. Complete two separate authorized live Windows collections; archive original dated source pages and status manifests before later runs overwrite them. Investigate the two skipped pages via independently authorized official sources rather than fabricating IDs. First observed ≠ first publicly published; no citywide completeness claim.
+2. **Vaughan and Kitchener access:** Vaughan's official notices still robots-denied in GitHub CI. Kitchener was not probed by that CI and previously hit robots denial on Windows. Continue prepared unsent publisher-access requests and authorized CSV/GeoJSON export route. Do not bypass access restrictions or confuse York regional planning reviewers with purchasers.
+3. **Industrial equipment pilot:** Existing `RUN_INDUSTRIAL_EQUIPMENT_PILOT.bat` on original retained Windows SQLite/cursor; up to 10 policy-permitted unreviewed/changed original ERO notices. Inspect new official-source precedence, failed recheck holds, historical notices, physical site, and equipment supplier fit. The prior two signals are not verified open orders.
+4. **Commercial activation pilot:** Existing `RUN_COMMERCIAL_ACTIVATION_PILOT.bat` local read-only; audit 20 real source rows, exclusion reasons, true site+unit and 10 source-backed activation dossiers. Issued licence/permit/inspection ≠ actual opening. No buyer/open package inference.
+
+**Completed:** six new targeted regressions, 4/4 cross-platform jobs and live bounded Burlington source check. **Still blocked:** full Windows repeat, Vaughan/Kitchener permitted collection, verified supplier work, independent openings, 10 validated actionable opportunities and two paying customers. Runbook: [PRIORITY_3_4_SOURCE_AND_PILOT_GATES_20261110.md](PRIORITY_3_4_SOURCE_AND_PILOT_GATES_20261110.md).
+
 ## Owner-priority order — November 10: do #3 then #4 before further sales qualification
 
 1. **Three-city reliability:** land the minimal exact-file-identity conflict hold, run full cross-platform tests and use the **next actual manual Windows collection** to evaluate the repaired Burlington canonical feed. Capture two separately dated permitted runs and source-status snapshots. Vaughan/Kitchener must continue their official authorized-export/request lane; no bypass of 403 or robots denial, no unsupported first-publication dates. The acceptance gate still requires exact application IDs, site/unit and original page evidence, not a registered URL or project-only row count.
