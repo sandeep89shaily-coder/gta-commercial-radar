@@ -1,5 +1,15 @@
 # Radar Next Actions — checkpoint 2026-11-08
 
+## Next verified owner-priority checkpoint after merged PR #172 (November 10)
+
+1. **Burlington:** current page parser validated against 10/10 live official pages and 16 exact application IDs in GitHub source workflow; now obtain TWO independently dated, compliant owner Windows collections and audit source files, status change, completeness, historical/awarded stages, and first-publication vs Radar first-seen before any coverage or new-lead claims.
+2. **Vaughan/Kitchener:** retain official-source blocked state and request a publisher-permitted CSV/GeoJSON or subscription/export. No robots/403 circumvention. Cross-check City planning application IDs against the original source, not just York Regional review.
+3. **Industrial pilot:** retained November 10 archive contains 4 equipment findings from 3 ERO source notices, 19 successful detail fetches among 156 cards, 0 verified open procurement. Continue manual cursor with up to 10 unreviewed or changed policy-permitted notices, excluding unchanged source-confirmed policy bulletins. Original site, stage, planned equipment change, historical decision and actual buyer/packages require human evidence.
+4. **Activation pilot:** 4,198 candidate source events and 139 same-site links, 0 independently verified openings. Use generated evidence-only 20-source-row queue plus 10 distinct exact site/unit dossier queue and check original records. Manual recheck status is pending even when queue files exist.
+5. **Gate before commercial claims:** actual first-publication evidence, supplier buying package, independent tenant/opening, real prospect interest and two paying pilots. Never turn a source excerpt, status, permit or address-only relationship into a confirmed contract.
+
+[Review and release criteria](PRIORITY_3_4_CONTINUED_ACCEPTANCE_20261110.md). **Merged PR #172** passed [cross-platform four-job matrix](https://github.com/sandeep89shaily-coder/gta-commercial-radar/actions/runs/42952904773) and [live five-city source workflow](https://github.com/sandeep89shaily-coder/gta-commercial-radar/actions/runs/42952904795). No further user permission check requested for future evidence-only code improvements, but blocked official source permissions and manual Windows data availability remain real dependencies.
+
 ## Owner-selected priority 3+4 continuation — latest original data and Burlington live result (Nov 10)
 
 1. **Burlington:** parser repair under PR #172 raised live GitHub sample from 8/10 official posts and 13 IDs to **10/10 posts and 16 IDs**, a first baseline with no new/changed alerts. Move next to two dated permitted Windows source runs, page/ID and source-age repeat comparisons, historic status checks and broader coverage evaluation. Don't declare all-city recovery or 16 supplier opportunities from these IDs.
