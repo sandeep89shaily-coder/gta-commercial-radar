@@ -92,3 +92,55 @@ def test_other_three_cities_only_audited_no_fake_gis_recovery(tmp_path):
   assert remaining[city]["application_id_rows_this_stage"]==0
   assert remaining[city]["automated_source_recovered_this_stage"] is False
  assert remaining["Newmarket"]["source_failure"]=="ROBOTS_ACCESS_DENIED"
+
+
+def test_conflicting_burlington_file_number_on_distinct_city_pages_is_held(tmp_path):
+ # Two individually parseable City pages use identical official file numbers.
+ # Do not let whichever page appears first fabricate a project identity.
+ page_a="https://www.burlington.ca/news-and-notices/posts/current-development-projects/first-project/"
+ page_b="https://www.burlington.ca/news-and-notices/posts/current-development-projects/second-project/"
+ index="<main><a href='"+page_a+"'>Project A</a><a href='"+page_b+"'>Project B</a></main>"
+ def official(url):
+  if url==BURLINGTON_INDEX:return index
+  if url==page_a:return PAGE
+  if url==page_b:return PAGE.replace("1376-1382 Plains Road East","Different Industrial Site")
+  raise ValueError("POLICY_BLOCKED_OR_UNAVAILABLE")
+ report=run(tmp_path,today=dt.date(2026,11,10),fetcher=official)
+ assert report["identity_conflicts_held_count"]==2
+ assert report["automatic_file_id_rows_this_stage"]==0
+ assert report["new_or_changed"]==0
+ burl=next(x for x in report["source_status"] if x["city"]=="Burlington")
+ assert burl["links_parsed"]==2
+ assert burl["identity_conflicts_held"]==2
+ assert burl["application_id_rows_this_stage"]==0
+ assert burl["status"]=="PARTIAL_OFFICIAL_PAGE_COLLECTION_IDENTITY_HOLD"
+ with (tmp_path/OUTPUT).open(encoding="utf-8-sig",newline="") as handle:
+  assert list(csv.DictReader(handle))==[]
+ # A held first visit must not become an accepted baseline.
+ state=json.loads((tmp_path/"GTA_RADAR_FIVE_CITY_OFFICIAL_SEEN.json").read_text()) if (
+  tmp_path/"GTA_RADAR_FIVE_CITY_OFFICIAL_SEEN.json").exists() else {"seen":{}}
+ assert not state["seen"]
+
+
+def test_conflicting_followup_does_not_replace_successful_identity_ledger(tmp_path):
+ page_a="https://www.burlington.ca/news-and-notices/posts/current-development-projects/first-project/"
+ page_b="https://www.burlington.ca/news-and-notices/posts/current-development-projects/second-project/"
+ def official(url,conflict=False):
+  if url==BURLINGTON_INDEX:
+   anchors="<a href='"+page_a+"'>Project A</a>"
+   if conflict: anchors+="<a href='"+page_b+"'>Project B</a>"
+   return "<main>"+anchors+"</main>"
+  if url in (page_a,page_b):return PAGE
+  raise ValueError("POLICY_BLOCKED_OR_UNAVAILABLE")
+ first=run(tmp_path,today=dt.date(2026,11,8),fetcher=lambda u:official(u))
+ assert first["automatic_file_id_rows_this_stage"]==2
+ ledger_path=tmp_path/"GTA_RADAR_FIVE_CITY_OFFICIAL_SEEN.json"
+ original=ledger_path.read_bytes()
+ second=run(tmp_path,today=dt.date(2026,11,9),
+            fetcher=lambda u:official(u,conflict=True))
+ assert second["identity_conflicts_held_count"]==2
+ assert second["new_or_changed"]==0
+ assert original==ledger_path.read_bytes()
+ third=run(tmp_path,today=dt.date(2026,11,10),fetcher=lambda u:official(u))
+ assert third["automatic_file_id_rows_this_stage"]==2
+ assert third["new_or_changed"]==0
