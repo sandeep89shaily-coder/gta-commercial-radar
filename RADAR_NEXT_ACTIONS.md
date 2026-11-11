@@ -1,5 +1,12 @@
 # Radar Next Actions — 2026-11-11
 
+## November 11 — same-day integrated manual operator run
+
+1. **Integration:** Finish and cross-platform-test today's new `RUN_GTA_RADAR_TODAY.bat`; old Monday/TOTAL shortcuts must resolve to it. It must safely fast-forward Git code, preserve local database, run the existing collector once plus the five research-only stages, and create a timestamped `GTA_RADAR_EXPORTS/GTA_RADAR_RESULTS_*.zip` with manifests and source hashes. See [manual release instructions](RUN_GTA_RADAR_TODAY_20261111.md).
+2. **Run when user-side original data is accessible:** Owner double-clicks one launcher on their Windows PC. Do not attempt empty GitHub-runner replicas or report a full manual collection on CI. Review `MONDAY_FULL_RADAR_STATUS.json`, each actual stage status and the dated ZIP; failed/outdated/stale runs are not sold as live.
+3. **Source acceptance after today's real ZIP:** Compare 16 Burlington exact source IDs and date/fingerprint against previous local 11-ID ledger, preserve first-observed-undated HOLDs; Vaughan/Kitchener await publisher-approved exports; continue industrial cursor (up to 10 official robots-permitted new/changed notices) and review balanced 20 activation sources/10 distinct facility dossiers without false opening or supplier package claims.
+4. **Client relevance:** Only independently confirmed project roles, actual buying opportunity and dated source evidence can justify outreach. Manual schedule and shared US$0.25/day AI cap stay unchanged.
+
 ## November 11 — latest tested state after merged PR #173
 
 **Done and verified in code:** safe ZIP14-vs-ZIP15 archive reconciliation (2,833 identical saved source hashes/stages/sites, 1,365 later-only licences), explicit source-age HOLD for parser-discovered undated City IDs, 3/3 original ERO proposal/site/equipment rechecks, and two actually sent approved-method requests to Vaughan/Kitchener offices. [PR #173](https://github.com/sandeep89shaily-coder/gta-commercial-radar/pull/173) passed [4/4 Windows/Linux CI](https://github.com/sandeep89shaily-coder/gta-commercial-radar/actions/runs/43028553192) plus [live City source CI](https://github.com/sandeep89shaily-coder/gta-commercial-radar/actions/runs/43028553034). A weekday email reply-only monitor is active; main Radar remains manual.

@@ -142,9 +142,25 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
     report["report_html"] = str(index)
     save()
     render()
+    # Create one dated, bounded export *after* the final integration manifest
+    # is written. Never include SQLite, API keys or live collector credentials.
+    # Failure to package is reported, not disguised as a complete run.
+    try:
+        from gta_daily_result_archive import create as create_archive
+        package = create_archive(results)
+        report["archive_status"] = "CREATED_REVIEW_ONLY"
+        report["run_archive"] = package["archive"]
+        report["run_archive_freshness_gate"] = package["freshness_gate"]
+        print("DATED REVIEW ZIP: " + package["archive"], flush=True)
+    except (OSError, ValueError, RuntimeError, ImportError) as exc:
+        report["archive_status"] = "FAILED_NOT_PACKAGED"
+        report["archive_error"] = type(exc).__name__ + ": " + str(exc)[:250]
+        print("ARCHIVE FAILED: " + report["archive_error"], flush=True)
+    save()
+    render()
     print("FULL RUN REPORT: " + str(index), flush=True)
     print("FULL RUN MANIFEST: " + str(manifest), flush=True)
-    return 0 if not failed else 2
+    return 0 if not failed and report["archive_status"] == "CREATED_REVIEW_ONLY" else 2
 
 
 def main():
@@ -153,6 +169,8 @@ def main():
     parser.add_argument("--industrial-limit", type=int, default=10)
     parser.add_argument("--skip-collection", action="store_true",
                         help="Explicit historical-only review; cannot claim fresh run")
+    parser.add_argument("--unattended", action="store_true",
+                        help="Accepted for the batch shortcut; controls console pause only")
     args = parser.parse_args()
     try:
         return execute(args.workspace, industrial_limit=args.industrial_limit,
