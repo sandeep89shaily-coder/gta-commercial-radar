@@ -1,4 +1,14 @@
-# Radar Next Actions — checkpoint 2026-11-08
+# Radar Next Actions — 2026-11-11
+
+## November 11 execution results and remaining blockers (source-only acceptance)
+
+1. **City access:** Vaughan and Kitchener official access requests have been **sent** through the connected Radar Gmail, with a separate weekday reply watch. Continue only with publisher-authorized City planning application exports/official notification subscriptions; there is no grant yet and prior robots/403 blocks remain. Kitchener's official open-data site explicitly supports published CSV downloads; do not assume the blocked API is accessible.
+2. **Burlington:** Last independent source sample 10/10 official current pages / 16 City file IDs; original owner Nov 9 & 10 ZIPs each preserved 11 earlier IDs but both had blocked current official fetch. Still need TWO separate actual post-fix owner Windows runs and source timestamp/status verification. New code holds previously unknown IDs without independently verified posting date rather than promoting parser backfills to new leads.
+3. **Industrial ERO:** 3 distinct original notices with 4 equipment changes checked on current public Registry pages as proposals (Pinty's dust collector/scrubber, Burlington cremation units, Vaughan Kristofoam boiler/cooling tower). Original site/stage/description verified; **buyer, procurement window, actual unawarded package UNKNOWN**. Next manual bounded live cursor run for changed/unreviewed records plus actual buyer role and procurement research remains.
+4. **Activation:** 2,833 previously accepted source-key rows are stable across the two user archives; another 1,365 Toronto licence rows exist only in the later accepted CSV. This does not independently reverify 20 source records, 10 tenant dossiers or any actual opening. Run/reconcile new 20+10 audit queues and source-preserving local Windows collector.
+5. **Implementation:** `gta_pilot_archive_reconciliation.py` performs safe read-only compare between original result ZIPs; `gta_five_city_application_recovery.py` holds undated recovered source IDs on previously baselined cities. Run full Windows/Linux and live-source tests, land isolated PR only after green CI. Preserve all prior project work, manual running and AI limits.
+
+See [November 11 independently checked source notes](PRIORITY_3_4_20261111_VERIFICATION.md). Public-source status is distinct from customer-ready industrial lead acceptance.
 
 ## Next verified owner-priority checkpoint after merged PR #172 (November 10)
 
