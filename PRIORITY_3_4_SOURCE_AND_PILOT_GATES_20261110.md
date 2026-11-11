@@ -1,5 +1,11 @@
 # GTA Radar — Priority 3 + 4 evidence-gate checkpoint (2026-11-10)
 
+## Checked implementation and first live sample (November 10)
+
+[PR #171 merged](https://github.com/sandeep89shaily-coder/gta-commercial-radar/pull/171). The [4/4 cross-platform test matrix](https://github.com/sandeep89shaily-coder/gta-commercial-radar/actions/runs/42929549982) and [separate live source acceptance](https://github.com/sandeep89shaily-coder/gta-commercial-radar/actions/runs/42929550077) passed.
+
+The official Burlington index yielded 10 selected pages, 8 parsed pages, 13 file-ID candidates, and 2 `NO_FILE_NUMBERS_SECTION` holds (`800-burloak-dr`, `burlington-nelson-quarry-extension`). The GitHub runner found zero ID conflicts and no new/changed source events on its first baseline. Vaughan remained robots denied; Kitchener was not re-fetched in that run. No production citywide, buyer, supplier or opening claim has passed. Retain two separate Windows snapshots next.
+
 **Scope:** preserve the 16-city manual Radar runner, finish source-integrity work for the **Burlington/Vaughan/Kitchener** repair lane, and keep **industrial equipment** and **commercial activation** as isolated manual pilots. The code changes in this checkpoint prevent unsupported source-evidence promotion; they do **not** establish new live site access, production geographic coverage, buyers or open contracts.
 
 ## Priority 3: existing three-city collector reliability
