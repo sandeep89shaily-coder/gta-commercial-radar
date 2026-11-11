@@ -1,5 +1,14 @@
 # Radar Next Actions — checkpoint 2026-11-08
 
+## Owner-selected priority 3+4 continuation — latest original data and Burlington live result (Nov 10)
+
+1. **Burlington:** parser repair under PR #172 raised live GitHub sample from 8/10 official posts and 13 IDs to **10/10 posts and 16 IDs**, a first baseline with no new/changed alerts. Move next to two dated permitted Windows source runs, page/ID and source-age repeat comparisons, historic status checks and broader coverage evaluation. Don't declare all-city recovery or 16 supplier opportunities from these IDs.
+2. **Vaughan/Kitchener:** old source blocks remain; use authorized publisher CSV, official City planning notice registry and unsent access-request pack. No robots/403 workaround. Preserve full original file ID, site and public date evidence and York Region's limited regional role.
+3. **Industrial:** owner ZIP15 contains 156 source ERO cards and 4 equipment findings from 3 notices (19 cursor successes), not merely November 7's 2 findings. New code tags clearly source-ineligible policy bulletins for cursor efficiency, and queues original ERO notice rechecks. Next owner's permitted batch is up to ten unseen/changed **original** notices; confirm site, environmental stage, history and purchaser / package separately, no open contract claim.
+4. **Activation:** owner ZIP15 holds 4,198 source candidates, 139 same-site links and 0 verified openings. New safe pack creates a balanced 20-record source recheck queue and ten exact-site/unit manual dossier queues. Complete original-source manual checks and independent opening signals before any promotion, retain database read-only and no automatic outreach.
+
+[Detailed source evidence and acceptance gates](PRIORITY_3_4_CONTINUED_ACCEPTANCE_20261110.md). Do not treat generated human review queues as the human review being done; continue tested code work before buyer-outreach tasks.
+
 ## Follow-through on priorities 3 and 4 after merged PR #171 — November 10
 
 1. **Burlington two-run acceptance:** The official GitHub sample yielded 13 file-ID candidates in 8/10 pages; the other two returned `NO_FILE_NUMBERS_SECTION`. Complete two separate authorized live Windows collections; archive original dated source pages and status manifests before later runs overwrite them. Investigate the two skipped pages via independently authorized official sources rather than fabricating IDs. First observed ≠ first publicly published; no citywide completeness claim.

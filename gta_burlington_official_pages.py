@@ -42,27 +42,37 @@ def _parse(html, url):
     heading=main.find("h1")
     title=heading.get_text(" ",strip=True) if heading else ""
     if not title or len(title)>350:raise ValueError("MISSING_PROJECT_PAGE_TITLE")
-    # Section extraction must be bounded so neighboring numbers (phone, dates,
-    # addresses) cannot become invented planning file numbers.
-    section=None
-    for node in main.find_all(["h2","h3","h4","strong","b"]):
-        if re.fullmatch(r"File Numbers?", node.get_text(" ",strip=True),re.I):
-            section=node
+    # The current City template also uses unstyled paragraphs and spans for
+    # "File Numbers" (not just h2/strong elements). Use bounded visible text
+    # AFTER an explicit section marker. Never collect numbers from the page's
+    # unrelated PDFs, phone numbers, other projects or navigation.
+    tokens=list(main.stripped_strings)
+    section_index=None
+    inline_tail=""
+    for i, raw in enumerate(tokens):
+        label=" ".join(raw.split())
+        match=re.fullmatch(r"File Numbers?\s*:?(?:\s*(.*))?",label,re.I)
+        if match:
+            section_index=i
+            inline_tail=match.group(1) or ""
             break
-    if section is None:raise ValueError("NO_FILE_NUMBERS_SECTION")
-    parts=[]
-    for sibling in section.parent.next_siblings:
-        if getattr(sibling,"name",None) in ("h2","h3","h4"):break
-        text=sibling.get_text(" ",strip=True) if hasattr(sibling,"get_text") else str(sibling).strip()
-        parts.append(text)
-        if len(" ".join(parts))>1200:break
-    # Some content templates place the heading and list inside a single wrapper.
-    if not any(FILE_NO.search(t) for t in parts):
-        wrapper=section.parent.parent
-        text=wrapper.get_text(" ",strip=True)[:1500] if wrapper else ""
-        marker=re.search(r"File Numbers?",text,re.I)
-        if marker:parts=[text[marker.end():]]
-    numbers=sorted(set(m.group(0).upper().replace(" ","") for m in FILE_NO.finditer(" ".join(parts))))
+    if section_index is None:
+        raise ValueError("NO_FILE_NUMBERS_SECTION")
+    parts=[inline_tail] if inline_tail else []
+    stop=re.compile(
+        r"^(?:Public Meetings?|Supporting Documents?|Application Processes?"
+        r" and Timeline|Planner on File|Public Engagement|Site Address|"
+        r"Applicant|Current Development Projects|Subscribe Back|"
+        r"View (?:Calendar|Full)|Contact Us)\b",re.I)
+    for piece in tokens[section_index+1:section_index+15]:
+        value=" ".join(piece.split())
+        if stop.search(value):
+            break
+        parts.append(value)
+        if len(" ".join(parts))>900:
+            break
+    numbers=sorted(set(m.group(0).upper().replace(" ","")
+                       for m in FILE_NO.finditer(" ".join(parts))))
     if not numbers:raise ValueError("NO_RECOGNIZED_BURLINGTON_FILE_NUMBERS")
     description=""
     for node in main.find_all(["h2","h3","h4","strong"]):

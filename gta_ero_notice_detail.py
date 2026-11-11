@@ -257,7 +257,20 @@ def fetch_notice_details(cards, *, max_notices=5, session=None, sleep=time.sleep
                     "reason": type(e).__name__ + ": " + str(e)[:120],
                 }
                 if page is not None and isinstance(e, ValueError):
-                    failure["page_shape"] = _page_shape(page)
+                    shape = _page_shape(page)
+                    failure["page_shape"] = shape
+                    headings = {str(h).casefold() for h in shape["heading_samples"]}
+                    # The real Nov 10 run repeatedly attempted ERO policy
+                    # bulletins without any physical industrial site or
+                    # proposal-detail section. This is not a parser outage:
+                    # it is the wrong notice *kind* for the equipment pilot.
+                    # Skip only when BOTH exact bulletin headings and absent
+                    # equipment/site evidence support that exclusion.
+                    if ({"bulletin summary", "bulletin details"} <= headings
+                        and not shape["proposal_details_label_seen"]
+                        and not shape["site_address_label_seen"]):
+                        failure["status"] = "NON_INSTRUMENT_BULLETIN"
+                        failure["reason"] = "BULLETIN_WITHOUT_SITE_OR_PROPOSAL"
                 audit.append(failure)
         return notices, audit
     finally:

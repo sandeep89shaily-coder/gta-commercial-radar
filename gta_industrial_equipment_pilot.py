@@ -491,6 +491,9 @@ def run(out, *, db=None, notice_csv=None, results=None, fetch_official=False,
         "official_fetch_audit": fetch_audit,
         "excluded_out_of_scope_sites": site_exclusions,
         "equipment_change_candidates": len(signals),
+        "distinct_ero_notices_with_equipment_changes": len({
+            row["ero_number"] for row in signals if row.get("ero_number")
+        }),
         "new_equipment_candidates_this_run": new_signal_count,
         "prior_equipment_candidates_preserved": len(prior),
         "carried_forward_source_recheck_holds": held_prior_count,
@@ -499,8 +502,14 @@ def run(out, *, db=None, notice_csv=None, results=None, fetch_official=False,
         "ero_detail_successes_total": (
             __import__("gta_industrial_review_cursor").reviewed_count(visited)
             if visited is not None else 0),
+        "ero_non_instrument_bulletins_excluded": (
+            __import__("gta_industrial_review_cursor").non_instrument_excluded_count(
+                visited,cards) if visited is not None else 0),
         "ero_notices_unreviewed": (
-            max(0,len(cards) - __import__("gta_industrial_review_cursor").reviewed_count(visited))
+            max(0,len(cards)
+                - __import__("gta_industrial_review_cursor").reviewed_count(visited)
+                - __import__("gta_industrial_review_cursor").non_instrument_excluded_count(
+                    visited,cards))
             if visited is not None else 0),
         "ero_notices_selected_this_run": len(chosen),
         "same_site_candidate_links": sum(s.get("project_match_status") ==

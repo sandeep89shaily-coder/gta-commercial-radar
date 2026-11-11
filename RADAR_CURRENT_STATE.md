@@ -1,5 +1,13 @@
 # Radar Current State — 2026-11-08 (draft PR #155)
 
+## November 10 continued priority 3 + 4 source acceptance — PR #172
+
+Owner historical November 10 results ZIP was recovered and reviewed: **4,198 commercial activation review candidates**, **139 same-site links**, **zero independently verified openings**; industrial ERO ledger **156 cards**, prior cursor **19 successfully parsed**, **4 equipment findings across 3 distinct original notices**, **0** proven open procurement or specific buyers. Do not replace these with the older November 7 two-signal baseline.
+
+The latest GitHub live official [five-city workflow #42952671824](https://github.com/sandeep89shaily-coder/gta-commercial-radar/actions/runs/42952671824) passed its targeted regressions and observed **10/10** current Burlington posts parsed, **16** exact source file-ID candidates, **zero** parse failures and **zero** new-on-baseline alerts. The two pages previously excluded (800 Burloak, Nelson Quarry) now provide three additional exact City IDs. No citywide, first-publication, procurement or independent Windows repeated-run acceptance is conferred. Vaughan still robots denied; Kitchener not refetched.
+
+PR #172 introduces an evidence-only, offline manual pilot acceptance pack with balanced **20-record activation source queue**, **10 different exact-site/unit dossier queue entries**, and exact ERO notice recheck queue; all unverified. It also excludes unambiguous non-site ERO policy bulletins from unchanged cursor retries while preserving revisits after source changes. Keep all earlier manual schedule and source access restrictions. See [continued priority 3+4 checkpoint](PRIORITY_3_4_CONTINUED_ACCEPTANCE_20261110.md).
+
 ## November 10 completed owner-priorities 3 + 4 checkpoint
 
 **Merged:** [PR #171](https://github.com/sandeep89shaily-coder/gta-commercial-radar/pull/171) at `ee6e829d2e361ef1c23db410255767c2e7869245`. [Windows/Linux 3.11/3.12 all four CI jobs passed](https://github.com/sandeep89shaily-coder/gta-commercial-radar/actions/runs/42929549982); separate [five-city live-source acceptance workflow](https://github.com/sandeep89shaily-coder/gta-commercial-radar/actions/runs/42929550077) passed its 16 targeted tests.
