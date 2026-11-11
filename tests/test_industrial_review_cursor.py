@@ -248,5 +248,76 @@ class IndustrialReviewCursorTests(unittest.TestCase):
             self.assertEqual(status["ero_detail_successes_total"],0)
             self.assertIn(seen[0],cursor.select(cards,cursor.load(out,cards),10))
 
+
+    def test_accepted_ero_notice_overrides_older_manual_excerpt(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td);manual=root/"manual.csv"
+            row={"ero_number":"026-1155",
+                 "official_notice_url":"https://ero.ontario.ca/notice/026-1155",
+                 "site_address":"890 Harrington Court","city":"Burlington",
+                 "proposal_details":"This application is to replace the boiler."}
+            with manual.open("w",encoding="utf-8",newline="") as f:
+                w=csv.DictWriter(f,fieldnames=list(row));w.writeheader();w.writerow(row)
+            cards={"026-1155":sample_cards()["026-1155"]}
+            def fresh(selected,max_notices):
+                self.assertEqual(list(selected),["026-1155"])
+                return [{
+                    "ero_number":"026-1155",
+                    "official_notice_url":cards["026-1155"]["official_notice_url"],
+                    "content_provenance":"FETCHED_EXACT_ERO_OFFICIAL_NOTICE",
+                    "site_address":"890 Harrington Court","city":"Burlington",
+                    "proposal_details":"This application is for the installation of two human cremation units.",
+                    "notice_stage":"Proposal",
+                }],[{"ero_number":"026-1155","status":"DETAIL_RETRIEVED"}]
+            with patch.object(pilot,"read_radar_ero",return_value=cards):
+                result=pilot.run(root/"out",db=root/"unused.sqlite",notice_csv=manual,
+                                 fetch_official=True,fetch_limit=1,official_fetcher=fresh)
+            signals=pilot._read_csv(root/"out"/pilot.OUTPUT)
+            self.assertEqual(result["equipment_change_candidates"],1)
+            self.assertEqual(signals[0]["equipment"],"Cremation equipment")
+            self.assertEqual(signals[0]["evidence_basis"],
+                             "FETCHED_EXACT_ERO_OFFICIAL_NOTICE")
+            self.assertFalse(any(r["equipment"]=="Boiler" for r in signals))
+
+    def test_failed_changed_ero_recheck_keeps_prior_held_instead_of_manual_republish(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td);out=root/"out";out.mkdir()
+            card=sample_cards()["026-1152"].copy()
+            old={"signal_id":"old-source-signal","ero_number":"026-1152",
+                 "official_notice_url":card["official_notice_url"],
+                 "site_address":"2714 Bristol Circle","city":"Oakville",
+                 "equipment":"Dust collection","action":"REPLACEMENT",
+                 "notice_stage":"Proposal","review_status":"MANUAL_REVIEW_REQUIRED",
+                 "procurement_status":"UNKNOWN","buyer_verified":"NO"}
+            with (out/pilot.OUTPUT).open("w",encoding="utf-8",newline="") as f:
+                w=csv.DictWriter(f,fieldnames=list(old));w.writeheader();w.writerow(old)
+            cursor.save(out,{"version":1,"notices":{
+                "026-1152":{"status":"DETAIL_RETRIEVED",
+                            "card_fingerprint":cursor.fingerprint(card)}})
+            card["notice_stage"]="Decision"
+            manual=root/"stale.csv"
+            row={"ero_number":"026-1152",
+                 "official_notice_url":card["official_notice_url"],
+                 "site_address":"2714 Bristol Circle","city":"Oakville",
+                 "proposal_details":"Install a new industrial boiler."}
+            with manual.open("w",encoding="utf-8",newline="") as f:
+                w=csv.DictWriter(f,fieldnames=list(row));w.writeheader();w.writerow(row)
+            def unavailable(selected,max_notices):
+                return [],[{"ero_number":no,"status":"DETAIL_REJECTED",
+                            "reason":"HTTP_503"} for no in selected]
+            with patch.object(pilot,"read_radar_ero",return_value={"026-1152":card}):
+                summary=pilot.run(out,db=root/"unused.sqlite",notice_csv=manual,
+                                  fetch_official=True,fetch_limit=1,
+                                  official_fetcher=unavailable)
+            signals=pilot._read_csv(out/pilot.OUTPUT)
+            self.assertEqual(len(signals),1)
+            self.assertEqual(signals[0]["signal_id"],"old-source-signal")
+            self.assertEqual(signals[0]["review_status"],
+                             "SOURCE_CHANGED_OR_RECHECK_FAILED_HOLD")
+            self.assertEqual(signals[0]["procurement_status"],"UNKNOWN")
+            self.assertEqual(summary["new_equipment_candidates_this_run"],0)
+            self.assertEqual(summary["unverified_manual_excerpt_ids_held_on_official_recheck"],
+                             ["026-1152"])
+
 if __name__=="__main__":
     unittest.main()
