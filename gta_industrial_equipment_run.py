@@ -11,6 +11,7 @@ from pathlib import Path
 
 from v6_daily_pipeline import choose_database, find_workspace
 from gta_industrial_equipment_pilot import run as pilot_run
+from gta_pilot_acceptance_pack import build as build_acceptance_pack
 
 def execute(workspace=None, *, limit=10, pilot=pilot_run):
     ws = find_workspace(workspace)
@@ -19,7 +20,11 @@ def execute(workspace=None, *, limit=10, pilot=pilot_run):
     out = results / "INDUSTRIAL_PILOT"
     summary = pilot(out, db=db, results=results,
                     fetch_official=True, fetch_limit=limit)
+    acceptance = (build_acceptance_pack(results, pilot="industrial")
+                  if (out / "GTA_RADAR_INDUSTRIAL_EQUIPMENT_REVIEW.csv").is_file()
+                  else None)
     print(json.dumps({
+        "review_queue": acceptance.get("industrial", {}).get("queue") if acceptance else "",
         "mode": "MANUAL_INDUSTRIAL_EQUIPMENT_PILOT",
         "db_read_only": str(db),
         "output": str(out),
