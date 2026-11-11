@@ -319,5 +319,21 @@ class IndustrialReviewCursorTests(unittest.TestCase):
             self.assertEqual(summary["unverified_manual_excerpt_ids_held_on_official_recheck"],
                              ["026-1152"])
 
+
+    def test_bulletin_exclusion_not_retried_until_source_card_changes(self):
+        cards=sample_cards()
+        source=cards["026-1148"]
+        state={"version":1,"notices":{}}
+        cursor.update(state,cards,[{"ero_number":"026-1148",
+            "status":"NON_INSTRUMENT_BULLETIN",
+            "reason":"BULLETIN_WITHOUT_SITE_OR_PROPOSAL"}])
+        self.assertEqual(cursor.non_instrument_excluded_count(state,cards),1)
+        selected=cursor.select({"026-1148":source},state,10)
+        self.assertEqual(selected,{})
+        cards["026-1148"]["notice_stage"]="Proposal"
+        self.assertEqual(cursor.non_instrument_excluded_count(state,cards),0)
+        selected=cursor.select({"026-1148":cards["026-1148"]},state,10)
+        self.assertEqual(list(selected),["026-1148"])
+
 if __name__=="__main__":
     unittest.main()
