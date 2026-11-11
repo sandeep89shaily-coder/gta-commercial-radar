@@ -1,5 +1,13 @@
 # Radar Current State — 2026-11-08 (draft PR #155)
 
+## November 10 completed owner-priorities 3 + 4 checkpoint
+
+**Merged:** [PR #171](https://github.com/sandeep89shaily-coder/gta-commercial-radar/pull/171) at `ee6e829d2e361ef1c23db410255767c2e7869245`. [Windows/Linux 3.11/3.12 all four CI jobs passed](https://github.com/sandeep89shaily-coder/gta-commercial-radar/actions/runs/42929549982); separate [five-city live-source acceptance workflow](https://github.com/sandeep89shaily-coder/gta-commercial-radar/actions/runs/42929550077) passed its 16 targeted tests.
+
+**First post-repair, official-source GitHub sample, not owner's Windows:** Burlington index selected 10 permitted city project pages; 8 parsed with 13 application-ID rows; 2 (`800-burloak-dr`, `burlington-nelson-quarry-extension`) lacked recognized file-number sections. Status `PARTIAL_OFFICIAL_PAGE_COLLECTION`, 0 conflicting IDs, 0 `new_or_changed` on baseline, 0 verified new opportunities or citywide completeness. Old Burlington `.aspx` still redirects. Vaughan blocked by `POLICY_DENIED:ROBOTS_ACCESS_DENIED`; Kitchener not recollected in this scoped workflow (prior Windows robots denial still applies).
+
+**Merged source guards:** duplicated official municipal IDs with conflicting pages now receive full HOLD; industrial ERO current official notice overrides stale manual excerpts and failed official rechecks preserve prior evidence under HOLD; activation rejects contradictory inline-suite/structured-UNIT sites. Buyer, procurement and actual opening remain unverified; manual only, no schedules/budget/outreach changes.
+
 ## November 10 — owner-prioritized municipal and two-pilot integrity checkpoint
 
 User priority is **(3) Burlington/Vaughan/Kitchener reliability first**, followed by **(4) industrial equipment and commercial activation pilots**. The commercial lead-qualification/outreach expansion is not the immediate coding task. See [PRIORITY_3_4_SOURCE_AND_PILOT_GATES_20261110.md](PRIORITY_3_4_SOURCE_AND_PILOT_GATES_20261110.md).
