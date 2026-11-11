@@ -1,5 +1,15 @@
 # Radar Current State — 2026-11-11 (current main release gates)
 
+## November 11 — P3/P4 verification and historical-run reconciliation merged
+
+[PR #173](https://github.com/sandeep89shaily-coder/gta-commercial-radar/pull/173) **merged** at `a59a72bbd3208b7a63ef19ce9478d0ea6b12ee6c`. All four Windows/Linux Python 3.11/3.12 jobs passed in [Radar CI #43028553192](https://github.com/sandeep89shaily-coder/gta-commercial-radar/actions/runs/43028553192); bounded official five-city source acceptance passed in [#43028553034](https://github.com/sandeep89shaily-coder/gta-commercial-radar/actions/runs/43028553034).
+
+**Actually completed externally:** Two separate government data-access requests sent from the connected Radar Gmail to official Vaughan and Kitchener contacts (Nov 11), both pending reply; weekday reply-only watch enabled, no automated Radar scheduling. Three original ERO notices and original sites/proposal stage/equipment scope independently checked; **not** verified purchasing contracts. Nov 9 vs 10 saved Windows ZIPs independently reconciled for **2,833 identical source hashes/stages/sites**, **1,365 Toronto licence records only in later accepted output**, and **4 equipment changes from 3 ERO notices**. This is archive continuity, not original-municipal-source authentication. The two archived Burlington runs were blocked; the new source parser's 10/10-page, 16-ID GitHub sample is **not** a substituted owner's two-run validation.
+
+**Now merged:** `gta_pilot_archive_reconciliation.py` produces conservative cross-run 20 source and 10 facility audit queues without false opening/buyer claims. `gta_five_city_application_recovery.py` holds previously unseen but **undated** City planning file IDs on already baselined municipalities as `FIRST_OBSERVED_UNDATED_HELD`; these cannot become falsely dated new opportunity alerts after a parser repair. True previously recorded changes retain `RECORD_CHANGED` review events. Six new regression tests passed.
+
+**Still blocked:** two post-fix owner Windows Burlington runs, municipal access grants and official exports, original 20 activation record / 10 facility tenant rechecks, fresh original ERO cursor batch and verified actual procurement packages. No lead/outreach automation. Full evidence: [Nov 11 source verification](PRIORITY_3_4_20261111_VERIFICATION.md).
+
 ## November 11 — remaining P3/P4 validation and official source access
 
 **Public independent original-source checks:** Three industrial ERO equipment notices **026-1152, 026-1155, 026-1021** are verified against live original Environmental Registry pages as **Proposal** at their exact industrial sites, with specific dust collector/scrubber, two cremation units, and boiler/cooling-tower changes. Exact documentation at [2026-11-11 original verification](PRIORITY_3_4_20261111_VERIFICATION.md) and [ERO evidence CSV](evidence/ERO_3_SOURCE_RECHECK_20261111.csv). **0 buyer identities and 0 unawarded purchase packages independently verified.**
