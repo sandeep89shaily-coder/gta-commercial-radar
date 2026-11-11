@@ -1,5 +1,13 @@
 # Radar Next Actions — 2026-11-11
 
+## November 11 — one-click manual daily Radar RELEASE READY, real run pending
+
+1. **Code merged and tested:** [PR #174](https://github.com/sandeep89shaily-coder/gta-commercial-radar/pull/174) squash `f722cac70c51fb0c14bfdcbe1bb85d2ad35bbc6f`, [4/4 CI #43031475039](https://github.com/sandeep89shaily-coder/gta-commercial-radar/actions/runs/43031475039). Existing full six-stage orchestrator remains unchanged in collector count/budget. New `RUN_GTA_RADAR_TODAY.bat` safe update-first entrypoint is accessible through both legacy Windows full-run shortcuts.
+2. **Next actual owner action:** on the PC containing the retained original `radar.sqlite` / `new data` workspace, double-click the canonical launcher. Read its `MONDAY_FULL_RADAR_STATUS.json` for actual stage success or refusal. Read the newly dated `GTA_RADAR_EXPORTS/GTA_RADAR_RESULTS_*.zip` containing SHA-labelled original output snapshots; it does not exist until the real Windows run. Share ZIP for independent review of original 20 activation records/10 exact facility dossiers and Burlington ID/history checks.
+3. **External constraints unchanged:** official Vaughan/Kitchener CSV/permissions awaited; independent supplier procurement, buyer and opening proof not yet obtained. Full GitHub CI success is not daily field results; manual-only, no outreach, same shared paid AI ceiling.
+
+[Current operator instructions](RUN_GTA_RADAR_TODAY_20261111.md).
+
 ## November 11 — same-day integrated manual operator run
 
 1. **Integration:** Finish and cross-platform-test today's new `RUN_GTA_RADAR_TODAY.bat`; old Monday/TOTAL shortcuts must resolve to it. It must safely fast-forward Git code, preserve local database, run the existing collector once plus the five research-only stages, and create a timestamped `GTA_RADAR_EXPORTS/GTA_RADAR_RESULTS_*.zip` with manifests and source hashes. See [manual release instructions](RUN_GTA_RADAR_TODAY_20261111.md).
