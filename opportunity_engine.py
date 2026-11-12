@@ -12,6 +12,45 @@ COLS=['opportunity_id','source_id','source_key','company_name','entity_name','ad
 def norm(v):return re.sub(r'[^a-z0-9]+',' ',str(v or '').lower()).strip()
 def valid(v):return bool(norm(v) and norm(v) not in {'unknown','none','n a','not available','anonymous','unidentified'})
 def digest(*parts):return hashlib.sha256('|'.join(map(str,parts)).encode('utf-8')).hexdigest()[:24]
+# A regional source label is NOT a municipality. Resolve to a municipality
+# only from its unambiguous collector identity or explicit civic address.
+# Keep an unresolved regional label rather than inventing a City.
+REGION_MUNICIPALITIES={
+    "Peel":("Brampton","Mississauga","Caledon"),
+    "Halton":("Burlington","Oakville","Milton","Halton Hills"),
+    "York":("Vaughan","Markham","Richmond Hill","Newmarket","Aurora"),
+    "Durham":("Ajax","Pickering","Whitby","Oshawa","Clarington"),
+    "Waterloo":("Waterloo","Kitchener","Cambridge"),
+    "Niagara":("Niagara Falls","St. Catharines","Thorold"),
+}
+UNAMBIGUOUS_SOURCE_PREFIXES=(
+    "brampton","mississauga","caledon","toronto","burlington",
+    "oakville","milton","vaughan","markham","waterloo_city",
+    "kitchener","cambridge","guelph","hamilton","oshawa",
+)
+
+
+def municipal_city(region,source_id,address):
+    region=str(region or "").strip()
+    source=str(source_id or "").strip().lower()
+    allowed=REGION_MUNICIPALITIES.get(region)
+    if region and allowed is None:
+        return region
+    # Exact single-municipality source prefixes have priority over street
+    # names or company text that may incidentally mention another city.
+    for prefix in UNAMBIGUOUS_SOURCE_PREFIXES:
+        if source==prefix or source.startswith(prefix+"_"):
+            city="Waterloo" if prefix=="waterloo_city" else prefix.replace("_"," ").title()
+            if allowed is None or city in allowed:
+                return city
+    if allowed:
+        for city in allowed:
+            if re.search(r"(?<!\w)"+re.escape(city)+r"(?!\w)",
+                         str(address or ""),re.I):
+                return city
+    return region
+
+
 def iter_municipal(data):
     p=data/'radar.sqlite'
     if not p.is_file():return
@@ -25,7 +64,7 @@ def iter_municipal(data):
                 name=str(normalized.get('entity_name') or normalized.get('business_name') or normalized.get('applicant') or normalized.get('owner_name') or '')
                 addr=str(normalized.get('address') or normalized.get('site_address') or '')
                 description=str(normalized.get('description') or normalized.get('work_description') or '')
-                yield dict(source_id=raw['source_id'],source_key=raw['record_key'],company_name=name,entity_name=name,address=addr,city=normalized.get('region',''),industry=normalized.get('industry',''),event_date=raw['source_date'] or normalized.get('event_date',''),event_type=normalized.get('event_type',''),observed_at='',buyer_categories='commercial_insurance;commercial_hvac;security_access',evidence_url=normalized.get('evidence_url',''),description=description,commercial_relevance=normalized.get('commercial_relevance',''),source_group='MUNICIPAL',is_primary_municipal='YES')
+                yield dict(source_id=raw['source_id'],source_key=raw['record_key'],company_name=name,entity_name=name,address=addr,city=municipal_city(normalized.get('region',''),raw['source_id'],addr),industry=normalized.get('industry',''),event_date=raw['source_date'] or normalized.get('event_date',''),event_type=normalized.get('event_type',''),observed_at='',buyer_categories='commercial_insurance;commercial_hvac;security_access',evidence_url=normalized.get('evidence_url',''),description=description,commercial_relevance=normalized.get('commercial_relevance',''),source_group='MUNICIPAL',is_primary_municipal='YES')
         except sqlite3.DatabaseError as e: print('Municipal database unreadable:',str(e)[:120])
 def iter_municipal_updates(data):
     """Post-baseline material updates are detection events, NOT newly issued permits.
@@ -48,7 +87,7 @@ def iter_municipal_updates(data):
                 address=str(info.get('address') or '')
                 yield dict(source_id=raw['source_id'],source_key=raw['record_key'],
                     company_name=name,entity_name=name,address=address,
-                    city=info.get('region',''),industry='',
+                    city=municipal_city(info.get('region',''),raw['source_id'],address),industry='',
                     event_date=raw['observed_at'],event_type='SOURCE_RECORD_UPDATED',
                     observed_at=raw['observed_at'],
                     buyer_categories='commercial_insurance;commercial_hvac;security_access',
