@@ -23,8 +23,12 @@ if not errorlevel 1 (
 ) else (
  set "PY_CMD=python"
 )
+rem %%~dp0 ends with a backslash: a trailing slash before a closing quote
+rem can escape that quote when Python parses the Windows command line.
+rem After cd /d, %%CD%% is the resolved code directory without a trailing slash.
+set "CODE_DIR=%CD%"
 echo Checking local code and GitHub main without touching your database...
-%PY_CMD% "%~dp0desktop_update.py" --code-dir "%~dp0"
+%PY_CMD% "%CODE_DIR%\desktop_update.py" --code-dir "%CODE_DIR%"
 if errorlevel 1 (
  echo.
  echo STOP: Code was NOT verified and no collection was started.
@@ -35,7 +39,7 @@ if errorlevel 1 (
 )
 echo.
 echo Running integrated collection and bounded research pilots...
-%PY_CMD% "%~dp0gta_monday_full_run.py" %*
+%PY_CMD% "%CODE_DIR%\gta_monday_full_run.py" %*
 set "CODE=%ERRORLEVEL%"
 echo.
 echo Reports: existing new data\GTA_RADAR_RESULTS\MONDAY_FULL_RADAR
