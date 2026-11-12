@@ -94,6 +94,37 @@ class CollectorPartialSourceTests(unittest.TestCase):
         self.assertEqual(status["integrated_intelligence"]["blocked_sources"],
                          ["meeting_vaughan"])
 
+    def test_optional_source_failure_after_successful_collector_is_warning(self):
+        code,status=self._run({
+            "status":"PARTIAL_REVIEW_REQUIRED",
+            "failed_stages":["meeting_brampton","burlington_official_gis"],
+            "optional_failed_stages":["meeting_brampton","burlington_official_gis"],
+            "required_failed_stages":[],
+            "blocked_sources":["meeting_vaughan"],
+            "combined_records":219})
+        self.assertEqual(code,0)
+        self.assertTrue(status["completed"])
+        self.assertTrue(status["meeting_document_pipeline_complete"])
+        self.assertTrue(status["review_source_coverage_partial"])
+        self.assertEqual(status["optional_stage_failures"],
+                         ["meeting_brampton","burlington_official_gis"])
+        self.assertEqual(status["required_stage_failures"],[])
+        self.assertEqual(status["status"],
+                         "INTEGRATED_INTELLIGENCE_READY_WITH_SOURCE_WARNINGS")
+
+    def test_required_processing_failure_still_fails_even_with_optional_outages(self):
+        code,status=self._run({
+            "status":"PARTIAL_REVIEW_REQUIRED",
+            "failed_stages":["meeting_brampton","canonical_collection_quality_acceptance"],
+            "optional_failed_stages":["meeting_brampton"],
+            "required_failed_stages":["canonical_collection_quality_acceptance"],
+            "blocked_sources":[]})
+        self.assertEqual(code,2)
+        self.assertFalse(status["completed"])
+        self.assertFalse(status["meeting_document_pipeline_complete"])
+        self.assertIn("canonical_collection_quality_acceptance",
+                      status["required_stage_failures"])
+
     def test_real_failed_processing_is_not_reported_as_success(self):
         code,status=self._run({
             "status":"PARTIAL_REVIEW_REQUIRED",
