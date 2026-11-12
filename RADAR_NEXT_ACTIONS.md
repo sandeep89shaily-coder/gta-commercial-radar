@@ -1,5 +1,17 @@
 # Radar Next Actions — 2026-11-11
 
+## November 11 — next live acceptance after merged regional-quality PRs #177 and #178
+
+1. **Run once on owner's existing Windows workspace** after safe automatic git code update (no database reset/rebaseline); use RUN_GTA_RADAR_TODAY.bat. Do not treat GitHub CI or the old Nov 11 archive as the new live run.
+2. **Check the updated results** GTA_RADAR_PRIVATE_TOP_10.csv, GTA_RADAR_PRIVATE_DEVELOPMENT_REVIEW.csv, GTA_RADAR_OPPORTUNITY_LANES_STATUS.json, GTA_RADAR_MUNICIPAL_RECOVERY_SCORECARD.csv, GTA_RADAR_MUNICIPAL_RECOVERY_STATUS.json and original source manifests. Look for Brampton/Mississauga in the private review queue and prevent Toronto automatically occupying all 10 slots unless no similarly credible distinct project exists. Confirm Peel-labelled Brampton original records now export as Brampton.
+3. **Audit 20 original municipal application/source records** across regions with original file IDs, civic sites, first-publication evidence vs application/event/observation dates, project status, owner/GC/tenant roles and unawarded supplier work. Reject old or withdrawn matters. A region-balanced investigation is not a verified supplier opportunity.
+4. **Repair only permitted source paths:** Toronto AIC, Brampton OPA/ZBA/site plan, Burlington post-fix repeat runs, Vaughan and Kitchener authorized exports/permissions, Richmond Hill/Newmarket restricted GIS. Never bypass robots/HTTP 403; record a distinct blocked/partial row in the new scorecard.
+5. **Use the next dated ZIP for independent comparison**, preserving the original radar.sqlite and existing first-seen history; investigate source-specific failures, prioritize qualified private commercial projects, then seek two paying pilot users. No automatic outreach, no extra paid AI, no false 16+ verified coverage claim.
+
+Source code: [PR #177](https://github.com/sandeep89shaily-coder/gta-commercial-radar/pull/177), [PR #178](https://github.com/sandeep89shaily-coder/gta-commercial-radar/pull/178). [Detailed gates](REGIONAL_COLLECTION_QUALITY_FIX_20261111.md).
+
+
+
 ## November 11 — one-click manual daily Radar RELEASE READY, real run pending
 
 1. **Code merged and tested:** [PR #174](https://github.com/sandeep89shaily-coder/gta-commercial-radar/pull/174) squash `f722cac70c51fb0c14bfdcbe1bb85d2ad35bbc6f`, [4/4 CI #43031475039](https://github.com/sandeep89shaily-coder/gta-commercial-radar/actions/runs/43031475039). Existing full six-stage orchestrator remains unchanged in collector count/budget. New `RUN_GTA_RADAR_TODAY.bat` safe update-first entrypoint is accessible through both legacy Windows full-run shortcuts.
