@@ -72,6 +72,49 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
     def save():
         manifest.write_text(json.dumps(report, indent=2), encoding="utf-8")
 
+    def inspect_daily_stage():
+        # Include sanitized primary diagnostics in the archived manifest. A
+        # previous run's saved JSON must never be presented as today's stage.
+        names=(("discovery", "GTA_RADAR_DISCOVERY_RUN_STATUS.json"),
+               ("integrated", "GTA_RADAR_INTEGRATED_INTELLIGENCE_STATUS.json"),
+               ("collector", "GTA_RADAR_V6_RUN.json"))
+        details={}
+        threshold=dt.datetime.fromisoformat(started).timestamp()-3
+        for key, filename in names:
+            path=results / filename
+            try:
+                if path.stat().st_mtime < threshold:
+                    details[key]={"status":"OLDER_SAVED_EVIDENCE_NOT_TODAYS_RUN"}
+                    continue
+                data=json.loads(path.read_text(encoding="utf-8"))
+                if not isinstance(data,dict):
+                    raise ValueError("EXPECTED_JSON_OBJECT")
+                if key=="discovery":
+                    details[key]={k:data.get(k) for k in (
+                        "status","completed","collection_exit_code",
+                        "collector_status","code_check_status",
+                        "meeting_document_pipeline_complete","optional_stage_failures",
+                        "required_stage_failures")}
+                elif key=="integrated":
+                    details[key]={k:data.get(k) for k in (
+                        "status","failed_stages","required_failed_stages",
+                        "optional_failed_stages","blocked_sources",
+                        "combined_records","cities_with_application_candidates_measured")}
+                    details[key]["stage_errors"]=[{
+                        "stage":str(s.get("stage",""))[:110],
+                        "required":bool(s.get("required")),
+                        "status":str(s.get("status",""))[:30],
+                        "error":str(s.get("error",""))[:250]}
+                        for s in data.get("stages",[]) if isinstance(s,dict)
+                        and s.get("status") in ("FAILED","BLOCKED")][:35]
+                else:
+                    details[key]={k:data.get(k) for k in (
+                        "status","projects","investigated","queue_stop_reason")}
+            except (OSError, ValueError, TypeError) as exc:
+                details[key]={"status":"NO_CURRENT_STAGE_DIAGNOSTIC",
+                              "error_type":type(exc).__name__}
+        return details
+
     def render():
         tr = "".join(
             "<tr><td>" + html.escape(row["name"]) +
@@ -126,6 +169,7 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
             # Discovery itself refuses missing/stale daily output. Its success
             # does not mean evidence/commercial gates have been satisfied.
             report["fresh_collection_verified"] = exit_code == 0
+            report["daily_radar_diagnostics"] = inspect_daily_stage()
         save()
         print(name + ": " + row["status"] + " | " + str(log), flush=True)
 
@@ -133,8 +177,17 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
     failed = [x["name"] for x in report["stages"] if x["status"] != "PASSED"]
     report["stage_successes"] = passed
     report["failed_stages"] = failed
+    integrated_diag=report.get("daily_radar_diagnostics",{}).get("integrated",{})
+    report["optional_source_warnings"]={
+        "optional_failed_stages":integrated_diag.get("optional_failed_stages") or [],
+        "blocked_sources":integrated_diag.get("blocked_sources") or [],
+        "details":integrated_diag.get("stage_errors") or []}
+    has_warnings=bool(report["optional_source_warnings"]["optional_failed_stages"]
+                      or report["optional_source_warnings"]["blocked_sources"])
     report["status"] = (
-        "ALL_STAGES_RAN_REVIEW_ONLY" if not failed and not skip_collection
+        "ALL_STAGES_RAN_WITH_SOURCE_WARNINGS_REVIEW_ONLY"
+        if not failed and not skip_collection and has_warnings
+        else "ALL_STAGES_RAN_REVIEW_ONLY" if not failed and not skip_collection
         else "REVIEW_COMPLETED_WITH_FAILURES" if failed
         else "SAVED_DATA_REVIEW_ONLY_NO_NEW_COLLECTION"
     )
