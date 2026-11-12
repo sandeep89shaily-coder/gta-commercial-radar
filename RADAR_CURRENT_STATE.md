@@ -1,5 +1,21 @@
 # Radar Current State — 2026-11-11 (current main release gates)
 
+## November 11 — Regional source-to-shortlist repair and producer city truth MERGED
+
+**Current main code:** [PR #177](https://github.com/sandeep89shaily-coder/gta-commercial-radar/pull/177) squash-merged as 917da54cc04381cca18c68cd17ed95b1f6694a6d, followed by [PR #178](https://github.com/sandeep89shaily-coder/gta-commercial-radar/pull/178) squash-merged as 601054ebcd652a2c3f99668e7b637820b529b424. Both PR-head test matrices passed four Windows/Linux Python 3.11/3.12 jobs. Primary source-file quality, urban-region ranking and executable manual integration are covered by tests, **not** proof of a new owner-side Windows run.
+
+**Measured owner November 11 archive BEFORE these code changes:** 148 V6 newly observed/changed source rows (146 Toronto, 2 labelled Peel despite Brampton street addresses), 1,523 canonical application files across 14/16 main municipality candidates, and private top ten 8 Toronto + 2 Burlington. The existing V6 qualification queue also retained 37 Brampton, 11 Mississauga, 2 Peel-labelled Brampton and 2 Waterloo records; none verified as sale-ready.
+
+**PR #177 fixed** the data-to-selection gap by using original official application/permit/site-plan identifiers from the existing V6 qualified source evidence in the PRIVATE **investigation** lane. AI contact names, sale-ready flags and source event dates are not promoted into buyer/publication verification. It also normalizes Peel-suffixed Brampton civic sites, selects a ten-project evidence-floor multi-region research shortlist with relaxed caps where necessary, and adds a read-only 16-city + separate experimental GGH/new-four municipal source failure/recovery scorecard. The integrated manual daily report now links the new source-health CSV and JSON. All new city pilots remain experimental and excluded from verified citywide coverage.
+
+**PR #178 fixed** the true upstream locality problem in opportunity_engine.py: official region labels such as Peel are translated to Brampton only with an unambiguous municipal source ID or an explicitly named city in the address; unresolved regional labels remain regional. Covers original municipal current records and recorded updates, without rewriting historical SQLite source evidence.
+
+**Remaining original-source gates:** User must run the updated one-click launcher once on the original Windows workspace and share the new dated GTA_RADAR_RESULTS ZIP. Compare the new PRIVATE_TOP_10 and MUNICIPAL_RECOVERY_SCORECARD with the original November 11 inputs; audit real source statuses and at least 20 original municipal files. Toronto AIC and Brampton planning feeds have restricted/failed source paths; Vaughan/Kitchener need permitted access. No exact buyer or currently available unawarded supplier contract verified, and no claim of improved conversion or additional citywide coverage yet. Manual-only schedule and the shared US$0.25/day DeepSeek ceiling remain unchanged.
+
+[Detailed November 11 fix and acceptance notes](REGIONAL_COLLECTION_QUALITY_FIX_20261111.md).
+
+
+
 ## November 11 — full manual one-click integration COMPLETED in merged PR #174
 
 **GitHub release code complete:** [PR #174](https://github.com/sandeep89shaily-coder/gta-commercial-radar/pull/174) merged into `main` at `f722cac70c51fb0c14bfdcbe1bb85d2ad35bbc6f`; the final PR-head [four-platform CI run #43031475039](https://github.com/sandeep89shaily-coder/gta-commercial-radar/actions/runs/43031475039) passed all Windows/Linux Python 3.11 and 3.12 jobs. `RUN_GTA_RADAR_TODAY.bat` is the canonical **manual** one-click entrypoint; the two older full-run shortcuts delegate to it. It safely fast-forwards ONLY code with the existing tested `desktop_update.py` origin/dirty/divergent/compile gate, then executes the existing six-stage full orchestrator in one separate Python process. Daily original collection occurs once, industrial ERO remains bounded at 10 permitted notices, commercial activation and facility/official evidence review remain read-only, and the AI harness remains free-only without exceeding the shared US$0.25/day paid AI budget.
