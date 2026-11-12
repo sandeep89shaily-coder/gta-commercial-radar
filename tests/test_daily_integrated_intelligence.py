@@ -224,10 +224,22 @@ class DailyIntegrationTests(unittest.TestCase):
         result=self.execute(meeting_pipeline=failing_meeting)
         self.assertEqual(result["status"],"PARTIAL_REVIEW_REQUIRED")
         self.assertIn("meeting_brampton",result["failed_stages"])
+        self.assertIn("meeting_brampton",result["optional_failed_stages"])
+        self.assertEqual(result["required_failed_stages"],[])
+        self.assertTrue(result["optional_source_coverage_incomplete"])
         self.assertTrue(Path(result["combined_html"]).exists())
         status=daily._json(self.root/daily.AUDIT)
         self.assertEqual(status["status"],"PARTIAL_REVIEW_REQUIRED")
         self.assertTrue(status["manual_purchaser_and_supplier_verification_required"])
+
+    def test_required_processing_failure_is_distinct_from_optional_source_outage(self):
+        from unittest.mock import patch
+        with patch("gta_collection_truth.build",side_effect=RuntimeError("canonical review broken")):
+            status=self.execute(paid=False)
+        self.assertIn("canonical_collection_quality_acceptance",status["required_failed_stages"])
+        self.assertIn("canonical_collection_quality_acceptance",status["failed_stages"])
+        self.assertEqual(status["status"],"PARTIAL_REVIEW_REQUIRED")
+        self.assertTrue(Path(status["combined_html"]).exists())
 
     def test_historical_first_seen_does_not_get_deeper_paid_project_research(self):
         old=dict(self.project,project_id="toronto:old",source_record_date="2025-01-01",
