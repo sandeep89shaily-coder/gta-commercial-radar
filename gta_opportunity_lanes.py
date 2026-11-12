@@ -99,7 +99,7 @@ def _site(v):
     # as the shorter address used by municipal application feeds. Do not
     # truncate genuine multi-address titles (e.g. "1 Street, 6 & 8 Street").
     tokens=str(v or "").split(",")
-    if len(tokens)>1 and re.match(r"^\\s*(?:Brampton|Mississauga|Caledon|Toronto|Burlington|Oakville|Vaughan|Markham|Waterloo|Kitchener|Cambridge|Guelph|Hamilton)\\b",tokens[1],re.I):
+    if len(tokens)>1 and re.match(r"^\s*(?:Brampton|Mississauga|Caledon|Toronto|Burlington|Oakville|Vaughan|Markham|Waterloo|Kitchener|Cambridge|Guelph|Hamilton)\b",tokens[1],re.I):
         v=tokens[0]
     text=_str(v).casefold().replace("boulevard","blvd").replace("road","rd")
     text=text.replace("drive","dr").replace("street","st").replace("avenue","ave")
@@ -198,7 +198,7 @@ def _private_item(source,row):
         date=_str(row.get("source_record_date"))
         basis="OFFICIAL_APPLICATION_OR_PERMIT_EVENT_DATE_NOT_PUBLICATION"
         kind="SOURCE_BACKED_V6_REVIEW_NOT_BUYER_VERIFIED"
-        application_year=date[:4] if re.match(r"20\\d{2}-\\d{2}-\\d{2}$",date) else ""
+        application_year=date[:4] if re.match(r"20\d{2}-\d{2}-\d{2}$",date) else ""
     else:
         return None
     if not city or not urls or not (description or title):
