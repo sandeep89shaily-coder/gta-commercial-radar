@@ -37,6 +37,7 @@ FILES={
     "private_master":"GTA_RADAR_COLLECTION_MASTER.csv",
     "private_municipal":"GTA_RADAR_MUNICIPAL_PROJECT_FEED.csv",
     "private_daily":"GTA_RADAR_DAILY_NEW_DEVELOPMENTS.csv",
+    "private_qualified":"GTA_RADAR_QUALIFIED_OPPORTUNITY_SHORTLIST.csv",
     "private_gis":"GTA_RADAR_BURLINGTON_GIS_PROJECTS.csv",
     "government":"GTA_RADAR_REGIONAL_COMMERCIAL_REVIEW.csv",
     "government_changes":"GTA_RADAR_REGIONAL_COMMERCIAL_CHANGES_TO_REVIEW.csv",
@@ -94,6 +95,12 @@ def _first(v):
     return next(iter(_links(v)),"")
 
 def _site(v):
+    # A civic site with a comma-suffixed city/postcode is the same parcel
+    # as the shorter address used by municipal application feeds. Do not
+    # truncate genuine multi-address titles (e.g. "1 Street, 6 & 8 Street").
+    tokens=str(v or "").split(",")
+    if len(tokens)>1 and re.match(r"^\s*(?:Brampton|Mississauga|Caledon|Toronto|Burlington|Oakville|Vaughan|Markham|Waterloo|Kitchener|Cambridge|Guelph|Hamilton)\b",tokens[1],re.I):
+        v=tokens[0]
     text=_str(v).casefold().replace("boulevard","blvd").replace("road","rd")
     text=text.replace("drive","dr").replace("street","st").replace("avenue","ave")
     text=text.replace("court","ct").replace("highway","hwy")
@@ -171,6 +178,27 @@ def _private_item(source,row):
         basis=_str(row.get("date_basis"))
         kind="PERMIT_EVENT_OWNER_NOT_VERIFIED"
         application_year=""
+    elif source=="private_qualified":
+        # Existing V6 qualification already carries current source-backed
+        # Brampton/Mississauga/Waterloo projects that the 16-city application
+        # collection cannot always join. Never import AI company/contact claims
+        # or a sale_ready flag from this *review-only* source.
+        city=_city(row.get("city"),row.get("address"))
+        title=""
+        address=_str(row.get("address"))
+        description=_str(row.get("qualification_scope") or row.get("description"))
+        status=_str(row.get("official_status"))
+        if _str(row.get("source_id")).endswith("building_permits"):
+            if status.casefold()=="applied":status="Permit Applied"
+            elif status.casefold()=="issued":status="Permit Issued"
+        ident=_str(row.get("official_permit_id"))
+        urls=_links(row.get("official_record_url") or row.get("record_source_url"))
+        observation="HISTORICAL_OR_UNDATED_SOURCE_REVIEW"
+        firstseen=""
+        date=_str(row.get("source_record_date"))
+        basis="OFFICIAL_APPLICATION_OR_PERMIT_EVENT_DATE_NOT_PUBLICATION"
+        kind="SOURCE_BACKED_V6_REVIEW_NOT_BUYER_VERIFIED"
+        application_year=date[:4] if re.match(r"20\d{2}-\d{2}-\d{2}$",date) else ""
     else:
         return None
     if not city or not urls or not (description or title):
@@ -406,13 +434,82 @@ def _rank(rows):
     for i,r in enumerate(ordered,1):r["rank"]=i
     return ordered
 
+REGION_BY_CITY = {
+    "Toronto": "Toronto",
+    "Brampton": "Peel", "Mississauga": "Peel", "Caledon": "Peel",
+    "Burlington": "Halton", "Oakville": "Halton",
+    "Milton": "Halton", "Halton Hills": "Halton",
+    "Vaughan": "York", "Markham": "York", "Richmond Hill": "York",
+    "Kitchener": "Waterloo", "Waterloo": "Waterloo", "Cambridge": "Waterloo",
+    "Ajax": "Durham", "Whitby": "Durham", "Pickering": "Durham",
+    "Oshawa": "Durham", "Clarington": "Durham",
+    "Guelph": "Wellington", "Hamilton": "Hamilton",
+    "Niagara Falls": "Niagara",
+}
+
+
+def _region(city):
+    return REGION_BY_CITY.get(city, city)
+
+
+def _tally(items):
+    counts=defaultdict(int)
+    for name in items:counts[name]+=1
+    return counts
+
+
+def _balanced_private_top(ordered, *, limit=10):
+    """Investigative selection, NOT a change in commercial verification status.
+
+    Fair opportunity to strong records outside Toronto. This is not a quota
+    that promotes weak, historical or appealed work when better work exists.
+    Caps relax only when the evidence-gated pool is too narrow to fill 10.
+    """
+    chosen=[]
+    selected=set()
+    cities=defaultdict(int)
+    regions=defaultdict(int)
+
+    def add(row):
+        key=row["opportunity_id"]
+        if key in selected:return
+        chosen.append(dict(row))
+        selected.add(key)
+        cities[row["city"]]+=1
+        regions[_region(row["city"])]+=1
+
+    eligible=[r for r in ordered
+              if int(r["score"])>=65
+              and r["stage_gate"] not in ("APPEALED_OR_ON_HOLD", "CLOSED_EXCLUDE",
+                                          "HISTORICAL_APPROVAL_EXCLUDE")
+              and r["source_urls"]]
+    # Each credible region's strongest project earns a review slot.
+    for row in eligible:
+        if len(chosen)>=limit:break
+        if not regions[_region(row["city"])]:add(row)
+    # Limit dominance by one municipality or region when other good records exist.
+    for city_cap,region_cap in ((2,3),(3,4),(limit,limit)):
+        for row in eligible:
+            if len(chosen)>=limit:break
+            if cities[row["city"]]>=city_cap or regions[_region(row["city"])]>=region_cap:
+                continue
+            add(row)
+    # With only one represented region, retain a useful shortlist rather
+    # than produce artificial missing slots. Clearly label weaker fallback.
+    for row in ordered:
+        if len(chosen)>=limit:break
+        if row["stage_gate"] not in ("CLOSED_EXCLUDE", "HISTORICAL_APPROVAL_EXCLUDE"):
+            add(row)
+    return _rank(chosen)
+
+
 def run(results,*,today=None):
     root=Path(results);root.mkdir(parents=True,exist_ok=True)
     today=today or dt.date.today()
     counts={key:0 for key in FILES}
     inputs=[]
     rejected=defaultdict(int)
-    for name in ("private_notice","private_master","private_municipal","private_daily"):
+    for name in ("private_notice","private_master","private_municipal","private_daily","private_qualified"):
         records=_csv(root/FILES[name]);counts[name]=len(records)
         for raw in records:
             obj=_private_item(name,raw)
@@ -436,13 +533,17 @@ def run(results,*,today=None):
     counts["government_excluded"]=len(_csv(root/FILES["government_excluded"]))
     govt=_rank([obj for row in gov_raw if (obj:=_government(row))])
     govt_changed=[r for r in govt if r["observation"] in ("RECORD_CHANGED","FIRST_OBSERVED")]
-    outputs={PRIVATE_TOP:active[:10],PRIVATE_ALL:active,PRIVATE_CHANGES:changed,
+    balanced_top=_balanced_private_top(active,limit=10)
+    outputs={PRIVATE_TOP:balanced_top,PRIVATE_ALL:active,PRIVATE_CHANGES:changed,
              PRIVATE_FRESH:confirmed,PRIVATE_REJECTED:[r for r in private if r not in active],
              GOV_TOP:govt[:10],GOV_CHANGES:govt_changed}
     for filename,records in outputs.items():_write(root/filename,records)
     data={"status":"READY","report_date":today.isoformat(),
         "input_rows":counts,"private_projects_eligible":len(active),
-        "private_top":min(10,len(active)),
+        "private_top":len(balanced_top),
+        "private_top_city_distribution":dict(sorted(_tally(r["city"] for r in balanced_top).items())),
+        "private_top_region_distribution":dict(sorted(_tally(_region(r["city"]) for r in balanced_top).items())),
+        "private_selection_rule":"REGION_FIRST_EVIDENCE_FLOOR_WITH_RELAXED_CAPS_WHEN_FEW_CANDIDATES",
         "private_changes_to_verify":len(changed),
         "private_verified_recent_publications":len(confirmed),
         "private_source_rows_discarded":dict(rejected),
@@ -465,7 +566,7 @@ def run(results,*,today=None):
            "<p>Separate rankings. Private ownership and purchasing contacts require verification. "
            "No procurement or publication claims are inferred from first observation.</p>"]
     for title,filename,rows in [
-        ("Private development — top opportunities",PRIVATE_TOP,active[:10]),
+        ("Private development — region-balanced investigation shortlist",PRIVATE_TOP,balanced_top),
         ("Government procurement — planned and stage-to-verify",GOV_TOP,govt[:10])]:
         parts.extend(["<h2>"+esc(title)+"</h2>",
             "<p><a href='"+esc(filename)+"'>Open full CSV</a></p>",
