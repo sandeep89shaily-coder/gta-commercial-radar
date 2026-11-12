@@ -85,10 +85,17 @@ def create(results, *, output=None, now=None):
         size+=file_size
     if not collected:
         raise ValueError("NO_REVIEW_OUTPUTS_TO_ARCHIVE")
-    mode=("FRESH_COLLECTION_EXECUTION_REPORTED_NOT_SOURCE_VERIFICATION"
-          if status.get("fresh_collection_verified") and status.get("collection_performed")
-          and not status.get("failed_stages")
-          else "PARTIAL_OR_SAVED_EVIDENCE_ONLY_NOT_FRESH_VERIFIED")
+    execution_passed=(status.get("fresh_collection_verified")
+                      and status.get("collection_performed")
+                      and not status.get("failed_stages"))
+    source_warnings=status.get("optional_source_warnings") or {}
+    warning_only=bool(source_warnings.get("optional_failed_stages")
+                      or source_warnings.get("blocked_sources"))
+    mode=("FRESH_COLLECTION_EXECUTION_WITH_PARTIAL_SOURCES_NOT_VERIFIED"
+          if execution_passed and warning_only
+          else "FRESH_COLLECTION_EXECUTION_REPORTED_NOT_SOURCE_VERIFICATION"
+          if execution_passed else
+          "PARTIAL_OR_SAVED_EVIDENCE_ONLY_NOT_FRESH_VERIFIED")
     metadata={
         "archive_type":"GTA_RADAR_SOURCE_OUTPUTS_REVIEW_ONLY",
         "created_at":instant.isoformat(),
@@ -96,6 +103,7 @@ def create(results, *, output=None, now=None):
         "integrated_run_status":status.get("status","UNKNOWN"),
         "freshness_gate":mode,
         "stage_failures":status.get("failed_stages",[]),
+        "optional_source_warnings":source_warnings,
         "accepted_commercial_leads":0,
         "buyer_verified":False,
         "open_supplier_package_verified":False,
