@@ -202,6 +202,7 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
     from gta_staged_durham_sources import run as staged_durham_default
     from gta_official_download_discovery import run as official_export_default
     from gta_collection_truth import build as collection_acceptance_default
+    from gta_municipal_recovery_scorecard import build as recovery_scorecard_default
     from gta_city_coverage_report import build as measured_coverage_default
     from gta_three_city_recovery_gate import build as three_city_gate_default
     from gta_three_city_official_csv import run as three_city_official_csv_default
@@ -479,7 +480,9 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
         ("status","private_projects_eligible","private_top",
          "private_changes_to_verify","private_verified_recent_publications",
          "government_projects_eligible","government_top",
-         "government_changes_to_verify","government_open_tenders_verified","warning")}
+         "government_changes_to_verify","government_open_tenders_verified",
+         "private_top_city_distribution","private_top_region_distribution",
+         "private_selection_rule","warning")}
 
     docdir = review / "TORONTO_DOCUMENTS"
     docdir.mkdir(parents=True, exist_ok=True)
@@ -554,6 +557,13 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
         "excluded_inactive_or_closed","new_or_changed_commercial_manual_review",
         "cities_with_application_files","cities_with_only_project_signals",
         "cities_without_any_project_signal","warning")}
+    source_quality=step("measured_municipal_source_recovery_scorecard",
+        lambda:recovery_scorecard_default(root),required=False)
+    state["municipal_recovery_scorecard"]={k:source_quality.get(k) for k in (
+        "main_municipalities_configured","main_municipalities_with_application_records",
+        "main_municipalities_with_failed_sources","main_municipalities_with_no_applications",
+        "experimental_city_source_rows_not_added_to_main",
+        "regions_with_balanced_investigation_slots","warning")}
     done = _json(root / DOC_LEDGER)
     selected_docs = []
     if pdf_union.is_file():
@@ -754,6 +764,8 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
         "<a href='GTA_RADAR_STRUCTURED_APPLICATION_SOURCE_STATUS.json'>Toronto/Brampton GIS source status</a> · "
         "<a href='GTA_RADAR_MARKHAM_CIRCULATED_APPLICATIONS.csv'>Markham dated circulation applications</a> · "
         "<a href='GTA_RADAR_CITY_COVERAGE_AUDIT.csv'>Measured coverage by city (not configured links)</a> · "
+        "<a href='GTA_RADAR_MUNICIPAL_RECOVERY_SCORECARD.csv'>Municipality source failures, qualifications and recovery actions</a> · "
+        "<a href='GTA_RADAR_MUNICIPAL_RECOVERY_STATUS.json'>Source readiness diagnostic</a> · "
         "<a href='GTA_RADAR_GGH_EXPANSION_APPLICATIONS.csv'>GGH twelve-city expansion planning application pilot (review only)</a> · "
         "<a href='GTA_RADAR_GGH_EXPANSION_SOURCE_STATUS.json'>GGH expansion source diagnostics</a> · "
         "<a href='GTA_RADAR_NEXT_FOUR_MUNICIPALITIES_REVIEW.csv'>Ajax, Whitby, Clarington and Brantford new-city review (not accepted leads)</a> · "
