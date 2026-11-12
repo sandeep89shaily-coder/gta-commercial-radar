@@ -77,6 +77,25 @@ class DatedManualResultsArchiveTests(unittest.TestCase):
                 m=json.loads(z.read(archive.MANIFEST))
                 self.assertEqual(m["stage_failures"],["daily_radar"])
 
+    def test_source_warnings_dont_masquerade_as_complete_municipal_coverage(self):
+        with tempfile.TemporaryDirectory() as td:
+            results=self._workspace(Path(td))
+            status=results/"MONDAY_FULL_RADAR"/"MONDAY_FULL_RADAR_STATUS.json"
+            manifest=json.loads(status.read_text())
+            manifest["optional_source_warnings"]={
+                "optional_failed_stages":["guelph_official_gis"],
+                "blocked_sources":["meeting_vaughan"],"details":[]}
+            manifest["status"]="ALL_STAGES_RAN_WITH_SOURCE_WARNINGS_REVIEW_ONLY"
+            status.write_text(json.dumps(manifest),encoding="utf-8")
+            archive_result=archive.create(results)
+            self.assertEqual(archive_result["freshness_gate"],
+                             "FRESH_COLLECTION_EXECUTION_WITH_PARTIAL_SOURCES_NOT_VERIFIED")
+            with zipfile.ZipFile(archive_result["archive"]) as z:
+                out=json.loads(z.read(archive.MANIFEST))
+            self.assertEqual(out["optional_source_warnings"]["blocked_sources"],
+                             ["meeting_vaughan"])
+            self.assertEqual(out["stage_failures"],[])
+
     def test_missing_or_invalid_original_run_status_cannot_be_published(self):
         with tempfile.TemporaryDirectory() as td:
             results=Path(td)/"GTA_RADAR_RESULTS"

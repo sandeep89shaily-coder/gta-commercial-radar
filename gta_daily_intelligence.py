@@ -843,9 +843,21 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
     (root / DASHBOARD).write_text("".join(lines),encoding="utf-8")
     failed=[x["stage"] for x in log if x["status"]=="FAILED"]
     blocked=[x["stage"] for x in log if x["status"]=="BLOCKED"]
+    # A source-specific optional stage may fail (403, malformed City PDF,
+    # permitted download outage) after the primary source collection was
+    # successful. Preserve its failure without turning a valid manual run
+    # into a false *critical* collection failure. The required set remains
+    # fail-closed and every original stage result stays in the audit.
+    required_failed=[x["stage"] for x in log
+                     if x["status"]=="FAILED" and x.get("required")]
+    optional_failed=[x["stage"] for x in log
+                     if x["status"]=="FAILED" and not x.get("required")]
     state.update({
         "status":"PARTIAL_REVIEW_REQUIRED" if (failed or blocked) else "INTEGRATED_REVIEW_READY",
         "failed_stages":failed,
+        "required_failed_stages":required_failed,
+        "optional_failed_stages":optional_failed,
+        "optional_source_coverage_incomplete":bool(optional_failed or blocked),
         "blocked_sources":blocked,
         "meeting_sources_attempted":list(municipal_official),
         "municipal_official_index_count":len(municipal_official),

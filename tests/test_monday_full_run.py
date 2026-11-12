@@ -72,6 +72,47 @@ class MondayIntegrationTests(unittest.TestCase):
                              ["daily_radar", "commercial_activation"])
             self.assertEqual(record["status"], "REVIEW_COMPLETED_WITH_FAILURES")
 
+    def test_optional_stage_errors_are_in_archived_status_without_false_failure(self):
+        import zipfile
+        with tempfile.TemporaryDirectory() as td:
+            ws=Path(td)
+            results=ws/"GTA_RADAR_RESULTS"
+            def successful_with_optional_errors(command, **kwargs):
+                script=Path(command[1]).name
+                if script=="gta_total_intelligence_run.py":
+                    (results/"GTA_RADAR_DISCOVERY_RUN_STATUS.json").write_text(json.dumps({
+                        "status":"INTEGRATED_INTELLIGENCE_READY_WITH_OPTIONAL_FAILURES",
+                        "completed":True,"collection_exit_code":0,
+                        "collector_status":"SUCCESS","code_check_status":"OK_UP_TO_DATE",
+                        "optional_stage_failures":["meeting_brampton"],
+                        "required_stage_failures":[]}),encoding="utf-8")
+                    (results/"GTA_RADAR_INTEGRATED_INTELLIGENCE_STATUS.json").write_text(json.dumps({
+                        "status":"PARTIAL_REVIEW_REQUIRED",
+                        "failed_stages":["meeting_brampton"],
+                        "required_failed_stages":[],
+                        "optional_failed_stages":["meeting_brampton"],
+                        "blocked_sources":[],
+                        "stages":[{"stage":"meeting_brampton","status":"FAILED",
+                                   "required":False,"error":"PermissionError:Blocked by source"}]
+                    }),encoding="utf-8")
+                return type("Result",(),{"returncode":0})()
+            with patch.object(monday,"find_workspace",return_value=ws):
+                self.assertEqual(monday.execute(ws,runner=successful_with_optional_errors),0)
+            manifest=json.loads((results/"MONDAY_FULL_RADAR"/monday.REPORT).read_text())
+            self.assertEqual(manifest["stage_successes"],6)
+            self.assertEqual(manifest["failed_stages"],[])
+            self.assertEqual(manifest["status"],
+                             "ALL_STAGES_RAN_WITH_SOURCE_WARNINGS_REVIEW_ONLY")
+            self.assertEqual(manifest["optional_source_warnings"]["optional_failed_stages"],
+                             ["meeting_brampton"])
+            self.assertEqual(manifest["daily_radar_diagnostics"]["integrated"]["stage_errors"][0]["required"],False)
+            with zipfile.ZipFile(manifest["run_archive"]) as package:
+                snapshot=json.loads(package.read("RUN_ARCHIVE_MANIFEST.json"))
+            self.assertEqual(snapshot["freshness_gate"],
+                             "FRESH_COLLECTION_EXECUTION_WITH_PARTIAL_SOURCES_NOT_VERIFIED")
+            self.assertEqual(snapshot["optional_source_warnings"]["optional_failed_stages"],
+                             ["meeting_brampton"])
+
     def test_historical_only_mode_cannot_claim_new_collection(self):
         with tempfile.TemporaryDirectory() as td:
             ws = Path(td)

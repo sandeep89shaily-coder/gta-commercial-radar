@@ -75,27 +75,48 @@ def execute(workspace=None,*,runner=None,preflight=None,list_builder=None,integr
         unified=(integrator or run_integrated_intelligence)(
             results,allow_paid=outcome.returncode==0)
         record["integrated_intelligence"]={
-            k:unified.get(k) for k in ("status","failed_stages","blocked_sources",
-               "combined_records","combined_csv","combined_html","pdfs_captured_in_union",
+            k:unified.get(k) for k in ("status","failed_stages","required_failed_stages",
+               "optional_failed_stages","blocked_sources","combined_records",
+               "combined_csv","combined_html","pdfs_captured_in_union",
                "new_source_dated_project_candidates","deepseek_shared_ceiling_usd")}
-        # An inaccessible optional municipal source is a coverage warning,
-        # not a failed collector or a failed completed intelligence review.
-        # Actual FAILED processing stages still fail the run.
+        # Real required processing failures must still stop a clean run.
+        # Source-specific optional stage failures and blocked official sources
+        # are visible warnings, not a second municipal collection failure.
+        # Unknown/old integrators without explicit required/optional fields
+        # remain fail-closed rather than silently reclassifying failures.
         review_status=unified.get("status")
-        blocked_only=(review_status=="PARTIAL_REVIEW_REQUIRED"
-                      and bool(unified.get("blocked_sources"))
-                      and not unified.get("failed_stages"))
+        blocked=list(unified.get("blocked_sources") or [])
+        optional=unified.get("optional_failed_stages")
+        required=unified.get("required_failed_stages")
+        if optional is None or required is None:
+            required=list(unified.get("failed_stages") or [])
+            optional=[]
+        else:
+            optional=list(optional)
+            required=list(required)
+        safe_partial=(review_status=="PARTIAL_REVIEW_REQUIRED" and not required
+                      and bool(optional or blocked))
         record["meeting_document_pipeline_complete"]=(
-            review_status=="INTEGRATED_REVIEW_READY" or blocked_only)
-        record["review_source_coverage_partial"]=blocked_only
+            review_status=="INTEGRATED_REVIEW_READY" or safe_partial)
+        record["review_source_coverage_partial"]=bool(safe_partial)
+        record["optional_stage_failures"]=optional
+        record["required_stage_failures"]=required
     except Exception as exc:
         record["meeting_document_pipeline_complete"]=False
         record["integrated_intelligence"]={"status":"FAILED",
             "error":type(exc).__name__+": "+str(exc)[:250]}
     record["completed"]=outcome.returncode==0 and record["meeting_document_pipeline_complete"]
+    # Distinguish a complete source-collection execution with warning-only
+    # optional stages from a clean review or a genuinely failed required step.
+    optional_warnings=bool(record.get("optional_stage_failures"))
+    blocked_warnings=bool(record.get("integrated_intelligence",{}).get("blocked_sources"))
     record["status"]=(
-        "INTEGRATED_INTELLIGENCE_READY_WITH_BLOCKED_SOURCES"
-        if record["completed"] and record.get("review_source_coverage_partial")
+        "INTEGRATED_INTELLIGENCE_READY_WITH_SOURCE_WARNINGS"
+        if record["completed"] and optional_warnings and blocked_warnings
+        else "INTEGRATED_INTELLIGENCE_READY_WITH_OPTIONAL_FAILURES"
+        if record["completed"] and optional_warnings
+        else "INTEGRATED_INTELLIGENCE_READY_WITH_BLOCKED_SOURCES"
+        if record["completed"] and blocked_warnings
         else "INTEGRATED_INTELLIGENCE_READY" if record["completed"]
         else "INTEGRATED_PARTIAL_REVIEW_REQUIRED")
     record["finished"]=dt.datetime.now().astimezone().isoformat()
