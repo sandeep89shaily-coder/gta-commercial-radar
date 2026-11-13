@@ -40,6 +40,45 @@ class MississaugaAgendaTests(unittest.TestCase):
         self.assertEqual(rows[1]["screening"], "OTHER_AGENDA_ITEM")
         self.assertEqual(rows[0]["first_published_at"], "")
 
+    def test_real_official_agenda_excerpt_structures_hold_multisite_and_policy(self):
+        # These short agenda-item excerpts correspond to genuine public City
+        # PDC PDFs: DocumentId 82234 (Mar 9) and 84942 (May 11, 2026).
+        march = [
+            "6.", "MATTERS TO BE CONSIDERED",
+            "6.1", "PUBLIC MEETING RECOMMENDATION REPORT (WARD 11)",
+            "Official Plan Amendment and Rezoning applications",
+            "64 & 66 Thomas Street, 95 Joymar Drive & 65 Tannery Street",
+            "Owner: Dezen Realty Company Limited",
+            "File: OZ/OPA 25-3 W11",
+            "6.2", "RECOMMENDATION REPORT (WARD 7)",
+            "2463 and 2469 Mimosa Row",
+            "File: OZ/OPA 24-14 W7",
+            "6.3", "PUBLIC MEETING RECOMMENDATION REPORT (WARD 1)",
+            "Rezoning application to permit two semi-detached dwelling units",
+            "893 Seventh Street, north of Atwater Avenue",
+            "Owner: Biocca Homes Inc.", "File: OZ 25-20 W1",
+            "7.", "ADJOURNMENT",
+        ]
+        rows, observed = parse_pages([(1, march)], URL, "1"*64)
+        self.assertTrue(observed)
+        self.assertEqual(len(rows), 3)
+        self.assertEqual([r["application_id"] for r in rows],
+                         ["OZ/OPA 25-3 W11", "OZ/OPA 24-14 W7", "OZ 25-20 W1"])
+        self.assertEqual(rows[0]["address_raw"], "")
+        self.assertEqual(rows[1]["address_raw"], "")
+        self.assertIn("893 Seventh Street", rows[2]["address_raw"])
+        may = ["6.", "MATTERS TO BE CONSIDERED",
+               "6.1", "INFORMATION REPORT (ALL WARDS)",
+               "Neighbourhood Commercial: Solutions at Home",
+               "File: BL.09-NBR (All Wards)",
+               "7.", "ADJOURNMENT"]
+        policy, _ = parse_pages([(1, may)],
+                                "https://pub-mississauga.escribemeetings.com/FileStream.ashx?DocumentId=84942",
+                                "2"*64)
+        self.assertEqual(policy[0]["screening"],
+                         "COMMERCIAL_TOPIC_NO_EXACT_SITE_OR_FILE_HOLD")
+        self.assertEqual(policy[0]["address_raw"], "")
+
     def test_unapproved_url_rejected(self):
         for url in [
             "https://www.mississauga.ca/FileStream.ashx?DocumentId=1",
