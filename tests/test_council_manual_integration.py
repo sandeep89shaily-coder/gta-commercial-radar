@@ -67,6 +67,45 @@ class CouncilManualIntegrationTests(unittest.TestCase):
             self.assertEqual(active["publisher_first_publications_verified"], 0)
             self.assertEqual(active["paid_ai_usd"], 0)
 
+    def test_exact_toronto_agenda_urls_use_manual_source_manifest(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp)
+            (root/council.CONFIG).write_text(json.dumps({
+                "version": 1, "documents": [],
+                "toronto_meeting_urls": [TORONTO]
+            }), encoding="utf-8")
+            calls=[]
+            def fake_toronto(urls, folder, authorized=False):
+                calls.append((urls, authorized))
+                return {"status": "REVIEW_ONLY_OFFICIAL_TMMIS_AGENDA_FETCH",
+                        "meetings_considered": 1, "meetings_with_items": 1,
+                        "meeting_results": [{"meeting_url": TORONTO,
+                                             "status": "AGENDA_ITEMS_REVIEW_ONLY"}],
+                        "paid_ai_calls": 0}
+            dry=council.execute(root, root/"results", index_auditor=index_stub,
+                                toronto_fetcher=fake_toronto)
+            self.assertEqual(calls, [])
+            self.assertEqual(dry["paid_ai_usd"], 0)
+            run=council.execute(root, root/"results", index_auditor=index_stub,
+                                fetch_toronto_official_agendas=True,
+                                toronto_fetcher=fake_toronto)
+            self.assertEqual(calls, [([TORONTO], True)])
+            self.assertEqual(run["toronto_exact_agenda_retrieval"]["meetings_with_items"], 1)
+            self.assertEqual(run["publisher_first_publications_verified"], 0)
+
+    def test_invalid_toronto_meeting_url_is_held(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp)
+            (root/council.CONFIG).write_text(json.dumps({
+                "version": 1, "documents": [],
+                "toronto_meeting_urls": ["https://other.example.com/council/report.do?meeting=2026.PH30&type=agenda"]
+            }), encoding="utf-8")
+            result=council.execute(root, root/"results", index_auditor=index_stub,
+                                   fetch_toronto_official_agendas=True)
+            self.assertEqual(result["toronto_exact_agenda_retrieval"]["status"],
+                             "OFFICIAL_TMMIS_FETCH_OR_MANIFEST_HELD")
+            self.assertEqual(result["source_documents_held"], 1)
+
     def test_all_three_city_item_adapters_in_one_review_stage(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

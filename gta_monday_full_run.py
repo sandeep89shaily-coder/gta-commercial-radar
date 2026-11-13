@@ -30,6 +30,7 @@ def stages(workspace, results, *, industrial_limit=10, skip_collection=False):
     if not skip_collection:
         council_args.append("--fetch-brampton-featured")
         council_args.append("--fetch-mississauga-pdc")
+        council_args.append("--fetch-toronto-official-agendas")
     base = [
         ("daily_radar", ["gta_total_intelligence_run.py", "--workspace", ws], True),
         ("industrial_equipment", ["gta_industrial_equipment_run.py",
@@ -192,6 +193,8 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
                     "brampton_featured_public_applications", {})
                 report["council_review_diagnostics"]["mississauga_discovered_pdc"] = council_data.get(
                     "mississauga_discovered_pdc", {})
+                report["council_review_diagnostics"]["toronto_exact_agenda_retrieval"] = council_data.get(
+                    "toronto_exact_agenda_retrieval", {})
                 report["council_review_diagnostics"]["mississauga_match"] = {
                     key: council_data.get("mississauga_20_case_comparison", {}).get(key)
                     for key in ("cases_reviewed", "missing_case_count",
