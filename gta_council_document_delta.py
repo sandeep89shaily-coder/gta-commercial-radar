@@ -14,7 +14,7 @@ import json
 from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit
 
-from municipal_meeting_capture import discover, OFFICIAL
+from municipal_meeting_capture import discover, OFFICIAL, eligible_agenda_document
 
 LEDGER = "COUNCIL_DOCUMENT_LINK_LEDGER.json"
 EVENTS = "COUNCIL_DOCUMENT_LINK_EVENTS.csv"
@@ -101,6 +101,9 @@ def run(city, results, *, fetch=None, now=None):
     previous_city = {key: item for key, item in before.items()
                      if item.get("city") == city}
     baseline = not previous_city
+    legacy_ineligible = sum(not eligible_agenda_document(
+        item.get("url", ""), item.get("title", ""), city)
+        for item in previous_city.values())
     retained = dict(before)
     changed = []
     newly_observed = 0
@@ -142,16 +145,24 @@ def run(city, results, *, fetch=None, now=None):
     _write_csv(folder / (city.upper() + "_" + EVENTS), changed)
     summary = {
         "city": city, "checked_utc": at,
-        "status": "INDEX_LINK_BASELINE_ONLY" if baseline else "INDEX_LINK_DELTA_REVIEW_ONLY",
+        "status": ("INDEX_FETCHED_ZERO_ELIGIBLE_LINKS_SOURCE_GAP" if not newest
+                   else "INDEX_LINK_BASELINE_ONLY" if baseline
+                   else "INDEX_LINK_DELTA_REVIEW_ONLY"),
         "official_index_status": source_state,
         "links_visible_this_check": len(newest),
+        "valid_individual_document_links": len(newest),
+        "legacy_ineligible_links_retained_not_promoted": legacy_ineligible,
+        "source_gap_review_required": not bool(newest),
         "first_observed_links": newly_observed,
         "changed_link_titles": renamed,
         "historical_links_retained": len(retained),
         "links_missing_from_current_index_not_removed": len(set(previous_city) - set(newest)),
         "new_publications_verified": 0, "actual_document_contents_retrieved": 0,
         "verified_projects": 0, "buyer_or_procurement_verified": 0,
-        "warning": "First observed is not first published. Index links and title edits are not project approvals. Read exact linked agenda/staff report separately, subject to source permissions."
+        "warning": ("Fetched index but no eligible individual agenda/report document links. "
+                    "Dynamic calendars or downstream portal navigation may need a separately validated adapter. "
+                    if not newest else "") +
+                   "First observed is not first published. Historical ineligible links are retained for audit, not promoted to documents or projects."
     }
     (folder / STATUS).write_text(json.dumps(summary, indent=2), encoding="utf-8")
     (folder / (city.upper() + "_" + STATUS)).write_text(
