@@ -15,7 +15,6 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from gta_facility_intelligence import normalize_address
-from gta_lead_time_proof import validate as lead_proof
 
 OUT = "GTA_AGENDA_APPLICATION_PERMIT_20_CASE_REVIEW.csv"
 STATUS = "GTA_AGENDA_APPLICATION_PERMIT_20_CASE_STATUS.json"
@@ -106,7 +105,7 @@ def compare(agenda, applications=None, permits=None, limit=20):
             "buyer_verified": False, "procurement_verified": False,
             "match_basis": "", "status": "HOLD", "hold_reason": ""
         }
-        if not city or not aid or not address or not _url(base["agenda_source_url"]):
+        if not city or not aid or not address[0] or not _url(base["agenda_source_url"]):
             base["hold_reason"] = "AGENDA_ID_ADDRESS_OR_ORIGIN_MISSING"
         elif applications is None:
             base["hold_reason"] = "APPLICATION_EXPORT_UNAVAILABLE"
