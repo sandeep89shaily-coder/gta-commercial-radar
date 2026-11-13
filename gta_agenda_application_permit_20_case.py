@@ -142,9 +142,24 @@ def compare(agenda, applications=None, permits=None, limit=20):
 
 
 def run(agenda_csv, application_csv, permit_csv, out, limit=20):
-    agenda = read(agenda_csv, "agenda")
-    if agenda is None:
-        raise ValueError("ACTUAL_AGENDA_CSV_REQUIRED")
+    sources = agenda_csv if isinstance(agenda_csv, (list, tuple)) else [agenda_csv]
+    if not sources:
+        raise ValueError("AT_LEAST_ONE_AGENDA_CSV_REQUIRED")
+    agenda = []
+    seen = set()
+    for source in sources:
+        rows = read(source, "agenda")
+        if rows is None:
+            raise ValueError("ACTUAL_AGENDA_CSV_REQUIRED:" + str(source))
+        for item in rows:
+            identity = (str(item.get("city") or "").casefold(),
+                        str(item.get("source_pdf_url") or ""),
+                        str(item.get("item_number") or ""),
+                        str(item.get("application_id") or ""))
+            if identity in seen:
+                continue
+            seen.add(identity)
+            agenda.append(item)
     apps = read(application_csv, "application")
     permits = read(permit_csv, "permit")
     cases = compare(agenda, apps, permits, limit)
@@ -177,7 +192,7 @@ def run(agenda_csv, application_csv, permit_csv, out, limit=20):
 
 if __name__ == "__main__":
     cli = argparse.ArgumentParser()
-    cli.add_argument("--agenda-csv", required=True)
+    cli.add_argument("--agenda-csv", required=True, nargs="+")
     cli.add_argument("--applications-csv")
     cli.add_argument("--permits-csv")
     cli.add_argument("--out", required=True)
