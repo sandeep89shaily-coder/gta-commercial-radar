@@ -49,7 +49,7 @@ REAL_ITEM=re.compile(r"(?:\.pdf(?:$|\?)|agenda[-_/ ]?(?:package|item|\d{2,})|min
 # The Nov 13 source run incorrectly counted Brampton's complaint protocol and
 # 2026-27 at-a-glance calendar as agenda documents. Fail closed on those.
 NON_DOCUMENT=re.compile(r"(?:at[ -]?a[ -]?glance|calendar|schedule|complaint|protocol|code[ -]?of[ -]?conduct|contact|how[ -]?to|overview|guide|faq)",re.I)
-ESCRIBE_DOCUMENT=re.compile(r"^/filestream\\.ashx$",re.I)
+ESCRIBE_DOCUMENT=re.compile(r"^/filestream\.ashx$",re.I)
 
 def eligible_agenda_document(url,label,city):
  p=urlparse(url)
