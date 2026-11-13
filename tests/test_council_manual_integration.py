@@ -67,6 +67,40 @@ class CouncilManualIntegrationTests(unittest.TestCase):
             self.assertEqual(active["publisher_first_publications_verified"], 0)
             self.assertEqual(active["paid_ai_usd"], 0)
 
+    def test_toronto_planning_notices_fresh_run_only_and_review_only(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            calls = []
+            def fake_notices(folder, fetch=False):
+                calls.append(fetch)
+                return {"status": "OFFICIAL_NOTICE_DETAILS_REVIEW_ONLY",
+                        "index_planning_notices": 9,
+                        "details_considered": 9,
+                        "details_parsed_with_exact_application_id": 7,
+                        "commercial_keyword_source_records_review_only": 3,
+                        "unparsed_details_held": 2,
+                        "first_local_observations": 7,
+                        "source_notice_dates_recorded": 7,
+                        "publisher_first_publication_dates_verified": 0,
+                        "paid_ai_calls": 0}
+            quiet = council.execute(root, root / "GTA_RADAR_RESULTS",
+                                    index_auditor=index_stub,
+                                    planning_notices_collector=fake_notices)
+            self.assertEqual(calls, [])
+            self.assertEqual(
+                quiet["toronto_official_planning_notices"]["status"], "NOT_REQUESTED")
+            result = council.execute(root, root / "GTA_RADAR_RESULTS",
+                                     index_auditor=index_stub,
+                                     fetch_toronto_planning_notices=True,
+                                     planning_notices_collector=fake_notices)
+            self.assertEqual(calls, [True])
+            self.assertEqual(
+                result["toronto_official_planning_notices"][
+                    "details_parsed_with_exact_application_id"], 7)
+            self.assertEqual(result["publisher_first_publications_verified"], 0)
+            self.assertEqual(result["commercial_buyers_verified"], 0)
+            self.assertEqual(result["paid_ai_usd"], 0)
+
     def test_official_toronto_schedule_does_not_claim_agenda_or_project(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

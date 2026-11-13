@@ -29,6 +29,7 @@ class MondayIntegrationTests(unittest.TestCase):
             self.assertIn("--fetch-mississauga-pdc", council_stage)
             self.assertIn("--fetch-toronto-official-agendas", council_stage)
             self.assertIn("--fetch-toronto-schedule", council_stage)
+            self.assertIn("--fetch-toronto-planning-notices", council_stage)
             history_stage = next(args for name, args, _ in monday.stages(
                 ws, ws / "GTA_RADAR_RESULTS", skip_collection=True)
                 if name == "council_agenda_intelligence")
@@ -36,6 +37,7 @@ class MondayIntegrationTests(unittest.TestCase):
             self.assertNotIn("--fetch-mississauga-pdc", history_stage)
             self.assertNotIn("--fetch-toronto-official-agendas", history_stage)
             self.assertNotIn("--fetch-toronto-schedule", history_stage)
+            self.assertNotIn("--fetch-toronto-planning-notices", history_stage)
             self.assertNotIn("--paid", stages[-1][1])
             self.assertNotIn("--fetch", stages[-3][1])
             self.assertNotIn("--live-ckan", stages[-3][1])
