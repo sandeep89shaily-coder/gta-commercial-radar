@@ -162,7 +162,7 @@ class SelectiveDailyTests(unittest.TestCase):
                     state=v6.pipeline(workspace,db,collector=collector,selector=selector,
                                       run_research=False,selective_ai=True,today=NOW)
             self.assertEqual(state["status"],"SUCCESS")
-            self.assertEqual(state["ai_mode"],"SELECTIVE_USD_0_25")
+            self.assertEqual(state["ai_mode"],"SELECTIVE_USD_2_0")
             self.assertEqual(state["free_daily_watch"]["initial_baseline"],1)
             self.assertIn("selector",calls)
             fake_ai.assert_called_once()
