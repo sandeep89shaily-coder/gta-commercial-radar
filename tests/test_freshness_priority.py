@@ -161,7 +161,7 @@ class FreshnessPriorityTests(unittest.TestCase):
                        sample("toronto:30d", "2026-10-15")])
             free.build(p, root, today=DAY+dt.timedelta(days=1))
             def fake_run(*args, **kwargs):
-                self.assertEqual(kwargs["budget_cap_usd"], 2.00)
+                self.assertEqual(kwargs["budget_cap_usd"], 1.00)
                 self.assertEqual(kwargs["eligible_project_ids"],
                                  {"toronto:recent","toronto:30d"})
                 self.assertEqual(kwargs["freshness_priority_buckets"],
