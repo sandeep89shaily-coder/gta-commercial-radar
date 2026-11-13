@@ -127,6 +127,27 @@ def check_three_city_manual_audit(tmp_path):
     saved = json.loads((tmp_path / LEDGER).read_text(encoding="utf-8"))
     assert len(saved["items"]) == 3
 
+def check_november_13_brampton_noise_filter(tmp_path):
+    markup = html_for(
+        ("/EN/City-Hall/Council-Committees/Council-Code-of-Conduct/Pages/Complaint-Process-New-Council-Code-2016.aspx", "Complaint Protocol"),
+        ("/EN/City-Hall/Council-Committees/meetings-agendas/Documents/2026%20and%202027%20At%20A%20Glance.pdf", "2026 and 2027 Year at At a Glance"))
+    result = run("Brampton", tmp_path, fetch=lambda _: markup, now=NOW)
+    assert result["status"] == "INDEX_FETCHED_ZERO_ELIGIBLE_LINKS_SOURCE_GAP"
+    assert result["valid_individual_document_links"] == 0
+    assert result["source_gap_review_required"]
+    assert rows(tmp_path) == []
+
+
+def check_escribe_document_still_visible(tmp_path):
+    from municipal_meeting_capture import eligible_agenda_document
+    doc = "https://pub-mississauga.escribemeetings.com/FileStream.ashx?DocumentId=82234"
+    assert eligible_agenda_document(doc, "Agenda", "Mississauga")
+    assert not eligible_agenda_document(doc.replace("82234", "x"), "Agenda", "Mississauga")
+    assert not eligible_agenda_document(doc.replace("pub-mississauga.escribemeetings.com", "evil.example"), "Agenda", "Mississauga")
+    result = run("Mississauga", tmp_path, fetch=lambda _: html_for((doc, "Agenda")), now=NOW)
+    assert result["valid_individual_document_links"] == 1
+    assert result["status"] == "INDEX_LINK_BASELINE_ONLY"
+
 
 class CouncilDocumentDeltaTests(unittest.TestCase):
     def test_baseline_and_observations(self):
@@ -138,6 +159,8 @@ class CouncilDocumentDeltaTests(unittest.TestCase):
                      check_missing_link_is_retained_without_removal_claim,
                      check_invalid_city_refuses_unknown_public_source,
                      check_cities_have_independent_baselines_and_durable_outputs,
-                     check_three_city_manual_audit):
+                     check_three_city_manual_audit,
+                     check_november_13_brampton_noise_filter,
+                     check_escribe_document_still_visible):
             with self.subTest(case=case.__name__), TemporaryDirectory() as directory:
                 case(Path(directory))

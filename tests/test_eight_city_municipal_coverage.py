@@ -34,8 +34,8 @@ class EightCityTests(unittest.TestCase):
         })
 
     def test_discover_official_agenda_links_but_never_calls_them_projects(self):
-        markup = ('<a href="/council/planning-agenda-2026">Planning agenda and staff reports</a>'
-                  '<a href="/council/planning-agenda-2026">Same duplicate</a>'
+        markup = ('<a href="/council/planning-agenda-2026.pdf">Planning agenda and staff reports</a>'
+                  '<a href="/council/planning-agenda-2026.pdf">Same duplicate</a>'
                   '<a href="https://evil.example/agendas">External agenda</a>')
         for city in CITIES:
             with self.subTest(city=city):
