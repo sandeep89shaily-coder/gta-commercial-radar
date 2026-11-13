@@ -167,6 +167,32 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
         if failure:
             row["error"] = failure
         report["stages"].append(row)
+        if name == "council_agenda_intelligence":
+            council_file = results / "COUNCIL_INTELLIGENCE_REVIEW" / "COUNCIL_INTEGRATED_REVIEW_STATUS.json"
+            try:
+                if council_file.stat().st_mtime < dt.datetime.fromisoformat(started).timestamp() - 3:
+                    raise ValueError("OLDER_COUNCIL_EVIDENCE_NOT_TODAY")
+                council_data = json.loads(council_file.read_text(encoding="utf-8"))
+                report["council_review_diagnostics"] = {
+                    key: council_data.get(key) for key in (
+                        "status", "documents_considered", "documents_parsed",
+                        "source_documents_missing", "source_documents_failed",
+                        "source_documents_held", "source_manifest_status",
+                        "agenda_to_application_permit_chains_verified",
+                        "publisher_first_publications_verified", "paid_ai_usd")
+                }
+                report["council_review_diagnostics"]["index"] = council_data.get("official_index_audit", {})
+                report["council_review_diagnostics"]["mississauga_match"] = {
+                    key: council_data.get("mississauga_20_case_comparison", {}).get(key)
+                    for key in ("cases_reviewed", "missing_case_count",
+                                "three_source_identity_review_candidates",
+                                "early_detection_advantage_proven")
+                }
+            except (OSError, ValueError, TypeError, KeyError) as exc:
+                report["council_review_diagnostics"] = {
+                    "status": "NO_CURRENT_COUNCIL_STAGE_DIAGNOSTIC",
+                    "error_type": type(exc).__name__
+                }
         if name == "daily_radar":
             # Discovery itself refuses missing/stale daily output. Its success
             # does not mean evidence/commercial gates have been satisfied.
