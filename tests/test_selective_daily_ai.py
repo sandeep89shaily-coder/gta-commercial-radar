@@ -123,7 +123,7 @@ class SelectiveDailyTests(unittest.TestCase):
                 self.assertTrue(ai.ledger_claim(conn,today,"under",.010,0,daily_limit=.25))
                 self.assertFalse(ai.ledger_claim(conn,today,"over-again",.002,0,daily_limit=.25))
                 self.assertFalse(ai.ledger_claim(conn,today,"legacy-hold",.001,.02,daily_limit=.25))
-                self.assertFalse(ai.ledger_claim(conn,today,"global-ceiling",2.01,0,daily_limit=3.00))
+                self.assertFalse(ai.ledger_claim(conn,today,"global-ceiling",1.01,0,daily_limit=3.00))
             finally:conn.close()
 
     def test_schedule_uses_selective_flag_and_enables_previously_disabled_task(self):
@@ -162,7 +162,7 @@ class SelectiveDailyTests(unittest.TestCase):
                     state=v6.pipeline(workspace,db,collector=collector,selector=selector,
                                       run_research=False,selective_ai=True,today=NOW)
             self.assertEqual(state["status"],"SUCCESS")
-            self.assertEqual(state["ai_mode"],"SELECTIVE_USD_2_0")
+            self.assertEqual(state["ai_mode"],"SELECTIVE_USD_1_0")
             self.assertEqual(state["free_daily_watch"]["initial_baseline"],1)
             self.assertIn("selector",calls)
             fake_ai.assert_called_once()
