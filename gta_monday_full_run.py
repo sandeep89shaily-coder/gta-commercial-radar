@@ -187,6 +187,8 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
                         "publisher_first_publications_verified", "paid_ai_usd")
                 }
                 report["council_review_diagnostics"]["index"] = council_data.get("official_index_audit", {})
+                report["council_review_diagnostics"]["brampton_featured"] = council_data.get(
+                    "brampton_featured_public_applications", {})
                 report["council_review_diagnostics"]["mississauga_match"] = {
                     key: council_data.get("mississauga_20_case_comparison", {}).get(key)
                     for key in ("cases_reviewed", "missing_case_count",
