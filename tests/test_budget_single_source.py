@@ -16,9 +16,9 @@ class BudgetSingleSourceTests(unittest.TestCase):
 
     def test_all_investigators_share_the_configured_ceiling(self):
         import radar_config, v5_investigator, v8_deepseek_native
-        self.assertEqual(radar_config.DEEPSEEK_DAILY_LIMIT_USD, 2.00)
-        self.assertEqual(v5_investigator.DAILY_BUDGET, 2.00)
-        self.assertEqual(v8_deepseek_native.DAILY_LIMIT, 2.00)
+        self.assertEqual(radar_config.DEEPSEEK_DAILY_LIMIT_USD, 1.00)
+        self.assertEqual(v5_investigator.DAILY_BUDGET, 1.00)
+        self.assertEqual(v8_deepseek_native.DAILY_LIMIT, 1.00)
 
 
 if __name__ == "__main__":
