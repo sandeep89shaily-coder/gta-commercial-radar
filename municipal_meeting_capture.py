@@ -45,6 +45,30 @@ class Links(HTMLParser):
 AGENDA_WORDS=re.compile(r"\b(?:agenda|minutes|report|meeting|planning|committee|application|council)\b",re.I)
 NAVIGATION_NOISE=re.compile(r"^(?:skip to (?:main )?content|home|search|about|contact|accessibility|privacy|council|meeting|agenda|minutes|committees?|back to top)$",re.I)
 REAL_ITEM=re.compile(r"(?:\.pdf(?:$|\?)|agenda[-_/ ]?(?:package|item|\d{2,})|minutes[-_/ ]?\d{2,}|meeting[-_/ ]?\d{2,}|\b20\d{2}\b|planning report|staff report|development application)",re.I)
+# A calendar/index link is not an actual individual agenda/staff-report PDF.
+# The Nov 13 source run incorrectly counted Brampton's complaint protocol and
+# 2026-27 at-a-glance calendar as agenda documents. Fail closed on those.
+NON_DOCUMENT=re.compile(r"(?:at[ -]?a[ -]?glance|calendar|schedule|complaint|protocol|code[ -]?of[ -]?conduct|contact|how[ -]?to|overview|guide|faq)",re.I)
+ESCRIBE_DOCUMENT=re.compile(r"^/filestream\\.ashx$",re.I)
+
+def eligible_agenda_document(url,label,city):
+ p=urlparse(url)
+ if not public_https(url):return False
+ if NON_DOCUMENT.search(label+" "+p.path):return False
+ host=(p.hostname or "").lower()
+ if host=="pub-"+city.lower()+".escribemeetings.com" and ESCRIBE_DOCUMENT.fullmatch(p.path):
+  from urllib.parse import parse_qs
+  query=parse_qs(p.query)
+  ids=query.get("DocumentId",query.get("documentid",[]))
+  return len(ids)==1 and ids[0].isdigit() and int(ids[0])>0
+ # Direct PDF files only. An ordinary municipal link or calendar landing
+ # page must not be counted as a staff report or agenda item.
+ if not p.path.lower().endswith(".pdf"):return False
+ title=label+" "+p.path
+ return bool(AGENDA_WORDS.search(title) and
+             (re.search(r"\\b20\\d{2}\\b",title) or
+              re.search(r"(?:staff[ -]?report|planning[ -]?report|agenda|minutes|committee)",title,re.I)))
+
 class AgendaAnchors(HTMLParser):
  def __init__(self):
   super().__init__();self.href=None;self.label=[];self.links=[]
@@ -73,6 +97,7 @@ def _agenda_candidates(markup,city,source):
   if NAVIGATION_NOISE.fullmatch(label.strip()) or len(label.strip())<8:continue
   if not AGENDA_WORDS.search(label+" "+urlparse(uri).path):continue
   if not REAL_ITEM.search(label+" "+urlparse(uri).path):continue
+  if not eligible_agenda_document(uri,label,city):continue
   if uri in seen:continue
   seen.add(uri)
   found.append({"url":uri,"title":label[:180],
