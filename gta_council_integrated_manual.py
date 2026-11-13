@@ -21,6 +21,8 @@ from gta_mississauga_discovered_pdc_run import run as collect_mississauga_discov
 from gta_toronto_tmmis_authorized_agendas import run as fetch_toronto_agendas
 from toronto_tmmis_documents import agenda_url
 from gta_toronto_official_schedule import run as collect_toronto_schedule
+from gta_toronto_schedule_tmmis_bridge import run as collect_toronto_schedule_agenda_items
+from gta_toronto_official_schedule import RESULTS_CSV as TORONTO_SCHEDULE_CSV
 
 CONFIG = "GTA_RADAR_COUNCIL_INPUTS.json"
 STATUS = "COUNCIL_INTEGRATED_REVIEW_STATUS.json"
@@ -79,7 +81,8 @@ def execute(workspace, results, *, index_auditor=None, fetch_brampton_featured=F
             featured_collector=None, fetch_mississauga_pdc=False,
             mississauga_discovered_collector=None,
             fetch_toronto_official_agendas=False, toronto_fetcher=None,
-            fetch_toronto_schedule=False, schedule_collector=None):
+            fetch_toronto_schedule=False, schedule_collector=None,
+            agenda_bridge_collector=None):
     root = Path(workspace).resolve()
     out = Path(results).resolve() / "COUNCIL_INTELLIGENCE_REVIEW"
     out.mkdir(parents=True, exist_ok=True)
@@ -223,6 +226,7 @@ def execute(workspace, results, *, index_auditor=None, fetch_brampton_featured=F
 
     # Toronto City Clerk official open-data meeting schedule: upstream
     # meeting-date inventory, *not* dynamic agenda or project discovery.
+    scheduled = None
     if fetch_toronto_schedule:
         try:
             scheduled = (schedule_collector or collect_toronto_schedule)(
@@ -241,6 +245,35 @@ def execute(workspace, results, *, index_auditor=None, fetch_brampton_featured=F
     else:
         report["toronto_official_meeting_schedule"] = {
             "status": "NOT_REQUESTED", "agenda_urls_discovered": 0}
+
+    # Full evidence bridge: City Clerk's verified schedule row -> bounded
+    # source response from Toronto TMMIS -> same-date/number/title item list.
+    # A speculative URL or mismatched TMMIS page never becomes a new item.
+    report["toronto_schedule_to_agenda_item_link"] = {
+        "status": "NOT_REQUESTED", "official_meeting_pages_matched": 0,
+        "original_tmmis_items_extracted": 0}
+    if fetch_toronto_schedule:
+        try:
+            source_status = (scheduled.get("status") if isinstance(scheduled, dict)
+                             else "OFFICIAL_SCHEDULE_NOT_FETCHED")
+            linked = (agenda_bridge_collector or collect_toronto_schedule_agenda_items)(
+                out / "TORONTO_OFFICIAL_MEETING_SCHEDULE" / TORONTO_SCHEDULE_CSV,
+                out / "TORONTO_PH_TMMIS_AGENDA_ITEMS",
+                source_status=source_status, fetch=True)
+            report["toronto_schedule_to_agenda_item_link"] = {
+                key: linked.get(key) for key in (
+                    "status", "schedule_source_status",
+                    "meeting_candidates_from_official_schedule",
+                    "official_meeting_pages_matched",
+                    "original_tmmis_items_extracted",
+                    "first_publisher_publication_dates_verified",
+                    "paid_ai_calls", "meeting_page_results", "error_type")
+            }
+        except Exception as exc:
+            report["toronto_schedule_to_agenda_item_link"] = {
+                "status": "OFFICIAL_TMMIS_LINK_STAGE_HELD",
+                "error_type": type(exc).__name__,
+                "official_meeting_pages_matched": 0}
 
     # Fetch only explicitly listed, exact official Toronto TMMIS meeting
     # agendas. No meeting-number enumeration or historical auto-promotion.
@@ -330,7 +363,8 @@ def main():
         "brampton_featured": report["brampton_featured_public_applications"],
         "mississauga_discovered_pdc": report["mississauga_discovered_pdc"],
         "toronto_exact_agenda_retrieval": report["toronto_exact_agenda_retrieval"],
-        "toronto_official_meeting_schedule": report["toronto_official_meeting_schedule"]
+        "toronto_official_meeting_schedule": report["toronto_official_meeting_schedule"],
+        "toronto_schedule_to_agenda_item_link": report["toronto_schedule_to_agenda_item_link"]
     }, indent=2))
 
 

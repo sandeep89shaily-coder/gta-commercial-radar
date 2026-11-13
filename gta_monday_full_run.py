@@ -198,6 +198,8 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
                     "toronto_exact_agenda_retrieval", {})
                 report["council_review_diagnostics"]["toronto_official_meeting_schedule"] = council_data.get(
                     "toronto_official_meeting_schedule", {})
+                report["council_review_diagnostics"]["toronto_schedule_to_agenda_item_link"] = council_data.get(
+                    "toronto_schedule_to_agenda_item_link", {})
                 report["council_review_diagnostics"]["mississauga_match"] = {
                     key: council_data.get("mississauga_20_case_comparison", {}).get(key)
                     for key in ("cases_reviewed", "missing_case_count",

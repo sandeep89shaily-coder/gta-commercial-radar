@@ -99,6 +99,54 @@ class CouncilManualIntegrationTests(unittest.TestCase):
             self.assertEqual(result["publisher_first_publications_verified"], 0)
             self.assertEqual(result["paid_ai_usd"], 0)
 
+    def test_toronto_schedule_can_verified_link_to_official_tmmis_item_list(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            called = []
+            def scheduled(folder, fetch=False):
+                called.append(("schedule", fetch))
+                return {"status": "RECENT_SCHEDULE_REVIEW_ONLY",
+                        "schedule_rows_read": 12, "recent_scheduled_meetings": 1,
+                        "agenda_urls_discovered": 0, "paid_ai_calls": 0}
+            def bridge(csvfile, output, *, source_status, fetch=False):
+                called.append(("bridge", fetch, source_status))
+                return {"status": "OFFICIAL_ITEM_LIST_REVIEW_ONLY",
+                        "meeting_candidates_from_official_schedule": 1,
+                        "official_meeting_pages_matched": 1,
+                        "original_tmmis_items_extracted": 8,
+                        "paid_ai_calls": 0,
+                        "first_publisher_publication_dates_verified": 0}
+            result = council.execute(
+                root, root / "GTA_RADAR_RESULTS", index_auditor=index_stub,
+                fetch_toronto_schedule=True, schedule_collector=scheduled,
+                agenda_bridge_collector=bridge)
+            self.assertEqual(called, [
+                ("schedule", True),
+                ("bridge", True, "RECENT_SCHEDULE_REVIEW_ONLY")])
+            self.assertEqual(result["toronto_schedule_to_agenda_item_link"][
+                "original_tmmis_items_extracted"], 8)
+            self.assertEqual(result["publisher_first_publications_verified"], 0)
+            self.assertEqual(result["paid_ai_usd"], 0)
+
+    def test_toronto_schedule_failure_cannot_trigger_stale_agenda_fetch(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            called = []
+            def bridge(csvfile, output, *, source_status, fetch=False):
+                called.append(source_status)
+                return {"status": "CURRENT_OFFICIAL_SCHEDULE_NOT_VALIDATED_HOLD",
+                        "official_meeting_pages_matched": 0,
+                        "original_tmmis_items_extracted": 0, "paid_ai_calls": 0}
+            result = council.execute(
+                root, root / "GTA_RADAR_RESULTS", index_auditor=index_stub,
+                fetch_toronto_schedule=True,
+                schedule_collector=lambda folder, fetch=False: {
+                    "status": "OFFICIAL_SCHEDULE_BLOCKED_OR_SCHEMA_HELD"},
+                agenda_bridge_collector=bridge)
+            self.assertEqual(called, ["OFFICIAL_SCHEDULE_BLOCKED_OR_SCHEMA_HELD"])
+            self.assertEqual(result["toronto_schedule_to_agenda_item_link"]["status"],
+                             "CURRENT_OFFICIAL_SCHEDULE_NOT_VALIDATED_HOLD")
+
     def test_exact_toronto_agenda_urls_use_manual_source_manifest(self):
         with tempfile.TemporaryDirectory() as temp:
             root=Path(temp)
