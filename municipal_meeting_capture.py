@@ -94,10 +94,12 @@ def _agenda_candidates(markup,city,source):
   if not (host==expected or host=="pub-"+city.lower()+".escribemeetings.com"
           or host=="escribemeetings.com" or host=="www.escribemeetings.com"):
    continue
-  if NAVIGATION_NOISE.fullmatch(label.strip()) or len(label.strip())<8:continue
-  if not AGENDA_WORDS.search(label+" "+urlparse(uri).path):continue
-  if not REAL_ITEM.search(label+" "+urlparse(uri).path):continue
   if not eligible_agenda_document(uri,label,city):continue
+  # An official eSCRIBE PDF can be labelled simply "Agenda". For ordinary
+  # direct municipal PDFs, retain a meaningful agenda/report label gate.
+  is_escribe=(urlparse(uri).hostname or "").lower()=="pub-"+city.lower()+".escribemeetings.com"
+  if not is_escribe and (NAVIGATION_NOISE.fullmatch(label.strip()) or len(label.strip())<8):continue
+  if not is_escribe and not AGENDA_WORDS.search(label+" "+urlparse(uri).path):continue
   if uri in seen:continue
   seen.add(uri)
   found.append({"url":uri,"title":label[:180],
