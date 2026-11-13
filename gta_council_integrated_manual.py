@@ -22,6 +22,7 @@ from gta_brampton_gis_radar_reconciliation import run as reconcile_brampton_gis
 from gta_mississauga_discovered_pdc_run import run as collect_mississauga_discovered
 from gta_mississauga_official_gis_source_audit import audit as audit_mississauga_gis
 from gta_mississauga_official_gis_records import run as collect_mississauga_gis_records
+from gta_mississauga_gis_reconciliation import run as reconcile_mississauga_gis
 from gta_toronto_tmmis_authorized_agendas import run as fetch_toronto_agendas
 from toronto_tmmis_documents import agenda_url
 from gta_toronto_official_schedule import run as collect_toronto_schedule
@@ -330,6 +331,24 @@ def execute(workspace, results, *, index_auditor=None, fetch_brampton_featured=F
             report["notices"].append("MISSISSAUGA_GIS_APPLICATIONS_SOURCE_EXCEPTION")
     else:
         report["mississauga_official_gis_application_records"] = {"status": "NOT_REQUESTED"}
+
+    if fetch_mississauga_gis:
+        try:
+            matched = reconcile_mississauga_gis(
+                out / "MISSISSAUGA_OFFICIAL_GIS_APPLICATIONS",
+                Path(results).resolve(),
+                out / "MISSISSAUGA_GIS_CROSS_SOURCE_REVIEW")
+            report["mississauga_gis_existing_radar_reconciliation"] = matched
+            if matched.get("status") != "EXACT_FILE_ID_REVIEW_READY":
+                report["notices"].append("MISSISSAUGA_GIS_CROSS_SOURCE_REVIEW_HELD")
+        except Exception as exc:
+            report["mississauga_gis_existing_radar_reconciliation"] = {
+                "status": "RECONCILIATION_EXCEPTION_HELD",
+                "reason": type(exc).__name__}
+            report["notices"].append("MISSISSAUGA_GIS_RECONCILIATION_FAILED")
+    else:
+        report["mississauga_gis_existing_radar_reconciliation"] = {
+            "status": "NOT_REQUESTED"}
 
     # Source-level Toronto Planning Act notices. The City's Notice Date is
     # explicit evidence, not original first-publication proof. Staff contacts
