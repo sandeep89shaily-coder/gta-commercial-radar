@@ -21,7 +21,7 @@ from pypdf import PdfReader
 MAX_BYTES = 45_000_000
 MAX_PAGES = 500
 MAX_BOOKMARKS = 600
-GENERIC_SECTION = re.compile(r"^(?:[0-9]+(?:[.][0-9]+)*[.]?\\s*)?(?:planning and development|planning and development committee|general business|other business)$", re.I)
+GENERIC_SECTION = re.compile(r"^(?:[0-9]+(?:[.][0-9]+)*[.]?\s*)?(?:planning and development|planning and development committee|general business|other business)$", re.I)
 MAX_DEPTH = 10
 LEDGER = "BRAMPTON_AGENDA_PDF_VERSIONS.json"
 CSV = "BRAMPTON_AGENDA_BOOKMARK_ITEMS_REVIEW.csv"
