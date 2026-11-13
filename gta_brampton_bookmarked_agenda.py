@@ -21,6 +21,7 @@ from pypdf import PdfReader
 MAX_BYTES = 45_000_000
 MAX_PAGES = 500
 MAX_BOOKMARKS = 600
+GENERIC_SECTION = re.compile(r"^(?:[0-9]+(?:[.][0-9]+)*[.]?\\s*)?(?:planning and development|planning and development committee|general business|other business)$", re.I)
 MAX_DEPTH = 10
 LEDGER = "BRAMPTON_AGENDA_PDF_VERSIONS.json"
 CSV = "BRAMPTON_AGENDA_BOOKMARK_ITEMS_REVIEW.csv"
@@ -134,7 +135,7 @@ def inspect(pdf_path, *, meeting_url, agenda_pdf_url, results, now=None):
     for bookmark in outline:
         title = bookmark["title"]
         category = ("AGENDA_BOOKMARK_RESEARCH_CANDIDATE" if TERMS.search(title)
-                    and not EXCLUDE.search(title) else "AGENDA_BOOKMARK_OTHER")
+                    and not EXCLUDE.search(title)\n                    and not GENERIC_SECTION.fullmatch(title)\n                    else "AGENDA_BOOKMARK_OTHER")
         rows.append({
             "meeting_url": meeting_url, "agenda_pdf_url": agenda_pdf_url,
             "pdf_sha256": digest, "item_path": bookmark["path"],
