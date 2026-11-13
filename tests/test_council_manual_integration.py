@@ -40,6 +40,42 @@ class CouncilManualIntegrationTests(unittest.TestCase):
             self.assertEqual(result["mississauga_20_case_comparison"]["cases_reviewed"], 0)
             self.assertTrue((results / "COUNCIL_INTELLIGENCE_REVIEW" / council.STATUS).is_file())
 
+    def test_brampton_actual_public_planning_layers_are_manual_only(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            calls = []
+            def fake_gis(folder, fetch=False):
+                calls.append(fetch)
+                return {
+                    "status": "PARTIAL_OFFICIAL_GIS_LAYERS_REVIEW_ONLY",
+                    "layers_checked": 3, "layers_complete": 2,
+                    "applications_currently_extracted": 120,
+                    "first_observed_on_complete_layers": 120,
+                    "changed_application_records_review_only": 0,
+                    "verified_first_publications": 0, "verified_buyers": 0,
+                    "paid_ai_calls": 0,
+                    "layer_results": [
+                        {"layer": 9, "status": "COMPLETE_REVIEW_ONLY"},
+                        {"layer": 10, "status": "COMPLETE_REVIEW_ONLY"},
+                        {"layer": 11, "status": "SOURCE_FAILED_PRIOR_HISTORY_PRESERVED"}
+                    ]
+                }
+            quiet = council.execute(
+                root, root / "GTA_RADAR_RESULTS", index_auditor=index_stub,
+                brampton_gis_collector=fake_gis)
+            self.assertEqual(calls, [])
+            self.assertEqual(quiet["brampton_official_gis_planning"]["status"],
+                             "NOT_REQUESTED")
+            result = council.execute(
+                root, root / "GTA_RADAR_RESULTS", index_auditor=index_stub,
+                fetch_brampton_gis=True, brampton_gis_collector=fake_gis)
+            self.assertEqual(calls, [True])
+            self.assertEqual(result["brampton_official_gis_planning"]["layers_complete"], 2)
+            self.assertIn("BRAMPTON_OFFICIAL_GIS_PARTIAL_SOURCE_GAP", result["notices"])
+            self.assertEqual(result["publisher_first_publications_verified"], 0)
+            self.assertEqual(result["commercial_buyers_verified"], 0)
+            self.assertEqual(result["paid_ai_usd"], 0)
+
     def test_featured_public_source_only_with_explicit_manual_collection(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
