@@ -17,6 +17,7 @@ from gta_brampton_bookmarked_agenda import inspect as brampton_items
 from gta_mississauga_pdc_agenda import run as mississauga_items, OUT as MISS_CSV
 from gta_agenda_application_permit_20_case import run as compare_20
 from gta_brampton_featured_pdc import run as collect_featured
+from gta_brampton_official_gis_planning import run as collect_brampton_official_gis
 from gta_mississauga_discovered_pdc_run import run as collect_mississauga_discovered
 from gta_toronto_tmmis_authorized_agendas import run as fetch_toronto_agendas
 from toronto_tmmis_documents import agenda_url
@@ -84,7 +85,8 @@ def execute(workspace, results, *, index_auditor=None, fetch_brampton_featured=F
             fetch_toronto_official_agendas=False, toronto_fetcher=None,
             fetch_toronto_schedule=False, schedule_collector=None,
             agenda_bridge_collector=None,
-            fetch_toronto_planning_notices=False, planning_notices_collector=None):
+            fetch_toronto_planning_notices=False, planning_notices_collector=None,
+            fetch_brampton_gis=False, brampton_gis_collector=None):
     root = Path(workspace).resolve()
     out = Path(results).resolve() / "COUNCIL_INTELLIGENCE_REVIEW"
     out.mkdir(parents=True, exist_ok=True)
@@ -120,6 +122,32 @@ def execute(workspace, results, *, index_auditor=None, fetch_brampton_featured=F
             "reason": type(exc).__name__
         }
         report["notices"].append("SOURCE_INDEX_AUDIT_FAILED")
+
+    # Brampton's public ArcGIS planning layers: OPA/ZBA, pre-consultation,
+    # site-plan. Complete exact GIS ID inventory required, all review-only.
+    if fetch_brampton_gis:
+        try:
+            gis = (brampton_gis_collector or collect_brampton_official_gis)(
+                out / "BRAMPTON_OFFICIAL_GIS_PLANNING", fetch=True)
+            report["brampton_official_gis_planning"] = {
+                key: gis.get(key) for key in (
+                    "status", "layers_checked", "layers_complete",
+                    "applications_currently_extracted",
+                    "first_observed_on_complete_layers",
+                    "changed_application_records_review_only",
+                    "verified_first_publications", "verified_buyers",
+                    "paid_ai_calls", "layer_results", "error_type")
+            }
+            if gis.get("layers_complete") != 3:
+                report["notices"].append("BRAMPTON_OFFICIAL_GIS_PARTIAL_SOURCE_GAP")
+        except Exception as exc:
+            report["brampton_official_gis_planning"] = {
+                "status": "SOURCE_FAILURE_HELD",
+                "reason": type(exc).__name__, "layers_complete": 0}
+            report["notices"].append("BRAMPTON_OFFICIAL_GIS_SOURCE_FAILURE")
+    else:
+        report["brampton_official_gis_planning"] = {
+            "status": "NOT_REQUESTED", "layers_complete": 0}
 
     # Separate first-party Brampton planning featured-application source.
     # This does not require the operator's locally saved agenda PDFs; the
@@ -381,6 +409,8 @@ def main():
                      help="Fetch only exact official TMMIS agenda URLs registered in workspace")
     cli.add_argument("--fetch-mississauga-pdc", action="store_true",
                      help="Fetch only newly observed official PDC PDF links through robots gate")
+    cli.add_argument("--fetch-brampton-official-gis", action="store_true",
+                     help="Official Brampton OPA/ZBA, pre-consultation and site-plan GIS")
     cli.add_argument("--fetch-brampton-featured", action="store_true",
                      help="Bounded, robots-checked official Brampton featured planning cards")
     args = cli.parse_args()
@@ -389,7 +419,8 @@ def main():
                      fetch_mississauga_pdc=args.fetch_mississauga_pdc,
                      fetch_toronto_official_agendas=args.fetch_toronto_official_agendas,
                      fetch_toronto_schedule=args.fetch_toronto_schedule,
-                     fetch_toronto_planning_notices=args.fetch_toronto_planning_notices)
+                     fetch_toronto_planning_notices=args.fetch_toronto_planning_notices,
+                     fetch_brampton_gis=args.fetch_brampton_official_gis)
     print(json.dumps({
         "status": report["status"],
         "documents_considered": report["documents_considered"],
@@ -401,7 +432,8 @@ def main():
         "toronto_exact_agenda_retrieval": report["toronto_exact_agenda_retrieval"],
         "toronto_official_meeting_schedule": report["toronto_official_meeting_schedule"],
         "toronto_schedule_to_agenda_item_link": report["toronto_schedule_to_agenda_item_link"],
-        "toronto_official_planning_notices": report["toronto_official_planning_notices"]
+        "toronto_official_planning_notices": report["toronto_official_planning_notices"],
+        "brampton_official_gis_planning": report["brampton_official_gis_planning"]
     }, indent=2))
 
 
