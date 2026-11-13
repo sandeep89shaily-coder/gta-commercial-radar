@@ -128,22 +128,37 @@ def parse_pages(pages, source_url, pdf_sha):
         for raw in files:
             file_ids.extend(APPLICATION.findall(raw))
         addresses = []
+        multi_site = False
         for line in lines[1:]:
             match = ADDRESS.search(line)
             if match:
                 addresses.append(match.group(0))
+                # Multi-unit/multi-address planning applications cannot be
+                # safely assigned to the first number observed.
+                if re.search(r"\b\d{1,6}\s*(?:&|and|,|-)\s*\d{1,6}\b", line, re.I):
+                    multi_site = True
+                if len(ADDRESS.findall(line)) > 1:
+                    multi_site = True
+        address = (addresses[0] if not multi_site and
+                   len(set(addresses)) == 1 else "")
+        application_id = file_ids[0] if len(set(file_ids)) == 1 else ""
         description = " ".join(lines[1:5])[:550]
         topic = TOPIC.search(heading + " " + description)
+        if topic and address and application_id:
+            lane = "COMMERCIAL_TITLE_REVIEW_ONLY"
+        elif topic:
+            lane = "COMMERCIAL_TOPIC_NO_EXACT_SITE_OR_FILE_HOLD"
+        else:
+            lane = "OTHER_AGENDA_ITEM"
         rows.append({
             "city": "Mississauga", "source_pdf_url": source_url,
             "pdf_sha256": pdf_sha, "item_number": code,
             "report_heading": heading, "description": description,
-            "address_raw": addresses[0] if len(set(addresses)) == 1 else "",
+            "address_raw": address,
             "owner_raw": owners[0] if len(set(owners)) == 1 else "",
-            "application_id": file_ids[0] if len(set(file_ids)) == 1 else "",
+            "application_id": application_id,
             "pdf_page_1based": item["page"],
-            "screening": ("COMMERCIAL_TITLE_REVIEW_ONLY" if topic
-                          else "OTHER_AGENDA_ITEM"),
+            "screening": lane,
             "evidence_level": "ACTUAL_SAVED_PDF_AGENDA_CONTENT_NOT_INDEPENDENTLY_VERIFIED",
             "first_published_at": "", "project_verified": False,
             "buyer_verified": False, "procurement_verified": False
