@@ -16,6 +16,7 @@ from gta_toronto_agenda_item_extraction import build as toronto_items
 from gta_brampton_bookmarked_agenda import inspect as brampton_items
 from gta_mississauga_pdc_agenda import run as mississauga_items, OUT as MISS_CSV
 from gta_agenda_application_permit_20_case import run as compare_20
+from gta_brampton_featured_pdc import run as collect_featured
 
 CONFIG = "GTA_RADAR_COUNCIL_INPUTS.json"
 STATUS = "COUNCIL_INTEGRATED_REVIEW_STATUS.json"
@@ -57,7 +58,8 @@ def _inputs(workspace):
     return entries, exports.get("applications_csv"), exports.get("permits_csv"), "SOURCE_MANIFEST_LOADED"
 
 
-def execute(workspace, results, *, index_auditor=None):
+def execute(workspace, results, *, index_auditor=None, fetch_brampton_featured=False,
+            featured_collector=None):
     root = Path(workspace).resolve()
     out = Path(results).resolve() / "COUNCIL_INTELLIGENCE_REVIEW"
     out.mkdir(parents=True, exist_ok=True)
@@ -94,6 +96,28 @@ def execute(workspace, results, *, index_auditor=None):
         }
         report["notices"].append("SOURCE_INDEX_AUDIT_FAILED")
 
+    # Separate first-party Brampton planning featured-application source.
+    # This does not require the operator's locally saved agenda PDFs; the
+    # public source is read only after explicit --fetch-brampton-featured
+    # on the MANUAL launcher and passes robots/DNS/source policy checks.
+    if fetch_brampton_featured:
+        try:
+            featured = (featured_collector or collect_featured)(
+                out / "BRAMPTON_FEATURED_PDC", fetch=True)
+            report["brampton_featured_public_applications"] = {
+                key: featured.get(key) for key in (
+                    "status", "cards_parsed", "commercial_keyword_cards_review_only",
+                    "newly_observed_cards_not_new_publications",
+                    "changed_cards_not_new_projects", "first_publications_verified",
+                    "paid_ai_calls", "failure_type")
+            }
+        except Exception as exc:
+            report["brampton_featured_public_applications"] = {
+                "status": "SOURCE_FAILURE_HELD",
+                "reason": type(exc).__name__, "verified_projects": 0}
+    else:
+        report["brampton_featured_public_applications"] = {
+            "status": "NOT_REQUESTED_IN_THIS_STAGE", "verified_projects": 0}
     try:
         documents, applications, permits, origin = _inputs(root)
     except (OSError, ValueError, TypeError, json.JSONDecodeError) as exc:
@@ -182,14 +206,18 @@ def main():
     cli = argparse.ArgumentParser(description=__doc__)
     cli.add_argument("--workspace", required=True)
     cli.add_argument("--results", required=True)
+    cli.add_argument("--fetch-brampton-featured", action="store_true",
+                     help="Bounded, robots-checked official Brampton featured planning cards")
     args = cli.parse_args()
-    report = execute(args.workspace, args.results)
+    report = execute(args.workspace, args.results,
+                     fetch_brampton_featured=args.fetch_brampton_featured)
     print(json.dumps({
         "status": report["status"],
         "documents_considered": report["documents_considered"],
         "documents_parsed": report["documents_parsed"],
         "mississauga_matching": report["mississauga_20_case_comparison"],
-        "paid_ai_usd": report["paid_ai_usd"]
+        "paid_ai_usd": report["paid_ai_usd"],
+        "brampton_featured": report["brampton_featured_public_applications"]
     }, indent=2))
 
 
