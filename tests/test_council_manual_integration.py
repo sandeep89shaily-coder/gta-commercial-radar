@@ -40,6 +40,46 @@ class CouncilManualIntegrationTests(unittest.TestCase):
             self.assertEqual(result["mississauga_20_case_comparison"]["cases_reviewed"], 0)
             self.assertTrue((results / "COUNCIL_INTELLIGENCE_REVIEW" / council.STATUS).is_file())
 
+    def test_brampton_gis_is_matched_against_saved_evidence_without_lead_promotion(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            calls = []
+            def gis(folder, fetch=False):
+                calls.append(("gis", fetch))
+                return {"status": "ALL_THREE_LAYERS_REVIEW_ONLY",
+                        "layers_complete": 3, "paid_ai_calls": 0}
+            def crosscheck(gis_folder, featured_folder, results, output):
+                calls.append(("match", gis_folder.name, results.name))
+                return {
+                    "status": "AUDIT_READY_COMPLETE_GIS_LAYERS",
+                    "gis_layers_complete": 3, "gis_current_rows": 250,
+                    "gis_unique_file_numbers": 225, "commercial_keyword_rows": 90,
+                    "exact_ids_in_saved_radar": 4,
+                    "exact_ids_in_private_investigation": 2,
+                    "exact_ids_in_private_top_ten": 0,
+                    "exact_ids_in_featured_pdc": 1,
+                    "cases_for_manual_audit": 20, "paid_ai_calls": 0,
+                    "publisher_first_publications_verified": 0,
+                    "buyers_verified": 0}
+            quiet = council.execute(
+                root, root/"GTA_RADAR_RESULTS", index_auditor=index_stub,
+                brampton_gis_collector=gis, brampton_reconciler=crosscheck)
+            self.assertEqual(calls, [])
+            self.assertEqual(quiet["brampton_gis_existing_radar_reconciliation"]["status"],
+                             "NOT_REQUESTED_HISTORICAL_REVIEW")
+            active = council.execute(
+                root, root/"GTA_RADAR_RESULTS", index_auditor=index_stub,
+                fetch_brampton_gis=True,
+                brampton_gis_collector=gis, brampton_reconciler=crosscheck)
+            self.assertEqual(calls, [
+                ("gis", True),
+                ("match", "BRAMPTON_OFFICIAL_GIS_PLANNING", "GTA_RADAR_RESULTS")])
+            self.assertEqual(
+                active["brampton_gis_existing_radar_reconciliation"][
+                    "exact_ids_in_private_investigation"], 2)
+            self.assertEqual(active["commercial_buyers_verified"], 0)
+            self.assertEqual(active["paid_ai_usd"], 0)
+
     def test_brampton_actual_public_planning_layers_are_manual_only(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

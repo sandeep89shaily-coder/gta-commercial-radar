@@ -18,6 +18,7 @@ from gta_mississauga_pdc_agenda import run as mississauga_items, OUT as MISS_CSV
 from gta_agenda_application_permit_20_case import run as compare_20
 from gta_brampton_featured_pdc import run as collect_featured
 from gta_brampton_official_gis_planning import run as collect_brampton_official_gis
+from gta_brampton_gis_radar_reconciliation import run as reconcile_brampton_gis
 from gta_mississauga_discovered_pdc_run import run as collect_mississauga_discovered
 from gta_toronto_tmmis_authorized_agendas import run as fetch_toronto_agendas
 from toronto_tmmis_documents import agenda_url
@@ -86,7 +87,8 @@ def execute(workspace, results, *, index_auditor=None, fetch_brampton_featured=F
             fetch_toronto_schedule=False, schedule_collector=None,
             agenda_bridge_collector=None,
             fetch_toronto_planning_notices=False, planning_notices_collector=None,
-            fetch_brampton_gis=False, brampton_gis_collector=None):
+            fetch_brampton_gis=False, brampton_gis_collector=None,
+            brampton_reconciler=None):
     root = Path(workspace).resolve()
     out = Path(results).resolve() / "COUNCIL_INTELLIGENCE_REVIEW"
     out.mkdir(parents=True, exist_ok=True)
@@ -171,6 +173,41 @@ def execute(workspace, results, *, index_auditor=None, fetch_brampton_featured=F
     else:
         report["brampton_featured_public_applications"] = {
             "status": "NOT_REQUESTED_IN_THIS_STAGE", "verified_projects": 0}
+    # Reconcile exact original Brampton case numbers against saved Radar
+    # investigation evidence. This is offline and never promotes buyer/leads.
+    # Historical --skip-collection does not reuse yesterday's GIS status.
+    if fetch_brampton_gis:
+        try:
+            matched = (brampton_reconciler or reconcile_brampton_gis)(
+                out / "BRAMPTON_OFFICIAL_GIS_PLANNING",
+                out / "BRAMPTON_FEATURED_PDC",
+                Path(results).resolve(),
+                out / "BRAMPTON_GIS_CROSS_SOURCE_REVIEW")
+            report["brampton_gis_existing_radar_reconciliation"] = {
+                key: matched.get(key) for key in (
+                    "status", "gis_layers_complete", "gis_current_rows",
+                    "gis_unique_file_numbers", "commercial_keyword_rows",
+                    "exact_ids_in_saved_radar",
+                    "exact_ids_in_private_investigation",
+                    "exact_ids_in_private_top_ten",
+                    "exact_ids_in_featured_pdc", "cases_for_manual_audit",
+                    "saved_radar_source_health",
+                    "publisher_first_publications_verified",
+                    "buyers_verified", "paid_ai_calls", "error_type")
+            }
+            if not str(matched.get("status", "")).startswith("AUDIT_READY_"):
+                report["notices"].append("BRAMPTON_GIS_CROSS_SOURCE_REVIEW_HELD")
+        except Exception as exc:
+            report["brampton_gis_existing_radar_reconciliation"] = {
+                "status": "RECONCILIATION_EXCEPTION_HELD",
+                "error_type": type(exc).__name__,
+                "cases_for_manual_audit": 0}
+            report["notices"].append("BRAMPTON_GIS_RECONCILIATION_FAILED")
+    else:
+        report["brampton_gis_existing_radar_reconciliation"] = {
+            "status": "NOT_REQUESTED_HISTORICAL_REVIEW",
+            "cases_for_manual_audit": 0}
+
     try:
         documents, applications, permits, origin = _inputs(root)
     except (OSError, ValueError, TypeError, json.JSONDecodeError) as exc:
@@ -433,7 +470,8 @@ def main():
         "toronto_official_meeting_schedule": report["toronto_official_meeting_schedule"],
         "toronto_schedule_to_agenda_item_link": report["toronto_schedule_to_agenda_item_link"],
         "toronto_official_planning_notices": report["toronto_official_planning_notices"],
-        "brampton_official_gis_planning": report["brampton_official_gis_planning"]
+        "brampton_official_gis_planning": report["brampton_official_gis_planning"],
+        "brampton_gis_existing_radar_reconciliation": report["brampton_gis_existing_radar_reconciliation"]
     }, indent=2))
 
 

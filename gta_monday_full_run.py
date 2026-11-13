@@ -196,6 +196,8 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
                     "brampton_featured_public_applications", {})
                 report["council_review_diagnostics"]["brampton_official_gis_planning"] = council_data.get(
                     "brampton_official_gis_planning", {})
+                report["council_review_diagnostics"]["brampton_gis_existing_radar_reconciliation"] = council_data.get(
+                    "brampton_gis_existing_radar_reconciliation", {})
                 report["council_review_diagnostics"]["mississauga_discovered_pdc"] = council_data.get(
                     "mississauga_discovered_pdc", {})
                 report["council_review_diagnostics"]["toronto_exact_agenda_retrieval"] = council_data.get(
