@@ -1,5 +1,6 @@
 """Offline acceptance for Datum-inspired meeting document discovery checks."""
 import csv
+import unittest
 import datetime as dt
 import json
 
@@ -19,7 +20,7 @@ def rows(folder):
         return list(csv.DictReader(handle))
 
 
-def test_initial_baseline_never_claims_new_publication(tmp_path):
+def check_initial_baseline_never_claims_new_publication(tmp_path):
     html = html_for(("/agenda-2026-11-12.pdf", "Planning staff report 2026 industrial development"))
     status = run("Brampton", tmp_path, fetch=lambda _: html, now=NOW)
     assert status["status"] == "INDEX_LINK_BASELINE_ONLY"
@@ -30,7 +31,7 @@ def test_initial_baseline_never_claims_new_publication(tmp_path):
     assert rows(tmp_path)[0]["source_content_checked"] == "false"
 
 
-def test_new_link_and_title_change_are_not_project_events(tmp_path):
+def check_new_link_and_title_change_are_not_project_events(tmp_path):
     one = ("/agenda-2026-11-12.pdf", "Planning staff report 2026 industrial development")
     two = ("/minutes-2026-11-13.pdf", "Planning committee minutes 2026")
     run("Toronto", tmp_path, fetch=lambda _: html_for(one), now=NOW)
@@ -46,7 +47,7 @@ def test_new_link_and_title_change_are_not_project_events(tmp_path):
     assert all(not r["publication_date"] for r in rows(tmp_path))
 
 
-def test_blocked_source_keeps_prior_evidence_and_no_false_zero(tmp_path):
+def check_blocked_source_keeps_prior_evidence_and_no_false_zero(tmp_path):
     run("Brampton", tmp_path, fetch=lambda _: html_for(
         ("/agenda-2026-11-12.pdf", "Planning report 2026 industrial")), now=NOW)
     prior = (tmp_path / LEDGER).read_bytes()
@@ -59,7 +60,7 @@ def test_blocked_source_keeps_prior_evidence_and_no_false_zero(tmp_path):
     assert (tmp_path / LEDGER).read_bytes() == prior
 
 
-def test_missing_link_is_retained_without_removal_claim(tmp_path):
+def check_missing_link_is_retained_without_removal_claim(tmp_path):
     first = ("/agenda-2026-11-12.pdf", "Planning report 2026 industrial")
     run("Toronto", tmp_path, fetch=lambda _: html_for(first), now=NOW)
     result = run("Toronto", tmp_path, fetch=lambda _: "<html></html>",
@@ -70,8 +71,24 @@ def test_missing_link_is_retained_without_removal_claim(tmp_path):
     assert rows(tmp_path) == []
 
 
-def test_invalid_city_refuses_unknown_public_source(tmp_path):
-    import pytest
-    with pytest.raises(ValueError):
+def check_invalid_city_refuses_unknown_public_source(tmp_path):
+    try:
         run("Imaginary City", tmp_path, now=NOW)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("Unknown city was accepted")
     assert not (tmp_path / LEDGER).exists()
+
+
+class CouncilDocumentDeltaTests(unittest.TestCase):
+    def test_baseline_and_observations(self):
+        from tempfile import TemporaryDirectory
+        from pathlib import Path
+        for case in (check_initial_baseline_never_claims_new_publication,
+                     check_new_link_and_title_change_are_not_project_events,
+                     check_blocked_source_keeps_prior_evidence_and_no_false_zero,
+                     check_missing_link_is_retained_without_removal_claim,
+                     check_invalid_city_refuses_unknown_public_source):
+            with self.subTest(case=case.__name__), TemporaryDirectory() as directory:
+                case(Path(directory))
