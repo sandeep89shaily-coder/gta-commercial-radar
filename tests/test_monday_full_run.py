@@ -27,11 +27,13 @@ class MondayIntegrationTests(unittest.TestCase):
                                  if name == "council_agenda_intelligence")
             self.assertIn("--fetch-brampton-featured", council_stage)
             self.assertIn("--fetch-mississauga-pdc", council_stage)
+            self.assertIn("--fetch-toronto-official-agendas", council_stage)
             history_stage = next(args for name, args, _ in monday.stages(
                 ws, ws / "GTA_RADAR_RESULTS", skip_collection=True)
                 if name == "council_agenda_intelligence")
             self.assertNotIn("--fetch-brampton-featured", history_stage)
             self.assertNotIn("--fetch-mississauga-pdc", history_stage)
+            self.assertNotIn("--fetch-toronto-official-agendas", history_stage)
             self.assertNotIn("--paid", stages[-1][1])
             self.assertNotIn("--fetch", stages[-3][1])
             self.assertNotIn("--live-ckan", stages[-3][1])
