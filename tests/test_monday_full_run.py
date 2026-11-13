@@ -26,6 +26,7 @@ class MondayIntegrationTests(unittest.TestCase):
             council_stage = next(args for name, args, _ in stages
                                  if name == "council_agenda_intelligence")
             self.assertIn("--fetch-brampton-featured", council_stage)
+            self.assertIn("--fetch-brampton-official-gis", council_stage)
             self.assertIn("--fetch-mississauga-pdc", council_stage)
             self.assertIn("--fetch-toronto-official-agendas", council_stage)
             self.assertIn("--fetch-toronto-schedule", council_stage)
@@ -34,6 +35,7 @@ class MondayIntegrationTests(unittest.TestCase):
                 ws, ws / "GTA_RADAR_RESULTS", skip_collection=True)
                 if name == "council_agenda_intelligence")
             self.assertNotIn("--fetch-brampton-featured", history_stage)
+            self.assertNotIn("--fetch-brampton-official-gis", history_stage)
             self.assertNotIn("--fetch-mississauga-pdc", history_stage)
             self.assertNotIn("--fetch-toronto-official-agendas", history_stage)
             self.assertNotIn("--fetch-toronto-schedule", history_stage)
