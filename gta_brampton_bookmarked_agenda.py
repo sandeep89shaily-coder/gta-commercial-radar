@@ -58,10 +58,14 @@ def _outline(reader):
     def walk(nodes, ancestors, depth):
         if depth > MAX_DEPTH:
             raise ValueError("OUTLINE_DEPTH_LIMIT")
+        last_title = None
         for node in nodes:
             if isinstance(node, list):
-                # A nested list belongs to the preceding bookmark.
-                walk(node, ancestors + (rows[-1]["title"],) if rows else ancestors, depth + 1)
+                # pypdf nests children after their parent: never borrow a
+                # bookmark title from another branch or preceding sibling.
+                if last_title is None:
+                    raise ValueError("ORPHANED_OUTLINE_CHILDREN")
+                walk(node, ancestors + (last_title,), depth + 1)
                 continue
             if len(rows) >= MAX_BOOKMARKS:
                 raise ValueError("OUTLINE_BOOKMARK_LIMIT")
@@ -74,6 +78,7 @@ def _outline(reader):
                 raise ValueError("UNRESOLVABLE_BOOKMARK_DESTINATION") from exc
             if not isinstance(page, int) or not 0 <= page < len(reader.pages):
                 raise ValueError("BOOKMARK_PAGE_OUT_OF_RANGE")
+            last_title = title
             rows.append(dict(title=title, page=page + 1, depth=depth,
                              path=" / ".join((*ancestors, title))[:900]))
     walk(reader.outline, (), 0)
