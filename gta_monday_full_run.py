@@ -33,6 +33,8 @@ def stages(workspace, results, *, industrial_limit=10, skip_collection=False):
                                "--workspace", ws, "--results", out], False),
         ("toronto_20_source_research", ["gta_toronto_20_commercial_review.py",
                                        "--out", str(results / "TORONTO_20_COMMERCIAL_REVIEW")], False),
+        ("council_agenda_intelligence", ["gta_council_integrated_manual.py",
+                                         "--workspace", ws, "--results", out], False),
         ("ai_harness_free", ["gta_agent_harness.py",
                              "--results", out], False),
     ]
