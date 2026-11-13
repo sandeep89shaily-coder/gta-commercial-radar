@@ -93,6 +93,26 @@ class Linkage20Tests(unittest.TestCase):
         self.assertEqual(compare(self.agenda, self.app, self.permit*2)[0]["hold_reason"],
                          "AMBIGUOUS_PERMIT_MATCH")
 
+    def test_multi_agenda_csv_batch_deduplicates_exact_item(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            files = []
+            for i in range(3):
+                file = root / ("agenda_" + str(i) + ".csv")
+                row = dict(self.agenda[0])
+                if i == 2:
+                    row["item_number"] = "6.2"
+                    row["application_id"] = "OZ 25-20 W1"
+                with file.open("w", newline="", encoding="utf-8") as output:
+                    writer = csv.DictWriter(output, fieldnames=row.keys())
+                    writer.writeheader()
+                    writer.writerow(row)
+                files.append(file)
+            result = compare_run(files, None, None, root / "batch", 20)
+            self.assertEqual(result["cases_reviewed"], 2)
+            self.assertEqual(result["missing_case_count"], 18)
+            self.assertEqual(result["three_source_identity_review_candidates"], 0)
+
     def test_twenty_case_no_fabrication_with_missing_exports(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
