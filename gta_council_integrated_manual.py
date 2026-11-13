@@ -23,6 +23,7 @@ from toronto_tmmis_documents import agenda_url
 from gta_toronto_official_schedule import run as collect_toronto_schedule
 from gta_toronto_schedule_tmmis_bridge import run as collect_toronto_schedule_agenda_items
 from gta_toronto_official_schedule import RESULTS_CSV as TORONTO_SCHEDULE_CSV
+from gta_toronto_official_planning_notices import run as collect_toronto_planning_notices
 
 CONFIG = "GTA_RADAR_COUNCIL_INPUTS.json"
 STATUS = "COUNCIL_INTEGRATED_REVIEW_STATUS.json"
@@ -82,7 +83,8 @@ def execute(workspace, results, *, index_auditor=None, fetch_brampton_featured=F
             mississauga_discovered_collector=None,
             fetch_toronto_official_agendas=False, toronto_fetcher=None,
             fetch_toronto_schedule=False, schedule_collector=None,
-            agenda_bridge_collector=None):
+            agenda_bridge_collector=None,
+            fetch_toronto_planning_notices=False, planning_notices_collector=None):
     root = Path(workspace).resolve()
     out = Path(results).resolve() / "COUNCIL_INTELLIGENCE_REVIEW"
     out.mkdir(parents=True, exist_ok=True)
@@ -224,6 +226,37 @@ def execute(workspace, results, *, index_auditor=None, fetch_brampton_featured=F
         report["mississauga_discovered_pdc"] = {
             "status": "NOT_REQUESTED", "captured_pdfs": 0}
 
+    # Source-level Toronto Planning Act notices. The City's Notice Date is
+    # explicit evidence, not original first-publication proof. Staff contacts
+    # are municipal information contacts, never commercial purchasing leads.
+    if fetch_toronto_planning_notices:
+        try:
+            notices = (planning_notices_collector or collect_toronto_planning_notices)(
+                out / "TORONTO_OFFICIAL_PLANNING_NOTICES", fetch=True)
+            report["toronto_official_planning_notices"] = {
+                key: notices.get(key) for key in (
+                    "status", "index_planning_notices", "details_considered",
+                    "details_parsed_with_exact_application_id",
+                    "commercial_keyword_source_records_review_only",
+                    "unparsed_details_held", "first_local_observations",
+                    "source_notice_dates_recorded",
+                    "publisher_first_publication_dates_verified",
+                    "paid_ai_calls", "failure_type", "failure_reason")
+            }
+            if notices.get("status") not in (
+                    "OFFICIAL_NOTICE_DETAILS_REVIEW_ONLY",
+                    "PARTIAL_OFFICIAL_NOTICE_DETAILS_REVIEW_ONLY"):
+                report["notices"].append("TORONTO_OFFICIAL_PLANNING_NOTICE_SOURCE_GAP")
+        except Exception as exc:
+            report["toronto_official_planning_notices"] = {
+                "status": "SOURCE_FAILURE_HELD",
+                "failure_type": type(exc).__name__,
+                "details_parsed_with_exact_application_id": 0}
+            report["notices"].append("TORONTO_OFFICIAL_PLANNING_NOTICE_SOURCE_FAILURE")
+    else:
+        report["toronto_official_planning_notices"] = {
+            "status": "NOT_REQUESTED", "details_parsed_with_exact_application_id": 0}
+
     # Toronto City Clerk official open-data meeting schedule: upstream
     # meeting-date inventory, *not* dynamic agenda or project discovery.
     scheduled = None
@@ -340,6 +373,8 @@ def main():
     cli = argparse.ArgumentParser(description=__doc__)
     cli.add_argument("--workspace", required=True)
     cli.add_argument("--results", required=True)
+    cli.add_argument("--fetch-toronto-planning-notices", action="store_true",
+                     help="Bounded City of Toronto official Planning Act current notices")
     cli.add_argument("--fetch-toronto-schedule", action="store_true",
                      help="Bounded public Toronto City Clerk schedule CSV source check")
     cli.add_argument("--fetch-toronto-official-agendas", action="store_true",
@@ -353,7 +388,8 @@ def main():
                      fetch_brampton_featured=args.fetch_brampton_featured,
                      fetch_mississauga_pdc=args.fetch_mississauga_pdc,
                      fetch_toronto_official_agendas=args.fetch_toronto_official_agendas,
-                     fetch_toronto_schedule=args.fetch_toronto_schedule)
+                     fetch_toronto_schedule=args.fetch_toronto_schedule,
+                     fetch_toronto_planning_notices=args.fetch_toronto_planning_notices)
     print(json.dumps({
         "status": report["status"],
         "documents_considered": report["documents_considered"],
@@ -364,7 +400,8 @@ def main():
         "mississauga_discovered_pdc": report["mississauga_discovered_pdc"],
         "toronto_exact_agenda_retrieval": report["toronto_exact_agenda_retrieval"],
         "toronto_official_meeting_schedule": report["toronto_official_meeting_schedule"],
-        "toronto_schedule_to_agenda_item_link": report["toronto_schedule_to_agenda_item_link"]
+        "toronto_schedule_to_agenda_item_link": report["toronto_schedule_to_agenda_item_link"],
+        "toronto_official_planning_notices": report["toronto_official_planning_notices"]
     }, indent=2))
 
 
