@@ -96,8 +96,7 @@ def run(city, results, *, fetch=None, now=None):
         # A parser/schema error must not be misreported as zero agenda items.
         return _status_only(folder, city, "DISCOVERY_FAILED", at,
                             type(exc).__name__ + ": " + str(exc)[:160])
-    baseline = not ledger_path.exists()
-    retained = dict(before)
+    # Each municipality must have its own baseline even when the shared ledger\n    # already contains another city. A second city is not a new publication.\n    previous_city = {key: item for key, item in before.items()\n                     if item.get("city") == city}\n    baseline = not previous_city\n    retained = dict(before)
     changed = []
     newly_observed = 0
     renamed = 0
@@ -132,7 +131,7 @@ def run(city, results, *, fetch=None, now=None):
     temp = ledger_path.with_suffix(".json.tmp")
     temp.write_text(json.dumps(ledger, indent=2), encoding="utf-8")
     temp.replace(ledger_path)
-    _write_csv(folder / EVENTS, changed)
+    _write_csv(folder / EVENTS, changed)\n    # Per-city snapshots avoid one city overwriting another during sequential runs.\n    # Retain existing filenames for compatibility with single-city consumers.\n    _write_csv(folder / (city.upper() + "_" + EVENTS), changed)
     summary = {
         "city": city, "checked_utc": at,
         "status": "INDEX_LINK_BASELINE_ONLY" if baseline else "INDEX_LINK_DELTA_REVIEW_ONLY",
@@ -141,12 +140,12 @@ def run(city, results, *, fetch=None, now=None):
         "first_observed_links": newly_observed,
         "changed_link_titles": renamed,
         "historical_links_retained": len(retained),
-        "links_missing_from_current_index_not_removed": len(set(before) - set(newest)),
+        "links_missing_from_current_index_not_removed": len(set(previous_city) - set(newest)),
         "new_publications_verified": 0, "actual_document_contents_retrieved": 0,
         "verified_projects": 0, "buyer_or_procurement_verified": 0,
         "warning": "First observed is not first published. Index links and title edits are not project approvals. Read exact linked agenda/staff report separately, subject to source permissions."
     }
-    (folder / STATUS).write_text(json.dumps(summary, indent=2), encoding="utf-8")
+    (folder / STATUS).write_text(json.dumps(summary, indent=2), encoding="utf-8")\n    (folder / (city.upper() + "_" + STATUS)).write_text(\n        json.dumps(summary, indent=2), encoding="utf-8")
     return summary
 
 
@@ -157,7 +156,7 @@ def _status_only(folder, city, source_state, at, explanation):
         "new_publications_verified": 0, "verified_projects": 0,
         "warning": "No assertion of empty/no-new municipal agenda documents."
     }
-    (folder / STATUS).write_text(json.dumps(result, indent=2), encoding="utf-8")
+    (folder / STATUS).write_text(json.dumps(result, indent=2), encoding="utf-8")\n    (folder / (city.upper() + "_" + STATUS)).write_text(\n        json.dumps(result, indent=2), encoding="utf-8")
     return result
 
 
