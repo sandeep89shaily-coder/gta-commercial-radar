@@ -76,7 +76,7 @@ def test_november_reported_sites_suppressed_across_days_and_postal_suffix(tmp_pa
     assert all(row["procurement_status"]=="UNKNOWN_NOT_VERIFIED_UNAWARDED" for row in top)
     assert all("PROJECT_ASSIGNED" not in row["contact_status"] for row in top)
     assert len(_read(tmp_path,CLIENT_EXCLUDED))==3
-    assert "Non-repeating" not in (tmp_path/CLIENT_HTML).read_text()  # no false claim of newly published
+    assert "NOT proof of a new" in (tmp_path/CLIENT_HTML).read_text()
 
 
 def test_fresh_modest_project_beats_huge_old_investment(tmp_path):
