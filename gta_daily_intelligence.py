@@ -214,6 +214,7 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
     from gta_regional_document_evidence import run as regional_document_default
     from gta_regional_commercial_review import run as regional_review_default
     from gta_opportunity_lanes import run as opportunity_lanes_default
+    from gta_client_freshness import run as client_freshness_default
     from gta_five_city_application_recovery import run as five_city_default
     from gta_ggh_early_planning import run as ggh_expansion_default
     from gta_next_four_municipalities import run as next_four_default
@@ -483,6 +484,12 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
          "government_changes_to_verify","government_open_tenders_verified",
          "private_top_city_distribution","private_top_region_distribution",
          "private_selection_rule","warning")}
+    client_fresh=step("source_dated_freshness_first_nonrepeating_client_review",
+        lambda:client_freshness_default(root,today=today),required=False)
+    state["fresh_nonrepeating_client_review"]={k:client_fresh.get(k) for k in
+        ("status","top_count","eligible_recent_unreported","source_date_last_7_days",
+         "verified_original_publications","projects_excluded_previously_reported",
+         "region_distribution","source_date_warning","no_padding_policy")}
 
     docdir = review / "TORONTO_DOCUMENTS"
     docdir.mkdir(parents=True, exist_ok=True)
@@ -763,6 +770,9 @@ def integrate(results, *, today=None, meeting_pipeline=None, document_discover=N
         "<a href='GTA_RADAR_STRUCTURED_APPLICATIONS_TORONTO_BRAMPTON.csv'>Toronto/Brampton official structured application baseline</a> · "
         "<a href='GTA_RADAR_STRUCTURED_APPLICATION_SOURCE_STATUS.json'>Toronto/Brampton GIS source status</a> · "
         "<a href='GTA_RADAR_MARKHAM_CIRCULATED_APPLICATIONS.csv'>Markham dated circulation applications</a> · "
+        "<a href='GTA_RADAR_CLIENT_FRESHNESS_REVIEW.html'>Freshness-first, non-repeating client research (new)</a> · "
+        "<a href='GTA_RADAR_CLIENT_FRESH_NONREPEAT_TOP_10.csv'>Client research shortlist CSV</a> · "
+        "<a href='GTA_RADAR_CLIENT_PREVIOUSLY_REPORTED.csv'>Prior report exclusion audit</a> · "
         "<a href='GTA_RADAR_CITY_COVERAGE_AUDIT.csv'>Measured coverage by city (not configured links)</a> · "
         "<a href='GTA_RADAR_MUNICIPAL_RECOVERY_SCORECARD.csv'>Municipality source failures, qualifications and recovery actions</a> · "
         "<a href='GTA_RADAR_MUNICIPAL_RECOVERY_STATUS.json'>Source readiness diagnostic</a> · "
