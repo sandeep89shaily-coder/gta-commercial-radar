@@ -15,6 +15,7 @@ from pathlib import Path
 EXTENSIONS={".csv",".json",".html",".pdf",".txt"}
 FOLDERS={
     "MONDAY_FULL_RADAR",
+    "COUNCIL_INTELLIGENCE_REVIEW",
     "INDUSTRIAL_PILOT",
     "COMMERCIAL_ACTIVATION_PILOT",
     "PRIORITY_3_4_ACCEPTANCE_PACK",
