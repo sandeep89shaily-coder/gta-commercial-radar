@@ -55,7 +55,7 @@ class DeepSeekFirstResearchTests(unittest.TestCase):
 
     def test_exhausted_budget_suppresses_paid_calls(self):
         self.db.execute("INSERT INTO spends VALUES (?,?,?,?,?)",
-                        (self.day,'prior',0.995,0.995,'DONE'))
+                        (self.day,'prior',v5.DAILY_BUDGET-0.001,v5.DAILY_BUDGET-0.001,'DONE'))
         self.db.commit()
         result=plan.research(self.row,'demo-secret',self.db,self.day,
                              post=lambda *_:self.fail('Exceeded budget'))
