@@ -107,6 +107,8 @@ def compare(agenda, applications=None, permits=None, limit=20):
         }
         if not city or not aid or not address[0] or not _url(base["agenda_source_url"]):
             base["hold_reason"] = "AGENDA_ID_ADDRESS_OR_ORIGIN_MISSING"
+        elif not re.fullmatch(r"[0-9a-fA-F]{64}", base["agenda_pdf_sha256"]):
+            base["hold_reason"] = "ACTUAL_AGENDA_PDF_SHA256_NOT_CAPTURED"
         elif applications is None:
             base["hold_reason"] = "APPLICATION_EXPORT_UNAVAILABLE"
         else:
