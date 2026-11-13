@@ -17,6 +17,7 @@ from gta_brampton_bookmarked_agenda import inspect as brampton_items
 from gta_mississauga_pdc_agenda import run as mississauga_items, OUT as MISS_CSV
 from gta_agenda_application_permit_20_case import run as compare_20
 from gta_brampton_featured_pdc import run as collect_featured
+from gta_mississauga_discovered_pdc_run import run as collect_mississauga_discovered
 
 CONFIG = "GTA_RADAR_COUNCIL_INPUTS.json"
 STATUS = "COUNCIL_INTEGRATED_REVIEW_STATUS.json"
@@ -59,7 +60,8 @@ def _inputs(workspace):
 
 
 def execute(workspace, results, *, index_auditor=None, fetch_brampton_featured=False,
-            featured_collector=None):
+            featured_collector=None, fetch_mississauga_pdc=False,
+            mississauga_discovered_collector=None):
     root = Path(workspace).resolve()
     out = Path(results).resolve() / "COUNCIL_INTELLIGENCE_REVIEW"
     out.mkdir(parents=True, exist_ok=True)
@@ -173,6 +175,34 @@ def execute(workspace, results, *, index_auditor=None, fetch_brampton_featured=F
             report["source_documents_failed"] += 1
         report["notices"].append(entry)
 
+    # Pass only actual, presently observed official PDC links through the
+    # explicit bounded robots-checked eSCRIBE PDF fetch path.
+    if fetch_mississauga_pdc:
+        try:
+            discovered = (mississauga_discovered_collector
+                          or collect_mississauga_discovered)(
+                out / "SOURCE_INDEX", out / "MISSISSAUGA_DISCOVERED_PDC", fetch=True)
+            report["mississauga_discovered_pdc"] = {
+                key: discovered.get(key) for key in (
+                    "status", "source_status", "eligible_pdc_links",
+                    "selected_for_fetch", "captured_pdfs", "parsed_agenda_pdfs",
+                    "paid_ai_calls", "fetch_statuses", "error_type")
+            }
+            mississauga_files.extend(Path(path) for path in
+                                     discovered.get("agenda_item_csvs", []))
+            if (discovered.get("status") not in (
+                    "EXTRACTED_REVIEW_ONLY",)
+                    and discovered.get("eligible_pdc_links", 0)):
+                report["source_documents_held"] += 1
+        except Exception as exc:
+            report["mississauga_discovered_pdc"] = {
+                "status": "SOURCE_FAILURE_HELD",
+                "reason": type(exc).__name__, "captured_pdfs": 0}
+            report["source_documents_held"] += 1
+    else:
+        report["mississauga_discovered_pdc"] = {
+            "status": "NOT_REQUESTED", "captured_pdfs": 0}
+
     # Do not call the identity join on a synthetic or absent agenda export.
     # A missing CSV is handled by the join itself, which explicitly reports HOLD.
     if mississauga_files:
@@ -206,18 +236,22 @@ def main():
     cli = argparse.ArgumentParser(description=__doc__)
     cli.add_argument("--workspace", required=True)
     cli.add_argument("--results", required=True)
+    cli.add_argument("--fetch-mississauga-pdc", action="store_true",
+                     help="Fetch only newly observed official PDC PDF links through robots gate")
     cli.add_argument("--fetch-brampton-featured", action="store_true",
                      help="Bounded, robots-checked official Brampton featured planning cards")
     args = cli.parse_args()
     report = execute(args.workspace, args.results,
-                     fetch_brampton_featured=args.fetch_brampton_featured)
+                     fetch_brampton_featured=args.fetch_brampton_featured,
+                     fetch_mississauga_pdc=args.fetch_mississauga_pdc)
     print(json.dumps({
         "status": report["status"],
         "documents_considered": report["documents_considered"],
         "documents_parsed": report["documents_parsed"],
         "mississauga_matching": report["mississauga_20_case_comparison"],
         "paid_ai_usd": report["paid_ai_usd"],
-        "brampton_featured": report["brampton_featured_public_applications"]
+        "brampton_featured": report["brampton_featured_public_applications"],
+        "mississauga_discovered_pdc": report["mississauga_discovered_pdc"]
     }, indent=2))
 
 
