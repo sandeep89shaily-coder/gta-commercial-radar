@@ -68,7 +68,7 @@ class NativeDeepseekTests(unittest.TestCase):
    self.assertEqual(rows[0]['status'],'AI_SOURCE_RECORD_REVIEW')
    self.assertEqual(rows[0]['contact'],'')
  def test_budget_enforced_before_search(self):
-  self.db.execute('INSERT INTO spends VALUES(?,?,?,?,?)',(self.day,'old',0.9995,None,'DONE'));self.db.commit()
+  self.db.execute('INSERT INTO spends VALUES(?,?,?,?,?)',(self.day,'old',mod.DAILY_LIMIT-0.0005,None,'DONE'));self.db.commit()
   self.assertFalse(mod.ledger_claim(self.db,self.day,'S8:another:0',mod.SEARCH_COST))
  def test_new_daily_ceiling_blocks_prior_excess(self):
   from radar_config import DEEPSEEK_DAILY_LIMIT_USD as CAP

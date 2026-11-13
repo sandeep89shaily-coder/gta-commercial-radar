@@ -273,7 +273,7 @@ def main():
     p.add_argument("--out", help="Separate harness review output folder")
     p.add_argument("--candidates", help="Optional explicit existing canonical CSV")
     p.add_argument("--paid", action="store_true",
-                   help="Explicitly authorize DeepSeek within existing US$0.25/day cap")
+                   help="Explicitly authorize DeepSeek within configured shared daily cap")
     p.add_argument("--max-projects", type=int, default=3)
     args = p.parse_args()
     try:

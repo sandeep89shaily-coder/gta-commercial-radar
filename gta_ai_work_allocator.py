@@ -6,6 +6,7 @@ source-supported uncertainty could change a lead's commercial viability.
 from __future__ import annotations
 import argparse,json
 from pathlib import Path
+from radar_config import DEEPSEEK_DAILY_LIMIT_USD
 
 STAGES=("SOURCE_EXTRACTION","PROJECT_RESOLUTION","BUYER_RELATIONSHIP",
         "PROCUREMENT_REVIEW","CONTRADICTION_CHECK")
@@ -29,7 +30,7 @@ def plan(candidate):
         add("CONTRADICTION_CHECK","Conflicting dates, roles or stages","Independent dated source quotations")
     return {"project_id":candidate.get("project_id"),"tasks":tasks,
             "ai_calls_executed":0,"verified_leads_created":0,
-            "budget_cap_usd_per_day":0.25,"production_promotion":False}
+            "budget_cap_usd_per_day":DEEPSEEK_DAILY_LIMIT_USD,"production_promotion":False}
 
 def main():
     p=argparse.ArgumentParser()

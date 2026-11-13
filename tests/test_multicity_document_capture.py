@@ -224,7 +224,7 @@ class MultiCityPDFTests(unittest.TestCase):
             self.assertTrue(all(r["canonical_project_match_status"]=="UNVERIFIED_NO_AUTO_MERGE"
                                 for r in register))
             self.assertTrue(all(r["verified_purchasing_authority"]=="False" for r in register))
-            self.assertEqual(result["deepseek_shared_ceiling_usd"],0.25)
+            self.assertEqual(result["deepseek_shared_ceiling_usd"],2.00)
             second=test.execute(multicity_capture=multicity)
             self.assertEqual(second["document_ai"]["status"],"NO_NEW_DOCUMENT_BYTES")
             self.assertEqual(second["persistent_document_project_candidates"],2)

@@ -91,10 +91,10 @@ class DurableResearchQueueTests(unittest.TestCase):
         export(self.source, [make_row(n) for n in range(3)])
         with closing(deepseek.v5._ledger(self.folder/'v5_ai_budget.sqlite')) as db:
             db.execute('INSERT INTO spends VALUES(?,?,?,?,?)',
-                       (FIXED.isoformat(), 'prior', 0.995, 0.995, 'DONE'))
+                       (FIXED.isoformat(), 'prior', deepseek.DAILY_LIMIT-0.001, deepseek.DAILY_LIMIT-0.001, 'DONE'))
             db.commit()
         def unexpected(*args):
-            self.fail('No provider calls permitted when the $1 cap is reached')
+            self.fail('No provider calls permitted when the shared daily cap is reached')
         state = deepseek.run(self.source, self.folder, key='test-only',
                              transport=unexpected, max_projects=0, today=FIXED)
         self.assertEqual(state['queue_stop_reason'], 'DAILY_USD_LIMIT')
@@ -170,16 +170,16 @@ class DurableResearchQueueTests(unittest.TestCase):
     def test_unknown_costs_still_hold_reservations_until_reconciled(self):
         with closing(deepseek.v5._ledger(self.folder/'v5_ai_budget.sqlite')) as db:
             db.execute('INSERT INTO spends VALUES(?,?,?,?,?)',
-                       (FIXED.isoformat(),'unknown-response',0.75,None,'ERROR'))
+                       (FIXED.isoformat(),'unknown-response',deepseek.DAILY_LIMIT-0.205,None,'ERROR'))
             db.execute('INSERT INTO spends VALUES(?,?,?,?,?)',
                        (FIXED.isoformat(),'done-with-no-usage',0.20,None,'DONE'))
             db.execute('INSERT INTO spends VALUES(?,?,?,?,?)',
                        (FIXED.isoformat(),'known-success',0.008,0.001,'DONE'))
             db.commit()
             effective,completed,unknown,nominal=deepseek.effective_spend(db,FIXED.isoformat())
-            self.assertAlmostEqual(effective,0.951)
+            self.assertAlmostEqual(effective,deepseek.DAILY_LIMIT-0.004)
             self.assertAlmostEqual(completed,0.001)
-            self.assertAlmostEqual(unknown,0.95)
+            self.assertAlmostEqual(unknown,deepseek.DAILY_LIMIT-0.005)
             self.assertFalse(deepseek.ledger_claim(db,FIXED.isoformat(),'too-large',0.05))
             self.assertFalse(deepseek.ledger_claim(db,FIXED.isoformat(),'small',0.01))
 

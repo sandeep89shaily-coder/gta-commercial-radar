@@ -171,7 +171,7 @@ class DailyIntegrationTests(unittest.TestCase):
     def test_daily_integrates_municipal_sources_doc_research_and_buyer_worklist(self):
         state=self.execute()
         self.assertEqual(state["status"],"INTEGRATED_REVIEW_READY")
-        self.assertEqual(state["deepseek_shared_ceiling_usd"],0.25)
+        self.assertEqual(state["deepseek_shared_ceiling_usd"],2.00)
         self.assertEqual(state["new_source_dated_project_candidates"],1)
         self.assertEqual(state["pdfs_captured_in_union"],1)
         self.assertEqual(state["meeting_documents_fetched_outside_toronto"],0)

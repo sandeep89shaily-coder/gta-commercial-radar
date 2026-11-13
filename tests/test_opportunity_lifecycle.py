@@ -156,7 +156,7 @@ class LifecycleTests(unittest.TestCase):
     def test_deepseek_budget_unchanged(self):
         from radar_config import DEEPSEEK_DAILY_LIMIT_USD as CAP
         self.assertEqual(native.DAILY_LIMIT,CAP)
-        self.assertEqual(CAP,0.25)
+        self.assertEqual(CAP,2.00)
 
 if __name__=='__main__':
     unittest.main()

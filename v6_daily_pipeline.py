@@ -616,13 +616,13 @@ def pipeline(workspace, database=None, *, run_collectors=True, run_research=True
             from commercial_lead_reports import build as build_commercial_reports
             state['lead_reports']=build_commercial_reports(out)
         else:
-            state['ai_mode']='SELECTIVE_USD_0_25' if selective_ai else 'OFF'
+            state['ai_mode']='SELECTIVE_USD_'+str(DAILY_CAP).replace('.', '_') if selective_ai else 'OFF'
             state['active_stage']='FREE_DAILY_RECORD_WATCH'
             from free_daily_report import build as build_free_daily, CSV_NAME
             state['free_daily_watch']=build_free_daily(projects,out,today=day)
             state['note']='Free municipal watch completed without DeepSeek calls.'
             if selective_ai:
-                state['active_stage']='SELECTIVE_DEEPSEEK_USD_0_25'
+                state['active_stage']='SELECTIVE_DEEPSEEK_USD_'+str(DAILY_CAP).replace('.', '_')
                 from selective_daily_ai import run as selective_run
                 if state['status']=='PARTIAL':
                     state['selective_ai']={'status':'COLLECTOR_PARTIAL_SKIP_PAID_AI',

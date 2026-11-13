@@ -1,4 +1,4 @@
-"""Regression tests: paid AI only for recent source events, max USD 0.25."""
+"""Regression tests: paid AI only for recent source events, configured shared daily budget."""
 from __future__ import annotations
 import csv
 import datetime as dt
@@ -103,7 +103,7 @@ class SelectiveDailyTests(unittest.TestCase):
                     source_keys="26-789012")
             save(p,[row(),new]);free_build(p,root,today=NOW+dt.timedelta(days=1))
             def stub(*args,**kwargs):
-                self.assertEqual(kwargs["budget_cap_usd"],0.25)
+                self.assertEqual(kwargs["budget_cap_usd"],selected.CAP_USD)
                 self.assertEqual(kwargs["eligible_project_ids"],{new["project_id"]})
                 self.assertLessEqual(kwargs["max_runtime_seconds"],600)
                 return dict(queue_stop_reason="QUEUE_DRAINED",ai_calls_attempted=0,
@@ -123,7 +123,7 @@ class SelectiveDailyTests(unittest.TestCase):
                 self.assertTrue(ai.ledger_claim(conn,today,"under",.010,0,daily_limit=.25))
                 self.assertFalse(ai.ledger_claim(conn,today,"over-again",.002,0,daily_limit=.25))
                 self.assertFalse(ai.ledger_claim(conn,today,"legacy-hold",.001,.02,daily_limit=.25))
-                self.assertFalse(ai.ledger_claim(conn,today,"lowered-global",.80,0,daily_limit=1.00))
+                self.assertFalse(ai.ledger_claim(conn,today,"global-ceiling",2.01,0,daily_limit=3.00))
             finally:conn.close()
 
     def test_schedule_uses_selective_flag_and_enables_previously_disabled_task(self):
@@ -157,12 +157,12 @@ class SelectiveDailyTests(unittest.TestCase):
                 calls.append("selector")
                 save(Path(out)/"CANDIDATES_V4_ALL_REVIEW_ONLY.csv",[row()])
             with patch("selective_daily_ai.run",return_value={"status":"NO_ELIGIBLE_NEW_PROJECTS",
-                       "paid_research_attempts":0,"daily_ceiling_usd":.25}) as fake_ai:
+                       "paid_research_attempts":0,"daily_ceiling_usd":selected.CAP_USD}) as fake_ai:
                 with patch("commercial_lead_reports.build",return_value={"qualified_investigation_candidates":0}):
                     state=v6.pipeline(workspace,db,collector=collector,selector=selector,
                                       run_research=False,selective_ai=True,today=NOW)
             self.assertEqual(state["status"],"SUCCESS")
-            self.assertEqual(state["ai_mode"],"SELECTIVE_USD_0_25")
+            self.assertEqual(state["ai_mode"],"SELECTIVE_USD_2_0")
             self.assertEqual(state["free_daily_watch"]["initial_baseline"],1)
             self.assertIn("selector",calls)
             fake_ai.assert_called_once()

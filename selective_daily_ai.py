@@ -16,8 +16,9 @@ from commercial_selector_v4 import (ACTION, COMMERCIAL, SMALL_RESIDENTIAL,
 from opportunity_lifecycle import classify_status
 from gta_freshness import assess as freshness_assess
 import v8_ai_queue as queue
+from radar_config import DEEPSEEK_DAILY_LIMIT_USD
 
-CAP_USD=0.25
+CAP_USD=DEEPSEEK_DAILY_LIMIT_USD
 PENDING="GTA_RADAR_SELECTIVE_AI_PENDING.csv"
 HISTORY="GTA_RADAR_V8_INVESTIGATIONS.csv"
 MIN_PRIORITY=35
