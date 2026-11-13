@@ -25,6 +25,16 @@ python gta_agenda_application_permit_20_case.py --agenda-csv "C:\RadarResearch\p
 ```
 Use actual official numeric DocumentId, not the illustrative placeholder. Input city/application/permit files must be genuine authorized source exports with the exact documented schema, not synthetically generated data. No network access or extra paid AI is initiated.
 
+## Explicit official eSCRIBE source capture
+
+The manual `gta_mississauga_pdc_authorized_fetch.py` adapter accepts up to five **exact original publicly referenced eSCRIBE DocumentId URLs** in one invocation. Without `--fetch` it performs **no network calls**. With `--fetch` it requires public DNS, permitted robots access, exact URL and host, no redirects, bounded size, PDF signature and valid PDF structure:
+
+```powershell
+python gta_mississauga_pdc_authorized_fetch.py --pdf-url "https://pub-mississauga.escribemeetings.com/FileStream.ashx?DocumentId=82234" "https://pub-mississauga.escribemeetings.com/FileStream.ashx?DocumentId=81898" --out "C:\RadarResearch\Mississauga" --fetch
+```
+
+It writes `MISSISSAUGA_PDC_EXPLICIT_FETCH_AUDIT.json` and isolated per-document PDF and item-review outputs. Source URLs shown are exact known City-published original documents, **not guesses**. Denials are recorded as holds, not empty data. Successful offline CI is not a live-network acceptance test. Commercial reuse permission and source publication dates require separate source evidence.
+
 ## Actual 20-case result and blockers
 
 **Independently verified 20 full agenda → application → permit chains: NOT YET ACHIEVED.** Public primary-source PDC agendas and a prior repository pilot containing 20 exact *Toronto permit* records exist, but the Toronto records are not Mississauga planning/permit identities and cannot be used as substitutes. The original local Radar historical ingestion ledger and a corresponding Mississauga permit export are not in GitHub, and no 20 exact-item agendas have been materialized, hashed and checked against actual application and permit records in this change.
