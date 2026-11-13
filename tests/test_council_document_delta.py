@@ -136,6 +136,8 @@ class CouncilDocumentDeltaTests(unittest.TestCase):
                      check_new_link_and_title_change_are_not_project_events,
                      check_blocked_source_keeps_prior_evidence_and_no_false_zero,
                      check_missing_link_is_retained_without_removal_claim,
-                     check_invalid_city_refuses_unknown_public_source,\n                     check_cities_have_independent_baselines_and_durable_outputs,\n                     check_three_city_manual_audit):
+                     check_invalid_city_refuses_unknown_public_source,
+                     check_cities_have_independent_baselines_and_durable_outputs,
+                     check_three_city_manual_audit):
             with self.subTest(case=case.__name__), TemporaryDirectory() as directory:
                 case(Path(directory))
