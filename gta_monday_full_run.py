@@ -23,6 +23,12 @@ INDEX = "MONDAY_FULL_RADAR_REPORT.html"
 
 def stages(workspace, results, *, industrial_limit=10, skip_collection=False):
     ws, out = str(workspace), str(results)
+    # A source fetch is allowed only within a true operator-initiated
+    # collection run, never a --skip-collection historical review.
+    council_args = ["gta_council_integrated_manual.py",
+                    "--workspace", ws, "--results", out]
+    if not skip_collection:
+        council_args.append("--fetch-brampton-featured")
     base = [
         ("daily_radar", ["gta_total_intelligence_run.py", "--workspace", ws], True),
         ("industrial_equipment", ["gta_industrial_equipment_run.py",
@@ -33,8 +39,7 @@ def stages(workspace, results, *, industrial_limit=10, skip_collection=False):
                                "--workspace", ws, "--results", out], False),
         ("toronto_20_source_research", ["gta_toronto_20_commercial_review.py",
                                        "--out", str(results / "TORONTO_20_COMMERCIAL_REVIEW")], False),
-        ("council_agenda_intelligence", ["gta_council_integrated_manual.py",
-                                         "--workspace", ws, "--results", out], False),
+        ("council_agenda_intelligence", council_args, False),
         ("ai_harness_free", ["gta_agent_harness.py",
                              "--results", out], False),
     ]
