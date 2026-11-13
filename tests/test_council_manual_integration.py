@@ -67,6 +67,38 @@ class CouncilManualIntegrationTests(unittest.TestCase):
             self.assertEqual(active["publisher_first_publications_verified"], 0)
             self.assertEqual(active["paid_ai_usd"], 0)
 
+    def test_official_toronto_schedule_does_not_claim_agenda_or_project(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            called = []
+            def fake_schedule(folder, fetch=False):
+                called.append(fetch)
+                return {
+                    "status": "RECENT_SCHEDULE_REVIEW_ONLY",
+                    "schedule_rows_read": 1445, "recent_scheduled_meetings": 4,
+                    "high_priority_committee_meetings": 2,
+                    "agenda_urls_discovered": 0,
+                    "publisher_first_publications_verified": 0,
+                    "paid_ai_calls": 0
+                }
+            baseline = council.execute(root, root / "GTA_RADAR_RESULTS",
+                                       index_auditor=index_stub,
+                                       schedule_collector=fake_schedule)
+            self.assertEqual(called, [])
+            self.assertEqual(
+                baseline["toronto_official_meeting_schedule"]["status"], "NOT_REQUESTED")
+            result = council.execute(root, root / "GTA_RADAR_RESULTS",
+                                     index_auditor=index_stub,
+                                     fetch_toronto_schedule=True,
+                                     schedule_collector=fake_schedule)
+            self.assertEqual(called, [True])
+            self.assertEqual(
+                result["toronto_official_meeting_schedule"]["recent_scheduled_meetings"], 4)
+            self.assertEqual(
+                result["toronto_official_meeting_schedule"]["agenda_urls_discovered"], 0)
+            self.assertEqual(result["publisher_first_publications_verified"], 0)
+            self.assertEqual(result["paid_ai_usd"], 0)
+
     def test_exact_toronto_agenda_urls_use_manual_source_manifest(self):
         with tempfile.TemporaryDirectory() as temp:
             root=Path(temp)
