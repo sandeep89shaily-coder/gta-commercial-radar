@@ -31,6 +31,7 @@ def stages(workspace, results, *, industrial_limit=10, skip_collection=False):
         council_args.append("--fetch-brampton-featured")
         council_args.append("--fetch-brampton-official-gis")
         council_args.append("--fetch-mississauga-pdc")
+        council_args.append("--fetch-mississauga-official-gis")
         council_args.append("--fetch-toronto-official-agendas")
         council_args.append("--fetch-toronto-schedule")
         council_args.append("--fetch-toronto-planning-notices")
