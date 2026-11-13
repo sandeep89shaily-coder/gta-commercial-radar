@@ -81,6 +81,53 @@ def check_invalid_city_refuses_unknown_public_source(tmp_path):
     assert not (tmp_path / LEDGER).exists()
 
 
+def check_cities_have_independent_baselines_and_durable_outputs(tmp_path):
+    sites = (
+        ("Brampton", ("/agenda-2026-11-12.pdf", "Planning staff report 2026 industrial")),
+        ("Mississauga", ("/minutes-2026-11-13.pdf", "Planning committee minutes 2026")),
+        ("Toronto", ("/agenda-2026-11-14.pdf", "Planning council agenda 2026")),
+    )
+    for city, link in sites:
+        result = run(city, tmp_path, fetch=lambda _, item=link: html_for(item), now=NOW)
+        assert result["status"] == "INDEX_LINK_BASELINE_ONLY"
+        assert result["first_observed_links"] == 0
+        assert result["links_missing_from_current_index_not_removed"] == 0
+        assert (tmp_path / (city.upper() + "_" + EVENTS)).exists()
+        assert (tmp_path / (city.upper() + "_" + STATUS)).exists()
+    saved = json.loads((tmp_path / LEDGER).read_text(encoding="utf-8"))
+    assert len(saved["items"]) == 3
+    second = run("Mississauga", tmp_path,
+                 fetch=lambda _: html_for(sites[1][1],
+                                           ("/agenda-2026-11-15.pdf", "Planning staff report 2026 new warehouse")),
+                 now=NOW + dt.timedelta(days=1))
+    assert second["status"] == "INDEX_LINK_DELTA_REVIEW_ONLY"
+    assert second["first_observed_links"] == 1
+    assert second["links_missing_from_current_index_not_removed"] == 0
+    assert len(rows(tmp_path)) == 1
+    with (tmp_path / ("BRAMPTON_" + EVENTS)).open(encoding="utf-8-sig", newline="") as handle:
+        assert len(list(csv.DictReader(handle))) == 1
+
+
+def check_three_city_manual_audit(tmp_path):
+    from gta_three_city_council_audit import audit, STATUS as AUDIT_STATUS
+    from municipal_meeting_capture import OFFICIAL
+    def fetch_for(city):
+        def fetch(url):
+            assert url == OFFICIAL[city]
+            return html_for(("/agenda-2026-11-12.pdf", "Planning staff report 2026 industrial"))
+        return fetch
+    result = audit(tmp_path, fetch_by_city={
+        city: fetch_for(city) for city in ("Brampton", "Mississauga", "Toronto")
+    }, now=NOW)
+    assert result["cities_checked"] == 3
+    assert result["index_link_collections"] == 3
+    assert result["deepseek_spend_usd"] == 0
+    assert all(item["status"] == "INDEX_LINK_BASELINE_ONLY" for item in result["cities"])
+    assert (tmp_path / AUDIT_STATUS).is_file()
+    saved = json.loads((tmp_path / LEDGER).read_text(encoding="utf-8"))
+    assert len(saved["items"]) == 3
+
+
 class CouncilDocumentDeltaTests(unittest.TestCase):
     def test_baseline_and_observations(self):
         from tempfile import TemporaryDirectory
@@ -89,6 +136,8 @@ class CouncilDocumentDeltaTests(unittest.TestCase):
                      check_new_link_and_title_change_are_not_project_events,
                      check_blocked_source_keeps_prior_evidence_and_no_false_zero,
                      check_missing_link_is_retained_without_removal_claim,
-                     check_invalid_city_refuses_unknown_public_source):
+                     check_invalid_city_refuses_unknown_public_source,
+                     check_cities_have_independent_baselines_and_durable_outputs,
+                     check_three_city_manual_audit):
             with self.subTest(case=case.__name__), TemporaryDirectory() as directory:
                 case(Path(directory))
