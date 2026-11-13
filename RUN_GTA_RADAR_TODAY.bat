@@ -13,8 +13,8 @@ echo  GTA RADAR - ONE MANUAL FULL RUN TODAY
 echo =============================================================
 echo 1. Fast-forward installed CODE to verified GitHub main (only if safe).
 echo 2. Run original Radar collection ONCE and shared capped AI.
-echo 3. Run industrial, activation, facility, Toronto, free AI harness pilots.
-echo 4. Preserve dated results ZIP for upload and evidence review.
+echo 3. Run industrial, activation, facility, Toronto and council-item pilots.
+echo 4. Include Brampton, Toronto and Mississauga council review outputs.\necho 5. Preserve dated results ZIP for upload and evidence review.
 echo No daily scheduling, no automatic outreach, no extra AI budget.
 echo.
 where py >nul 2>nul
@@ -44,7 +44,7 @@ set "CODE=%ERRORLEVEL%"
 echo.
 echo Reports: existing new data\GTA_RADAR_RESULTS\MONDAY_FULL_RADAR
 echo Dated evidence ZIP: existing new data\GTA_RADAR_EXPORTS
-echo Read MONDAY_FULL_RADAR_STATUS.json for FAILED/PASSED stages.
+echo Read MONDAY_FULL_RADAR_STATUS.json for FAILED/PASSED stages.\necho Council items: COUNCIL_INTELLIGENCE_REVIEW (missing original docs remain HOLD).
 echo If an original source is blocked, it remains blocked; no invented lead.
 if not "%CODE%"=="0" echo One or more stages or ZIP packaging failed. Review the logs.
 if /I not "%~1"=="--unattended" pause
