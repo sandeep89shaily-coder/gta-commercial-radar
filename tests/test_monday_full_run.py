@@ -23,6 +23,13 @@ class MondayIntegrationTests(unittest.TestCase):
                                  for s in stages), 1)
             industrial = stages[1][1]
             self.assertEqual(industrial[industrial.index("--limit") + 1], "10")
+            council_stage = next(args for name, args, _ in stages
+                                 if name == "council_agenda_intelligence")
+            self.assertIn("--fetch-brampton-featured", council_stage)
+            history_stage = next(args for name, args, _ in monday.stages(
+                ws, ws / "GTA_RADAR_RESULTS", skip_collection=True)
+                if name == "council_agenda_intelligence")
+            self.assertNotIn("--fetch-brampton-featured", history_stage)
             self.assertNotIn("--paid", stages[-1][1])
             self.assertNotIn("--fetch", stages[-3][1])
             self.assertNotIn("--live-ckan", stages[-3][1])
