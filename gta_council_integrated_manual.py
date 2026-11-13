@@ -18,6 +18,8 @@ from gta_mississauga_pdc_agenda import run as mississauga_items, OUT as MISS_CSV
 from gta_agenda_application_permit_20_case import run as compare_20
 from gta_brampton_featured_pdc import run as collect_featured
 from gta_mississauga_discovered_pdc_run import run as collect_mississauga_discovered
+from gta_toronto_tmmis_authorized_agendas import run as fetch_toronto_agendas
+from toronto_tmmis_documents import agenda_url
 
 CONFIG = "GTA_RADAR_COUNCIL_INPUTS.json"
 STATUS = "COUNCIL_INTEGRATED_REVIEW_STATUS.json"
@@ -59,9 +61,23 @@ def _inputs(workspace):
     return entries, exports.get("applications_csv"), exports.get("permits_csv"), "SOURCE_MANIFEST_LOADED"
 
 
+def _toronto_meeting_urls(workspace):
+    config = Path(workspace) / CONFIG
+    if not config.is_file():
+        return []
+    data = json.loads(config.read_text(encoding="utf-8"))
+    urls = data.get("toronto_meeting_urls", [])
+    if not isinstance(urls, list) or len(urls) > 3:
+        raise ValueError("INVALID_TORONTO_MEETING_URL_LIST")
+    if any(not isinstance(url, str) or not agenda_url(url) for url in urls):
+        raise ValueError("NON_OFFICIAL_TORONTO_MEETING_URL")
+    return urls
+
+
 def execute(workspace, results, *, index_auditor=None, fetch_brampton_featured=False,
             featured_collector=None, fetch_mississauga_pdc=False,
-            mississauga_discovered_collector=None):
+            mississauga_discovered_collector=None,
+            fetch_toronto_official_agendas=False, toronto_fetcher=None):
     root = Path(workspace).resolve()
     out = Path(results).resolve() / "COUNCIL_INTELLIGENCE_REVIEW"
     out.mkdir(parents=True, exist_ok=True)
@@ -203,6 +219,38 @@ def execute(workspace, results, *, index_auditor=None, fetch_brampton_featured=F
         report["mississauga_discovered_pdc"] = {
             "status": "NOT_REQUESTED", "captured_pdfs": 0}
 
+    # Fetch only explicitly listed, exact official Toronto TMMIS meeting
+    # agendas. No meeting-number enumeration or historical auto-promotion.
+    report["toronto_exact_agenda_retrieval"] = {
+        "status": "NO_REGISTERED_OFFICIAL_TMMIS_MEETING_URLS",
+        "meetings_with_items": 0
+    }
+    if fetch_toronto_official_agendas:
+        try:
+            urls = _toronto_meeting_urls(root)
+            if urls:
+                toronto = (toronto_fetcher or fetch_toronto_agendas)(
+                    urls, out / "TORONTO_TMMIS_OFFICIAL", authorized=True)
+                report["toronto_exact_agenda_retrieval"] = {
+                    "status": toronto.get("status"),
+                    "meetings_considered": toronto.get("meetings_considered", 0),
+                    "meetings_with_items": toronto.get("meetings_with_items", 0),
+                    "meeting_results": [
+                        {"meeting_url": record.get("meeting_url"),
+                         "status": record.get("status"),
+                         "reason": record.get("reason", "")}
+                        for record in toronto.get("meeting_results", [])
+                    ],
+                    "paid_ai_calls": toronto.get("paid_ai_calls", 0)
+                }
+            elif origin == "INVALID_SOURCE_MANIFEST":
+                report["toronto_exact_agenda_retrieval"]["status"] = "INVALID_MANIFEST_HOLD"
+        except (OSError, ValueError, TypeError, KeyError, json.JSONDecodeError) as exc:
+            report["toronto_exact_agenda_retrieval"] = {
+                "status": "OFFICIAL_TMMIS_FETCH_OR_MANIFEST_HELD",
+                "reason": type(exc).__name__, "meetings_with_items": 0}
+            report["source_documents_held"] += 1
+
     # Do not call the identity join on a synthetic or absent agenda export.
     # A missing CSV is handled by the join itself, which explicitly reports HOLD.
     if mississauga_files:
@@ -236,6 +284,8 @@ def main():
     cli = argparse.ArgumentParser(description=__doc__)
     cli.add_argument("--workspace", required=True)
     cli.add_argument("--results", required=True)
+    cli.add_argument("--fetch-toronto-official-agendas", action="store_true",
+                     help="Fetch only exact official TMMIS agenda URLs registered in workspace")
     cli.add_argument("--fetch-mississauga-pdc", action="store_true",
                      help="Fetch only newly observed official PDC PDF links through robots gate")
     cli.add_argument("--fetch-brampton-featured", action="store_true",
@@ -243,7 +293,8 @@ def main():
     args = cli.parse_args()
     report = execute(args.workspace, args.results,
                      fetch_brampton_featured=args.fetch_brampton_featured,
-                     fetch_mississauga_pdc=args.fetch_mississauga_pdc)
+                     fetch_mississauga_pdc=args.fetch_mississauga_pdc,
+                     fetch_toronto_official_agendas=args.fetch_toronto_official_agendas)
     print(json.dumps({
         "status": report["status"],
         "documents_considered": report["documents_considered"],
@@ -251,7 +302,8 @@ def main():
         "mississauga_matching": report["mississauga_20_case_comparison"],
         "paid_ai_usd": report["paid_ai_usd"],
         "brampton_featured": report["brampton_featured_public_applications"],
-        "mississauga_discovered_pdc": report["mississauga_discovered_pdc"]
+        "mississauga_discovered_pdc": report["mississauga_discovered_pdc"],
+        "toronto_exact_agenda_retrieval": report["toronto_exact_agenda_retrieval"]
     }, indent=2))
 
 
