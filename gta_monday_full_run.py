@@ -29,6 +29,7 @@ def stages(workspace, results, *, industrial_limit=10, skip_collection=False):
                     "--workspace", ws, "--results", out]
     if not skip_collection:
         council_args.append("--fetch-brampton-featured")
+        council_args.append("--fetch-brampton-official-gis")
         council_args.append("--fetch-mississauga-pdc")
         council_args.append("--fetch-toronto-official-agendas")
         council_args.append("--fetch-toronto-schedule")
@@ -193,6 +194,8 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
                 report["council_review_diagnostics"]["index"] = council_data.get("official_index_audit", {})
                 report["council_review_diagnostics"]["brampton_featured"] = council_data.get(
                     "brampton_featured_public_applications", {})
+                report["council_review_diagnostics"]["brampton_official_gis_planning"] = council_data.get(
+                    "brampton_official_gis_planning", {})
                 report["council_review_diagnostics"]["mississauga_discovered_pdc"] = council_data.get(
                     "mississauga_discovered_pdc", {})
                 report["council_review_diagnostics"]["toronto_exact_agenda_retrieval"] = council_data.get(
