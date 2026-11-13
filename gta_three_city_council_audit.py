@@ -33,13 +33,22 @@ def audit(results, *, fetch_by_city=None, now=None):
         "checked_utc": at.astimezone(dt.timezone.utc).isoformat(),
         "cities": cities,
         "cities_checked": len(cities),
-        "index_link_collections": sum(
+        "index_pages_fetched": sum(
             item.get("official_index_status") == "INDEX_FETCHED_LINK_ONLY"
+            for item in cities),
+        "index_link_collections": sum(
+            item.get("valid_individual_document_links", 0) > 0
+            for item in cities),
+        "cities_with_zero_eligible_document_links": [
+            item.get("city") for item in cities
+            if item.get("source_gap_review_required")],
+        "historical_ineligible_links_retained": sum(
+            item.get("legacy_ineligible_links_retained_not_promoted", 0)
             for item in cities),
         "new_publications_verified": 0,
         "verified_new_projects": 0,
         "deepseek_spend_usd": 0,
-        "warning": "This is an official index-link audit, not source-document retrieval or verified project intelligence."
+        "warning": "A fetched calendar index is not document collection. Zero eligible links requires downstream authorized calendar/source adapter review. Historical false links remain audit-only; no new verified projects."
     }
     (root / STATUS).write_text(json.dumps(result, indent=2), encoding="utf-8")
     return result
