@@ -40,6 +40,33 @@ class CouncilManualIntegrationTests(unittest.TestCase):
             self.assertEqual(result["mississauga_20_case_comparison"]["cases_reviewed"], 0)
             self.assertTrue((results / "COUNCIL_INTELLIGENCE_REVIEW" / council.STATUS).is_file())
 
+    def test_featured_public_source_only_with_explicit_manual_collection(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            calls = []
+            def fake_featured(folder, fetch=False):
+                calls.append((folder, fetch))
+                return {"status": "FEATURED_APPLICATIONS_REVIEW_ONLY",
+                        "cards_parsed": 2,
+                        "commercial_keyword_cards_review_only": 1,
+                        "newly_observed_cards_not_new_publications": 2,
+                        "first_publications_verified": 0, "paid_ai_calls": 0}
+            dry = council.execute(root, root / "GTA_RADAR_RESULTS",
+                                  index_auditor=index_stub,
+                                  featured_collector=fake_featured)
+            self.assertEqual(calls, [])
+            self.assertEqual(dry["brampton_featured_public_applications"]["status"],
+                             "NOT_REQUESTED_IN_THIS_STAGE")
+            active = council.execute(root, root / "GTA_RADAR_RESULTS",
+                                     index_auditor=index_stub,
+                                     fetch_brampton_featured=True,
+                                     featured_collector=fake_featured)
+            self.assertEqual(len(calls), 1)
+            self.assertTrue(calls[0][1])
+            self.assertEqual(active["brampton_featured_public_applications"]["cards_parsed"], 2)
+            self.assertEqual(active["publisher_first_publications_verified"], 0)
+            self.assertEqual(active["paid_ai_usd"], 0)
+
     def test_all_three_city_item_adapters_in_one_review_stage(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
