@@ -12,7 +12,7 @@ import json
 import re
 from pathlib import Path
 
-from gta_council_document_delta import LEDGER
+from gta_council_document_delta import LEDGER, STATUS as INDEX_STATUS
 from municipal_meeting_capture import OFFICIAL
 from gta_mississauga_pdc_agenda import official_pdf, OUT as PDC_CSV
 from gta_mississauga_pdc_authorized_fetch import batch as fetch_documents
@@ -28,6 +28,16 @@ PDC_LABEL = re.compile(
 def select_sources(index_folder, *, limit=MAX_DOCUMENTS):
     if not 1 <= limit <= MAX_DOCUMENTS:
         raise ValueError("PDC_DOCUMENT_LIMIT_OUT_OF_BOUNDS")
+    # Never process a historical PDF link as a current source discovery when
+    # the city's latest index attempt is blocked or has zero usable links.
+    status_path = Path(index_folder) / ("MISSISSAUGA_" + INDEX_STATUS)
+    if not status_path.is_file():
+        return [], "CURRENT_CITY_SOURCE_STATUS_MISSING"
+    status = json.loads(status_path.read_text(encoding="utf-8"))
+    if (status.get("city") != "Mississauga"
+            or status.get("official_index_status") != "INDEX_FETCHED_LINK_ONLY"
+            or not status.get("valid_individual_document_links")):
+        return [], "CURRENT_PDC_SOURCE_NOT_VERIFIED_OR_NO_LINKS"
     file = Path(index_folder) / LEDGER
     if not file.is_file():
         return [], "OFFICIAL_INDEX_LEDGER_MISSING"
@@ -55,7 +65,8 @@ def select_sources(index_folder, *, limit=MAX_DOCUMENTS):
             continue
         # Legacy ledger rows may predate the tightened document classifier.
         # Validate that link content has not yet been verified as a project.
-        if item.get("source_content_checked") not in (None, False):
+        if (item.get("source_content_checked") not in (None, False)
+                or item.get("last_observed_utc") != status.get("checked_utc")):
             excluded += 1
             continue
         candidates.append({
