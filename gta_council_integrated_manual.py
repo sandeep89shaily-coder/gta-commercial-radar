@@ -127,7 +127,7 @@ def execute(workspace, results, *, index_auditor=None):
                         source, meeting_url=item["meeting_url"],
                         agenda_pdf_url=item["agenda_pdf_url"], results=folder)
                     count = result["bookmarks_parsed"]
-                    level = "SAVED_BRAMPton_PDF_BOOKMARKS"
+                    level = "SAVED_BRAMPTON_PDF_BOOKMARKS"
                 else:
                     result = mississauga_items(source, item["agenda_pdf_url"], folder)
                     count = result["toc_items"]
