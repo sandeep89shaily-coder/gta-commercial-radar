@@ -46,13 +46,14 @@ def stages(workspace, results, *, industrial_limit=10, skip_collection=False):
         ("toronto_20_source_research", ["gta_toronto_20_commercial_review.py",
                                        "--out", str(results / "TORONTO_20_COMMERCIAL_REVIEW")], False),
         ("council_agenda_intelligence", council_args, False),
-        # The prior daily stage only planned AI work and never executed it.
-        # On an explicit full manual collection, allow at most two
-        # source-backed AI research reviews through the SAME existing ledger,
-        # model executor and run lock. Never do this for saved-data review.
+        # Allow source-backed research beyond the former 2-project limit on
+        # explicit full manual runs. The existing executor's per-request
+        # US$1/day shared ledger, idempotency and source gate remain mandatory.
+        # A max of 10 is a research-queue bound, not a spending target.
+        # Saved-data review remains free.
         ("ai_harness_adaptive" if not skip_collection else "ai_harness_free",
          ["gta_agent_harness.py", "--results", out] +
-         (["--paid", "--max-projects", "2"] if not skip_collection else []),
+         (["--paid", "--max-projects", "10"] if not skip_collection else []),
          False),
     ]
     if skip_collection:
@@ -463,6 +464,28 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
     else:
         report["company_procurement_review"] = {
             "status": "NOT_RUN_HISTORICAL_MODE",
+        }
+
+    # Zero-cost cross-source internal analyst shortlist. This is a research
+    # priority list, NOT a customer lead file or a verified buyer/contact list.
+    # It is generated after the AI bridge and supplier review, using current
+    # source-event dates and explicit unknown procurement status.
+    try:
+        from gta_commercial_qualification_review import run as qualify_review
+        q = qualify_review(results)
+        report["commercial_qualification_worklist"] = {
+            "status": q["status"],
+            "source_rows": q["source_rows"],
+            "internal_top_10_count": q["internal_top_10_count"],
+            "verified_buyers": 0,
+            "verified_open_supplier_contracts": 0,
+            "paid_ai_calls": 0,
+            "outreach_authorized": False,
+        }
+    except (OSError, ValueError, TypeError, ImportError) as exc:
+        report["commercial_qualification_worklist"] = {
+            "status": "INTERNAL_COMMERCIAL_WORKLIST_HELD",
+            "error_type": type(exc).__name__,
         }
 
     passed = sum(x["status"] == "PASSED" for x in report["stages"])

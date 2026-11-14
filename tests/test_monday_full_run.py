@@ -41,7 +41,7 @@ class MondayIntegrationTests(unittest.TestCase):
             self.assertNotIn("--fetch-toronto-schedule", history_stage)
             self.assertNotIn("--fetch-toronto-planning-notices", history_stage)
             self.assertIn("--paid", stages[-1][1])
-            self.assertEqual(stages[-1][1][stages[-1][1].index("--max-projects") + 1], "2")
+            self.assertEqual(stages[-1][1][stages[-1][1].index("--max-projects") + 1], "10")
             self.assertNotIn("--paid", monday.stages(
                 ws, ws / "GTA_RADAR_RESULTS", skip_collection=True)[-1][1])
             self.assertNotIn("--fetch", stages[-3][1])
