@@ -14,6 +14,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from pypdf import PdfReader
+from pypdf.errors import PdfReadError
 
 MANIFEST = "GTA_RADAR_COUNCIL_INPUTS.json"
 OUTPUT = "GTA_RADAR_DOCUMENT_EVIDENCE_SEGMENTS.json"
@@ -90,7 +91,7 @@ def _record(root, item):
             result["status"] = "REVIEW_CAPPED_PAGES"
         if not result["segments"] and result["status"] == "PDF_TEXT_REVIEW_ONLY":
             result["status"] = "NO_COMMERCIAL_TEXT_OR_SCANNED_PAGES_HOLD"
-    except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
+    except (PdfReadError, ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
         result["status"] = "PDF_PARSE_HELD_" + type(exc).__name__
         result["segments"] = []
     return result
