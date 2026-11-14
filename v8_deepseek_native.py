@@ -54,14 +54,29 @@ PRIORITY={'PERMIT_REVIEW':0,'BUSINESS_REVIEW':1,'PLANNING_WATCH':2,
 class BudgetExceeded(Exception):pass
 
 
+class DeepSeekAccountBalanceError(RuntimeError):
+    """DeepSeek rejected a request with HTTP 402 before returning a result."""
+
+
 def request(path, payload, key, transport=None):
     """Simple HTTPS JSON client; injectable for deterministic offline tests."""
-    if transport is not None:return transport(path,payload)
+    if transport is not None:
+        try:
+            return transport(path,payload)
+        except Exception as exc:
+            if getattr(exc,"code",None)==402:
+                raise DeepSeekAccountBalanceError("DeepSeek HTTP 402: account balance rejected") from exc
+            raise
     data=json.dumps(payload,ensure_ascii=True).encode('ascii')
     req=Request(ROOT_API+path,data=data,method='POST',headers={
         'Content-Type':'application/json','Authorization':'Bearer '+key})
-    with urlopen(req,timeout=40 if 'tools/' in path else 75) as response:
-        return json.load(response)
+    try:
+        with urlopen(req,timeout=40 if 'tools/' in path else 75) as response:
+            return json.load(response)
+    except Exception as exc:
+        if getattr(exc,"code",None)==402:
+            raise DeepSeekAccountBalanceError("DeepSeek HTTP 402: account balance rejected") from exc
+        raise
 
 
 def effective_spend(db,day):
@@ -206,6 +221,10 @@ def fetch_native(row, key, db, day, legacy, transport=None, *, daily_limit=None)
             ledger_finish(db,day,charge,'DONE' if content else 'NONBILLABLE',FETCH_COST if content else 0)
             calls['fetch']+=1
             append(url,content,'FETCHED_MARKDOWN')
+        except DeepSeekAccountBalanceError:
+            # Official Search/Fetch billing: failed HTTP 402 is nonbillable.
+            ledger_finish(db,day,charge,'NONBILLABLE')
+            raise
         except Exception as exc:
             ledger_finish(db,day,charge,'ERROR',None)
             calls['errors'].append('FETCH_'+type(exc).__name__)
@@ -251,6 +270,9 @@ def fetch_native(row, key, db, day, legacy, transport=None, *, daily_limit=None)
             if not isinstance(entries,list):raise ValueError('Malformed Search results')
             ledger_finish(db,day,charge,'DONE' if entries else 'NONBILLABLE',SEARCH_COST if entries else 0)
             calls['search']+=1
+        except DeepSeekAccountBalanceError:
+            ledger_finish(db,day,charge,'NONBILLABLE')
+            raise
         except Exception as exc:
             ledger_finish(db,day,charge,'ERROR',None)
             calls['errors'].append('SEARCH_'+type(exc).__name__);continue
@@ -451,6 +473,9 @@ def find_public_business_contact(row, operator, key, db, day, legacy, transport=
         if not isinstance(entries,list):raise ValueError('Bad business search results')
         ledger_finish(db,day,charge,'DONE' if entries else 'NONBILLABLE',
                       SEARCH_COST if entries else 0)
+    except DeepSeekAccountBalanceError:
+        ledger_finish(db,day,charge,'NONBILLABLE')
+        raise
     except Exception:
         ledger_finish(db,day,charge,'ERROR',None)
         return {},0
@@ -578,8 +603,12 @@ def run(projects_file,results_dir,legacy_data_dir=None,*,key=None,transport=None
                  'official_company','official_company_role','official_verification_level')})
             if official.get('official_description'):
                 research_row['description']=official['official_description']
-            evidence,stat=fetch_native(research_row,key,db,day,legacy,transport,
-                                        daily_limit=ceiling)
+            try:
+                evidence,stat=fetch_native(research_row,key,db,day,legacy,transport,
+                                            daily_limit=ceiling)
+            except DeepSeekAccountBalanceError:
+                reason='DEEPSEEK_HTTP_402_ACCOUNT_BALANCE'
+                break
             item.update(web_pages=len(evidence),searches=stat['search'],
                         native_searches=stat['search'],native_fetches=stat['fetch'],
                         source_urls=' | '.join(e['url'] for e in evidence),
@@ -612,6 +641,12 @@ def run(projects_file,results_dir,legacy_data_dir=None,*,key=None,transport=None
                     ledger_finish(db,day,name,'DONE',actual)
                     counts['ai_calls_succeeded']+=1
                     counts['source_only_ai_calls']+=not evidence
+                except DeepSeekAccountBalanceError:
+                    ledger_finish(db,day,name,'NONBILLABLE')
+                    reason='DEEPSEEK_HTTP_402_ACCOUNT_BALANCE'
+                    # Don't write a misleading AI review or continue to the
+                    # next candidate. A rejected request is not model output.
+                    break
                 except Exception as exc:
                     ledger_finish(db,day,name,'ERROR',None)
                     item.update(status='AI_ERROR_REVIEW',
@@ -625,8 +660,12 @@ def run(projects_file,results_dir,legacy_data_dir=None,*,key=None,transport=None
             if (item.get('status') in ('AI_EVIDENCE_REVIEW','AI_SOURCE_RECORD_REVIEW')
                     and contact_target and (evidence or official_verified)
                     and not item.get('contact')):
-                extra,ns=find_public_business_contact(research_row,contact_target,key,db,day,legacy,transport,
-                                                       daily_limit=ceiling)
+                try:
+                    extra,ns=find_public_business_contact(research_row,contact_target,key,db,day,legacy,transport,
+                                                           daily_limit=ceiling)
+                except DeepSeekAccountBalanceError:
+                    extra,ns={},0
+                    reason='DEEPSEEK_HTTP_402_ACCOUNT_BALANCE'
                 counts['company_contact_searches']+=ns
                 counts['native_searches']+=ns
                 if extra:
@@ -668,6 +707,8 @@ def run(projects_file,results_dir,legacy_data_dir=None,*,key=None,transport=None
             v5.write_rows(history_path,list(previous.values()),columns=FIELDS)
             v5.write_rows(out/'GTA_RADAR_V6_LATEST_INVESTIGATIONS.csv',current,columns=FIELDS)
             queue.save(queue_path,enrolled)
+            if reason=='DEEPSEEK_HTTP_402_ACCOUNT_BALANCE':
+                break
 
         if not current:
             # Never display an older run as the current run.

@@ -45,6 +45,11 @@ def plan(row,key,db,day,legacy,transport=None,*,daily_limit=.49):
         native.ledger_finish(db,day,claim,"DONE" if cost is not None else "UNKNOWN",cost)
         return {"topic":topic,"queries":[queries[i] for i in order],
                 "status":"AI_PLANNED","model_cost_usd":cost}
+    except native.DeepSeekAccountBalanceError:
+        # Explicit HTTP 402 from DeepSeek: request rejected, not an
+        # unresolved model token charge. Stop this run, do not retry 100x.
+        native.ledger_finish(db,day,claim,"NONBILLABLE")
+        raise
     except Exception:
         native.ledger_finish(db,day,claim,"UNKNOWN")
         return {**fallback,"status":"PLANNER_ERROR_RESERVATION_HELD"}
