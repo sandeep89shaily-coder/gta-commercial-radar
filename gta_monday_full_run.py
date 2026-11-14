@@ -249,6 +249,41 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
     else:
         report["source_quality"] = {"status": "NOT_RUN_HISTORICAL_MODE"}
 
+    # Read-only registry and explicitly registered PDF evidence review.
+    # No new source fetch, extra stage, AI spend, or outreach.
+    try:
+        from gta_municipal_platform_registry import run as run_platform_registry
+        platforms = run_platform_registry(results)
+        report["platform_registry"] = {
+            "status": platforms["status"],
+            "source_count": platforms["source_count"],
+            "known_platform_sources": platforms["known_platform_sources"],
+        }
+    except (OSError, ValueError, ImportError) as exc:
+        report["platform_registry"] = {
+            "status": "PLATFORM_REGISTRY_HELD",
+            "error_type": type(exc).__name__,
+        }
+    if not skip_collection:
+        try:
+            from gta_registered_document_evidence import run as run_document_evidence
+            review = run_document_evidence(ws, results)
+            report["registered_document_evidence"] = {
+                "status": review["status"],
+                "documents_registered": review.get("documents_registered", 0),
+                "segments_for_manual_review": review.get("segments_for_manual_review", 0),
+                "project_leads_verified": 0,
+            }
+        except (OSError, ValueError, ImportError) as exc:
+            report["registered_document_evidence"] = {
+                "status": "REGISTERED_DOCUMENT_EVIDENCE_HELD",
+                "error_type": type(exc).__name__,
+            }
+    else:
+        report["registered_document_evidence"] = {
+            "status": "NOT_RUN_HISTORICAL_MODE",
+        }
+
     passed = sum(x["status"] == "PASSED" for x in report["stages"])
     failed = [x["name"] for x in report["stages"] if x["status"] != "PASSED"]
     report["stage_successes"] = passed
