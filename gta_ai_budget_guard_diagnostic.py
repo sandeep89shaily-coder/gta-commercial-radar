@@ -10,6 +10,7 @@ import argparse
 import datetime as dt
 import json
 import sqlite3
+from contextlib import closing
 from pathlib import Path
 
 from radar_config import DEEPSEEK_DAILY_LIMIT_USD
@@ -27,8 +28,10 @@ def _table(path, day, date_column):
         raise ValueError("SYMLINKED_BUDGET_LEDGER_REFUSED")
     try:
         # Important: read-only URI; sqlite3.connect(path) would create a missing DB.
-        with sqlite3.connect(path.resolve().as_uri() + "?mode=ro",
-                             uri=True, timeout=3) as db:
+        # sqlite3.Connection's context manager does NOT close the handle;
+        # Windows refuses to delete/open occupied files. Explicitly close it.
+        with closing(sqlite3.connect(path.resolve().as_uri() + "?mode=ro",
+                                     uri=True, timeout=3)) as db:
             if date_column == "day":
                 sql = """SELECT status, COUNT(*), COALESCE(SUM(reserved),0),
                   COALESCE(SUM(CASE WHEN status='DONE'
