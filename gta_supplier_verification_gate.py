@@ -273,10 +273,14 @@ def build(results, workspace=None, *, now=None):
             not isinstance(reviews.get("procurement_reviews"), list) or
             len(reviews["role_reviews"]) + len(reviews["procurement_reviews"]) > MAX_REVIEWS):
         raise ValueError("REVIEW_MANIFEST_SCHEMA_OR_SIZE")
-    holds, accepted, seen_edge = [], {}, set()
+    holds, accepted, rejected, seen_edge = [], {}, set(), set()
     for row in reviews["role_reviews"]:
         edge_id = row.get("edge_id") if isinstance(row, dict) else None
         if not edge_id or edge_id in seen_edge:
+            # Duplicate approvals/rejections are ambiguous: invalidate the
+            # earlier acceptance instead of silently keeping first-in-file.
+            accepted.pop(edge_id, None)
+            rejected.discard(edge_id)
             holds.append({"kind": "ROLE", "edge_id": edge_id,
                           "reason": "DUPLICATE_OR_MISSING_ROLE_EDGE_ID"})
             continue
@@ -289,9 +293,20 @@ def build(results, workspace=None, *, now=None):
             record = _role_review(row, edges[edge_id], now)
             if record["decision"] == "CONFIRM_ROLE":
                 accepted[edge_id] = record
+            else:
+                rejected.add(edge_id)
         except (ValueError, TypeError, KeyError, OverflowError) as exc:
             holds.append({"kind": "ROLE", "edge_id": edge_id,
                           "reason": str(exc)[:120]})
+    for queued in role_queue:
+        edge_id = queued["edge_id"]
+        if edge_id in accepted:
+            queued["review_status"] = "HUMAN_ATTESTED_ROLE_NOT_LIVE_VERIFIED"
+        elif edge_id in rejected:
+            queued["review_status"] = "ROLE_REJECTED_BY_HUMAN_REVIEW"
+        elif edge_id in seen_edge:
+            queued["review_status"] = "ROLE_REVIEW_HELD_OR_CONFLICTING"
+
     tender_rows, seen_tender = [], set()
     for row in reviews["procurement_reviews"]:
         key = ((row.get("project_node_id"), row.get("tender_id"))
@@ -309,9 +324,26 @@ def build(results, workspace=None, *, now=None):
         except (ValueError, TypeError, KeyError, OverflowError) as exc:
             holds.append({"kind": "TENDER", "tender_id": str(key[1])[:100],
                           "reason": str(exc)[:120]})
+    # Every project is a potential procurement research task even when there
+    # has been no explicit public tender review. Never invent a work package.
     tender_queue = []
+    for pid, project_info in sorted(projects.items()):
+        if len(tender_queue) >= MAX_QUEUE:
+            break
+        tender_queue.append({
+            "project_node_id": pid, "project_id": project_info["project_id"],
+            "city": project_info["city"], "supplier_sector": "UNDETERMINED",
+            "tender_id": "", "work_scope": "", "tender_url": "",
+            "closing_date": "", "buyer_role_edge_id": "",
+            "review_status": "NO_PROJECT_SPECIFIC_PROCUREMENT_EVIDENCE",
+            "verification_action": "Find original tender/EOI or vendor-selection evidence; check buyer, trade scope, deadline and awards",
+        })
     for tender in tender_rows[:MAX_QUEUE]:
         p = projects[tender["project_node_id"]]
+        # Replace this project's generic investigation row with its explicit
+        # tender decision instead of double-counting the same project as both.
+        tender_queue = [q for q in tender_queue if not (
+            q["project_node_id"] == p["node_id"] and not q["tender_id"])]
         tender_queue.append({
             "project_node_id": p["node_id"], "project_id": p["project_id"],
             "city": p["city"], "supplier_sector": tender["sector"],
@@ -329,6 +361,9 @@ def build(results, workspace=None, *, now=None):
         "operator_role_decisions": len(reviews["role_reviews"]),
         "operator_tender_decisions": len(reviews["procurement_reviews"]),
         "reviewer_attested_role_claims": len(accepted),
+        "reviewer_rejected_role_claims": len(rejected),
+        "projects_queued_for_procurement_research": sum(
+            not q["tender_id"] for q in tender_queue),
         "reviewer_attested_open_tender_needing_live_recheck": sum(
             t["review_status"] == "REVIEWER_ATTESTED_OPEN_TENDER_LIVE_RECHECK_REQUIRED"
             for t in tender_rows),
