@@ -104,6 +104,37 @@ class ProcurementGateTests(unittest.TestCase):
         self.assertEqual(outcome["verified_buyers"], 0)
         self.assertEqual(outcome["verified_open_supplier_contracts"], 0)
 
+    def test_duplicate_conflicting_role_cannot_leave_accepted_approval(self):
+        self.decisions(roles=[
+            self.role(decision="CONFIRM_ROLE"),
+            self.role(decision="REJECT_ROLE"),
+        ], tenders=[self.tender()])
+        result = build(self.results, self.workspace, now=NOW)
+        self.assertEqual(result["reviewer_attested_role_claims"], 0)
+        self.assertEqual(result["reviewer_rejected_role_claims"], 0)
+        self.assertEqual(result["tender_reviews"][0]["review_status"],
+                         "PURCHASING_AUTHORITY_NOT_REVIEWED_HOLD")
+        self.assertEqual(result["role_queue"][0]["review_status"],
+                         "ROLE_REVIEW_HELD_OR_CONFLICTING")
+
+    def test_unreviewed_projects_receive_procurement_tasks_not_fake_tenders(self):
+        result = build(self.results, self.workspace, now=NOW)
+        self.assertEqual(result["projects_queued_for_procurement_research"], 1)
+        task = result["tender_queue"][0]
+        self.assertEqual(task["supplier_sector"], "UNDETERMINED")
+        self.assertEqual(task["review_status"],
+                         "NO_PROJECT_SPECIFIC_PROCUREMENT_EVIDENCE")
+        self.assertEqual(task["tender_id"], "")
+        self.assertEqual(result["verified_open_supplier_contracts"], 0)
+
+    def test_reject_role_is_reflected_in_queue_without_buyers(self):
+        self.decisions(roles=[self.role(decision="REJECT_ROLE")])
+        result = build(self.results, self.workspace, now=NOW)
+        self.assertEqual(result["reviewer_attested_role_claims"], 0)
+        self.assertEqual(result["reviewer_rejected_role_claims"], 1)
+        self.assertEqual(result["role_queue"][0]["review_status"],
+                         "ROLE_REJECTED_BY_HUMAN_REVIEW")
+
     def test_wrong_name_or_edge_does_not_accept_role(self):
         self.decisions(roles=[
             self.role(organization_name="Other Company", edge_id=EDGE)
