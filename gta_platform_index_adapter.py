@@ -159,5 +159,19 @@ if __name__ == "__main__":
     parser.add_argument("--source-id", required=True)
     parser.add_argument("--fetch", action="store_true",
                         help="Explicitly opt in to one protected index fetch")
+    parser.add_argument("--fetch-direct-pdfs", action="store_true",
+                        help="After a successful --fetch, retrieve at most three same-official-host direct PDFs")
     a = parser.parse_args()
-    print(json.dumps(run(a.results, a.source_id, fetch=a.fetch), indent=2))
+    if a.fetch_direct_pdfs and not a.fetch:
+        parser.error("--fetch-direct-pdfs requires --fetch")
+    status = run(a.results, a.source_id, fetch=a.fetch)
+    if a.fetch_direct_pdfs:
+        if status["status"] == "INDEX_FETCHED_DOCUMENT_LINKS_REVIEW_ONLY":
+            from gta_official_platform_pdf_intake import run as run_pdfs
+            status["pdf_intake"] = {
+                k: v for k, v in run_pdfs(
+                    a.results, a.source_id, fetch=True).items() if k != "documents"
+            }
+        else:
+            status["pdf_intake"] = {"status": "NOT_RUN_INDEX_NOT_VERIFIED"}
+    print(json.dumps(status, indent=2))
