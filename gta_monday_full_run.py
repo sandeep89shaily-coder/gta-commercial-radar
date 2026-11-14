@@ -284,6 +284,29 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
             "status": "NOT_RUN_HISTORICAL_MODE",
         }
 
+    # Saved captions can be reviewed without fetching or transcribing media.
+    # Missing explicit manifest means no caption evidence; historical-only runs
+    # do not reinterpret saved material as today's newly collected source.
+    if not skip_collection:
+        try:
+            from gta_local_caption_evidence import run as run_caption_evidence
+            captions = run_caption_evidence(ws, results)
+            report["local_caption_evidence"] = {
+                "status": captions["status"],
+                "caption_files": captions.get("caption_files", 0),
+                "mentions_for_review": captions.get("mentions_for_review", 0),
+                "verified_projects": 0,
+            }
+        except (OSError, ValueError, ImportError) as exc:
+            report["local_caption_evidence"] = {
+                "status": "CAPTION_REVIEW_HELD",
+                "error_type": type(exc).__name__,
+            }
+    else:
+        report["local_caption_evidence"] = {
+            "status": "NOT_RUN_HISTORICAL_MODE",
+        }
+
     passed = sum(x["status"] == "PASSED" for x in report["stages"])
     failed = [x["name"] for x in report["stages"] if x["status"] != "PASSED"]
     report["stage_successes"] = passed
