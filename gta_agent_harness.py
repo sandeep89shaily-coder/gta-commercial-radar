@@ -200,6 +200,28 @@ def run(results, out=None, *, candidates=None, paid=False, max_projects=3,
                     source, results, review, paid=True,
                     max_projects=max_projects
                 )
+                # Reconcile saved, exact-ID AI evidence into the existing
+                # company and procurement review queues without new model
+                # spending, collection, direct sales claims or duplicate DB.
+                # Keep this under the same OS lock to avoid racing a collector.
+                if executor is None:
+                    try:
+                        from gta_ai_project_intelligence_refresh import run as refresh_project_graph
+                        integration = refresh_project_graph(results)
+                        state["project_intelligence_integration"] = {
+                            "status": integration["status"],
+                            "source_supported_ai_role_claims":
+                                integration["source_supported_ai_role_claims"],
+                            "projects_with_source_conflicts":
+                                integration["projects_with_source_conflicts"],
+                            "verified_buyers": 0,
+                            "verified_open_supplier_contracts": 0,
+                        }
+                    except (OSError, ValueError, TypeError, ImportError) as exc:
+                        state["project_intelligence_integration"] = {
+                            "status": "SOURCE_INTEGRATION_HELD_FOR_MANUAL_REVIEW",
+                            "error_type": type(exc).__name__,
+                        }
             state["steps"].append({
                 "name": "existing_deepseek_research",
                 "status": state["executor"].get("status", "UNKNOWN"),

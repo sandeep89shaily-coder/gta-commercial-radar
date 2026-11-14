@@ -17,6 +17,7 @@ from pathlib import Path
 
 from gta_local_caption_evidence import CITIES
 from gta_facility_intelligence import https
+from gta_ai_project_evidence_bridge import build as build_ai_project_bridge
 
 OUTPUT = "GTA_RADAR_PROJECT_COMPANY_EVIDENCE_GRAPH.json"
 CROSS = "GTA_RADAR_CROSS_SOURCE_RECONCILIATION.json"
@@ -124,11 +125,13 @@ def build(results, *, now=None):
                            "import_source_url", *OFFICIAL_ROLE_FIELDS.keys()},
                           MAX_ROLE_ROWS)
     recon = _read_cross(root)
+    ai_bridge = build_ai_project_bridge(root)
     statuses = {
         "facility_events": "PRESENT" if events is not None else "MISSING",
         "research_role_hints": "PRESENT" if hints is not None else "MISSING",
         "official_role_review": "PRESENT" if officials is not None else "MISSING",
         "council_application_reconciliation": "PRESENT" if recon is not None else "MISSING",
+        "ai_project_review_bridge": ai_bridge["status"],
     }
     indexed_events = {}
     for event in events or []:
@@ -240,6 +243,23 @@ def build(results, *, now=None):
                           source_record_id=record["application_id"],
                           quote_present=False)
 
+    # Exact-ID AI review findings are now composed into the existing project
+    # mention graph. They are NOT verified companies/buyers: each role requires
+    # a source passage with the exact current application ID and role wording.
+    for candidate in ai_bridge.get("projects", []):
+        project(candidate["city"], candidate["project_id"])
+    for claim in ai_bridge.get("role_claims", []):
+        role_edge(
+            claim["city"], claim["project_id"], claim["organization"],
+            claim["role"], "AI_RESEARCH_EXACT_ID_SOURCE_LITERAL_REVIEW_ONLY",
+            claim["source_url"], source_record_id=claim["application_id"],
+            evidence_id="ai:" + _hash(claim["evidence_excerpt"], claim["source_url"]),
+            quote_present=True,
+        )
+    for issue in ai_bridge.get("holds", []):
+        if issue.get("reason") not in ("RESIDENTIAL_DOMINANT_NOT_AUTO_COMMERCIAL_PRIORITY",):
+            hold("AI_BRIDGE_" + issue["reason"], issue.get("project_id") or issue.get("file"))
+
     # Site-local mentions are not project associations. They never link to a
     # project node, even when another record shares site_id or organization.
     for record in events or []:
@@ -320,6 +340,11 @@ def build(results, *, now=None):
         "source_site_contexts": len(sites),
         "claimed_relationships": len(edges),
         "council_id_context_links": len(council_links),
+        "ai_review_project_candidates": ai_bridge.get("project_candidates", 0),
+        "ai_source_supported_role_claims": ai_bridge.get(
+            "source_supported_role_claims_not_legal_verification", 0),
+        "ai_review_conflict_candidates": ai_bridge.get(
+            "projects_with_address_or_lifecycle_conflicts", 0),
         "role_conflicts": len(conflicts),
         "held_issues": len(holds),
         "truncated": truncated,
@@ -337,6 +362,16 @@ def build(results, *, now=None):
         "site_nodes": sorted(sites.values(), key=lambda n: n["node_id"]),
         "edges": sorted(edges, key=lambda e: e["edge_id"]),
         "council_evidence": council_links,
+        "ai_review_priorities": [{
+            "project_id": p["project_id"],
+            "sector_for_review": p["commercial_sector_for_review"],
+            "maturity_for_review": p["maturity_for_review"],
+            "official_status": p["official_status"],
+            "official_milestone_date": p["official_milestone_date"],
+            "date_basis": p["date_basis"],
+            "unresolved_issues": [h["reason"] for h in p["holds"]],
+            "commercial_buyer_verified": False,
+        } for p in ai_bridge.get("projects", [])],
         "conflicts": conflicts,
         "holds": holds,
     }

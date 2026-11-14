@@ -384,6 +384,28 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
             "status": "NOT_RUN_HISTORICAL_MODE",
         }
 
+    # Reconcile exact-ID source-backed AI research from the preceding harness
+    # into review-only project roles, status conflicts and supplier priority.
+    # No API call, company entity verification or changed collector DB.
+    try:
+        from gta_ai_project_evidence_bridge import run as run_ai_bridge
+        ai_bridge = run_ai_bridge(results)
+        report["ai_project_evidence_bridge"] = {
+            "status": ai_bridge["status"],
+            "project_candidates": ai_bridge.get("project_candidates", 0),
+            "source_supported_role_claims": ai_bridge.get(
+                "source_supported_role_claims_not_legal_verification", 0),
+            "address_or_lifecycle_conflict_candidates": ai_bridge.get(
+                "projects_with_address_or_lifecycle_conflicts", 0),
+            "verified_buyers": 0, "verified_open_supplier_packages": 0,
+            "paid_ai_usd": 0,
+        }
+    except (OSError, ValueError, TypeError, ImportError) as exc:
+        report["ai_project_evidence_bridge"] = {
+            "status": "AI_SOURCE_EVIDENCE_BRIDGE_HELD",
+            "error_type": type(exc).__name__,
+        }
+
     # Build an evidence graph from existing facility/research and council
     # review files. Company names remain unverified, project-scoped mentions;
     # no contacts, buyer assertions, source fetches or paid AI.
@@ -398,6 +420,10 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
                 "claimed_relationships": role_graph["claimed_relationships"],
                 "role_conflicts": role_graph["role_conflicts"],
                 "council_id_context_links": role_graph["council_id_context_links"],
+                "ai_source_supported_role_claims": role_graph.get(
+                    "ai_source_supported_role_claims", 0),
+                "ai_review_conflict_candidates": role_graph.get(
+                    "ai_review_conflict_candidates", 0),
                 "verified_project_company_roles": 0,
                 "verified_buyers": 0,
             }
