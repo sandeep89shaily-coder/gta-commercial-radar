@@ -21,6 +21,7 @@ import v5_investigator as v5
 import v8_deepseek_native as native
 import candidate_scoring as scoring
 import source_dates
+from gta_ai_research_priority import key as research_priority
 from radar_config import DEEPSEEK_DAILY_LIMIT_USD as DAILY_CAP
 
 def read_candidates(path):
@@ -59,14 +60,17 @@ def locate_candidates(results,explicit=None):
         checked.append({"path":str(path),"reason":"NO_ELIGIBLE_SOURCED_PROJECTS"})
     raise ValueError("No eligible V8 sourced project queue found; checked: "+json.dumps(checked)[:900])
 
-def select_projects(projects):
-    """Rank candidates by commercial significance; return (eligible, summary).
+def select_projects(projects, *, today=None):
+    """Select commercial source-evidence work, ordered by date and sector.
 
-    eligible is [(row, score_result)] best first. Public bodies and projects
-    under the threshold are never researched with paid AI.
+    Existing deterministic score remains the hard eligibility gate. Within
+    that gate, documented source-event freshness and industrial/commercial
+    scope outrank older/later-stage residential sources. No first-publication
+    assertion, AI-generated evidence or procurement certification.
     """
     ranked=scoring.rank(projects)
     eligible=[(r,s) for r,s in ranked if not s["excluded"] and s["score"]>=scoring.MIN_SELECTION_SCORE]
+    eligible.sort(key=lambda item: research_priority(item[0], item[1], today))
     summary={"candidates":len(projects),"eligible_for_paid_ai":len(eligible),
              "excluded_public_body":sum(1 for _,s in ranked if s["excluded"]),
              "below_threshold":sum(1 for _,s in ranked if not s["excluded"] and s["score"]<scoring.MIN_SELECTION_SCORE),
@@ -93,7 +97,7 @@ def execute(candidate_file,shared_results,out,*,paid=False,max_projects=3,
             key=None,transport=None,today=None):
     candidate_file,projects=locate_candidates(shared_results,candidate_file)
     dest=Path(out);dest.mkdir(parents=True,exist_ok=True)
-    eligible,selection=select_projects(projects)
+    eligible,selection=select_projects(projects, today=today)
     state={"status":"PREFLIGHT","candidates":len(projects),"attempted":0,
            "completed":0,"candidate_source":str(candidate_file),
            "verified_private_leads":0,"deepseek_budget_limit_usd":DAILY_CAP,
