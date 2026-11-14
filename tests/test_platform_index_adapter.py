@@ -35,7 +35,7 @@ class Session:
         return self.response
 
 
-def public_resolver(*_):
+def public_resolver(*_, **__):
     return [(2, 1, 6, "", ("8.8.8.8", 443))]
 
 
@@ -76,7 +76,7 @@ class PolicyFetchTests(unittest.TestCase):
     def test_private_dns_rejected_before_request(self):
         s = Session(Response())
         with self.assertRaises(PermissionError):
-            fetch_index(URL, session=s, resolver=lambda *_: [(2,1,6,"",("127.0.0.1",443))])
+            fetch_index(URL, session=s, resolver=lambda *_, **__: [(2,1,6,"",("127.0.0.1",443))])
         self.assertEqual(len(s.calls), 0)
 
 
