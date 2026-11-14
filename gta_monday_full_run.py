@@ -37,7 +37,6 @@ def stages(workspace, results, *, industrial_limit=10, skip_collection=False):
         council_args.append("--fetch-toronto-planning-notices")
     base = [
         ("daily_radar", ["gta_total_intelligence_run.py", "--workspace", ws], True),
-        ("source_quality", ["gta_source_quality_v1.py", "--results", str(results)], False),
         ("industrial_equipment", ["gta_industrial_equipment_run.py",
                                   "--workspace", ws, "--limit", str(industrial_limit)], False),
         ("commercial_activation", ["gta_commercial_activation_run.py",
@@ -228,6 +227,27 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
             report["daily_radar_diagnostics"] = inspect_daily_stage()
         save()
         print(name + ": " + row["status"] + " | " + str(log), flush=True)
+
+    # Read-only quality report is part of post-run evidence accounting, not a
+    # new collector/stage. Preserve the established seven-stage contract.
+    if not skip_collection:
+        try:
+            from gta_source_quality_v1 import run as run_source_quality
+            quality = run_source_quality(results)
+            report["source_quality"] = {
+                "status": quality["status"],
+                "municipalities_with_records": quality.get("municipalities_with_records", 0),
+                "citywide_verified": 0,
+                "buyer_leads_verified": 0,
+                "report": str(results / "GTA_RADAR_SOURCE_QUALITY_V1.json"),
+            }
+        except (OSError, ValueError, ImportError) as exc:
+            report["source_quality"] = {
+                "status": "SOURCE_QUALITY_REPORT_FAILED",
+                "error_type": type(exc).__name__,
+            }
+    else:
+        report["source_quality"] = {"status": "NOT_RUN_HISTORICAL_MODE"}
 
     passed = sum(x["status"] == "PASSED" for x in report["stages"])
     failed = [x["name"] for x in report["stages"] if x["status"] != "PASSED"]
