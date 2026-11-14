@@ -7,7 +7,7 @@ The new `gta_supplier_verification_gate.py` builds **an actionable analyst workl
 Inside `GTA_RADAR_RESULTS`:
 
 - `GTA_RADAR_COMPANY_ROLE_REVIEW_QUEUE.csv`: project, city, named organization, role claimed, source URL, stable graph edge ID and what to verify.
-- `GTA_RADAR_SUPPLIER_PACKAGE_REVIEW.csv`: reviewed tender/package observations, stage and source reference. Empty until operator-supplied evidence exists.
+- `GTA_RADAR_SUPPLIER_PACKAGE_REVIEW.csv`: rank-ready procurement research tasks for each existing project with an explicit UNKNOWN supplier sector and no invented tender, followed by reviewed package observations (where supplied). No row is an automatically verified contract.
 - `GTA_RADAR_COMPANY_PROCUREMENT_REVIEW_STATUS.json`: audit summary, review holds, reviewer-attested roles, deadlines and clearly labelled unverified claims.
 
 These are included in the normal dated ZIP because they are root `GTA_RADAR_*.csv/json` reports. The original collector SQLite, first-observed ledger, source files, current DeepSeek budget and seven-stage launcher are untouched.
