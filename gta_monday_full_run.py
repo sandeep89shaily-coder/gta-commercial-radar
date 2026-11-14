@@ -307,6 +307,29 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
             "status": "NOT_RUN_HISTORICAL_MODE",
         }
 
+    # Correlate existing application IDs with saved council excerpts, never
+    # promote text mentions to verified projects, applicants or purchasing leads.
+    if not skip_collection:
+        try:
+            from gta_cross_source_evidence_reconciliation import run as run_reconciliation
+            recon = run_reconciliation(results)
+            report["cross_source_reconciliation"] = {
+                "status": recon["status"],
+                "mentions_considered": recon["mentions_considered"],
+                "exact_id_review_candidates": recon["exact_id_review_candidates"],
+                "unmatched_or_ambiguous_mentions": recon["unmatched_or_ambiguous_mentions"],
+                "independently_verified_project_links": 0,
+            }
+        except (OSError, ValueError, ImportError) as exc:
+            report["cross_source_reconciliation"] = {
+                "status": "RECONCILIATION_HELD",
+                "error_type": type(exc).__name__,
+            }
+    else:
+        report["cross_source_reconciliation"] = {
+            "status": "NOT_RUN_HISTORICAL_MODE",
+        }
+
     passed = sum(x["status"] == "PASSED" for x in report["stages"])
     failed = [x["name"] for x in report["stages"] if x["status"] != "PASSED"]
     report["stage_successes"] = passed
