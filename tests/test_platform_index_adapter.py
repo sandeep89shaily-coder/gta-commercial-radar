@@ -4,7 +4,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from gta_platform_index_adapter import run, fetch_index, EVIDENCE, STATUS
+from gta_platform_index_adapter import run, fetch_index
 
 
 class Response:
@@ -90,7 +90,7 @@ class PilotTests(unittest.TestCase):
         out = run(self.results, "brampton_planning")
         self.assertEqual(out["status"], "NOT_FETCHED_MANUAL_OPT_IN_REQUIRED")
         self.assertEqual(out["verified_projects"], 0)
-        self.assertFalse((self.results / EVIDENCE).exists())
+        self.assertFalse((self.results / 'GTA_RADAR_PLATFORM_INDEX_BRAMPTON_PLANNING_EVIDENCE.json').exists())
 
     def test_explicit_fetch_captures_links_not_documents(self):
         html = (b'<a href="/docs/Planning-Agenda-2026.pdf">'
@@ -100,20 +100,20 @@ class PilotTests(unittest.TestCase):
         self.assertEqual(out["official_document_links_read"], 1)
         self.assertEqual(out["documents_downloaded"], 0)
         self.assertEqual(out["buyers_verified"], 0)
-        saved = json.loads((self.results / EVIDENCE).read_text())
+        saved = json.loads((self.results / 'GTA_RADAR_PLATFORM_INDEX_BRAMPTON_PLANNING_EVIDENCE.json').read_text())
         self.assertEqual(len(saved["index_sha256"]), 64)
         self.assertFalse(saved["source_first_publication_verified"])
 
     def test_failure_preserves_prior_source_evidence(self):
         run(self.results, "brampton_planning", fetch=True,
             getter=lambda _: b"<html>empty but valid</html>")
-        original = (self.results / EVIDENCE).read_bytes()
+        original = (self.results / 'GTA_RADAR_PLATFORM_INDEX_BRAMPTON_PLANNING_EVIDENCE.json').read_bytes()
         def denied(_):
             raise PermissionError("robots")
         out = run(self.results, "brampton_planning", fetch=True, getter=denied)
         self.assertIn("FAILED", out["status"])
-        self.assertEqual((self.results / EVIDENCE).read_bytes(), original)
-        self.assertTrue((self.results / STATUS).is_file())
+        self.assertEqual((self.results / 'GTA_RADAR_PLATFORM_INDEX_BRAMPTON_PLANNING_EVIDENCE.json').read_bytes(), original)
+        self.assertTrue((self.results / 'GTA_RADAR_PLATFORM_INDEX_BRAMPTON_PLANNING_STATUS.json').is_file())
 
     def test_unknown_id_never_fetches(self):
         with self.assertRaises(ValueError):
