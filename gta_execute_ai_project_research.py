@@ -160,6 +160,13 @@ def execute(candidate_file,shared_results,out,*,paid=False,max_projects=3,
                 investigation_plan=plan(row,key,db,day,legacy,transport,daily_limit=DAILY_CAP)
                 planned_row={**row,"_adaptive_query_order":investigation_plan["queries"]}
                 evidence,stats=native.fetch_native(planned_row,key,db,day,legacy,transport,daily_limit=DAILY_CAP)
+            except native.DeepSeekAccountBalanceError:
+                # One explicit provider HTTP 402 ends this paid run rather
+                # than charging another 100 failed requests / reservations.
+                state["stop_reason"]="DEEPSEEK_HTTP_402_ACCOUNT_BALANCE"
+                audit.append({"project_id":rid,"status":"PROVIDER_HTTP_402_BALANCE_REJECTED",
+                              "provider_bill_verified":False})
+                break
             except Exception as exc:
                 audit.append({"project_id":rid,"status":"DISCOVERY_FAILURE",
                               "error_type":type(exc).__name__,"error_reason":_failure_reason(exc)})
@@ -203,6 +210,12 @@ def execute(candidate_file,shared_results,out,*,paid=False,max_projects=3,
                 audit.append({"project_id":rid,"status":"AI_REVIEW_SAVED",
                               "fetched_sources":len(evidence),"selection_score":pick["score"],
                               "model_dates_removed":answer.get("model_dates_removed",0)})
+            except native.DeepSeekAccountBalanceError:
+                native.ledger_finish(db,day,reservation,"NONBILLABLE")
+                state["stop_reason"]="DEEPSEEK_HTTP_402_ACCOUNT_BALANCE"
+                audit.append({"project_id":rid,"status":"PROVIDER_HTTP_402_BALANCE_REJECTED",
+                              "provider_bill_verified":False})
+                break
             except Exception as exc:
                 cost=getattr(exc,"cost",None)
                 if cost is not None:native.ledger_finish(db,day,reservation,"DONE",cost)
@@ -222,7 +235,9 @@ def execute(candidate_file,shared_results,out,*,paid=False,max_projects=3,
                               "failure_file":failure_file.name,"evidence_file":evidence_file.name,
                               "cost_usd":cost})
                 continue
-        state["status"]=("REVIEW_ONLY_RESULTS" if state["completed"] else
+        state["status"]=("PROVIDER_HTTP_402_BALANCE_REJECTED"
+            if state.get("stop_reason")=="DEEPSEEK_HTTP_402_ACCOUNT_BALANCE" else
+            "REVIEW_ONLY_RESULTS" if state["completed"] else
             "BUDGET_EXHAUSTED" if state.get("stop_reason")=="DAILY_BUDGET_EXHAUSTED_OR_HELD" else
             "ALREADY_PROCESSED_TODAY" if state["skipped_previous_requests"] and not state["attempted"] else
             "NO_ELIGIBLE_PROJECTS_ABOVE_THRESHOLD" if not eligible else
