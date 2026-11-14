@@ -324,26 +324,15 @@ def build(results, workspace=None, *, now=None):
         except (ValueError, TypeError, KeyError, OverflowError) as exc:
             holds.append({"kind": "TENDER", "tender_id": str(key[1])[:100],
                           "reason": str(exc)[:120]})
-    # Every project is a potential procurement research task even when there
-    # has been no explicit public tender review. Never invent a work package.
+    # Reviewed tenders take priority, then fill remaining slots with projects
+    # lacking any tender evidence. No speculative procurement facts are filled.
     tender_queue = []
-    for pid, project_info in sorted(projects.items()):
+    reviewed_project_ids = set()
+    for tender in tender_rows:
         if len(tender_queue) >= MAX_QUEUE:
             break
-        tender_queue.append({
-            "project_node_id": pid, "project_id": project_info["project_id"],
-            "city": project_info["city"], "supplier_sector": "UNDETERMINED",
-            "tender_id": "", "work_scope": "", "tender_url": "",
-            "closing_date": "", "buyer_role_edge_id": "",
-            "review_status": "NO_PROJECT_SPECIFIC_PROCUREMENT_EVIDENCE",
-            "verification_action": "Find original tender/EOI or vendor-selection evidence; check buyer, trade scope, deadline and awards",
-        })
-    for tender in tender_rows[:MAX_QUEUE]:
         p = projects[tender["project_node_id"]]
-        # Replace this project's generic investigation row with its explicit
-        # tender decision instead of double-counting the same project as both.
-        tender_queue = [q for q in tender_queue if not (
-            q["project_node_id"] == p["node_id"] and not q["tender_id"])]
+        reviewed_project_ids.add(p["node_id"])
         tender_queue.append({
             "project_node_id": p["node_id"], "project_id": p["project_id"],
             "city": p["city"], "supplier_sector": tender["sector"],
@@ -352,6 +341,19 @@ def build(results, workspace=None, *, now=None):
             "buyer_role_edge_id": tender["buyer_role_edge_id"],
             "review_status": tender["review_status"],
             "verification_action": "Reopen exact public tender and independently reconfirm buyer, availability, award status and closing date",
+        })
+    for pid, project_info in sorted(projects.items()):
+        if len(tender_queue) >= MAX_QUEUE:
+            break
+        if pid in reviewed_project_ids:
+            continue
+        tender_queue.append({
+            "project_node_id": pid, "project_id": project_info["project_id"],
+            "city": project_info["city"], "supplier_sector": "UNDETERMINED",
+            "tender_id": "", "work_scope": "", "tender_url": "",
+            "closing_date": "", "buyer_role_edge_id": "",
+            "review_status": "NO_PROJECT_SPECIFIC_PROCUREMENT_EVIDENCE",
+            "verification_action": "Find original tender/EOI or vendor-selection evidence; check buyer, trade scope, deadline and awards",
         })
     return {
         "status": status,
