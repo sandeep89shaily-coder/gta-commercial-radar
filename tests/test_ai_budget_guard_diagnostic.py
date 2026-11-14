@@ -2,6 +2,7 @@
 import datetime as dt
 import json
 import sqlite3
+from contextlib import closing
 import tempfile
 import unittest
 from pathlib import Path
@@ -19,7 +20,7 @@ class AIBudgetGuardDiagnosticTests(unittest.TestCase):
 
     def ledger(self, items):
         path = self.root / "v5_ai_budget.sqlite"
-        with sqlite3.connect(path) as db:
+        with closing(sqlite3.connect(path)) as db:
             db.execute("CREATE TABLE spends (day TEXT,candidate TEXT,"
                        "reserved REAL,actual REAL,status TEXT,"
                        "PRIMARY KEY(day,candidate))")
