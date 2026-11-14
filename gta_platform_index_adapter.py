@@ -161,9 +161,15 @@ if __name__ == "__main__":
                         help="Explicitly opt in to one protected index fetch")
     parser.add_argument("--fetch-direct-pdfs", action="store_true",
                         help="After a successful --fetch, retrieve at most three same-official-host direct PDFs")
+    parser.add_argument("--fetch-escribe-documents", action="store_true",
+                        help="Only exact officially discovered city-specific eSCRIBE document URLs")
+    parser.add_argument("--authorized-public-document-access", action="store_true",
+                        help="Operator attests access is permitted for the selected eSCRIBE source")
     a = parser.parse_args()
-    if a.fetch_direct_pdfs and not a.fetch:
-        parser.error("--fetch-direct-pdfs requires --fetch")
+    if (a.fetch_direct_pdfs or a.fetch_escribe_documents) and not a.fetch:
+        parser.error("Document retrieval requires --fetch")
+    if a.fetch_escribe_documents and not a.authorized_public_document_access:
+        parser.error("eSCRIBE download requires explicit permitted-access attestation")
     status = run(a.results, a.source_id, fetch=a.fetch)
     if a.fetch_direct_pdfs:
         if status["status"] == "INDEX_FETCHED_DOCUMENT_LINKS_REVIEW_ONLY":
@@ -174,4 +180,14 @@ if __name__ == "__main__":
             }
         else:
             status["pdf_intake"] = {"status": "NOT_RUN_INDEX_NOT_VERIFIED"}
+    if a.fetch_escribe_documents:
+        if status["status"] == "INDEX_FETCHED_DOCUMENT_LINKS_REVIEW_ONLY":
+            from gta_escribe_exact_document_intake import run as run_escribe
+            status["escribe_intake"] = {
+                k: v for k, v in run_escribe(
+                    a.results, a.source_id, fetch=True, authorized=True).items()
+                if k != "documents"
+            }
+        else:
+            status["escribe_intake"] = {"status": "NOT_RUN_INDEX_NOT_VERIFIED"}
     print(json.dumps(status, indent=2))
