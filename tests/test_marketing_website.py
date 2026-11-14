@@ -75,6 +75,32 @@ class WebsiteTests(unittest.TestCase):
         self.assertIn("prefers-reduced-motion", css)
         self.assertIn(":focus-visible", css)
 
+    def test_hero_explains_customer_product_in_plain_language(self):
+        html = (ROOT / "index.html").read_text(encoding="utf-8")
+        self.assertIn("Know what's being built.", html)
+        self.assertIn("Find where you fit.", html)
+        self.assertIn("instead of sending you a pile of permits", html.lower())
+        self.assertIn('id="report"', html)
+        self.assertIn("See an example report", html)
+        self.assertIn("Purchasing / open bids", html)
+        self.assertIn("Not confirmed", html)
+
+    def test_example_report_is_unambiguously_fictional(self):
+        html = (ROOT / "index.html").read_text(encoding="utf-8")
+        self.assertIn("NOT A REAL PROJECT", html)
+        self.assertIn("Illustrative Ontario location", html)
+        self.assertIn("Not a depiction of verified live opportunities", html)
+        self.assertNotIn("16 municipalities", html)
+        self.assertNotIn("RESEARCH WORKSPACE", html)
+
+    def test_simple_navigation_describes_delivery_and_sample(self):
+        html = (ROOT / "index.html").read_text(encoding="utf-8")
+        self.assertIn('href="#report">What you get', html)
+        self.assertIn('href="#solutions">Who it', html)
+        self.assertIn('href="#sample"', html)
+        self.assertIn('id="coverage"', html)
+        self.assertIn('id="method"', html)
+
     def test_mail_client_contact_uses_only_public_business_inbox(self):
         html = (ROOT / "index.html").read_text(encoding="utf-8")
         js = (ROOT / "app.js").read_text(encoding="utf-8")
