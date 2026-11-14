@@ -16,7 +16,7 @@ class MondayIntegrationTests(unittest.TestCase):
             self.assertEqual([s[0] for s in stages], [
                 "daily_radar", "industrial_equipment", "commercial_activation",
                 "facility_evidence", "toronto_20_source_research",
-                "council_agenda_intelligence", "ai_harness_free"])
+                "council_agenda_intelligence", "ai_harness_adaptive"])
             self.assertEqual(sum("gta_total_intelligence_run.py" in s[1]
                                  for s in stages), 1)
             self.assertEqual(sum("gta_agent_harness.py" in s[1]
@@ -40,7 +40,10 @@ class MondayIntegrationTests(unittest.TestCase):
             self.assertNotIn("--fetch-toronto-official-agendas", history_stage)
             self.assertNotIn("--fetch-toronto-schedule", history_stage)
             self.assertNotIn("--fetch-toronto-planning-notices", history_stage)
-            self.assertNotIn("--paid", stages[-1][1])
+            self.assertIn("--paid", stages[-1][1])
+            self.assertEqual(stages[-1][1][stages[-1][1].index("--max-projects") + 1], "2")
+            self.assertNotIn("--paid", monday.stages(
+                ws, ws / "GTA_RADAR_RESULTS", skip_collection=True)[-1][1])
             self.assertNotIn("--fetch", stages[-3][1])
             self.assertNotIn("--live-ckan", stages[-3][1])
             self.assertNotIn("--fetch", stages[-2][1])
@@ -61,6 +64,8 @@ class MondayIntegrationTests(unittest.TestCase):
             self.assertEqual(report["status"], "ALL_STAGES_RAN_REVIEW_ONLY")
             self.assertTrue(report["fresh_collection_verified"])
             self.assertEqual(report["stage_successes"], 7)
+            self.assertEqual(report["ai_harness_mode"], "ADAPTIVE_RESEARCH_SHARED_BUDGET")
+            self.assertFalse(report["deepseek_guard_diagnostic"]["provider_billing_verified"])
             self.assertEqual(report["archive_status"], "CREATED_REVIEW_ONLY")
             self.assertTrue(Path(report["run_archive"]).is_file())
             self.assertIn("GTA_RADAR_EXPORTS", report["run_archive"])
@@ -144,6 +149,7 @@ class MondayIntegrationTests(unittest.TestCase):
             self.assertEqual(report["status"], "SAVED_DATA_REVIEW_ONLY_NO_NEW_COLLECTION")
             self.assertFalse(report["collection_performed"])
             self.assertFalse(report["fresh_collection_verified"])
+            self.assertEqual(report["ai_harness_mode"], "FREE_PREFLIGHT")
             self.assertEqual(len(report["stages"]), 6)
 
     def test_refuses_more_than_ten_notice_fetches(self):

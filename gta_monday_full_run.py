@@ -46,8 +46,14 @@ def stages(workspace, results, *, industrial_limit=10, skip_collection=False):
         ("toronto_20_source_research", ["gta_toronto_20_commercial_review.py",
                                        "--out", str(results / "TORONTO_20_COMMERCIAL_REVIEW")], False),
         ("council_agenda_intelligence", council_args, False),
-        ("ai_harness_free", ["gta_agent_harness.py",
-                             "--results", out], False),
+        # The prior daily stage only planned AI work and never executed it.
+        # On an explicit full manual collection, allow at most two
+        # source-backed AI research reviews through the SAME existing ledger,
+        # model executor and run lock. Never do this for saved-data review.
+        ("ai_harness_adaptive" if not skip_collection else "ai_harness_free",
+         ["gta_agent_harness.py", "--results", out] +
+         (["--paid", "--max-projects", "2"] if not skip_collection else []),
+         False),
     ]
     if skip_collection:
         base = base[1:]
@@ -72,7 +78,7 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
         "collection_performed": not skip_collection,
         "fresh_collection_verified": False,
         "industrial_official_fetch_maximum": industrial_limit,
-        "ai_harness_mode": "FREE_PREFLIGHT_NO_ADDITIONAL_PAID_REQUESTS",
+        "ai_harness_mode": "ADAPTIVE_RESEARCH_SHARED_BUDGET" if not skip_collection else "FREE_PREFLIGHT",
         "buyer_verified_by_integration": False,
         "open_supplier_contract_verified_by_integration": False,
         "outreach_performed": False,
@@ -150,7 +156,9 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
             "<table><tr><th>Stage</th><th>Status</th><th>Exit</th><th>Log</th></tr>"
             + tr + "</table>"
             "<p>Review the individual pilot CSV/HTML reports under GTA_RADAR_RESULTS."
-            " No automated outreach, scheduling or extra paid AI was authorized.</p>"
+            " AI research may run within the pre-existing shared local budget guard, "
+            "but local reservations are not proof of provider charges. "
+            "No automated outreach or scheduling.</p>"
             "</body></html>", encoding="utf-8"
         )
 
@@ -220,6 +228,27 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
                     "status": "NO_CURRENT_COUNCIL_STAGE_DIAGNOSTIC",
                     "error_type": type(exc).__name__
                 }
+        if name in ("ai_harness_adaptive", "ai_harness_free"):
+            # Exit code 0 is not evidence that DeepSeek ran or was billed.
+            # The harness's own manifest explicitly reports attempts and
+            # model results; never equate ledger holds with API charges.
+            ai_manifest = results / "AGENT_HARNESS_REVIEW" / "AI_HARNESS_STATUS.json"
+            try:
+                data = json.loads(ai_manifest.read_text(encoding="utf-8"))
+                report["ai_harness_diagnostics"] = {
+                    "status": data.get("status", "UNKNOWN"),
+                    "mode": data.get("mode", "UNKNOWN"),
+                    "research_attempts": data.get("executor", {}).get("attempted", 0),
+                    "research_completed": data.get("executor", {}).get("completed", 0),
+                    "model_calls_billed_verified": False,
+                    "local_guard_used_or_held_usd_not_billing": data.get(
+                        "executor", {}).get("budget_used_or_held_usd"),
+                }
+            except (OSError, ValueError, TypeError) as exc:
+                report["ai_harness_diagnostics"] = {
+                    "status": "HARNESS_REPORT_MISSING_OR_UNREADABLE",
+                    "error_type": type(exc).__name__,
+                }
         if name == "daily_radar":
             # Discovery itself refuses missing/stale daily output. Its success
             # does not mean evidence/commercial gates have been satisfied.
@@ -227,6 +256,31 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
             report["daily_radar_diagnostics"] = inspect_daily_stage()
         save()
         print(name + ": " + row["status"] + " | " + str(log), flush=True)
+
+    # Provide an independent, read-only breakdown of the *local software*
+    # guard. Reservations and estimates are NOT DeepSeek provider invoices.
+    # The SQLite files are opened read-only and remain unchanged.
+    if not skip_collection:
+        try:
+            from gta_ai_budget_guard_diagnostic import run as run_ai_guard_diagnostic
+            audit = run_ai_guard_diagnostic(results)
+            report["deepseek_guard_diagnostic"] = {
+                "status": audit["status"],
+                "provider_billing_verified": False,
+                "provider_actual_billed_usd": None,
+                "shared_completed_estimate_usd": audit["shared_ledger"].get(
+                    "completed_estimate_usd"),
+                "shared_unresolved_reserved_usd": audit["shared_ledger"].get(
+                    "unresolved_reserved_usd"),
+                "local_guard_usage_usd_not_provider_billing": audit[
+                    "shared_ledger"].get("local_guard_usage_usd"),
+            }
+        except (OSError, ValueError, TypeError, ImportError) as exc:
+            report["deepseek_guard_diagnostic"] = {
+                "status": "BUDGET_GUARD_AUDIT_HELD",
+                "error_type": type(exc).__name__,
+                "provider_billing_verified": False,
+            }
 
     # Read-only quality report is part of post-run evidence accounting, not a
     # new collector/stage. Preserve the established seven-stage contract.
