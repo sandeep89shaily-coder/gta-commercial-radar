@@ -37,6 +37,7 @@ def stages(workspace, results, *, industrial_limit=10, skip_collection=False):
         council_args.append("--fetch-toronto-planning-notices")
     base = [
         ("daily_radar", ["gta_total_intelligence_run.py", "--workspace", ws], True),
+        ("source_quality", ["gta_source_quality_v1.py", "--results", out], False),
         ("industrial_equipment", ["gta_industrial_equipment_run.py",
                                   "--workspace", ws, "--limit", str(industrial_limit)], False),
         ("commercial_activation", ["gta_commercial_activation_run.py",
