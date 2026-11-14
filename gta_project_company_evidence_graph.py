@@ -144,6 +144,7 @@ def build(results, *, now=None):
     role_names = defaultdict(set)
     truncated = {"role_mentions": 0, "site_mentions": 0}
     emitted = set()
+    site_mentions_emitted = 0
 
     def hold(reason, origin):
         if len(holds) < MAX_HOLDS:
@@ -248,7 +249,7 @@ def build(results, *, now=None):
         name = _name(record.get("organization"))
         if not role or not name:
             continue
-        if len(sites) >= MAX_EXPORTED_SITE_MENTIONS:
+        if site_mentions_emitted >= MAX_EXPORTED_SITE_MENTIONS:
             truncated["site_mentions"] += 1
             continue
         city = _city(record["city"])
@@ -269,6 +270,7 @@ def build(results, *, now=None):
             "organization_name_as_stated": name,
             "identity_verified": False, "canonical_company_id": None,
         }
+        site_mentions_emitted += 1
         edges.append({
             "edge_id": edge_id, "from_node": site_key, "to_node": org_id,
             "relationship": "SOURCE_SITE_ORGANIZATION_MENTION_NOT_PROJECT_ROLE",
