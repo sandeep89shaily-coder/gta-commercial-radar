@@ -357,6 +357,34 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
             "status": "NOT_RUN_HISTORICAL_MODE",
         }
 
+    # Source-backed buyer/supplier research queue. Operator attestations live
+    # outside exported run results and never authorize outreach or live claims.
+    if not skip_collection:
+        try:
+            from gta_supplier_verification_gate import run as run_supplier_gate
+            verification = run_supplier_gate(results, ws)
+            report["company_procurement_review"] = {
+                "status": verification["status"],
+                "source_graph_role_claims": verification.get("source_graph_role_claims", 0),
+                "reviewer_attested_role_claims": verification.get("reviewer_attested_role_claims", 0),
+                "reviewer_attested_open_tender_needing_live_recheck":
+                    verification.get("reviewer_attested_open_tender_needing_live_recheck", 0),
+                "held_or_conflicting_decisions":
+                    verification.get("held_or_conflicting_decisions", 0),
+                "verified_buyers": 0,
+                "verified_open_supplier_contracts": 0,
+                "outreach_authorized": False,
+            }
+        except (OSError, ValueError, TypeError, ImportError) as exc:
+            report["company_procurement_review"] = {
+                "status": "COMPANY_PROCUREMENT_GATE_HELD",
+                "error_type": type(exc).__name__,
+            }
+    else:
+        report["company_procurement_review"] = {
+            "status": "NOT_RUN_HISTORICAL_MODE",
+        }
+
     passed = sum(x["status"] == "PASSED" for x in report["stages"])
     failed = [x["name"] for x in report["stages"] if x["status"] != "PASSED"]
     report["stage_successes"] = passed
