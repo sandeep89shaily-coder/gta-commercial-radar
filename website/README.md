@@ -1,46 +1,47 @@
-# GTA Commercial Radar — public website V1
+# GTA Radar public website — V2 clarity redesign
 
-Professional, responsive, accessible **static** landing site in \`website/\`. The current working brand is **GTA RADAR / GTA Commercial Radar**, because a final premium name and domain have not yet been selected. Rebranding is a text/CSS update, not an architectural rewrite.
+This is the **marketing website**, not the municipal collection dashboard. The site lives in `website/` and is deliberately small, responsive, dependency-free and easy to rebrand when a new domain/name is selected.
 
-## Preview immediately on your Windows computer
+## What changed in V2
 
-From the existing repository code folder (not your retained \`new data\` database workspace):
+Feedback on V1: it was visually busy and unclear about the actual product. V2 replaces the abstract radar animation, multiple general-purpose slogans, and prominent unvalidated city-coverage count with:
 
-\`\`\`powershell
+1. A plain-English headline: **Know what's being built. Find where you fit.**
+2. A large, clearly fictional **sample project brief** with scope, source documents, company-role uncertainty and procurement status (shown as unknown).
+3. A short "what you get" section explaining the actual deliverable rather than listing software features.
+4. Supplier-specific use cases for HVAC, industrial equipment, electrical/security, and insurance/facilities.
+5. Short sections on research workflow, geographic limitations, frequently asked questions, and email sample requests.
+6. Streamlined light/green design with mobile layouts, keyboard focus styles, reduced-motion support and no external web dependencies.
+
+Nothing implies that the illustrated facility is a real or currently actionable project.
+
+## Preview on Windows
+
+In your existing Radar GitHub code folder after the current run finishes:
+
+```powershell
 git pull --ff-only
 start .\website\index.html
-\`\`\`
+```
 
-Or run a local web server (for consistent local HTTP behavior):
+Or serve a local site:
 
-\`\`\`powershell
+```powershell
 py -3 -m http.server 8080 --directory website
-\`\`\`
+```
 
-Then visit \`http://localhost:8080\`. Stop the server with Ctrl+C.
+Then open http://localhost:8080 and press Ctrl+C when finished. Do not run the collector a second time just to view the website.
 
-The site does **not** start, modify, or operate the Radar data collectors. For the full **owner-side collection** separately use the existing \`.\RUN_GTA_RADAR_TODAY.bat\`, which safely updates the code and launches the seven-stage original database run. Never claim this run happened merely because the site preview or GitHub CI worked.
+## Publishing
 
-## Website deployment
+The marketing site is served from `website/` with no build command. The manual GitHub Pages workflow `.github/workflows/deploy-marketing-site.yml` still works. In GitHub Settings → Pages, choose GitHub Actions; then Actions → Deploy GTA Radar marketing website → Run workflow. Publishing remains a separate manual decision and is **not** triggered by merging website code.
 
-The site has no build step or framework dependency. It can be deployed from the \`website\` directory with **Cloudflare Pages**, Netlify, or GitHub Pages.
+Cloudflare Pages with Git integration can alternatively use `main`, no build command and `website` as the output directory. Custom-domain and DNS setup require the chosen domain and provider account.
 
-For Cloudflare Pages through Git integration: select the \`sandeep89shaily-coder/gta-commercial-radar\` repository, production branch \`main\`, leave the build command blank, set output directory to \`website\`. A Cloudflare account and explicit authorization will be required. Attach the purchased domain only after its name and DNS are finalized.
+## Sample requests and honest limitations
 
-For GitHub Pages, use the included optional \`workflow_dispatch\` deployment workflow at \`.github/workflows/deploy-marketing-site.yml\`. On GitHub open **Settings → Pages → Build and deployment → Source: GitHub Actions**, then **Actions → Deploy GTA Radar marketing website → Run workflow**. Pages requires the repository and account to allow Pages. The deployment does not enable site DNS automatically or create a custom domain.
+The sample request form currently opens the visitor's own email program to prepare a request to `gtaradar18@gmail.com`. It does not capture addresses into a CRM, store submitted personal information, unlock an automatic PDF, or claim an email has been sent. The visitor must manually send the draft. Do not announce a gated download until an actual verified report PDF and consent-aware form service/backend are connected.
 
-## Sample report request: intentional V1 constraint
+The site never claims 16 cities with complete data coverage or verified sale-ready buyers. Its sample brief is labelled `DEMO` / `NOT A REAL PROJECT`, and open-bid status remains unconfirmed. Live reports need a separate original-source audit; marketing copy cannot turn a research candidate into verified procurement.
 
-The form validates a work email, allows sector/region choice and opens a prefilled email to the existing public business mailbox \`gtaradar18@gmail.com\`. The visitor **must press Send** in their own mail application. This static site does **not** receive, store, or automatically deliver a report.
-
-The page explicitly discloses that limitation. Before launching an actual email-gated downloadable sample, we must connect a supported form service or a small consent-aware backend with secure storage, abuse controls, a privacy notice, and an approved **verified** sample PDF. Do **not** advertise a fake instant download, invent ten live projects, or assert citywide completeness/buyer verification.
-
-## Messaging guardrails
-
-- 16 is the **configured research municipality scope**, not 16 fully working collectors, complete municipal coverage, or citywide verified inventory.
-- The dark radar illustration is clearly labelled **illustrative / not a live feed**.
-- Source-linked company role review does not establish a real buyer, open contract or first-publication timing until independent evidence checks pass.
-- No analytics, cookies, external fonts, external JavaScript SDKs, contacts database or network calls are embedded.
-- Local GitHub CI checks HTML links, CSS/JS assets, labels and sample form disclaimers.
-
-The website is a useful public marketing foundation. Commercial launch still requires real source audits, authorized form capture, privacy/legal review, an authentic sample report, domain/trademark clearance and a business contact process.
+No changes were made to daily Radar collectors, SQLite, scheduled work, AI costs or outreach permissions. `python -m unittest discover -s tests -p test_marketing_website.py` validates structure and claims; full GitHub CI tests the repository matrix.
