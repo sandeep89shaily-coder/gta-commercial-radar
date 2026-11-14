@@ -20,6 +20,9 @@ from gta_brampton_featured_pdc import run as collect_featured
 from gta_brampton_official_gis_planning import run as collect_brampton_official_gis
 from gta_brampton_gis_radar_reconciliation import run as reconcile_brampton_gis
 from gta_mississauga_discovered_pdc_run import run as collect_mississauga_discovered
+from gta_mississauga_official_gis_source_audit import audit as audit_mississauga_gis
+from gta_mississauga_official_gis_records import run as collect_mississauga_gis_records
+from gta_mississauga_gis_reconciliation import run as reconcile_mississauga_gis
 from gta_toronto_tmmis_authorized_agendas import run as fetch_toronto_agendas
 from toronto_tmmis_documents import agenda_url
 from gta_toronto_official_schedule import run as collect_toronto_schedule
@@ -88,7 +91,8 @@ def execute(workspace, results, *, index_auditor=None, fetch_brampton_featured=F
             agenda_bridge_collector=None,
             fetch_toronto_planning_notices=False, planning_notices_collector=None,
             fetch_brampton_gis=False, brampton_gis_collector=None,
-            brampton_reconciler=None):
+            brampton_reconciler=None, fetch_mississauga_gis=False,
+            mississauga_gis_auditor=None):
     root = Path(workspace).resolve()
     out = Path(results).resolve() / "COUNCIL_INTELLIGENCE_REVIEW"
     out.mkdir(parents=True, exist_ok=True)
@@ -291,6 +295,61 @@ def execute(workspace, results, *, index_auditor=None, fetch_brampton_featured=F
         report["mississauga_discovered_pdc"] = {
             "status": "NOT_REQUESTED", "captured_pdfs": 0}
 
+    # Independent official GIS acceptance, not project extraction or buyer leads.
+    # Keeps useful source access diagnostics separate from eSCRIBE PDF results.
+    if fetch_mississauga_gis:
+        try:
+            gis_audit = (mississauga_gis_auditor or audit_mississauga_gis)(
+                out / "MISSISSAUGA_OFFICIAL_GIS_SOURCE_AUDIT", fetch=True)
+            report["mississauga_official_gis_source_audit"] = gis_audit
+            if gis_audit.get("id_inventory_complete_layers") != 2:
+                report["notices"].append("MISSISSAUGA_GIS_SCHEMA_OR_ACCESS_GAP")
+        except Exception as exc:
+            report["mississauga_official_gis_source_audit"] = {
+                "status": "SOURCE_EXCEPTION_HELD", "reason": type(exc).__name__}
+            report["notices"].append("MISSISSAUGA_GIS_SOURCE_EXCEPTION")
+    else:
+        report["mississauga_official_gis_source_audit"] = {
+            "status": "NOT_REQUESTED"}
+
+    # Full official Mississauga application file extraction; independent
+    # from the schema-only acceptance and eSCRIBE committee-PDF handoff.
+    if fetch_mississauga_gis:
+        try:
+            gis_rows = collect_mississauga_gis_records(
+                out / "MISSISSAUGA_OFFICIAL_GIS_APPLICATIONS", fetch=True)
+            report["mississauga_official_gis_application_records"] = {
+                k: gis_rows.get(k) for k in (
+                    "status", "layers_complete", "current_application_files",
+                    "commercial_review_files", "changed_records_review_only",
+                    "cases_for_manual_audit", "layer_results", "paid_ai_calls")}
+            if gis_rows.get("layers_complete") != 2:
+                report["notices"].append("MISSISSAUGA_GIS_APPLICATIONS_PARTIAL_OR_HELD")
+        except Exception as exc:
+            report["mississauga_official_gis_application_records"] = {
+                "status": "SOURCE_EXCEPTION_HELD", "reason": type(exc).__name__}
+            report["notices"].append("MISSISSAUGA_GIS_APPLICATIONS_SOURCE_EXCEPTION")
+    else:
+        report["mississauga_official_gis_application_records"] = {"status": "NOT_REQUESTED"}
+
+    if fetch_mississauga_gis:
+        try:
+            matched = reconcile_mississauga_gis(
+                out / "MISSISSAUGA_OFFICIAL_GIS_APPLICATIONS",
+                Path(results).resolve(),
+                out / "MISSISSAUGA_GIS_CROSS_SOURCE_REVIEW")
+            report["mississauga_gis_existing_radar_reconciliation"] = matched
+            if matched.get("status") != "EXACT_FILE_ID_REVIEW_READY":
+                report["notices"].append("MISSISSAUGA_GIS_CROSS_SOURCE_REVIEW_HELD")
+        except Exception as exc:
+            report["mississauga_gis_existing_radar_reconciliation"] = {
+                "status": "RECONCILIATION_EXCEPTION_HELD",
+                "reason": type(exc).__name__}
+            report["notices"].append("MISSISSAUGA_GIS_RECONCILIATION_FAILED")
+    else:
+        report["mississauga_gis_existing_radar_reconciliation"] = {
+            "status": "NOT_REQUESTED"}
+
     # Source-level Toronto Planning Act notices. The City's Notice Date is
     # explicit evidence, not original first-publication proof. Staff contacts
     # are municipal information contacts, never commercial purchasing leads.
@@ -444,6 +503,8 @@ def main():
                      help="Bounded public Toronto City Clerk schedule CSV source check")
     cli.add_argument("--fetch-toronto-official-agendas", action="store_true",
                      help="Fetch only exact official TMMIS agenda URLs registered in workspace")
+    cli.add_argument("--fetch-mississauga-official-gis", action="store_true",
+                     help="Bounded official Mississauga GIS source schema and ID audit")
     cli.add_argument("--fetch-mississauga-pdc", action="store_true",
                      help="Fetch only newly observed official PDC PDF links through robots gate")
     cli.add_argument("--fetch-brampton-official-gis", action="store_true",
@@ -454,6 +515,7 @@ def main():
     report = execute(args.workspace, args.results,
                      fetch_brampton_featured=args.fetch_brampton_featured,
                      fetch_mississauga_pdc=args.fetch_mississauga_pdc,
+                     fetch_mississauga_gis=args.fetch_mississauga_official_gis,
                      fetch_toronto_official_agendas=args.fetch_toronto_official_agendas,
                      fetch_toronto_schedule=args.fetch_toronto_schedule,
                      fetch_toronto_planning_notices=args.fetch_toronto_planning_notices,
