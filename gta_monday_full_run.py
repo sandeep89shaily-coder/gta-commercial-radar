@@ -330,6 +330,33 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
             "status": "NOT_RUN_HISTORICAL_MODE",
         }
 
+    # Build an evidence graph from existing facility/research and council
+    # review files. Company names remain unverified, project-scoped mentions;
+    # no contacts, buyer assertions, source fetches or paid AI.
+    if not skip_collection:
+        try:
+            from gta_project_company_evidence_graph import run as run_role_graph
+            role_graph = run_role_graph(results)
+            report["project_company_evidence_graph"] = {
+                "status": role_graph["status"],
+                "project_candidates": role_graph["project_candidates"],
+                "organization_mentions": role_graph["organization_mentions"],
+                "claimed_relationships": role_graph["claimed_relationships"],
+                "role_conflicts": role_graph["role_conflicts"],
+                "council_id_context_links": role_graph["council_id_context_links"],
+                "verified_project_company_roles": 0,
+                "verified_buyers": 0,
+            }
+        except (OSError, ValueError, ImportError) as exc:
+            report["project_company_evidence_graph"] = {
+                "status": "PROJECT_COMPANY_GRAPH_HELD",
+                "error_type": type(exc).__name__,
+            }
+    else:
+        report["project_company_evidence_graph"] = {
+            "status": "NOT_RUN_HISTORICAL_MODE",
+        }
+
     passed = sum(x["status"] == "PASSED" for x in report["stages"])
     failed = [x["name"] for x in report["stages"] if x["status"] != "PASSED"]
     report["stage_successes"] = passed
