@@ -13,6 +13,7 @@ from pathlib import Path
 from gta_ai_project_evidence_bridge import run as bridge_run
 from gta_project_company_evidence_graph import run as graph_run
 from gta_supplier_verification_gate import run as supplier_run
+from gta_commercial_qualification_review import run as qualification_run
 
 REPORT = "GTA_RADAR_AI_PROJECT_INTEGRATION_STATUS.json"
 
@@ -24,6 +25,7 @@ def run(results, workspace=None):
     bridge = bridge_run(root)
     graph = graph_run(root)
     gate = supplier_run(root, workspace)
+    qualification = qualification_run(root)
     report = {
         "status": "AI_PROJECT_GRAPH_AND_SUPPLIER_REVIEW_REFRESHED",
         "ai_review_projects": bridge.get("project_candidates", 0),
@@ -35,6 +37,8 @@ def run(results, workspace=None):
         "graph_role_claims": graph.get("claimed_relationships", 0),
         "supplier_role_review_queue": len(gate.get("role_queue", [])),
         "supplier_procurement_review_queue": len(gate.get("tender_queue", [])),
+        "internal_commercial_review_top10": qualification["internal_top_10_count"],
+        "qualified_sale_ready_leads": 0,
         "verified_buyers": 0, "verified_open_supplier_contracts": 0,
         "new_paid_ai_calls": 0, "live_source_fetches": 0,
         "outreach_authorized": False,
@@ -48,6 +52,8 @@ def run(results, workspace=None):
             "bridge": "GTA_RADAR_AI_PROJECT_EVIDENCE_BRIDGE.json",
             "graph": "GTA_RADAR_PROJECT_COMPANY_EVIDENCE_GRAPH.json",
             "procurement_review": "GTA_RADAR_COMPANY_PROCUREMENT_REVIEW_STATUS.json",
+            "commercial_analyst_top10": "GTA_RADAR_COMMERCIAL_TOP10_ANALYST_REVIEW.csv",
+            "commercial_qualification": "GTA_RADAR_COMMERCIAL_QUALIFICATION_STATUS.json",
         },
     }
     path = root / REPORT
