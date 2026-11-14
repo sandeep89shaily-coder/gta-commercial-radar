@@ -265,21 +265,26 @@ def build(results):
         raise ValueError("EXCESSIVE_AI_REVIEW_FILE_COUNT")
     # Versioned checkpoints for the same project are kept as evidence, but
     # never combined into one current lifecycle without an input-version key.
-    ids = set()
+    ids, ambiguous = set(), set()
     for path in files:
         item, error = _review(path)
         if error:
             holds.append({"file": path.name, "reason": error})
             continue
         if item["project_id"] in ids:
+            ambiguous.add(item["project_id"])
             holds.append({"file": path.name,
                           "reason": "MULTIPLE_REVIEW_VERSIONS_NO_CURRENT_INPUT_AUTHORITY"})
             projects = [p for p in projects if p["project_id"] != item["project_id"]]
             continue
         ids.add(item["project_id"])
         projects.append(item)
+    # A later third/fourth checkpoint may never reintroduce an ambiguous ID.
+    projects = [p for p in projects if p["project_id"] not in ambiguous]
+    for item in projects:
         for hold in item["holds"]:
             holds.append({"project_id": item["project_id"], **hold})
+
     # Supplier review order is an analyst priority heuristic, not probability
     # of an unawarded package. Industrial/commercial before residential,
     # outstanding source contradictions and late approvals held for review.
