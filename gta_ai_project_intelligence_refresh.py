@@ -47,7 +47,7 @@ def run(results, workspace=None):
         "outputs": {
             "bridge": "GTA_RADAR_AI_PROJECT_EVIDENCE_BRIDGE.json",
             "graph": "GTA_RADAR_PROJECT_COMPANY_EVIDENCE_GRAPH.json",
-            "procurement_review": "GTA_RADAR_COMPANY_PROCUREMENT_REVIEW.json",
+            "procurement_review": "GTA_RADAR_COMPANY_PROCUREMENT_REVIEW_STATUS.json",
         },
     }
     path = root / REPORT
