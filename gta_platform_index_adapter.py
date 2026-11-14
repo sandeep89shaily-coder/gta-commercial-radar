@@ -10,6 +10,7 @@ import argparse
 import datetime as dt
 import hashlib
 import json
+import re
 import socket
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -90,6 +91,10 @@ def run(results, source_id, *, fetch=False, getter=None, now=None):
     if len(matches) != 1:
         raise ValueError("SOURCE_ID_NOT_IN_OFFICIAL_REGISTRY")
     item = matches[0]
+    if not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", source_id):
+        raise ValueError("INVALID_SOURCE_ID_FOR_OUTPUT")
+    evidence_file = "GTA_RADAR_PLATFORM_INDEX_" + source_id.upper() + "_EVIDENCE.json"
+    status_file = "GTA_RADAR_PLATFORM_INDEX_" + source_id.upper() + "_STATUS.json"
     at = now or dt.datetime.now(dt.timezone.utc).isoformat()
     status = {
         "status": "NOT_FETCHED_MANUAL_OPT_IN_REQUIRED",
@@ -126,7 +131,7 @@ def run(results, source_id, *, fetch=False, getter=None, now=None):
             }
             # Atomic replacement only after successful exact-source processing;
             # previous good evidence is never destroyed by blocked fetches.
-            outfile = results / EVIDENCE
+            outfile = results / evidence_file
             tmp = outfile.with_suffix(".json.tmp")
             tmp.write_text(json.dumps(document, indent=2), encoding="utf-8")
             tmp.replace(outfile)
@@ -143,7 +148,7 @@ def run(results, source_id, *, fetch=False, getter=None, now=None):
                 "reason": type(exc).__name__,
                 "detail": str(exc)[:180],
             })
-    (results / STATUS).write_text(json.dumps(status, indent=2),
+    (results / status_file).write_text(json.dumps(status, indent=2),
                                   encoding="utf-8")
     return status
 
