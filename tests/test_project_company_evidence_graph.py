@@ -135,6 +135,22 @@ class CompanyGraphTests(unittest.TestCase):
         self.assertTrue(report["edges"][0]["from_node"].startswith("site:"))
         self.assertEqual(report["verified_buyers"], 0)
 
+    def test_many_names_at_one_site_are_bounded(self):
+        self.events([{
+            "event_id": "E" + str(i), "project_id": "",
+            "city": "Brampton", "site_id": "SAME_SITE",
+            "source_family": "industrial", "source_id": "ero",
+            "source_record_id": str(i),
+            "organization": "Company " + str(i),
+            "organization_role": "REGULATORY_PROPONENT_NOT_VERIFIED_BUYER",
+            "source_url": "https://ero.ontario.ca/",
+        } for i in range(310)])
+        report = build(self.root)
+        self.assertEqual(report["source_site_contexts"], 1)
+        self.assertEqual(report["organization_mentions"], 300)
+        self.assertEqual(report["claimed_relationships"], 300)
+        self.assertEqual(report["truncated"]["site_mentions"], 10)
+
     def test_conflicting_source_claims_are_review_holds(self):
         self.events([{
             "event_id": "E1", "project_id": "APP-1", "city": "Vaughan",
