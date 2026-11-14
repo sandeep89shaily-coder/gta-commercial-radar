@@ -249,7 +249,10 @@ def run(results, out=None, *, candidates=None, paid=False, max_projects=3,
         }
         state["steps"].append({"name": "source_evidence_gate", "status": "COMPLETE",
                                "checks": state["metrics"]})
-        state["status"] = ("PREFLIGHT_READY_NO_SPEND" if not paid else
+        state["status"] = ("PROVIDER_HTTP_402_BALANCE_REJECTED"
+                           if state.get("executor", {}).get("stop_reason") ==
+                              "DEEPSEEK_HTTP_402_ACCOUNT_BALANCE" else
+                           "PREFLIGHT_READY_NO_SPEND" if not paid else
                            "REVIEW_ONLY_REQUIRES_HUMAN_VALIDATION" if sourced or context or no_source else
                            "PAID_MODE_NO_COMPLETED_REVIEWS")
     except Exception as exc:
