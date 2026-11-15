@@ -356,7 +356,7 @@ def _stage_model(row, evidence, stage, profile, prior,
                    sort_keys=True).encode()).hexdigest()[:28]
     claim = "ai10_v1_" + fingerprint
     result = {"stage": stage, "status": "PENDING", "classification": "UNKNOWN",
-              "claims": [], "unresolved": [],
+              "claims": [], "unresolved": [], "evaluated_on": day.isoformat(),
               "verified_buyer": False, "verified_open_package": False}
     if stage == "customer_specific_supplier_fit" and not profile:
         result["status"] = "CUSTOMER_PROFILE_REQUIRED"
@@ -365,7 +365,11 @@ def _stage_model(row, evidence, stage, profile, prior,
         result["status"] = "NO_INDEPENDENT_EVIDENCE"
         return result
     if not native.ledger_claim(db, day.isoformat(), claim, .012, legacy):
-        result["status"] = "BUDGET_OR_PREVIOUS_CLAIM"
+        prior_claim = db.execute(
+            "SELECT 1 FROM spends WHERE day=? AND candidate=?",
+            (day.isoformat(), claim)).fetchone()
+        result["status"] = ("PREVIOUS_REQUEST_LEDGER_NO_RETRY" if prior_claim
+                            else "BUDGET_DEFERRED")
         return result
     # Persist a durable attempted-request marker via the shared ledger first.
     try:
@@ -526,8 +530,17 @@ def run(results, *, paid=False, limit=2, start_index=0,
                         "open_contract_verified": False,
                         "outreach_authorized": False}
                 for stage in STAGES:
-                    if stage in dossier["stages"]:
-                        continue  # never duplicate a completed/uncertain call
+                    previous_stage = dossier["stages"].get(stage)
+                    if previous_stage:
+                        # A day with no budget did not send a paid request:
+                        # it can continue on a later day. Charged/uncertain
+                        # requests are never repeated automatically.
+                        if (previous_stage.get("status") == "BUDGET_DEFERRED"
+                                and previous_stage.get("evaluated_on") !=
+                                day.isoformat()):
+                            del dossier["stages"][stage]
+                        else:
+                            continue
                     # The contact/procurement/lifecycle/technical/early stages
                     # can obtain NEW independently fetched public evidence,
                     # not just re-analyze the original municipal permit.
@@ -553,8 +566,8 @@ def run(results, *, paid=False, limit=2, start_index=0,
                     dossier["stages"][stage] = result
                     _write_json(path, dossier)
                     if result["status"] in (
-                        "BUDGET_OR_PREVIOUS_CLAIM", "HTTP_402",
-                        "REQUEST_FAILED_UNCERTAIN_BILLING",
+                        "BUDGET_DEFERRED", "PREVIOUS_REQUEST_LEDGER_NO_RETRY",
+                        "HTTP_402", "REQUEST_FAILED_UNCERTAIN_BILLING",
                         "USAGE_UNCERTAIN_EVIDENCE_RETAINED"):
                         break
                 brief_path = root / BRIEFS / (
