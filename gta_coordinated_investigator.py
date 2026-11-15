@@ -20,6 +20,7 @@ from gta_top10_live_source_recheck import _identity
 from radar_run_lock import once_lock
 
 OUT = "GTA_RADAR_COORDINATED_CASES"
+OVERLAY = "GTA_RADAR_COORDINATED_PROJECT_OVERLAY.json"
 STAGES = ("company_entity_relationships", "buyer_contact_path",
           "project_lifecycle_supersession", "procurement_award_status",
           "technical_documents_equipment", "early_investment_signals")
@@ -206,6 +207,32 @@ def _save(path, state):
     path.with_suffix(".md").write_text(_brief(state), encoding="utf-8")
 
 
+def _publish_overlay(root, state):
+    """Join only exact-record research into canonical qualification output."""
+    existing = _read_json(root / OVERLAY)
+    projects = existing.get("projects")
+    if not isinstance(projects, dict):
+        projects = {}
+    row = state["project"]
+    projects[row["record_id"]] = {
+        "record_id": row["record_id"], "city": row["city"],
+        "address": row["address"], "application_id": row["application_id"],
+        "project_description": row["project_description"],
+        "status": state["status"],
+        "company_site_leads": state["dossier"]["site_company_leads"][:8],
+        "source_backed_claims": state["accepted_claims"][:8],
+        "ai_commercial_classification_unverified": str(
+            state.get("analysis", {}).get("classification") or "UNKNOWN")[:60],
+        "verified_buyer": False, "verified_open_supplier_contract": False,
+        "outreach_authorized": False,
+        "source_count": len(state["evidence"]),
+        "report_path": state["report_path"],
+    }
+    _write_json(root / OVERLAY, {
+        "schema": 1, "source": "COORDINATED_AI_INVESTIGATION",
+        "projects": projects, "outreach_authorized": False})
+
+
 def investigate(results, record_id, *, paid=False, customer_profile="",
                 today=None, token=None, transport=None):
     root = Path(results)
@@ -315,6 +342,7 @@ def investigate(results, record_id, *, paid=False, customer_profile="",
             else:
                 state["status"] = "ANALYSIS_" + analysis["status"]
             _save(path, state)
+            _publish_overlay(root, state)
             return state
         finally:
             db.close()
