@@ -80,7 +80,8 @@ def check_roles(proposals, sources):
         identity = str(src.get("identity") or "")
         if identity not in ("EXACT_APPLICATION_ID_IN_FETCHED_TEXT",
                             "EXACT_OFFICIAL_ARCGIS_APPLICATION",
-                            "SAME_ADDRESS_PROJECT_CONTEXT_NOT_LINKED"):
+                            "SAME_ADDRESS_PROJECT_CONTEXT_NOT_LINKED",
+                            "SAME_ADDRESS_COMPANY_CONTEXT_NOT_LINKED"):
             rejected += 1
             continue
         key = (name.casefold(),role,str(src.get("url") or ""))
@@ -125,3 +126,53 @@ def buyer_hypothesis(value):
         "buyer_verified": False,
         "contact_verified": False,
     }
+
+
+def check_site_mentions(proposals, sources):
+    """Keep source-backed co-location candidates without promoting project roles.
+
+    A business at the same address is NOT necessarily the permit applicant,
+    operator, owner, supplier, purchaser or contractor.
+    """
+    if not isinstance(proposals, list):
+        return [], 0
+    accepted, rejected, seen = [], 0, set()
+    for item in proposals[:8]:
+        if not isinstance(item, dict):
+            rejected += 1
+            continue
+        name = clean(item.get("organization"), 120)
+        quote = clean(item.get("quote"), 240)
+        idx = item.get("source_j")
+        if not name or not quote or type(idx) is not int or idx < 0 or idx >= len(sources):
+            rejected += 1
+            continue
+        src = sources[idx]
+        if not isinstance(src, dict) or src.get("identity") not in (
+                "SAME_ADDRESS_PROJECT_CONTEXT_NOT_LINKED",
+                "SAME_ADDRESS_COMPANY_CONTEXT_NOT_LINKED",
+                "EXACT_APPLICATION_ID_IN_FETCHED_TEXT",
+                "EXACT_OFFICIAL_ARCGIS_APPLICATION"):
+            rejected += 1
+            continue
+        passages = [clean(src.get(field), 2000) for field in ("excerpt", "role_excerpt")]
+        if name.casefold() not in quote.casefold() or not any(
+                quote.casefold() in passage.casefold() for passage in passages):
+            rejected += 1
+            continue
+        key = (name.casefold(), str(src.get("url") or ""))
+        if key in seen:
+            continue
+        seen.add(key)
+        accepted.append({
+            "organization": name,
+            "source_url": str(src.get("url") or "")[:1600],
+            "evidence_quote": quote,
+            "source_identity": src["identity"],
+            "evidence_level": "SITE_ASSOCIATION_ONLY_NOT_PERMIT_ROLE",
+            "project_role_supported_for_review": False,
+            "buyer_verified": False,
+            "procurement_verified": False,
+            "contact_verified": False,
+        })
+    return accepted, rejected + max(0, len(proposals)-8)
