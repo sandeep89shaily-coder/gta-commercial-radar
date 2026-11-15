@@ -30,6 +30,7 @@ MODEL_RESERVE = 0.012
 MAX_REQUEST_BYTES = 11000
 ALLOWED = {"PREFER", "NEUTRAL", "CHECK_CONFLICT", "DEPRIORITIZE"}
 BATCH_DIR = "AI_TOP10_REVIEW_BATCHES"
+ATTEMPT = "GTA_RADAR_AI_TOP10_ATTEMPT_STATUS.json"
 
 
 def _safe_text(value, limit=180):
@@ -157,13 +158,23 @@ def run(results, *, paid=False, key=None, transport=None, today=None):
         "budget_cap_usd": DEEPSEEK_DAILY_LIMIT_USD,
         "reviews": [],
     }
+    def save_attempt():
+        target = root / ATTEMPT
+        tmp_attempt = target.with_suffix(".json.tmp")
+        tmp_attempt.write_text(json.dumps(
+            {k:v for k,v in state.items() if k != "reviews"},
+            ensure_ascii=False, indent=2), encoding="utf-8")
+        tmp_attempt.replace(target)
+
     if not paid or not pool:
         state["status"] = "NO_CANDIDATES" if not pool else "FREE_PREFLIGHT_NOT_SUBMITTED"
+        save_attempt()
         return state
 
     token = v5.key_from_windows() if key is None else key
     if not token:
         state["status"] = "MISSING_API_KEY_NO_PAID_REVIEW"
+        save_attempt()
         return state
 
     with once_lock(root):
@@ -212,7 +223,8 @@ def run(results, *, paid=False, key=None, transport=None, today=None):
                     break
                 # A request may have incurred tokens even if output cannot be
                 # parsed. Record provider-reported usage estimate, never fake $0.
-                cost = native.model_usage_cost(response.get("usage") or {})
+                cost = native.model_usage_cost(
+                    response.get("usage") or {} if isinstance(response, dict) else {})
                 if cost is None:
                     native.ledger_finish(db, day.isoformat(), claim, "UNKNOWN")
                     status = "MODEL_USAGE_MISSING_FULL_RESERVATION_HELD"
@@ -255,6 +267,7 @@ def run(results, *, paid=False, key=None, transport=None, today=None):
     if state["reviewed_count"] != len(pool):
         state["status"] = "AI_PRESELECTION_INCOMPLETE_" + state["status"]
         state["applies_to_top10"] = False
+        save_attempt()
         return state
     state["status"] = "AI_TOP10_REVIEW_ONLY"
     state["applies_to_top10"] = True
@@ -262,7 +275,8 @@ def run(results, *, paid=False, key=None, transport=None, today=None):
     tmp.write_text(json.dumps(state, ensure_ascii=False, indent=2),
                    encoding="utf-8")
     tmp.replace(out)
-    regenerate_shortlist(root)
+    regenerate_shortlist(root, today=day)
+    save_attempt()
     return state
 
 
