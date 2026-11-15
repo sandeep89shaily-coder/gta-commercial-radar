@@ -23,7 +23,8 @@ from gta_commercial_qualification_review import (
     build as base_build, ai_candidate_pool, ai_fingerprint,
     AI_REVIEW, run as regenerate_shortlist,
 )
-from gta_top10_live_source_recheck import check_one as recheck_project
+from gta_top10_live_source_recheck import (check_one as recheck_project,
+    model_directed_company_search)
 from gta_ai_company_role_evidence import check_roles, check_site_mentions, buyer_hypothesis
 
 MAX_CANDIDATES = 24
@@ -224,7 +225,8 @@ def _validate(answer, count, batch=None, live_checks=None):
     return result
 
 
-def run(results, *, paid=False, key=None, transport=None, today=None):
+def run(results, *, paid=False, deep_research=False, deep_project_limit=4,
+        key=None, transport=None, today=None):
     root = Path(results)
     if not root.is_dir():
         raise ValueError("EXISTING_RADAR_RESULTS_REQUIRED")
@@ -246,6 +248,7 @@ def run(results, *, paid=False, key=None, transport=None, today=None):
         "verified_buyers": 0, "verified_open_supplier_packages": 0,
         "budget_cap_usd": DEEPSEEK_DAILY_LIMIT_USD,
         "reviews": [],
+        "model_directed_research": [],
     }
     def save_attempt():
         target = root / ATTEMPT
@@ -299,6 +302,43 @@ def run(results, *, paid=False, key=None, transport=None, today=None):
                     len(v.get("issues", [])) for v in live_checks.values())
                 save_attempt()
                 return state
+            # Opt-in DeepSeek web research: model discovers URLs, then Radar
+            # independently Fetches and rechecks them for permit/site identity.
+            # The deep pass is capped separately; cached source records and
+            # completed model-review checkpoints remain reusable.
+            if deep_research:
+                for row in pool[:max(0, min(deep_project_limit, 4))]:
+                    original = live_checks[(row["city"].casefold(),
+                                            row["record_id"])]
+                    researched = model_directed_company_search(
+                        root, row, token, db, day, legacy,
+                        transport=transport)
+                    state["model_directed_research"].append({
+                        "record_id": row["record_id"],
+                        "status": researched.get("status"),
+                        "model_calls": researched.get("paid_model_calls", 0),
+                        "source_count": len(researched.get("sources") or []),
+                    })
+                    extras = researched.get("sources") or []
+                    if extras:
+                        existing = original["sources"]
+                        combined = list(existing)
+                        seen_urls = {src.get("url") for src in existing}
+                        for src in extras:
+                            if src.get("url") not in seen_urls:
+                                combined.append(src)
+                                seen_urls.add(src.get("url"))
+                        # Preserve at least one official exact-ID source and
+                        # include independently fetched alternative context.
+                        exact = [src for src in combined
+                                 if str(src.get("identity", "")).startswith("EXACT")]
+                        others = [src for src in combined if src not in exact]
+                        deep_urls = {src.get("url") for src in extras}
+                        novel = [src for src in others
+                                 if src.get("url") in deep_urls]
+                        prior = [src for src in others
+                                 if src.get("url") not in deep_urls]
+                        original["sources"] = (exact[:1] + novel[:2] + prior)[:4]
             state["source_snapshot_only"] = state["live_sources_retrieved"] == 0
             for start in range(0, len(pool), BATCH_SIZE):
                 batch = pool[start:start + BATCH_SIZE]
@@ -464,7 +504,9 @@ if __name__ == "__main__":
     p.add_argument("--results", required=True)
     p.add_argument("--paid", action="store_true",
                    help="Explicitly allow bounded paid DeepSeek shortlist assessment")
+    p.add_argument("--deep-research", action="store_true",
+                   help="Opt in to bounded DeepSeek web-tool discovery for up to four projects")
     opts = p.parse_args()
-    output = run(opts.results, paid=opts.paid)
+    output = run(opts.results, paid=opts.paid, deep_research=opts.deep_research)
     print(json.dumps({k: v for k, v in output.items() if k != "reviews"},
                      indent=2))
