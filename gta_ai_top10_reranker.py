@@ -180,10 +180,11 @@ def _validate(answer, count, batch=None, live_checks=None):
             row = batch[i]
             source = (live_checks.get((row["city"].casefold(),
                                        row["record_id"])) or {}).get("sources", [])
-            if (cited < 0 or cited >= len(source) or
-                    quote.casefold() not in " ".join(
-                        str(source[cited].get("excerpt","")).split()).casefold()):
-                raise ValueError("LIVE_CITATION_NOT_IN_FETCHED_EXCERPT")
+            if (cited < 0 or cited >= min(len(source), 4) or
+                    not any(quote.casefold() in " ".join(
+                        str(source[cited].get(field, "")).split()).casefold()
+                        for field in ("excerpt", "role_excerpt"))):
+                raise ValueError("LIVE_CITATION_NOT_IN_SUPPLIED_SOURCE_PASSAGE")
             matched_source = {
                 "url": source[cited]["url"],
                 "identity": source[cited]["identity"],
@@ -339,10 +340,21 @@ def run(results, *, paid=False, key=None, transport=None, today=None):
                     break
                 native.ledger_finish(db, day.isoformat(), claim, "DONE", cost)
                 state["paid_model_calls"] += 1
+                # Preserve the exact paid response for local offline diagnosis.
+                # Do not automatically retry a request that may already be billed.
+                raw_path = review_root / (claim + ".raw_response.json")
+                raw_tmp = raw_path.with_suffix(".json.tmp")
+                raw_tmp.write_text(
+                    json.dumps(response, ensure_ascii=False, indent=2),
+                    encoding="utf-8")
+                raw_tmp.replace(raw_path)
                 try:
                     parsed = _validate(response, len(batch), batch, live_checks)
                 except (ValueError, TypeError, AttributeError) as exc:
                     status = "AI_REVIEW_INVALID_" + type(exc).__name__
+                    state["failed_project_id"] = batch[0]["record_id"]
+                    state["validation_error"] = _safe_text(exc, 180)
+                    state["failed_response_file"] = str(raw_path)
                     break
                 accepted = []
                 for i, row in enumerate(batch):
