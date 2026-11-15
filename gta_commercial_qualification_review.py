@@ -327,10 +327,11 @@ def ai_fingerprint(pool):
         separators=(",", ":")).encode("ascii")).hexdigest()
 
 
-def _apply_ai(pool, all_rows, review):
+def _apply_ai(pool, all_rows, review, today):
     """Only a complete, source-input-matched AI batch may affect ordering."""
     if (review.get("status") != "AI_TOP10_REVIEW_ONLY"
-            or review.get("source_snapshot_only") is not True
+            or review.get("live_recheck_used") is not True
+            or review.get("recheck_date") != today.isoformat()
             or review.get("applies_to_top10") is not True
             or review.get("input_fingerprint") != ai_fingerprint(pool)):
         return 0
@@ -366,6 +367,33 @@ def _apply_ai(pool, all_rows, review):
         row["ai_preselection_next_check"] = _clean(data["next_check"], 140)
         row["ai_preselection_score_adjustment"] = allowed[data["decision"]]
         row["internal_research_priority_score_not_sale_probability"] += allowed[data["decision"]]
+        recheck = data.get("live_recheck") or {}
+        sources = recheck.get("sources") or []
+        cited = data.get("cited_live_source")
+        row["ai_live_checked_on"] = _clean(recheck.get("checked_on"))
+        row["ai_official_status_fetched"] = _clean(
+            recheck.get("official_current_status_literal"))
+        row["ai_official_status_differs_from_saved"] = bool(
+            recheck.get("official_status_change_review"))
+        row["ai_live_source_count"] = len(sources)
+        first_source = sources[0] if sources and isinstance(sources[0],dict) else {}
+        # Show the independently fetched URL even when the model did not
+        # cite it; an empty quote means no literal citation was established.
+        row["ai_live_evidence_url"] = _url(
+            cited.get("url") if isinstance(cited,dict) else first_source.get("url"))
+        row["ai_live_evidence_quote"] = _clean(
+            cited.get("quote"), 220) if isinstance(cited,dict) else ""
+        row["ai_live_evidence_identity"] = _clean(
+            cited.get("identity") if isinstance(cited,dict)
+            else first_source.get("identity"))
+        if any(s.get("identity") == "SAME_ADDRESS_PROJECT_CONTEXT_NOT_LINKED"
+               for s in sources):
+            row["ai_live_project_version_review"] = "UNLINKED_NEWER_ADDRESS_CONTEXT_REVIEW"
+        elif any(str(s.get("identity","")).startswith("EXACT") for s in sources):
+            row["ai_live_project_version_review"] = "EXACT_ID_SOURCE_REVIEW_NOT_PROCUREMENT_PROOF"
+        else:
+            row["ai_live_project_version_review"] = "NO_CURRENT_CORROBORATING_PROJECT_PAGE"
+        row["next_verification_action"] = _clean(data["next_check"], 260)
     return len(reviewed)
 
 
@@ -425,7 +453,7 @@ def build(results, *, today=None, apply_ai=True):
     ai_status = "NOT_RUN_OR_STALE"
     if apply_ai:
         review = _read_json(root, AI_REVIEW)
-        applied = _apply_ai(pool, deduped, review)
+        applied = _apply_ai(pool, deduped, review, today)
         ai_status = "APPLIED_TO_RESEARCH_RANK" if applied else (
             "STALE_OR_INCOMPLETE_REVIEW_IGNORED" if review
             else "NO_AI_PRESELECTION_REVIEW")
@@ -461,6 +489,11 @@ def build(results, *, today=None, apply_ai=True):
         "ai_preselection_status": ai_status if apply_ai else "DISABLED_BASELINE",
         "ai_preselection_reviewed_count": applied,
         "ai_preselection_not_independent_verification": True,
+        "ai_recheck_evidence_note": (
+            "Current Search/Fetch may return updated evidence. Source retrieval "
+            "is not verified first-publication, same-address project identity "
+            "or unawarded supplier procurement. Exact-ID evidence and URL shown "
+            "separately, and past AI assessments expire by local day."),
         "internal_top_10_count": len(top),
         "source_supported_ai_company_roles": sum(len(r["exact_project_roles"]) for r in deduped),
         "projects_with_ai_conflicts": sum(bool(r["ai_conflicts"]) for r in deduped),
@@ -487,7 +520,11 @@ FIELDS = ("analyst_queue_rank", "record_id", "origin", "city", "address",
           "contact_email", "contact_phone", "missing_required_proof",
           "next_verification_action",
           "ai_preselection_decision", "ai_preselection_reason",
-          "ai_preselection_next_check", "ai_preselection_score_adjustment")
+          "ai_preselection_next_check", "ai_preselection_score_adjustment",
+          "ai_live_checked_on", "ai_live_source_count", "ai_live_evidence_url",
+          "ai_live_evidence_quote", "ai_live_evidence_identity",
+          "ai_live_project_version_review",
+          "ai_official_status_fetched", "ai_official_status_differs_from_saved")
 
 
 def _csv_safe(value):
