@@ -373,6 +373,9 @@ def _apply_ai(pool, all_rows, review, today):
         sources = recheck.get("sources") or []
         cited = data.get("cited_live_source")
         row["ai_live_checked_on"] = _clean(recheck.get("checked_on"))
+        row["ai_live_recheck_complete"] = recheck.get("complete") is True
+        row["ai_live_source_check_issues"] = _clean(
+            "|".join(str(issue) for issue in recheck.get("issues", [])[:8]), 420)
         row["ai_official_status_fetched"] = _clean(
             recheck.get("official_current_status_literal"))
         row["ai_official_status_differs_from_saved"] = bool(
@@ -582,7 +585,9 @@ FIELDS = ("analyst_queue_rank", "record_id", "origin", "city", "address",
           "next_verification_action",
           "ai_preselection_decision", "ai_preselection_reason",
           "ai_preselection_next_check", "ai_preselection_score_adjustment",
-          "ai_live_checked_on", "ai_live_source_count", "ai_live_evidence_url",
+          "ai_live_checked_on", "ai_live_recheck_complete",
+          "ai_live_source_check_issues",
+          "ai_live_source_count", "ai_live_evidence_url",
           "ai_live_evidence_quote", "ai_live_evidence_identity",
           "ai_live_project_version_review",
           "ai_official_status_fetched", "ai_official_status_differs_from_saved",
