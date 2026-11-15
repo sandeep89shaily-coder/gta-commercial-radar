@@ -47,6 +47,32 @@ class TenCapabilityTests(unittest.TestCase):
                      "retrieved_on": "2026-11-15"}
                 ]}]}), encoding="utf-8")
 
+    def test_exact_record_id_preflight_selects_correct_project(self):
+        with (self.root / "GTA_RADAR_COMMERCIAL_TOP10_ANALYST_REVIEW.csv").open(
+                "a", newline="", encoding="utf-8") as stream:
+            writer = csv.DictWriter(stream, fieldnames=list(self.record))
+            writer.writerow({**self.record,
+                             "record_id": "toronto:other",
+                             "address": "1430 Birchmount Road"})
+        selected = run(self.root, record_id="toronto:other", today=TODAY)
+        self.assertEqual(selected["projects_selected"], 1)
+        self.assertEqual(selected["results"][0]["record_id"], "toronto:other")
+        self.assertEqual(selected["results"][0]["address"],
+                         "1430 Birchmount Road")
+        self.assertEqual(selected["status"], "PREFLIGHT_NO_SPEND")
+        self.assertFalse((self.root / "v5_ai_budget.sqlite").exists())
+
+    def test_exact_record_id_must_exist_and_must_not_conflict_with_index(self):
+        with self.assertRaisesRegex(ValueError, "EXACT_RECORD_ID_NOT_IN_CURRENT_TOP10"):
+            run(self.root, record_id="missing", today=TODAY, paid=True,
+                token="test", transport=lambda *_:
+                    self.fail("No paid call on wrong selected project"))
+        with self.assertRaisesRegex(ValueError,
+                                    "EXACT_RECORD_ID_CANNOT_COMBINE_WITH_START_INDEX"):
+            run(self.root, record_id=self.record["record_id"],
+                start_index=1, today=TODAY, paid=True, token="test",
+                transport=lambda *_: self.fail("No paid call"))
+
     def test_preflight_is_free_and_exposes_ten_stages(self):
         result = run(self.root, today=TODAY)
         self.assertEqual(result["status"], "PREFLIGHT_NO_SPEND")
