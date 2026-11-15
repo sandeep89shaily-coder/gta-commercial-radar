@@ -249,6 +249,8 @@ def run(results, *, paid=False, deep_research=False, deep_project_limit=4,
         "budget_cap_usd": DEEPSEEK_DAILY_LIMIT_USD,
         "reviews": [],
         "model_directed_research": [],
+        "partial_source_checks": [],
+        "source_evidence_incomplete": False,
     }
     def save_attempt():
         target = root / ATTEMPT
@@ -288,11 +290,20 @@ def run(results, *, paid=False, deep_research=False, deep_project_limit=4,
                     status = "PROVIDER_HTTP_402_ACCOUNT_BALANCE"
                     break
                 live_checks[(row["city"].casefold(),row["record_id"])] = result
-                if result.get("complete") is not True:
-                    status = "LIVE_RECHECK_INCOMPLETE"
-                    break
-                state["live_checks_completed"] += 1
                 state["live_sources_retrieved"] += len(result.get("sources", []))
+                if result.get("complete") is True:
+                    state["live_checks_completed"] += 1
+                else:
+                    # Incomplete Search/Fetch is not approval, procurement or
+                    # publication evidence. Preserve and label source gaps,
+                    # rather than discarding usable previously fetched pages.
+                    # The provider ledger still prevents duplicate paid calls.
+                    state["source_evidence_incomplete"] = True
+                    state["partial_source_checks"].append({
+                        "record_id": row["record_id"],
+                        "source_count": len(result.get("sources", [])),
+                        "issues": list(result.get("issues", []))[:8],
+                    })
             state["live_recheck_used"] = True
             state["recheck_date"] = day.isoformat()
             if len(live_checks) != len(pool) or status != "AI_PRESELECTION_REVIEW_ONLY":
@@ -339,6 +350,8 @@ def run(results, *, paid=False, deep_research=False, deep_project_limit=4,
                         prior = [src for src in others
                                  if src.get("url") not in deep_urls]
                         original["sources"] = (exact[:1] + novel[:2] + prior)[:4]
+            state["live_recheck_issue_count"] = sum(
+                len(v.get("issues", [])) for v in live_checks.values())
             state["source_snapshot_only"] = state["live_sources_retrieved"] == 0
             for start in range(0, len(pool), BATCH_SIZE):
                 batch = pool[start:start + BATCH_SIZE]
