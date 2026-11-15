@@ -139,6 +139,56 @@ class AITopTenSelectionTests(unittest.TestCase):
         q=build(self.root,today=DAY)
         self.assertEqual(q["ai_preselection_reviewed_count"],0)
 
+
+    def test_invalid_paid_response_is_preserved_for_offline_diagnosis(self):
+        self.write([self.row("A")])
+        def invalid(path, payload):
+            if path == "/v1/tools/search":
+                return {"results": []}
+            if path == "/v1/tools/fetch":
+                return {"content": ""}
+            return {"choices": [{"message": {"content": '{"reviews":[]}'},
+                                 "finish_reason": "stop"}],
+                    "usage": {"prompt_tokens": 900, "completion_tokens": 50}}
+        result = ai_run(self.root, paid=True, key="test", today=DAY,
+                        transport=invalid)
+        self.assertIn("AI_REVIEW_INVALID_ValueError", result["status"])
+        self.assertEqual(result["failed_project_id"], "A")
+        self.assertIn("AI_PRESELECTION_REVIEW_COUNT_INVALID",
+                      result["validation_error"])
+        raw_path = Path(result["failed_response_file"])
+        self.assertTrue(raw_path.is_file())
+        self.assertEqual(json.loads(raw_path.read_text(encoding="utf-8"))
+                         ["choices"][0]["message"]["content"], '{"reviews":[]}')
+        self.assertFalse((self.root / AI_REVIEW).exists())
+
+    def test_evidence_quote_can_reference_supplied_role_excerpt(self):
+        from gta_ai_top10_reranker import _validate
+        row = {"city": "Toronto", "record_id": "A"}
+        source = {
+            "identity": "EXACT_APPLICATION_ID_IN_FETCHED_TEXT",
+            "url": "https://example.org/planning",
+            "retrieved_on": DAY.isoformat(),
+            "excerpt": "Planning file A.",
+            "role_excerpt": "Registered owner: Acme Development Inc.",
+        }
+        response = {
+            "choices": [{"message": {"content": json.dumps({"reviews": [{
+                "i": 0, "decision": "NEUTRAL", "reason": "Investigate",
+                "investigate": "Find the construction tender",
+                "evidence_j": 0,
+                "evidence_quote": "Registered owner: Acme Development Inc.",
+                "role_claims": [{"organization": "Acme Development Inc.",
+                                 "role": "OWNER", "source_j": 0,
+                                 "quote": "Registered owner: Acme Development Inc."}]
+            }]})}, "finish_reason": "stop"}]
+        }
+        parsed = _validate(
+            response, 1, [row], {("toronto", "A"): {"sources": [source]}})
+        self.assertEqual(len(parsed[0]["role_candidates"]), 1)
+        self.assertEqual(parsed[0]["cited_source"]["quote"],
+                         "Registered owner: Acme Development Inc.")
+
     def test_http402_is_not_a_charge_and_prevents_result(self):
         self.write([self.row("A"),self.row("B")])
         def reject(path,payload):
