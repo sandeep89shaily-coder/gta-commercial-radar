@@ -47,6 +47,8 @@ class AITopTenSelectionTests(unittest.TestCase):
             if counter is not None: counter.append(path)
             if path == "/v1/tools/search":
                 return {"results": []}
+            if path == "/v1/tools/fetch":
+                return {"content": ""}
             self.assertEqual(path,"/chat/completions")
             user=json.loads(payload["messages"][1]["content"])
             reviews=[]
@@ -125,6 +127,8 @@ class AITopTenSelectionTests(unittest.TestCase):
         def invalid(path,payload):
             if path == "/v1/tools/search":
                 return {"results":[]}
+            if path == "/v1/tools/fetch":
+                return {"content":""}
             return {"choices":[{"message":{"content":json.dumps(
                 {"reviews":[{"i":0,"decision":"PREFER","reason":"x","investigate":"y"}]})},
                 "finish_reason":"stop"}],
