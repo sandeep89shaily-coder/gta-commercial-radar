@@ -156,6 +156,94 @@ class AnnouncementQualificationTest(unittest.TestCase):
                         customer_profile="Industrial HVAC contractors")
         self.assertTrue(again["checkpoint_reused"])
 
+    def test_http_error_fetch_does_not_abort_source_based_synthesis(self):
+        from urllib.error import HTTPError
+        calls = []
+        def provider(endpoint, payload):
+            calls.append(endpoint)
+            if endpoint == "/v1/tools/search":
+                return {"results": [{
+                    "url": "https://harbourlight.example/contact",
+                    "title": "Harbourlight Developments contact",
+                    "snippet": "Official Harbourlight Developments contact"}]}
+            if endpoint == "/v1/tools/fetch":
+                raise HTTPError(payload["url"], 403, "Forbidden", None, None)
+            if endpoint == "/chat/completions":
+                return {"choices": [{"finish_reason": "stop", "message": {
+                    "content": json.dumps({
+                        "classification": "HOLD",
+                        "commercial_reason": "Announced industrial project",
+                        "source_claims": [
+                            {"kind": "company",
+                             "subject": "Harbourlight Developments",
+                             "source_index": 0,
+                             "quote": "Harbourlight Developments announced acquisition of Northfield Works"},
+                        ],
+                    })}}],
+                    "usage": {"prompt_tokens": 500, "completion_tokens": 80}}
+            self.fail(endpoint)
+        result = qualify(self.root, project_name="Northfield Works",
+                         paid=True, token="test", transport=provider,
+                         day=DAY)
+        self.assertEqual(result["model_calls"], 1)
+        self.assertEqual(result["assessment"]["classification"], "HOLD")
+        self.assertEqual(len(result["evidence"]), 1)
+        self.assertEqual(len(result["fetch_failures"]), 1)
+        self.assertEqual(result["fetch_failures"][0]["status"],
+                         "UNCERTAIN_HTTPError")
+        self.assertFalse(result["outreach_authorized"])
+        self.assertEqual(calls.count("/v1/tools/fetch"), 1)
+        self.assertEqual(calls.count("/chat/completions"), 1)
+
+    def test_resume_old_fetch_checkpoint_uses_only_synthesis(self):
+        from gta_announcement_commercial_qualification import _save
+        preflight = qualify(
+            self.root, project_name="Northfield Works", day=DAY,
+            customer_profile="Industrial HVAC contractors")
+        checkpoint = dict(preflight)
+        checkpoint["status"] = "FETCH_UNCERTAIN_HTTPError"
+        checkpoint["research_steps"] = [
+            {"stage": "company_contacts", "search_status": "OK"}]
+        checkpoint["model_calls"] = 0
+        _save(Path(checkpoint["report_path"]), checkpoint)
+        calls = []
+        def provider(endpoint, payload):
+            calls.append(endpoint)
+            self.assertEqual(endpoint, "/chat/completions")
+            return {"choices": [{"finish_reason": "stop", "message": {
+                "content": json.dumps({
+                    "classification": "HOLD",
+                    "source_claims": [{
+                        "kind": "company",
+                        "subject": "Harbourlight Developments",
+                        "source_index": 0,
+                        "quote": "Harbourlight Developments announced acquisition of Northfield Works",
+                    }],
+                })}}],
+                "usage": {"prompt_tokens": 400, "completion_tokens": 60}}
+        resumed = qualify(
+            self.root, project_name="Northfield Works",
+            day=DAY, customer_profile="Industrial HVAC contractors",
+            resume_saved=True, paid=True, token="test", transport=provider)
+        self.assertEqual(calls, ["/chat/completions"])
+        self.assertEqual(resumed["model_calls"], 1)
+        self.assertEqual(resumed["assessment"]["classification"], "HOLD")
+        self.assertEqual(len(resumed["evidence"]), 1)
+        self.assertTrue(resumed["fetch_failures"])
+        self.assertFalse(resumed["outreach_authorized"])
+        again = qualify(
+            self.root, project_name="Northfield Works",
+            day=DAY, customer_profile="Industrial HVAC contractors",
+            paid=True, token="test", transport=lambda *_:
+            self.fail("Never repeat completed paid work"))
+        self.assertTrue(again["checkpoint_reused"])
+        with self.assertRaisesRegex(ValueError, "MODEL_ALREADY_ATTEMPTED_NO_RETRY"):
+            qualify(
+                self.root, project_name="Northfield Works",
+                day=DAY, customer_profile="Industrial HVAC contractors",
+                resume_saved=True, paid=True, token="test", transport=lambda *_:
+                self.fail("Never repeat model"))
+
     def test_contact_is_not_a_confirmed_project_buyer(self):
         page = [{"url": "https://example.org/company/contact",
                  "content": CONTACT,
