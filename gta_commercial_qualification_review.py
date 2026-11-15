@@ -29,6 +29,7 @@ TOP_OUT = "GTA_RADAR_COMMERCIAL_TOP10_ANALYST_REVIEW.csv"
 REPORT = "GTA_RADAR_COMMERCIAL_QUALIFICATION_STATUS.json"
 AI_REVIEW = "GTA_RADAR_AI_TOP10_REVIEW_STATUS.json"
 AI_TEN_OVERLAY = "GTA_RADAR_AI_TEN_CAPABILITIES_OVERLAY.json"
+COORDINATED_OVERLAY = "GTA_RADAR_COORDINATED_PROJECT_OVERLAY.json"
 
 MAX_BYTES = 24_000_000
 MAX_RECORDS = 5000
@@ -560,6 +561,30 @@ def build(results, *, today=None, apply_ai=True):
         # Never auto-populate contact_phone/email from an unreviewed AI
         # claim. They remain in the sourced research fields above.
 
+    # Join the single coordinated investigator into the SAME canonical
+    # project record; use exact identity, never a shared street address.
+    coordinated = _read_json(root, COORDINATED_OVERLAY).get("projects", {})
+    if not isinstance(coordinated, dict):
+        coordinated = {}
+    coordinated_integrated = 0
+    for row in deduped:
+        c = coordinated.get(row["record_id"])
+        if not isinstance(c, dict) or not all(
+                str(c.get(k) or "") == str(row.get(k) or "")
+                for k in ("record_id", "city", "address",
+                          "application_id", "project_description")):
+            continue
+        coordinated_integrated += 1
+        row["coordinated_research_status"] = str(c.get("status") or "UNKNOWN")
+        row["coordinated_company_leads"] = c.get("company_site_leads", [])
+        row["coordinated_source_claims"] = c.get("source_backed_claims", [])
+        row["coordinated_assessment_unverified"] = str(
+            c.get("ai_commercial_classification_unverified") or "UNKNOWN")
+        row["coordinated_source_count"] = int(c.get("source_count") or 0)
+        row["coordinated_research_report"] = str(c.get("report_path") or "")
+        # Never mark a buyer, trade contract or outreach as verified based
+        # merely on the site's contact page or a model opinion.
+
     # Small geographically balanced analyst worklist; do not fabricate a
     # fixed city minimum when no viable source-backed candidates exist.
     top = []
@@ -589,6 +614,7 @@ def build(results, *, today=None, apply_ai=True):
         "ai_preselection_status": ai_status if apply_ai else "DISABLED_BASELINE",
         "ai_preselection_reviewed_count": applied,
         "ai_ten_projects_integrated": integrated_count,
+        "coordinated_projects_integrated": coordinated_integrated,
         "ai_ten_lifecycle_review_holds": lifecycle_holds,
         "ai_preselection_not_independent_verification": True,
         "ai_recheck_evidence_note": (
@@ -644,7 +670,11 @@ FIELDS = ("analyst_queue_rank", "record_id", "origin", "city", "address",
           "ai_ten_stage_status", "ai_ten_lifecycle_proposal",
           "ai_ten_lifecycle_hold",
           "ai_ten_company_source_claims", "ai_ten_contact_source_claims",
-          "ai_ten_procurement_review", "ai_ten_supplier_fit_review")
+          "ai_ten_procurement_review", "ai_ten_supplier_fit_review",
+          "coordinated_research_status",
+          "coordinated_company_leads", "coordinated_source_claims",
+          "coordinated_assessment_unverified",
+          "coordinated_source_count", "coordinated_research_report")
 
 
 def _csv_safe(value):
@@ -670,7 +700,9 @@ def _write_csv(path, records):
                                     "ai_ten_company_source_claims",
                                     "ai_ten_contact_source_claims",
                                     "ai_ten_procurement_review",
-                                    "ai_ten_supplier_fit_review")
+                                    "ai_ten_supplier_fit_review",
+                                    "coordinated_company_leads",
+                                    "coordinated_source_claims")
                    else record.get(key, ""))
                    for key in FIELDS}
             writer.writerow({k: _csv_safe(v) for k,v in row.items()})
