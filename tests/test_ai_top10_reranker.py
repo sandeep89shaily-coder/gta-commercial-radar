@@ -100,6 +100,44 @@ class AITopTenSelectionTests(unittest.TestCase):
         self.assertEqual(report["status"],"FREE_PREFLIGHT_NOT_SUBMITTED")
         self.assertFalse((self.root/"v5_ai_budget.sqlite").exists())
 
+
+    def test_partial_source_check_produces_labeled_internal_review(self):
+        from unittest.mock import patch
+        self.write([self.row("A"), self.row("B")])
+        def check(_root, record, *_args, **_kwargs):
+            complete = record["record_id"] != "A"
+            return ({
+                "record_id": record["record_id"],
+                "city": record["city"],
+                "complete": complete,
+                "checked_on": DAY.isoformat(),
+                "sources": [{
+                    "url": record["source_url"],
+                    "identity": "EXACT_APPLICATION_ID_IN_FETCHED_TEXT",
+                    "excerpt": "Project record " + record["application_id"],
+                    "role_excerpt": "",
+                    "retrieved_on": DAY.isoformat(),
+                }],
+                "issues": [] if complete else ["SEARCH_LEDGER_HELD_OR_PREVIOUS"],
+            }, False)
+        with patch("gta_ai_top10_reranker.recheck_project", side_effect=check):
+            result = ai_run(
+                self.root, paid=True, key="test", today=DAY,
+                transport=self.transport())
+        self.assertEqual(result["status"], "AI_TOP10_REVIEW_ONLY")
+        self.assertTrue(result["source_evidence_incomplete"])
+        self.assertEqual(result["live_checks_completed"], 1)
+        self.assertEqual(result["partial_source_checks"][0]["record_id"], "A")
+        self.assertEqual(result["paid_model_calls"], 2)
+        self.assertFalse(result["verified_buyers"])
+        after = build(self.root, today=DAY)
+        findings = {x["record_id"]: x for x in after["top10"]}
+        self.assertFalse(findings["A"]["ai_live_recheck_complete"])
+        self.assertIn("SEARCH_LEDGER_HELD_OR_PREVIOUS",
+                      findings["A"]["ai_live_source_check_issues"])
+        self.assertTrue(findings["B"]["ai_live_recheck_complete"])
+        self.assertFalse(after["outreach_authorized"])
+
     def test_existing_exact_batch_checkpoint_idempotent(self):
         self.write([self.row("A"),self.row("B")])
         counter=[]
