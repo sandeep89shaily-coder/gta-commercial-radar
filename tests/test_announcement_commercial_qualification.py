@@ -11,7 +11,8 @@ import unittest
 from pathlib import Path
 
 from gta_announcement_commercial_qualification import (
-    _accepted_claims, _discovery, _public_contacts, qualify,
+    _accepted_claims, _discovery, _public_contacts,
+    _potential_municipal_links, qualify,
 )
 
 DAY = dt.date(2026, 11, 15)
@@ -140,7 +141,7 @@ class AnnouncementQualificationTest(unittest.TestCase):
             result["public_contact_routes"][0]["channel"],
             "office@harbourlight.example")
         self.assertEqual(calls.count("/chat/completions"), 1)
-        self.assertEqual(calls.count("/v1/tools/search"), 3)
+        self.assertEqual(calls.count("/v1/tools/search"), 4)
         self.assertEqual(calls.count("/v1/tools/fetch"), 1)
         with (self.root / "GTA_RADAR_EARLY_INVESTMENT_LEADS.csv").open(
                 newline="", encoding="utf-8") as stream:
@@ -165,6 +166,22 @@ class AnnouncementQualificationTest(unittest.TestCase):
         self.assertTrue(leads[0]["publicly_listed"])
         self.assertFalse(leads[0]["purchasing_authority_verified"])
         self.assertFalse(leads[0]["project_procurement_role_verified"])
+
+    def test_planning_reference_is_only_possible_not_confirmed(self):
+        found = _potential_municipal_links([{
+            "url": "https://example.org/city-source",
+            "content": "Northfield Works project mentioned in a discussion "
+                       "of planning application SPA-2026-0089, subject to "
+                       "confirmation of the correct legal parcel."}],
+            {"project_name": "Northfield Works"})
+        self.assertEqual(len(found), 1)
+        self.assertEqual(found[0]["application_id"], "SPA-2026-0089")
+        self.assertFalse(found[0]["same_project_verified"])
+        unrelated = _potential_municipal_links([{
+            "url": "https://example.org/another-project",
+            "content": "A different project has SPA-2026-0089"}],
+            {"project_name": "Northfield Works"})
+        self.assertEqual(unrelated, [])
 
     def test_invented_procurement_claim_is_discarded(self):
         sources = [{"url": "https://example.org/announcement",
