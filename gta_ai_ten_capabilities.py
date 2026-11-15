@@ -391,8 +391,15 @@ def _stage_model(row, evidence, stage, profile, prior,
     # relevant original evidence exists. The exact permit's existence is
     # already recorded without another model call.
     raw_permit_only = all(
-        str(src.get("identity") or "") ==
-            "EXACT_OFFICIAL_ARCGIS_APPLICATION" for src in evidence)
+        str(src.get("identity") or "") in (
+            "EXACT_OFFICIAL_ARCGIS_APPLICATION",
+            "EXACT_APPLICATION_ID_IN_FETCHED_TEXT")
+        and "permitnumber" in str(src.get("content") or "").casefold()
+        and len(str(src.get("content") or "")) <= 1000
+        and not any(term in str(src.get("content") or "").casefold()
+                    for term in ("registered owner", "developer:",
+                                 "contractor:", "applicant_company"))
+        for src in evidence)
     if raw_permit_only and stage in (
             "buyer_contact_path", "procurement_award_status",
             "technical_documents_equipment", "early_investment_signals",
