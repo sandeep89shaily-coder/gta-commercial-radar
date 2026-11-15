@@ -304,7 +304,7 @@ def run(results, *, paid=False, key=None, transport=None, today=None):
                 evidence_fingerprint = hashlib.sha256(json.dumps(
                     [live_checks[(r["city"].casefold(),r["record_id"])]
                      for r in batch], sort_keys=True).encode("utf-8")).hexdigest()
-                claim = "ai_top10_live_v2_" + hashlib.sha256(
+                claim = "ai_top10_company_v3_" + hashlib.sha256(
                     (digest + ":" + fingerprint + ":" + evidence_fingerprint
                      + ":" + day.isoformat()).encode()).hexdigest()[:26]
                 immutable = review_root / (claim + ".json")
