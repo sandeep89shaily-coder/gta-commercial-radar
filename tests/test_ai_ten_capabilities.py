@@ -8,7 +8,9 @@ from pathlib import Path
 
 from gta_ai_ten_capabilities import STAGES, run, _evidence, _verified_claims
 from gta_commercial_qualification_review import build as qualification_build
-from gta_ai_ten_source_enrichment import enrich as source_enrich
+from gta_ai_ten_source_enrichment import (
+    enrich as source_enrich, site_company_candidates, _query as site_query)
+from gta_ai_ten_capabilities import reconcile_saved
 import v5_investigator as v5
 
 TODAY = dt.date(2026, 11, 15)
@@ -272,6 +274,75 @@ class TenCapabilityTests(unittest.TestCase):
             self.assertEqual(calls, ["/v1/tools/search", "/v1/tools/fetch"])
         finally:
             db.close()
+
+    def test_site_company_leads_allow_contact_research_without_model_claims(self):
+        row = {**self.record, "address": "1430 BIRCHMOUNT RD",
+               "record_id": "toronto:birchmount",
+               "application_id": "25249692ESC21CD"}
+        sources = [
+            {"url": "https://businesspoint.ca/media",
+             "identity": "SAME_ADDRESS_PROJECT_CONTEXT_NOT_LINKED",
+             "content": "On Tuesday, June 18th, 2025, Business Point "
+                        "officially broke ground on their latest development, "
+                        "Toronto East Business Centre, located at "
+                        "1430 Birchmount Rd in Scarborough."},
+            {"url": "https://www.squareyards.ca/1430-birchmount",
+             "identity": "SAME_ADDRESS_PROJECT_CONTEXT_NOT_LINKED",
+             "content": "1430 Birchmount Rd - Developer : Construction Point "
+                        "Project Size - 2 Buildings; designed by TAES "
+                        "Architect Inc for Construction Point."},
+        ]
+        leads = site_company_candidates(sources, row)
+        names = {x["company"] for x in leads}
+        self.assertIn("Business Point", names)
+        self.assertIn("Construction Point", names)
+        self.assertIn("TAES Architect Inc", names)
+        self.assertTrue(all(not x["buyer_verified"] and
+                            not x["exact_application_role_verified"]
+                            for x in leads))
+        query = site_query(row, "buyer_contact_path",
+                           {"company_entity_relationships": {
+                               "claims": []}}, sources)
+        self.assertIn("Business Point", query)
+
+    def test_saved_birchmount_reconciliation_uses_zero_paid_calls(self):
+        row = {**self.record,
+               "record_id": "toronto:birchmount",
+               "application_id": "25249692ESC21CD",
+               "address": "1430 BIRCHMOUNT RD"}
+        with (self.root / "GTA_RADAR_COMMERCIAL_TOP10_ANALYST_REVIEW.csv").open(
+                "w", newline="", encoding="utf-8") as stream:
+            writer = csv.DictWriter(stream, fieldnames=list(row))
+            writer.writeheader()
+            writer.writerow(row)
+        import hashlib
+        digest = hashlib.sha256(
+            (row["record_id"] + ":" + row["city"]).encode()).hexdigest()[:24]
+        path = (self.root / "GTA_RADAR_AI_TEN_CAPABILITIES_DOSSIERS"
+                / (digest + ".json"))
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({
+            **row, "input_fingerprint": "test",
+            "stages": {"company_entity_relationships": {
+                "status": "MODEL_COMPLETED_NO_CITABLE_CLAIMS",
+                "claims": []}},
+            "evidence": [{"url": "https://businesspoint.ca/media",
+                          "identity": "SAME_ADDRESS_PROJECT_CONTEXT_NOT_LINKED",
+                          "content": "Business Point officially broke ground on "
+                                     "their latest development, Toronto East "
+                                     "Business Centre, located at 1430 "
+                                     "Birchmount Rd in Scarborough."}]
+        }), encoding="utf-8")
+        answer = reconcile_saved(self.root, row["record_id"])
+        self.assertEqual(answer["status"], "SAVED_DOSSIER_RECONCILED_NO_SPEND")
+        self.assertEqual(answer["paid_requests"], 0)
+        self.assertTrue(any(x["company"] == "Business Point"
+                            for x in answer["site_company_leads"]))
+        self.assertFalse((self.root / "v5_ai_budget.sqlite").exists())
+        self.assertFalse(answer["outreach_authorized"])
+        dossier = json.loads(path.read_text(encoding="utf-8"))
+        self.assertEqual(dossier["stages"]["company_entity_relationships"][
+            "claims"], [])
 
     def test_company_contact_source_enrichment_uses_fetch_not_snippets(self):
         previous = {"company_entity_relationships": {"claims": [{
