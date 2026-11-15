@@ -402,7 +402,7 @@ def _apply_ai(pool, all_rows, review, today):
         saved_claims = data.get("company_role_candidates")
         proposals = []
         if isinstance(saved_claims, list):
-            for claim in saved_claims[:3]:
+            for claim in saved_claims[:8]:
                 if not isinstance(claim, dict):
                     continue
                 uri = claim.get("source_url")
@@ -417,6 +417,27 @@ def _apply_ai(pool, all_rows, review, today):
                         "quote":claim.get("evidence_quote"),
                     })
         accepted, rejections = check_roles(proposals, sources)
+        # Report same-site companies separately; they are NOT permit roles.
+        site_proposals = []
+        for claim in data.get("site_company_candidates", [])[:8]:
+            if not isinstance(claim, dict):
+                continue
+            indices = [i for i, src in enumerate(sources)
+                       if isinstance(src, dict)
+                       and src.get("url") == claim.get("source_url")
+                       and src.get("identity") == claim.get("source_identity")]
+            if indices:
+                site_proposals.append({
+                    "organization": claim.get("organization"),
+                    "quote": claim.get("evidence_quote"),
+                    "source_j": indices[0],
+                })
+        from gta_ai_company_role_evidence import check_site_mentions
+        sites, site_rejected = check_site_mentions(site_proposals, sources)
+        row["ai_site_company_mentions_review"] = sites
+        row["ai_site_company_mentions_count"] = len(sites)
+        row["ai_site_company_mentions_rejected"] = (
+            int(data.get("site_company_rejections") or 0) + site_rejected)
         row["ai_company_roles_review"] = accepted
         row["ai_company_roles_exact_id_count"] = sum(
             c["project_role_supported_for_review"] for c in accepted)
@@ -532,7 +553,8 @@ def build(results, *, today=None, apply_ai=True):
         "ai_exact_application_role_candidates": sum(
             r.get("ai_company_roles_exact_id_count",0) for r in top),
         "ai_same_address_company_mentions": sum(
-            r.get("ai_company_roles_context_only_count",0) for r in top),
+            r.get("ai_site_company_mentions_count",0)
+            + r.get("ai_company_roles_context_only_count",0) for r in top),
         "verified_purchasing_authorities": 0,
         "source_supported_ai_company_roles": sum(len(r["exact_project_roles"]) for r in deduped),
         "projects_with_ai_conflicts": sum(bool(r["ai_conflicts"]) for r in deduped),
@@ -564,6 +586,8 @@ FIELDS = ("analyst_queue_rank", "record_id", "origin", "city", "address",
           "ai_live_evidence_quote", "ai_live_evidence_identity",
           "ai_live_project_version_review",
           "ai_official_status_fetched", "ai_official_status_differs_from_saved",
+          "ai_site_company_mentions_review", "ai_site_company_mentions_count",
+          "ai_site_company_mentions_rejected",
           "ai_company_roles_review", "ai_company_roles_exact_id_count",
           "ai_company_roles_context_only_count",
           "ai_company_role_proposals_rejected",

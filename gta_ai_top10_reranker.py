@@ -23,8 +23,9 @@ from gta_commercial_qualification_review import (
     build as base_build, ai_candidate_pool, ai_fingerprint,
     AI_REVIEW, run as regenerate_shortlist,
 )
-from gta_top10_live_source_recheck import check_one as recheck_project
-from gta_ai_company_role_evidence import check_roles, buyer_hypothesis
+from gta_top10_live_source_recheck import (check_one as recheck_project,
+    model_directed_company_search)
+from gta_ai_company_role_evidence import check_roles, check_site_mentions, buyer_hypothesis
 
 MAX_CANDIDATES = 24
 BATCH_SIZE = 1
@@ -89,7 +90,13 @@ def _payload(items, live_checks=None):
         "which might describe a different project. Extract ALL explicitly "
         "evidenced owner, developer, tenant, operator, general contractor, "
         "construction manager, applicant and architect relationships (up to "
-        "eight). Never conflate roles. Each role_claims quote must be a "
+        "eight). Never conflate roles. Also identify source-supported "
+        "site_company_mentions when a company appears at the same address "
+        "without proof of involvement in this specific permit. Preserve "
+        "these names as SITE ASSOCIATIONS, never owners, developers or buyers "
+        "unless an explicit project role is documented. Include up to eight "
+        "such names with source_j and literal quoted company name. "
+        "Each role_claims quote must be a "
         "literal contiguous source passage containing BOTH company name "
         "AND explicit role wording, with the live_sources index. "
         "If absent return no role claim, not an invented company. "
@@ -104,6 +111,8 @@ def _payload(items, live_checks=None):
         "investigate:'specific next document or business to investigate',"
         "role_claims:[{organization:'Company Ltd',role:'OWNER',source_j:0,"
         "quote:'literal source passage'}],"
+        "site_company_mentions:[{organization:'Company Ltd',source_j:0,"
+        "quote:'literal text naming company'}],"
         "buyer_function:{function:'UNKNOWN',reason:'commercial rationale'}}]}. "
         "Decisions: PREFER, NEUTRAL, CHECK_CONFLICT, DEPRIORITIZE. "
         "PREFER requires source-backed recent supplier-relevant work; "
@@ -199,19 +208,25 @@ def _validate(answer, count, batch=None, live_checks=None):
                                                   "sources", [])
             roles, rejected = check_roles(item.get("role_claims", []),
                                           original_sources)
+            sites, site_rejected = check_site_mentions(
+                item.get("site_company_mentions", []), original_sources)
             hypothesis = buyer_hypothesis(item.get("buyer_function"))
         else:
             roles, rejected = [], 0
+            sites, site_rejected = [], 0
             hypothesis = buyer_hypothesis(None)
         result[i] = {"decision": item["decision"], "reason": reason,
                      "next_check": next_check, "cited_source": matched_source,
                      "role_candidates": roles,
                      "role_proposals_rejected": rejected,
+                     "site_company_candidates": sites,
+                     "site_company_rejections": site_rejected,
                      "buyer_function_hypothesis": hypothesis}
     return result
 
 
-def run(results, *, paid=False, key=None, transport=None, today=None):
+def run(results, *, paid=False, deep_research=False, deep_project_limit=4,
+        key=None, transport=None, today=None):
     root = Path(results)
     if not root.is_dir():
         raise ValueError("EXISTING_RADAR_RESULTS_REQUIRED")
@@ -233,6 +248,7 @@ def run(results, *, paid=False, key=None, transport=None, today=None):
         "verified_buyers": 0, "verified_open_supplier_packages": 0,
         "budget_cap_usd": DEEPSEEK_DAILY_LIMIT_USD,
         "reviews": [],
+        "model_directed_research": [],
     }
     def save_attempt():
         target = root / ATTEMPT
@@ -286,6 +302,43 @@ def run(results, *, paid=False, key=None, transport=None, today=None):
                     len(v.get("issues", [])) for v in live_checks.values())
                 save_attempt()
                 return state
+            # Opt-in DeepSeek web research: model discovers URLs, then Radar
+            # independently Fetches and rechecks them for permit/site identity.
+            # The deep pass is capped separately; cached source records and
+            # completed model-review checkpoints remain reusable.
+            if deep_research:
+                for row in pool[:max(0, min(deep_project_limit, 4))]:
+                    original = live_checks[(row["city"].casefold(),
+                                            row["record_id"])]
+                    researched = model_directed_company_search(
+                        root, row, token, db, day, legacy,
+                        transport=transport)
+                    state["model_directed_research"].append({
+                        "record_id": row["record_id"],
+                        "status": researched.get("status"),
+                        "model_calls": researched.get("paid_model_calls", 0),
+                        "source_count": len(researched.get("sources") or []),
+                    })
+                    extras = researched.get("sources") or []
+                    if extras:
+                        existing = original["sources"]
+                        combined = list(existing)
+                        seen_urls = {src.get("url") for src in existing}
+                        for src in extras:
+                            if src.get("url") not in seen_urls:
+                                combined.append(src)
+                                seen_urls.add(src.get("url"))
+                        # Preserve at least one official exact-ID source and
+                        # include independently fetched alternative context.
+                        exact = [src for src in combined
+                                 if str(src.get("identity", "")).startswith("EXACT")]
+                        others = [src for src in combined if src not in exact]
+                        deep_urls = {src.get("url") for src in extras}
+                        novel = [src for src in others
+                                 if src.get("url") in deep_urls]
+                        prior = [src for src in others
+                                 if src.get("url") not in deep_urls]
+                        original["sources"] = (exact[:1] + novel[:2] + prior)[:4]
             state["source_snapshot_only"] = state["live_sources_retrieved"] == 0
             for start in range(0, len(pool), BATCH_SIZE):
                 batch = pool[start:start + BATCH_SIZE]
@@ -293,7 +346,7 @@ def run(results, *, paid=False, key=None, transport=None, today=None):
                 evidence_fingerprint = hashlib.sha256(json.dumps(
                     [live_checks[(r["city"].casefold(),r["record_id"])]
                      for r in batch], sort_keys=True).encode("utf-8")).hexdigest()
-                claim = "ai_top10_company_v4_" + hashlib.sha256(
+                claim = "ai_top10_company_v5_" + hashlib.sha256(
                     (digest + ":" + fingerprint + ":" + evidence_fingerprint
                      + ":" + day.isoformat()).encode()).hexdigest()[:26]
                 immutable = review_root / (claim + ".json")
@@ -366,6 +419,8 @@ def run(results, *, paid=False, key=None, transport=None, today=None):
                         "cited_live_source": rec["cited_source"],
                         "company_role_candidates": rec["role_candidates"],
                         "company_role_rejections": rec["role_proposals_rejected"],
+                        "site_company_candidates": rec["site_company_candidates"],
+                        "site_company_rejections": rec["site_company_rejections"],
                         "buyer_function_hypothesis": rec["buyer_function_hypothesis"],
                         "live_recheck": {
                             "checked_on": day.isoformat(),
@@ -449,7 +504,9 @@ if __name__ == "__main__":
     p.add_argument("--results", required=True)
     p.add_argument("--paid", action="store_true",
                    help="Explicitly allow bounded paid DeepSeek shortlist assessment")
+    p.add_argument("--deep-research", action="store_true",
+                   help="Opt in to bounded DeepSeek web-tool discovery for up to four projects")
     opts = p.parse_args()
-    output = run(opts.results, paid=opts.paid)
+    output = run(opts.results, paid=opts.paid, deep_research=opts.deep_research)
     print(json.dumps({k: v for k, v in output.items() if k != "reviews"},
                      indent=2))

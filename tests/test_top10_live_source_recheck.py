@@ -57,7 +57,7 @@ class LiveTopTenProjectCheckTests(unittest.TestCase):
             "At 1430 Birchmount Road the new unrelated 26 999999 application "
             "describes a different 2026 construction project.", row())
         self.assertEqual(identity,"SAME_ADDRESS_PROJECT_CONTEXT_NOT_LINKED")
-        self.assertIn("1430 birchmount",excerpt)
+        self.assertIn("1430 birchmount",excerpt.casefold())
 
     def test_live_search_fetch_exact_id_with_source_checkpoint_reuse(self):
         calls=[]
