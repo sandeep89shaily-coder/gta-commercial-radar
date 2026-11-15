@@ -27,7 +27,7 @@ BUYER_FUNCTIONS = {
     "OWNER_PROJECT_TEAM",
     "UNKNOWN",
 }
-MAX_ROLE_PROPOSALS = 3
+MAX_ROLE_PROPOSALS = 8
 
 
 def clean(value, maximum=210):
