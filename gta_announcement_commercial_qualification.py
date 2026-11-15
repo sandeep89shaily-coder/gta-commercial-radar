@@ -29,7 +29,7 @@ from radar_run_lock import once_lock
 OUT = "GTA_RADAR_ANNOUNCEMENT_QUALIFICATION"
 LEADS = "GTA_RADAR_EARLY_INVESTMENT_LEADS.csv"
 MAX_FETCH = 8
-MAX_SEARCH = 3
+MAX_SEARCH = 4
 EMAIL = re.compile(
     r"(?<![\w.+-])[\w.+-]+@(?:[\w-]+\.)+[A-Za-z]{2,}(?![\w.-])")
 ALLOWED = {"PURSUE", "HOLD", "REJECT", "UNKNOWN"}
@@ -115,6 +115,7 @@ def _queries(project, city):
         f'"{companies[0]}" official business contact email telephone',
         f'"{name}" {city} construction planning site status developer update',
         f'"{name}" {city} tender contractor subcontractor award procurement',
+        f'"{name}" {city} official site plan application parcel address applicant',
     ]
 
 
@@ -151,6 +152,31 @@ def _evidence_match(body, project, companies):
     return ("PROJECT_MENTION", named) if exact else (
         ("NAMED_COMPANY_ONLY_NOT_PROJECT", named) if named else
         ("UNRELATED_FETCH", []))
+
+
+def _potential_municipal_links(sources, project):
+    """Cited application references are investigation hints, not project identity."""
+    result, seen = [], set()
+    name = str(project["project_name"]).casefold()
+    for source in sources:
+        body = str(source.get("content") or "")
+        if name not in body.casefold():
+            continue
+        for match in re.finditer(r"\b(?:SPA|OZS|DPC)[- ]20\d{2}[- ]\d{4}\b",
+                                 body, re.I):
+            identifier = match.group().upper().replace(" ", "-")
+            if identifier in seen:
+                continue
+            seen.add(identifier)
+            result.append({
+                "application_id": identifier,
+                "source_url": source["url"],
+                "literal_context": body[max(0, match.start() - 180):
+                                        match.end() + 150],
+                "same_project_verified": False,
+                "verification_needed": "Official city application/parcel/applicant record",
+            })
+    return result[:8]
 
 
 def _public_contacts(sources, companies):
@@ -307,6 +333,11 @@ def _save(path, state):
     for c in state.get("accepted_claims", []):
         brief += ["- " + c["subject"] + " — " + c["kind"],
                   "  - " + c["literal_quote"], "  - " + c["source_url"]]
+    brief += ["", "## Possible municipal application references (unverified)", ""]
+    for item in state.get("possible_municipal_links", []):
+        brief += ["- " + item["application_id"] + " — unverified",
+                  "  - " + item["source_url"],
+                  "  - " + item["literal_context"]]
     brief += ["", "## Essential caveats", "",
               "- No exact municipal application linked",
               "- No purchasing authority or procurement package confirmed",
@@ -385,6 +416,7 @@ def qualify(results, *, project_name, city="Brampton", paid=False,
         "date": stamp.isoformat(), "status": "PREFLIGHT_NO_SPEND",
         "project": discovery, "originating_discovery_file": str(report_path),
         "evidence": sources, "public_contact_routes": [],
+        "possible_municipal_links": [],
         "assessment": {}, "accepted_claims": [],
         "research_steps": [], "model_calls": 0,
         "source_fetched_on_not_published": stamp.isoformat(),
@@ -419,7 +451,7 @@ def qualify(results, *, project_name, city="Brampton", paid=False,
                      "need_content": True}, transport)
                 state["research_steps"].append({
                     "stage": ["company_contacts", "current_development",
-                              "procurement_timing"][i],
+                              "procurement_timing", "municipal_identity"][i],
                     "search_status": status, "sources_added": 0})
                 _save(path, state)
                 if status != "OK":
@@ -455,6 +487,8 @@ def qualify(results, *, project_name, city="Brampton", paid=False,
                 _save(path, state)
             state["public_contact_routes"] = _public_contacts(
                 sources, companies)
+            state["possible_municipal_links"] = _potential_municipal_links(
+                sources, discovery)
             _save(path, state)
             response, status = _bill(
                 db, stamp.isoformat(),
