@@ -75,7 +75,7 @@ class TenCapabilityTests(unittest.TestCase):
                 "usage": {"prompt_tokens": 700, "completion_tokens": 150}}
         first = run(self.root, paid=True, today=TODAY, token="test",
                     customer_profile="Industrial HVAC installers in Ontario",
-                    transport=provider)
+                    enrich_sources=False, transport=provider)
         self.assertEqual(first["status"], "CHECKPOINTED_AI_REVIEW")
         self.assertEqual(called, list(STAGES))
         dossier = json.loads(Path(first["results"][0]["dossier"]).read_text())
@@ -91,6 +91,7 @@ class TenCapabilityTests(unittest.TestCase):
         self.assertEqual(item["city"], "Toronto")
         again = run(self.root, paid=True, today=TODAY, token="test",
                     customer_profile="Industrial HVAC installers in Ontario",
+                    enrich_sources=False,
                     transport=lambda *_: self.fail("Duplicate paid AI request"))
         self.assertEqual(again["results"][0]["stages"],
                          first["results"][0]["stages"])
@@ -152,6 +153,7 @@ class TenCapabilityTests(unittest.TestCase):
         called = []
         result = run(self.root, paid=True, today=TODAY, token="test",
                      customer_profile="Industrial HVAC", discover=False,
+                     enrich_sources=False,
                      transport=lambda *a: called.append(a))
         self.assertEqual(called, [])
         dossier = json.loads(Path(result["results"][0]["dossier"]).read_text())
@@ -163,6 +165,7 @@ class TenCapabilityTests(unittest.TestCase):
 
     def test_no_customer_profile_explicitly_holds_matching(self):
         result = run(self.root, paid=True, today=TODAY, token="test",
+                     enrich_sources=False,
                      transport=lambda path, payload: {
                          "choices": [{"finish_reason": "stop",
                                       "message": {"content": json.dumps({
