@@ -417,7 +417,9 @@ def run(results, *, paid=False, key=None, transport=None, today=None):
     tmp.write_text(json.dumps(state, ensure_ascii=False, indent=2),
                    encoding="utf-8")
     tmp.replace(out)
-    regenerate_shortlist(root, today=day)
+    exported = regenerate_shortlist(root, today=day)
+    state["top10_export_status"] = exported["top10_export_status"]
+    state["latest_top10_analyst_csv"] = exported["outputs"]["top10_analyst_csv"]
     # Reuse the existing read-only bridge -> company graph -> procurement
     # review pipeline; it verifies quotes again without further model calls.
     from gta_ai_project_intelligence_refresh import run as refresh_graph
@@ -429,7 +431,15 @@ def run(results, *, paid=False, key=None, transport=None, today=None):
         "verified_buyers": 0,
         "verified_open_supplier_contracts": 0,
         "additional_paid_ai_calls": 0,
+        "top10_export_status": refreshed.get("top10_export_status"),
+        "latest_top10_analyst_csv": refreshed.get("latest_top10_analyst_csv"),
     }
+    # The source/model work is complete even if Excel held the canonical CSV
+    # open: save the actual updated report path for user recovery.
+    state["top10_export_status"] = refreshed.get(
+        "top10_export_status", state["top10_export_status"])
+    state["latest_top10_analyst_csv"] = refreshed.get(
+        "latest_top10_analyst_csv", state["latest_top10_analyst_csv"])
     save_attempt()
     return state
 
