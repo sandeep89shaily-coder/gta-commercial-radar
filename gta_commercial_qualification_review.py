@@ -582,7 +582,9 @@ def _write_csv(path, records):
         writer = csv.DictWriter(stream, fieldnames=FIELDS, extrasaction="ignore")
         writer.writeheader()
         for record in records:
-            row = {key: (json.dumps(record[key], ensure_ascii=False)
+            row = {key: (json.dumps(record.get(
+                           key, {} if key == "ai_buying_function_hypothesis"
+                           else []), ensure_ascii=False)
                          if key in ("exact_project_roles", "ai_conflicts",
                                     "ai_company_roles_review",
                                     "ai_buying_function_hypothesis")
