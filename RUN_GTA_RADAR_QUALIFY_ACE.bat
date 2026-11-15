@@ -7,7 +7,11 @@ if not exist "%RESULTS%\GTA_RADAR_INVESTMENT_DISCOVERY" (
   echo ERROR: Missing blind discovery results. The announcement must be discovered first.
   exit /b 1
 )
-if /I "%~1"=="PAID" (
+if /I "%~1"=="RESUME" (
+  echo Resume only saved ACE synthesis after the prior Fetch error.
+  echo No previous Search or Fetch requests will be repeated.
+  py -3 gta_announcement_commercial_qualification.py --results "%RESULTS%" --project-name "Ace Brampton" --city Brampton --resume-saved --paid --customer-profile "Commercial HVAC, electrical, security, industrial equipment and facility service suppliers in Southern Ontario"
+) else if /I "%~1"=="PAID" (
   echo Performing paid source-backed ACE Brampton qualification.
   py -3 gta_announcement_commercial_qualification.py --results "%RESULTS%" --project-name "Ace Brampton" --city Brampton --paid --customer-profile "Commercial HVAC, electrical, security, industrial equipment and facility service suppliers in Southern Ontario"
 ) else (
