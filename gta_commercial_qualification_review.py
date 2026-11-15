@@ -492,9 +492,9 @@ def _write_csv(path, records):
     tmp.replace(path)
 
 
-def run(results):
+def run(results, *, today=None):
     root = Path(results)
-    summary = build(root)
+    summary = build(root, today=today)
     _write_csv(root / ALL_OUT, summary["all_candidates"])
     _write_csv(root / TOP_OUT, summary["top10"])
     report = {key: value for key, value in summary.items()
