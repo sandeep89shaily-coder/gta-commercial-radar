@@ -17,7 +17,8 @@ from pathlib import Path
 import v5_investigator as v5
 import v8_deepseek_native as native
 from gta_ai_top10_company_probe import _rows
-from gta_top10_live_source_recheck import check_one as live_source_check
+from gta_top10_live_source_recheck import (
+    check_one as live_source_check, _identity as validate_source_identity)
 from gta_ai_ten_source_enrichment import enrich as enrich_stage_sources
 from radar_run_lock import once_lock
 
@@ -134,6 +135,14 @@ def _evidence(results, row, day):
                 # Only independently returned passages, never AI narratives.
                 if not native.safe_url(url) or not (body or role):
                     continue
+                # Repair stale checkpoints: the old address matcher confused
+                # 75 Advance Blvd with 175 Advance Blvd. Source claims must
+                # actually identify the exact site or full permit.
+                checked_identity, _ = validate_source_identity(
+                    body + " " + role, row)
+                if not checked_identity:
+                    continue
+                identity = checked_identity
                 if url in seen:
                     continue
                 seen.add(url)
@@ -166,10 +175,14 @@ def _discover_original_sources(root, row, key, db, day, legacy, transport):
         role = str(item.get("role_excerpt") or "")
         if not native.safe_url(url) or not (body or role):
             continue
+        checked_identity, _ = validate_source_identity(
+            body + " " + role, row)
+        if not checked_identity:
+            continue
         if url in {x["url"] for x in found}:
             continue
         found.append({
-            "url": url, "identity": str(item.get("identity") or ""),
+            "url": url, "identity": checked_identity,
             "content": (body + "\n" + role)[:MAX_TEXT],
             "source_checked_on": str(item.get("retrieved_on") or ""),
             "publication_date": "UNKNOWN",
@@ -371,6 +384,24 @@ def _stage_model(row, evidence, stage, profile, prior,
         return result
     if not evidence:
         result["status"] = "NO_INDEPENDENT_EVIDENCE"
+        return result
+    # Don't spend model tokens asking nine specialists to restate a raw
+    # municipal permit with zero corporate/technical/project context.
+    # First perform stage-specific source retrieval, then evaluate only if
+    # relevant original evidence exists. The exact permit's existence is
+    # already recorded without another model call.
+    raw_permit_only = all(
+        str(src.get("identity") or "") ==
+            "EXACT_OFFICIAL_ARCGIS_APPLICATION" for src in evidence)
+    if raw_permit_only and stage in (
+            "buyer_contact_path", "procurement_award_status",
+            "technical_documents_equipment", "early_investment_signals",
+            "commercial_opportunity_qualification",
+            "customer_brief_and_feedback"):
+        result["status"] = "INSUFFICIENT_SOURCE_CONTEXT_NO_MODEL_CALL"
+        result["next_action"] = (
+            "Find named businesses, additional project details or current "
+            "documents before paid analysis")
         return result
     if not native.ledger_claim(db, day.isoformat(), claim, .012, legacy):
         prior_claim = db.execute(
