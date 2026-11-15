@@ -13,6 +13,7 @@ import hashlib
 import datetime as dt
 import json
 import re
+import uuid
 from pathlib import Path
 from urllib.parse import urlsplit
 from gta_ai_company_role_evidence import check_roles, buyer_hypothesis
@@ -591,16 +592,40 @@ def _write_csv(path, records):
                    else record.get(key, ""))
                    for key in FIELDS}
             writer.writerow({k: _csv_safe(v) for k,v in row.items()})
-    tmp.replace(path)
+    try:
+        tmp.replace(path)
+        return path, "CANONICAL_UPDATED"
+    except PermissionError:
+        # Excel on Windows commonly holds an exclusive lock on an opened
+        # report. Preserve the locked original, never pretend it was updated,
+        # and move the complete new CSV to a distinctly named deliverable.
+        # No source retrieval or paid model rerun is needed.
+        alternate = path.with_name(path.stem + "_UPDATED_" +
+                                   uuid.uuid4().hex[:12] + path.suffix)
+        tmp.replace(alternate)
+        return alternate, "CANONICAL_LOCKED_UPDATED_ALTERNATE_WRITTEN"
 
 
 def run(results, *, today=None):
     root = Path(results)
     summary = build(root, today=today)
-    _write_csv(root / ALL_OUT, summary["all_candidates"])
-    _write_csv(root / TOP_OUT, summary["top10"])
+    all_path, all_status = _write_csv(root / ALL_OUT, summary["all_candidates"])
+    top_path, top_status = _write_csv(root / TOP_OUT, summary["top10"])
     report = {key: value for key, value in summary.items()
               if key not in ("all_candidates", "top10")}
+    report["outputs"] = {
+        "all_candidates_csv": str(all_path),
+        "top10_analyst_csv": str(top_path),
+        "status_json": str(root / REPORT),
+    }
+    report["top10_export_status"] = top_status
+    report["all_candidates_export_status"] = all_status
+    report["canonical_top10_updated"] = top_status == "CANONICAL_UPDATED"
+    report["warning_if_locked"] = (
+        "The originally opened CSV was locked by another application. "
+        "The latest AI-reviewed export is saved at outputs.top10_analyst_csv; "
+        "do not use the old canonical CSV."
+        if top_status != "CANONICAL_UPDATED" else "")
     path = root / REPORT
     tmp = path.with_suffix(".json.tmp")
     tmp.write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
