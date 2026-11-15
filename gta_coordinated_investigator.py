@@ -185,9 +185,24 @@ def _brief(state):
                      "  - Quote: " + c["literal_quote"],
                      "  - Source: " + c["source_url"],
                      "  - Exact-application role and buyer: UNVERIFIED"])
-    text.extend(["", "## Commercial assessment", "",
-                 str(state.get("analysis") or {}).strip(), "",
-                 "## Accepted factual source quotes", ""])
+    assessment = state.get("analysis") or {}
+    text.extend([
+        "", "## Commercial assessment", "",
+        "**Model recommendation (unverified):** " +
+        str(assessment.get("classification") or "UNKNOWN")[:60],
+        "**Why it might matter:** " +
+        str(assessment.get("commercial_reason") or "Not established.")[:600],
+        "**Reasons to reject or delay:** " +
+        str(assessment.get("disqualification_reason") or "Not established.")[:600],
+        "**Potential supplier categories (hypotheses only):** " +
+        ", ".join(str(t)[:80] for t in
+                  (assessment.get("potential_trades") or [])[:8]),
+        "**Procurement stage:** UNKNOWN until independently documented",
+        "**Next specific verification:** " +
+        str(assessment.get("next_verification") or
+            "Confirm current project stage and who controls purchasing.")[:450],
+        "", "## Accepted factual source quotes", "",
+    ])
     for c in state["accepted_claims"]:
         text.extend(["- " + c["subject"] + " — " +
                      c["relationship_hypothesis"],
