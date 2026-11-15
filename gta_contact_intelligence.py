@@ -254,6 +254,14 @@ def _verified_people(data, sources, companies):
         if ident in seen:
             continue
         seen.add(ident)
+        # A published corporate inbox such as office@ does NOT become the
+        # person's direct email merely because a model saw it beside a name.
+        local = email.split("@", 1)[0].casefold() if email else ""
+        words = [w.casefold() for w in re.findall(r"[A-Za-z]+", person)]
+        direct_email = bool(email and len(words) >= 2 and
+                            words[-1] in local and words[0][0] in local)
+        direct_phone = bool(phone and person and re.search(
+            r"\b(direct line|direct phone|direct dial)\b", quote, re.I))
         found.append({
             "company": company, "person": person or "NOT_NAMED",
             "job_title": title or "UNKNOWN",
@@ -262,7 +270,8 @@ def _verified_people(data, sources, companies):
             "source_url": source["url"], "literal_quote": quote,
             "project_relationship": project_relation,
             "purchasing_authority": authority,
-            "direct_business_contact_verified": bool(email or phone),
+            "direct_business_contact_verified": direct_email or direct_phone,
+            "public_channel_mentioned_with_person": bool(email or phone),
             "named_role_source_supported": bool(person and title),
             "relevance_score": (
                 4 * bool(role_relevant) + 3 * bool(person) +
@@ -295,6 +304,8 @@ def _brief(state):
             "- **" + p["person"] + "** — " + p["job_title"] + ", " + p["company"],
             "  - Published business email: " + p["email"],
             "  - Published business telephone: " + p["phone"],
+            "  - Verified direct line/address rather than general channel: " +
+            str(p["direct_business_contact_verified"]),
             "  - Purchasing authority: " + p["purchasing_authority"],
             "  - Project-specific relationship: " + p["project_relationship"],
             "  - Original source: " + p["source_url"],
