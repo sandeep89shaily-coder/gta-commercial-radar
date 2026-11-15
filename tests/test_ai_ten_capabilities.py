@@ -107,7 +107,7 @@ class TenCapabilityTests(unittest.TestCase):
                      discover=False, enrich_sources=False,
                      transport=lambda *_: self.fail("No paid retry"))
         self.assertEqual(len(second["results"]), 1)
-        self.assertEqual(len(responses), 10)
+        self.assertEqual(len(responses), 9)  # supplier fit needs a profile
 
     def test_preflight_is_free_and_exposes_ten_stages(self):
         result = run(self.root, today=TODAY)
