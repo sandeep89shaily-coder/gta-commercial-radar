@@ -16,6 +16,7 @@ from pathlib import Path
 import v5_investigator as v5
 import v8_deepseek_native as native
 from gta_ai_top10_company_probe import _rows
+from gta_top10_live_source_recheck import check_one as live_source_check
 from radar_run_lock import once_lock
 
 OVERLAY = "GTA_RADAR_AI_TEN_CAPABILITIES_OVERLAY.json"
@@ -142,6 +143,37 @@ def _evidence(results, row, day):
                 if len(sources) >= MAX_EVIDENCE:
                     return sources
     return sources
+
+
+def _discover_original_sources(root, row, key, db, day, legacy, transport):
+    """Fallback to existing Radar Search/Fetch pipeline, not another crawler.
+
+    The source checker reuses exact-project/date checkpoints and the SAME
+    shared budget ledger; no untrusted model narrative is treated as evidence.
+    """
+    data, reused = live_source_check(
+        root, row, key, db, day, legacy, transport=transport)
+    found = []
+    for item in data.get("sources", []):
+        if not isinstance(item, dict):
+            continue
+        url = str(item.get("url") or "")
+        body = str(item.get("excerpt") or "")
+        role = str(item.get("role_excerpt") or "")
+        if not native.safe_url(url) or not (body or role):
+            continue
+        if url in {x["url"] for x in found}:
+            continue
+        found.append({
+            "url": url, "identity": str(item.get("identity") or ""),
+            "content": (body + "\n" + role)[:MAX_TEXT],
+            "source_checked_on": str(item.get("retrieved_on") or ""),
+            "publication_date": "UNKNOWN",
+            "project_role_verified": False,
+        })
+        if len(found) >= MAX_EVIDENCE:
+            break
+    return found, list(data.get("issues") or []), bool(data.get("complete"))
 
 
 def _project_payload(row, evidence, stage, profile, prior):
@@ -341,7 +373,8 @@ def _overlay_item(row, dossier):
 
 
 def run(results, *, paid=False, limit=2, start_index=0,
-        customer_profile="", token=None, today=None, transport=None):
+        customer_profile="", discover=True,
+        token=None, today=None, transport=None):
     if type(limit) is not int or not 1 <= limit <= 10:
         raise ValueError("LIMIT_MUST_BE_1_TO_10")
     if type(start_index) is not int or start_index < 0:
@@ -378,6 +411,11 @@ def run(results, *, paid=False, limit=2, start_index=0,
                 projects = {}
             for row in rows:
                 evidence = _evidence(root, row, day)
+                discovery_issues, discovery_complete = [], True
+                if discover and not evidence:
+                    evidence, discovery_issues, discovery_complete = (
+                        _discover_original_sources(
+                            root, row, key, db, day, legacy, transport))
                 fingerprint = hashlib.sha256(json.dumps(
                     [row, evidence, profile], sort_keys=True).encode()
                     ).hexdigest()
@@ -407,6 +445,8 @@ def run(results, *, paid=False, limit=2, start_index=0,
                         "project_description": row["project_description"],
                         "input_fingerprint": fingerprint,
                         "evidence": evidence, "stages": {},
+                        "source_discovery_issues": discovery_issues,
+                        "source_discovery_complete": discovery_complete,
                         "verified_buyer": False,
                         "open_contract_verified": False,
                         "outreach_authorized": False}
@@ -449,10 +489,13 @@ def main():
     p.add_argument("--limit", type=int, default=2)
     p.add_argument("--start-index", type=int, default=0)
     p.add_argument("--customer-profile", default="")
+    p.add_argument("--no-discovery", action="store_true",
+                   help="Use only previously retrieved independent sources")
     args = p.parse_args()
     print(json.dumps(run(args.results, paid=args.paid, limit=args.limit,
                          start_index=args.start_index,
-                         customer_profile=args.customer_profile),
+                         customer_profile=args.customer_profile,
+                         discover=not args.no_discovery),
                      indent=2))
 
 
