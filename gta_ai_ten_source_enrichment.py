@@ -33,13 +33,64 @@ def _write(path, value):
     temp.replace(path)
 
 
-def _query(row, stage, previous):
+def site_company_candidates(sources, row):
+    """Extract source-quoted SITE leads, never exact-permit roles or buyers."""
+    candidates, seen = [], set()
+    patterns = (
+        (r"([A-Z][A-Za-z0-9&.' -]{2,75}?)\s+officially\s+broke\s+ground",
+         "GROUNDBREAKING_SITE_ASSOCIATION"),
+        (r"\bDeveloper\s*:\s*([A-Z][A-Za-z0-9&.' -]{2,65}?)(?=\s+(?:Project|Size|\-|\||Architect|Home|Property)|$)",
+         "LISTING_SITE_DEVELOPER"),
+        (r"\bDEVELOPER\s+([A-Z][A-Za-z0-9&.' -]{2,65}?)(?=\s+(?:Total|Projects|Pre |Under |Completed)|$)",
+         "LISTING_SITE_DEVELOPER"),
+        (r"\bdesigned by\s+([A-Z][A-Za-z0-9&.' -]{2,65}?)(?=\s+for\s+)",
+         "LISTING_SITE_ARCHITECT"),
+    )
+    for source in sources:
+        if source.get("identity") not in (
+                "SAME_ADDRESS_PROJECT_CONTEXT_NOT_LINKED",
+                "SAME_ADDRESS_COMPANY_CONTEXT_NOT_LINKED",
+                "EXACT_APPLICATION_ID_IN_FETCHED_TEXT"):
+            continue
+        body = " ".join(str(source.get("content") or "").split())
+        if not _identity(body, row)[0]:
+            continue
+        for pattern, relationship in patterns:
+            for match in re.finditer(pattern, body, re.I):
+                name = " ".join(match.group(1).strip(" -.,:").split())
+                if not 4 <= len(name) <= 70 or name.casefold() in (
+                        "the developer", "the company", "official source"):
+                    continue
+                key = (name.casefold(), source.get("url"))
+                if key in seen:
+                    continue
+                seen.add(key)
+                candidates.append({
+                    "company": name,
+                    "source_url": source.get("url"),
+                    "source_identity": source.get("identity"),
+                    "literal_quote": body[max(0, match.start() - 60):
+                                         min(len(body), match.end() + 105)],
+                    "association": relationship,
+                    "exact_application_role_verified": False,
+                    "buyer_verified": False,
+                    "contact_verified": False,
+                })
+    return candidates[:8]
+
+
+def _query(row, stage, previous, sources=None):
     address = row["address"].split(",")[0].strip()[:70]
     city = row["city"][:40]
     permit = row.get("application_id") or ""
     companies = previous.get("company_entity_relationships", {}).get("claims", [])
     names = [str(c.get("subject") or "").strip()[:90]
              for c in companies if c.get("subject") and c.get("literal_quote")]
+    # A model may correctly abstain from identifying the EXACT application
+    # owner, yet a source-backed site company can still have a contact page.
+    for item in site_company_candidates(sources or [], row):
+        if item["company"].casefold() not in {n.casefold() for n in names}:
+            names.append(item["company"])
     if stage == "company_entity_relationships":
         return f'"{address}" {city} business operator owner developer industrial'
     if stage == "buyer_contact_path":
@@ -69,8 +120,11 @@ def _check_identity(stage, body, row, previous):
             "claims", [])
         # Contact site must literally name a company that appeared in a
         # source-backed project claim; this still does NOT validate its buyer.
-        for claim in companies:
-            company = str(claim.get("subject") or "").strip()
+        names = [str(c.get("subject") or "").strip()
+                 for c in companies if c.get("subject") and c.get("literal_quote")]
+        names.extend(c["company"] for c in site_company_candidates(
+            previous.get("_source_evidence", []), row))
+        for company in names:
             if len(company) > 4 and company.casefold() in body.casefold():
                 return "SAME_NAMED_COMPANY_CONTACT_CONTEXT_NOT_BUYER"
     return ""
@@ -80,7 +134,7 @@ def enrich(root, row, stage, previous, sources, key, db, day, legacy,
            transport=None):
     if stage not in SOURCE_STAGES:
         return [], "NOT_REQUIRED"
-    query = _query(row, stage, previous)
+    query = _query(row, stage, previous, sources)
     if not query:
         return [], "REQUIRED_IDENTIFIED_COMPANY_MISSING"
     stamp = hashlib.sha256(json.dumps(
@@ -169,7 +223,8 @@ def enrich(root, row, stage, previous, sources, key, db, day, legacy,
             native.ledger_finish(db, ledger_day, bill, "UNKNOWN")
             status["issues"].append("FETCH_" + type(exc).__name__)
             continue
-        identity = _check_identity(stage, body, row, previous)
+        identity = _check_identity(
+            stage, body, row, {**previous, "_source_evidence": sources})
         if not identity:
             status["issues"].append("FETCHED_PAGE_NO_PROJECT_OR_COMPANY_MATCH")
             continue
