@@ -168,7 +168,8 @@ class AITopTenSelectionTests(unittest.TestCase):
         after=shortlist_run(self.root,today=DAY)
         self.assertEqual(after["ai_preselection_reviewed_count"],0)
         self.assertEqual(after["verified_buyers"],0)
-        self.assertEqual(after["top10"][0]["contact_email"],"")
+        reloaded=build(self.root,today=DAY)
+        self.assertEqual(reloaded["top10"][0]["contact_email"],"")
 
 
 if __name__=="__main__":
