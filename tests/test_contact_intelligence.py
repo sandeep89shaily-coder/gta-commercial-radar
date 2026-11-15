@@ -254,6 +254,59 @@ class ContactInvestigationTests(unittest.TestCase):
                             not x["project_purchasing_role_verified"]
                             for x in channels))
 
+    def test_masked_sales_vendor_emails_and_sample_formats_are_rejected(self):
+        source = _source_page(
+            "https://www.signalhire.com/companies/fiera-real-estate",
+            "Fiera Real Estate: Contact employees. "
+            "h*****************c@uqtr.ca k*********k@fierarealestate.com "
+            "m******i@brampton.ca.",
+            ["Fiera Real Estate"], "Ace Brampton", DAY)
+        channels = _public_channels([source], ["Fiera Real Estate"])
+        self.assertEqual(channels, [])
+        sample = _source_page(
+            "https://www.neverbounce.com/company/fiera-real-estate",
+            "Fiera Real Estate Contact email pattern (ex. "
+            "John.Smith@fierarealestate.com) and JSmith@fierarealestate.com. "
+            "First.Last@fierarealestate.com",
+            ["Fiera Real Estate"], "Ace Brampton", DAY)
+        self.assertEqual(_public_channels([sample], ["Fiera Real Estate"]), [])
+
+    def test_crunchbase_joined_contact_email_is_normalized(self):
+        page = _source_page(
+            "https://www.crunchbase.com/organization/fiera-real-estate",
+            "Fiera Real Estate Contact Emailinfo@fierarealestate.com "
+            "Phone Number844-431-7684",
+            ["Fiera Real Estate"], "Ace Brampton", DAY)
+        channels = _public_channels([page], ["Fiera Real Estate"])
+        self.assertEqual({x["value"] for x in channels},
+                         {"info@fierarealestate.com", "844-431-7684"})
+        self.assertTrue(all(x["needs_live_business_verification"] for x in channels))
+
+    def test_reconcile_saved_contact_report_without_api_calls(self):
+        from gta_contact_intelligence import reconcile_saved, _save
+        old = investigate(self.root, project_name="Northfield Works", day=DAY)
+        old["status"] = "NAMED_CONTACTS_AND_BUSINESS_CHANNELS_REVIEW"
+        old["evidence"].append(_source_page(
+            "https://www.crunchbase.com/organization/harbourlight",
+            "Harbourlight Developments Contact Emailinfo@harbourlightdevelopments.ca "
+            "Phone Number416-555-0149",
+            ["Harbourlight Developments"], "Northfield Works", DAY))
+        old["public_channels"] = [{
+            "company": "Harbourlight Developments",
+            "type": "PUBLIC_EMAIL", "value": "Emailinfo@harbourlightdevelopments.ca"}]
+        _save(Path(old["report_path"]), old)
+        result = reconcile_saved(
+            self.root, project_name="Northfield Works", city="Brampton")
+        self.assertEqual(result["paid_calls_during_reconciliation"], 0)
+        self.assertIn("info@harbourlightdevelopments.ca",
+                      [x["value"] for x in result["public_channels"]])
+        self.assertNotIn("Emailinfo@harbourlightdevelopments.ca",
+                         [x["value"] for x in result["public_channels"]])
+        original = json.loads(Path(old["report_path"]).read_text())
+        self.assertEqual(original["public_channels"][0]["value"],
+                         "Emailinfo@harbourlightdevelopments.ca")
+        self.assertFalse((self.root / "v5_ai_budget.sqlite").exists())
+
     def test_unknown_project_does_not_query_paid_provider(self):
         with self.assertRaisesRegex(ValueError,
                                     "EXACT_CITED_DISCOVERY_NOT_FOUND"):
