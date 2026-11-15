@@ -437,7 +437,9 @@ def run(results, *, paid=False, deep_research=False, deep_project_limit=4,
                         "buyer_function_hypothesis": rec["buyer_function_hypothesis"],
                         "live_recheck": {
                             "checked_on": day.isoformat(),
-                            "complete": True,
+                            "complete": live_checks[
+                                (row["city"].casefold(), row["record_id"])
+                            ].get("complete") is True,
                             "source_count": len(live_checks[
                                 (row["city"].casefold(),row["record_id"])]["sources"]),
                             "sources": live_checks[
