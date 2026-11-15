@@ -35,6 +35,11 @@ def run(results, workspace=None):
             "projects_with_address_or_lifecycle_conflicts", 0),
         "graph_projects": graph.get("project_candidates", 0),
         "graph_role_claims": graph.get("claimed_relationships", 0),
+        "ai_top10_quote_supported_role_candidates": graph.get(
+            "ai_top10_quote_supported_role_review_candidates", 0),
+        "ai_top10_report_role_candidates": qualification.get(
+            "ai_exact_application_role_candidates", 0),
+        "verified_purchasing_authorities": 0,
         "supplier_role_review_queue": len(gate.get("role_queue", [])),
         "supplier_procurement_review_queue": len(gate.get("tender_queue", [])),
         "internal_commercial_review_top10": qualification["internal_top_10_count"],
