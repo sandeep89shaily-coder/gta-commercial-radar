@@ -1,5 +1,6 @@
 """Regression tests: DeepSeek participates in top-ten preselection, safely."""
 import csv
+from contextlib import closing
 import datetime as dt
 import json
 import tempfile
@@ -139,7 +140,7 @@ class AITopTenSelectionTests(unittest.TestCase):
         self.assertIn("PROVIDER_HTTP_402_ACCOUNT_BALANCE",result["status"])
         self.assertFalse((self.root/AI_REVIEW).exists())
         import sqlite3
-        with sqlite3.connect(self.root/"v5_ai_budget.sqlite") as db:
+        with closing(sqlite3.connect(self.root/"v5_ai_budget.sqlite")) as db:
             rows=db.execute("SELECT reserved,actual,status FROM spends").fetchall()
         self.assertEqual(rows,[(0.0,0.0,"NONBILLABLE")])
 
