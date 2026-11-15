@@ -478,6 +478,9 @@ def model_directed_company_search(root, row, key, db, day, legacy, *,
         save()
         return state
     message = choices[0].get("message") or {}
+    # Save the complete model narrative as an unverified research hint.
+    # Only independently fetched source passages can support company claims.
+    state["model_research_summary"] = str(message.get("content") or "")[:10000]
     urls = []
     for annotation in message.get("annotations") or []:
         if isinstance(annotation, dict):
