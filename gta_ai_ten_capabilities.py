@@ -221,7 +221,8 @@ def _project_payload(row, evidence, stage, profile, prior, feedback=None):
     """No internet tools: reason strictly over independently fetched evidence."""
     return {
         "model": native.MODEL, "thinking": {"type": "disabled"},
-        "stream": False, "max_tokens": 1100,
+        "response_format": {"type": "json_object"},
+        "stream": False, "max_tokens": 1800,
         "messages": [
             {"role": "system", "content":
              "You are a skeptical Canadian construction intelligence analyst. "
@@ -239,11 +240,21 @@ def _project_payload(row, evidence, stage, profile, prior, feedback=None):
              "evidence, produce classification UNKNOWN and empty claims. "
              "Focus: " + PROMPTS[stage]},
             {"role": "user", "content": json.dumps({
-                "stage": stage, "project": row,
-                "evidence": [{"index": i, **src}
-                             for i, src in enumerate(evidence)],
-                "supplier_profile": profile if stage ==
-                    "customer_specific_supplier_fit" else "",
+                "stage": stage,
+                "project": {
+                    field: row.get(field, "")
+                    for field in ("record_id", "city", "address",
+                                  "application_id", "project_description",
+                                  "source_stage", "source_url")},
+                # Explicit per-source length caps, not truncation of a
+                # serialized JSON object halfway through a quotation.
+                "evidence": [
+                    {"index": i, "url": str(src.get("url") or "")[:1100],
+                     "identity": str(src.get("identity") or "")[:120],
+                     "content": str(src.get("content") or "")[:900]}
+                    for i, src in enumerate(evidence[:18])],
+                "supplier_profile": (
+                    profile if stage == "customer_specific_supplier_fit" else ""),
                 "customer_feedback_from_user_records": (
                     feedback or []) if stage in (
                         "customer_specific_supplier_fit",
@@ -252,7 +263,7 @@ def _project_payload(row, evidence, stage, profile, prior, feedback=None):
                     {"stage": name, "classification": value.get(
                         "classification", "UNKNOWN")}
                     for name, value in prior.items()],
-            }, ensure_ascii=True)[:15500]},
+            }, ensure_ascii=True)},
         ],
     }
 
@@ -441,6 +452,21 @@ def _stage_model(row, evidence, stage, profile, prior,
     answer, status = _parse(response)
     if answer is None:
         result["status"] = "INCOMPLETE_OR_INVALID_" + status
+        choice = (response.get("choices") or [{}])[0] if (
+            isinstance(response, dict)) else {}
+        message = choice.get("message") or {} if isinstance(choice, dict) else {}
+        # Preserve the returned paid response for offline diagnosis. Never
+        # force a repeat call merely to find out why JSON parsing failed.
+        result["response_diagnostic"] = {
+            "finish_reason": (choice.get("finish_reason")
+                              if isinstance(choice, dict) else None),
+            "content_excerpt": str(message.get("content") or "")[:5000]
+                if isinstance(message, dict) else "",
+            "usage_present": isinstance(
+                response.get("usage"), dict) if isinstance(response, dict)
+                else False,
+            "parse_status": status,
+        }
         return result
     result["classification"] = str(answer.get("classification") or
                                    "UNKNOWN").strip().upper()[:80]
