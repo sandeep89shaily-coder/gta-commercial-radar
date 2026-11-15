@@ -206,10 +206,34 @@ def check_one(root, row, key, db, day, legacy, *, transport=None,
                                   transport=arcgis_transport)
             matched = pattern.search(raw or "")
             if raw and matched:
+                attributes = json.loads(raw).get("attributes") or []
+                fields = attributes[0] if attributes and isinstance(
+                    attributes[0],dict) else {}
+                status = next((str(fields[name]) for name in (
+                    "STATUS_DESC","STATUS","STATUS_GROUP",
+                    "LATEST_MILESTONE","APPLICATION_STATUS","PERMIT_STATUS")
+                    if fields.get(name)), "")
+                state["official_current_status_literal"] = status[:180]
+                old = " ".join(str(row.get("source_stage") or "").casefold().split())
+                new = " ".join(status.casefold().split())
+                if old and new and old != new:
+                    state["issues"].append(
+                        "EXACT_OFFICIAL_APPLICATION_STATUS_DIFFERS_FROM_SAVED_RECORD")
+                    state["official_status_change_review"] = {
+                        "saved_stage":str(row.get("source_stage") or "")[:180],
+                        "retrieved_stage":status[:180],
+                        "not_automatic_construction_or_procurement_proof":True,
+                    }
                 state["sources"].append({
                     "url":url,"identity":"EXACT_OFFICIAL_ARCGIS_APPLICATION",
                     "authority":"OFFICIAL_ARCGIS_EXACT_ID",
-                    "excerpt":str(raw)[:650],
+                    "excerpt":str(raw)[:950],
+                    "official_status_fields": {
+                        name:str(fields[name])[:150] for name in (
+                            "STATUS_DESC","STATUS","STATUS_GROUP",
+                            "LATEST_MILESTONE","APPLICATION_STATUS","PERMIT_STATUS")
+                        if fields.get(name)
+                    },
                     "retrieved_on":day.isoformat(),
                     "date_is_fetch_day_not_publication":True,
                 })
