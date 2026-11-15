@@ -293,7 +293,9 @@ class ContactInvestigationTests(unittest.TestCase):
             ["Harbourlight Developments"], "Northfield Works", DAY))
         old["public_channels"] = [{
             "company": "Harbourlight Developments",
-            "type": "PUBLIC_EMAIL", "value": "Emailinfo@harbourlightdevelopments.ca"}]
+            "type": "PUBLIC_EMAIL", "value": "Emailinfo@harbourlightdevelopments.ca",
+            "source_url": "https://www.crunchbase.com/organization/harbourlight",
+            "literal_quote": "Contact Emailinfo@harbourlightdevelopments.ca"}]
         _save(Path(old["report_path"]), old)
         result = reconcile_saved(
             self.root, project_name="Northfield Works", city="Brampton")
