@@ -142,18 +142,26 @@ def _citation_claims(response, sources, city):
                 "procurement_open_verified": False,
             })
         proposed_name = str(item.get("project_name") or "").strip()[:150]
-        project_named = any(
-            claim["kind"] == "project" and
-            claim["subject"].casefold() == proposed_name.casefold()
-            for claim in claims)
+        # The named project can be proven by ANY accepted source-quoted
+        # company claim naming it. An LLM sometimes supplies an unrelated
+        # scope quote for kind=project, while the original company quote
+        # correctly says "acquisition of Ace Brampton". Do not discard a
+        # genuinely source-backed name in that situation.
+        project_sources = {
+            claim["source_url"] for claim in claims
+            if claim["kind"] == "project" and
+            claim["subject"].casefold() == proposed_name.casefold()}
+        for claim in claims:
+            if (proposed_name and len(proposed_name) >= 4 and
+                    claim["kind"] in ("developer", "partner") and
+                    proposed_name.casefold() in claim["quote"].casefold()):
+                project_sources.add(claim["source_url"])
+        project_named = bool(project_sources)
         # Brampton has multiple UNRELATED condominium developments on
         # nearby streets, sometimes with the same institutional investor.
         # A company cited from a different project's page is not a
         # developer/partner of this named project.
         if project_named:
-            project_sources = {
-                c["source_url"] for c in claims if c["kind"] == "project"
-                and c["subject"].casefold() == proposed_name.casefold()}
             claims = [
                 c for c in claims
                 if c["kind"] not in ("developer", "partner") or
