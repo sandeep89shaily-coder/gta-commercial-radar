@@ -415,9 +415,11 @@ def build(results, *, now=None):
     }
 
 
-def run(results):
+def run(results, *, today=None):
     root = Path(results)
-    report = build(root)
+    timestamp = (dt.datetime.combine(today, dt.time(12), dt.timezone.utc).isoformat()
+                 if today else None)
+    report = build(root, now=timestamp)
     path = root / OUTPUT
     tmp = path.with_suffix(".json.tmp")
     tmp.write_text(json.dumps(report, ensure_ascii=False, indent=2),
