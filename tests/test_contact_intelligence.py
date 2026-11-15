@@ -309,6 +309,13 @@ class ContactInvestigationTests(unittest.TestCase):
                          "Emailinfo@harbourlightdevelopments.ca")
         self.assertFalse((self.root / "v5_ai_budget.sqlite").exists())
 
+    def test_uk_country_code_suffix_is_not_treated_as_canadian_phone(self):
+        page = _source_page(
+            "https://www.neverbounce.com/company/fiera-real-estate",
+            "Fiera Real Estate Contact telephone +44 2074095500",
+            ["Fiera Real Estate"], "Ace Brampton", DAY)
+        self.assertEqual(_public_channels([page], ["Fiera Real Estate"]), [])
+
     def test_unknown_project_does_not_query_paid_provider(self):
         with self.assertRaisesRegex(ValueError,
                                     "EXACT_CITED_DISCOVERY_NOT_FOUND"):
