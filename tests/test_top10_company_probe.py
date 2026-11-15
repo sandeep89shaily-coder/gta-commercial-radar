@@ -69,6 +69,35 @@ class DirectTop10CompanyProbeTests(unittest.TestCase):
                          "STOPPED_UNKNOWN_PROVIDER_USAGE_NO_RETRY")
         self.assertEqual(calls, ["/chat/completions"])
 
+    def test_truncated_web_research_preserves_discovered_source_leads(self):
+        calls = []
+        def send(path, payload):
+            calls.append(path)
+            self.assertEqual(path, "/chat/completions")
+            return {
+                "choices": [{"finish_reason": "length", "message": {
+                    "content": "Potential facility operator at this address",
+                    "server_tool_calls": [{"index": 0, "calls": [{
+                        "type": "deepseek_web_search",
+                        "sources": [{"url": "https://example.org/company",
+                                     "title": "Company profile"}]
+                    }]}]}}],
+                "usage": {"prompt_tokens": 1400, "completion_tokens": 1700,
+                          "server_tool_use": {"tool_search": 2, "tool_fetch": 1}}
+            }
+        result = run(self.root, paid=True, token="test", today=TODAY,
+                     transport=send)
+        self.assertEqual(result["status"], "ALL_TOP10_RESEARCH_ATTEMPTED")
+        record = result["reviews"][0]
+        self.assertEqual(record["research_status"],
+                         "INCOMPLETE_WEB_RESEARCH_LENGTH")
+        self.assertEqual(record["discovered_urls_unverified"],
+                         ["https://example.org/company"])
+        self.assertIn("Potential facility operator",
+                      record["model_summary_research_hint_not_verified"])
+        self.assertEqual(result["completed_fetch_evidence"], 0)
+        self.assertEqual(calls, ["/chat/completions"])
+
     def test_paid_probe_fetches_evidence_separately_and_reuses_checkpoint(self):
         calls = []
         def send(path, payload):
