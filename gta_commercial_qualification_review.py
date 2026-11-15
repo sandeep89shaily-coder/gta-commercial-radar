@@ -371,6 +371,10 @@ def _apply_ai(pool, all_rows, review, today):
         sources = recheck.get("sources") or []
         cited = data.get("cited_live_source")
         row["ai_live_checked_on"] = _clean(recheck.get("checked_on"))
+        row["ai_official_status_fetched"] = _clean(
+            recheck.get("official_current_status_literal"))
+        row["ai_official_status_differs_from_saved"] = bool(
+            recheck.get("official_status_change_review"))
         row["ai_live_source_count"] = len(sources)
         first_source = sources[0] if sources and isinstance(sources[0],dict) else {}
         # Show the independently fetched URL even when the model did not
@@ -519,7 +523,8 @@ FIELDS = ("analyst_queue_rank", "record_id", "origin", "city", "address",
           "ai_preselection_next_check", "ai_preselection_score_adjustment",
           "ai_live_checked_on", "ai_live_source_count", "ai_live_evidence_url",
           "ai_live_evidence_quote", "ai_live_evidence_identity",
-          "ai_live_project_version_review")
+          "ai_live_project_version_review",
+          "ai_official_status_fetched", "ai_official_status_differs_from_saved")
 
 
 def _csv_safe(value):
