@@ -17,6 +17,7 @@ import v5_investigator as v5
 import v8_deepseek_native as native
 from gta_ai_top10_company_probe import _rows
 from gta_top10_live_source_recheck import check_one as live_source_check
+from gta_ai_ten_source_enrichment import enrich as enrich_stage_sources
 from radar_run_lock import once_lock
 
 OVERLAY = "GTA_RADAR_AI_TEN_CAPABILITIES_OVERLAY.json"
@@ -373,7 +374,7 @@ def _overlay_item(row, dossier):
 
 
 def run(results, *, paid=False, limit=2, start_index=0,
-        customer_profile="", discover=True,
+        customer_profile="", discover=True, enrich_sources=True,
         token=None, today=None, transport=None):
     if type(limit) is not int or not 1 <= limit <= 10:
         raise ValueError("LIMIT_MUST_BE_1_TO_10")
@@ -453,9 +454,27 @@ def run(results, *, paid=False, limit=2, start_index=0,
                 for stage in STAGES:
                     if stage in dossier["stages"]:
                         continue  # never duplicate a completed/uncertain call
+                    # The contact/procurement/lifecycle/technical/early stages
+                    # can obtain NEW independently fetched public evidence,
+                    # not just re-analyze the original municipal permit.
+                    research_state = "NOT_REQUESTED"
+                    if enrich_sources and evidence:
+                        additional, research_state = enrich_stage_sources(
+                            root, row, stage, dossier["stages"], evidence,
+                            key, db, day, legacy, transport=transport)
+                        current_urls = {x["url"] for x in evidence}
+                        for source in additional:
+                            if (isinstance(source, dict) and
+                                    source.get("url") not in current_urls and
+                                    len(evidence) < 18):
+                                evidence.append(source)
+                                current_urls.add(source["url"])
+                        dossier["evidence"] = evidence
+                        _write_json(path, dossier)
                     result = _stage_model(
                         row, evidence, stage, profile, dossier["stages"], key,
                         db, day, legacy, fingerprint, transport)
+                    result["source_enrichment_status"] = research_state
                     dossier["stages"][stage] = result
                     _write_json(path, dossier)
                     if result["status"] in (
@@ -491,11 +510,14 @@ def main():
     p.add_argument("--customer-profile", default="")
     p.add_argument("--no-discovery", action="store_true",
                    help="Use only previously retrieved independent sources")
+    p.add_argument("--no-source-enrichment", action="store_true",
+                   help="Use existing source passages only, no stage searches")
     args = p.parse_args()
     print(json.dumps(run(args.results, paid=args.paid, limit=args.limit,
                          start_index=args.start_index,
                          customer_profile=args.customer_profile,
-                         discover=not args.no_discovery),
+                         discover=not args.no_discovery,
+                         enrich_sources=not args.no_source_enrichment),
                      indent=2))
 
 
