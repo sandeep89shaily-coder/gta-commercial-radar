@@ -138,8 +138,10 @@ def _search_candidates(result, project, companies):
         score += 6 if any(c in teaser for c in company_names) else 0
         score += 2 if "contact" in teaser or "construction" in teaser else 0
         selected.append((score, url))
+    # A ranked search result without any project/company/contact context
+    # is not worth spending a paid Fetch on. It is never evidence.
     return [x[1] for x in sorted(
-        set(selected), key=lambda x: (-x[0], x[1]))]
+        set(selected), key=lambda x: (-x[0], x[1])) if x[0] > 0]
 
 
 def _evidence_match(body, project, companies):
