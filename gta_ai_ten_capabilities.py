@@ -537,6 +537,49 @@ def _overlay_item(row, dossier):
     }
 
 
+def reconcile_saved(results, record_id):
+    """Refresh existing source-quoted leads and briefs: NO network or AI calls."""
+    root = Path(results)
+    matches = [row for row in _rows(root)
+               if row["record_id"] == record_id]
+    if len(matches) != 1:
+        raise ValueError("EXACT_CURRENT_TOP10_RECORD_REQUIRED")
+    row = matches[0]
+    identifier = hashlib.sha256(
+        (row["record_id"] + ":" + row["city"]).encode()).hexdigest()[:24]
+    path = root / DOSSIERS / (identifier + ".json")
+    dossier = _read_json(path)
+    if not dossier or not all(
+            dossier.get(k) == row.get(k) for k in
+            ("record_id", "city", "address", "application_id")):
+        raise ValueError("SAVED_DOSSIER_IDENTITY_MISMATCH_OR_NOT_FOUND")
+    original_sources = dossier.get("evidence")
+    if not isinstance(original_sources, list):
+        raise ValueError("SAVED_DOSSIER_EVIDENCE_INVALID")
+    leads = site_company_candidates(original_sources, row)
+    dossier["site_company_candidates"] = leads
+    _write_json(path, dossier)
+    brief_path = root / BRIEFS / (identifier + ".md")
+    brief_path.parent.mkdir(parents=True, exist_ok=True)
+    brief_path.write_text(_render_brief(row, dossier), encoding="utf-8")
+    existing_overlay = _read_json(root / OVERLAY)
+    projects = existing_overlay.get("projects")
+    if not isinstance(projects, dict):
+        projects = {}
+    projects[row["record_id"]] = _overlay_item(row, dossier)
+    _write_json(root / OVERLAY, {
+        "version": 1, "review_only": True, "projects": projects,
+        "verified_buyers": 0, "outreach_authorized": False})
+    return {
+        "status": "SAVED_DOSSIER_RECONCILED_NO_SPEND",
+        "record_id": record_id, "address": row["address"],
+        "source_count": len(original_sources),
+        "site_company_leads": leads, "analyst_brief": str(brief_path),
+        "paid_requests": 0,
+        "outreach_authorized": False,
+    }
+
+
 def run(results, *, paid=False, limit=2, start_index=0,
         record_id="", customer_profile="", discover=True,
         enrich_sources=True, token=None, today=None, transport=None):
@@ -708,6 +751,9 @@ def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--results", required=True)
     p.add_argument("--paid", action="store_true")
+    p.add_argument("--reconcile-saved", action="store_true",
+                   help="Refresh existing saved source-based site company "
+                        "leads without any API request or daily budget usage")
     p.add_argument("--limit", type=int, default=2)
     p.add_argument("--start-index", type=int, default=0)
     p.add_argument("--record-id", default="",
@@ -719,6 +765,12 @@ def main():
     p.add_argument("--no-source-enrichment", action="store_true",
                    help="Use existing source passages only, no stage searches")
     args = p.parse_args()
+    if args.reconcile_saved:
+        if args.paid or not args.record_id:
+            p.error("--reconcile-saved requires --record-id and forbids --paid")
+        print(json.dumps(reconcile_saved(args.results, args.record_id),
+                         indent=2))
+        return
     print(json.dumps(run(args.results, paid=args.paid, limit=args.limit,
                          start_index=args.start_index,
                          record_id=args.record_id,
