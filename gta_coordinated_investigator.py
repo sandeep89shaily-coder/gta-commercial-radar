@@ -353,10 +353,13 @@ def investigate(results, record_id, *, paid=False, customer_profile="",
                 state["analysis"] = analysis["data"]
                 state["accepted_claims"] = _claim_validation(
                     analysis["data"], evidence)
-                state["status"] = ("SOURCE_BACKED_REVIEW_COMPLETE"
-                                   if state["accepted_claims"] or
-                                   state["dossier"]["site_company_leads"]
-                                   else "NO_USEFUL_SOURCE_BACKED_FINDINGS")
+                has_contact = any(c.get("kind") == "contact"
+                                  for c in state["accepted_claims"])
+                state["status"] = (
+                    "RESEARCH_COMPLETE_CONTACT_REVIEW_REQUIRED" if has_contact
+                    else "RESEARCH_COMPLETE_SITE_COMPANY_ONLY"
+                    if state["dossier"]["site_company_leads"]
+                    else "RESEARCH_COMPLETE_NO_COMPANY_FINDINGS")
             else:
                 state["status"] = "ANALYSIS_" + analysis["status"]
             _save(path, state)
