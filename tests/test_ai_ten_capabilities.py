@@ -108,7 +108,7 @@ class TenCapabilityTests(unittest.TestCase):
         self.probe.unlink()
         called = []
         result = run(self.root, paid=True, today=TODAY, token="test",
-                     customer_profile="Industrial HVAC",
+                     customer_profile="Industrial HVAC", discover=False,
                      transport=lambda *a: called.append(a))
         self.assertEqual(called, [])
         dossier = json.loads(Path(result["results"][0]["dossier"]).read_text())
