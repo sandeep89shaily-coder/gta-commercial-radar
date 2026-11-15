@@ -499,15 +499,25 @@ def _overlay_item(row, dossier):
 
 
 def run(results, *, paid=False, limit=2, start_index=0,
-        customer_profile="", discover=True, enrich_sources=True,
-        token=None, today=None, transport=None):
+        record_id="", customer_profile="", discover=True,
+        enrich_sources=True, token=None, today=None, transport=None):
     if type(limit) is not int or not 1 <= limit <= 10:
         raise ValueError("LIMIT_MUST_BE_1_TO_10")
     if type(start_index) is not int or start_index < 0:
         raise ValueError("START_INDEX_MUST_BE_NONNEGATIVE")
     root = Path(results)
     all_rows = _rows(root)
-    rows = all_rows[start_index:start_index + limit]
+    if record_id:
+        if start_index:
+            raise ValueError("EXACT_RECORD_ID_CANNOT_COMBINE_WITH_START_INDEX")
+        rows = [row for row in all_rows
+                if row["record_id"] == record_id]
+        if not rows:
+            raise ValueError("EXACT_RECORD_ID_NOT_IN_CURRENT_TOP10")
+        if len(rows) != 1:
+            raise ValueError("AMBIGUOUS_DUPLICATE_RECORD_ID")
+    else:
+        rows = all_rows[start_index:start_index + limit]
     if not rows:
         raise ValueError("NO_SELECTED_PROJECTS")
     day = today or dt.date.today()
@@ -519,6 +529,9 @@ def run(results, *, paid=False, limit=2, start_index=0,
         for row in rows:
             report["results"].append({
                 "record_id": row["record_id"],
+                "address": row["address"],
+                "city": row["city"],
+                "application_id": row["application_id"],
                 "available_source_count": len(_evidence(root, row, day)),
                 "planned_stages": list(STAGES)})
         return report
@@ -628,6 +641,8 @@ def run(results, *, paid=False, limit=2, start_index=0,
                 projects[row["record_id"]] = _overlay_item(row, dossier)
                 report["results"].append({
                     "record_id": row["record_id"],
+                    "address": row["address"],
+                    "city": row["city"],
                     "source_count": len(evidence),
                     "stages": {name: item["status"] for name, item
                                in dossier["stages"].items()},
@@ -652,6 +667,9 @@ def main():
     p.add_argument("--paid", action="store_true")
     p.add_argument("--limit", type=int, default=2)
     p.add_argument("--start-index", type=int, default=0)
+    p.add_argument("--record-id", default="",
+                   help="Exact record_id in the current Top 10; fails closed "
+                        "if missing or ambiguous instead of guessing a row")
     p.add_argument("--customer-profile", default="")
     p.add_argument("--no-discovery", action="store_true",
                    help="Use only previously retrieved independent sources")
@@ -660,6 +678,7 @@ def main():
     args = p.parse_args()
     print(json.dumps(run(args.results, paid=args.paid, limit=args.limit,
                          start_index=args.start_index,
+                         record_id=args.record_id,
                          customer_profile=args.customer_profile,
                          discover=not args.no_discovery,
                          enrich_sources=not args.no_source_enrichment),
