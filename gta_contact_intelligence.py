@@ -33,7 +33,7 @@ MAX_SEARCH = 12
 MAX_FETCH = 20
 MAX_SOURCES_MODEL = 22
 MAX_SOURCE_CHAR = 2100
-EMAIL = re.compile(r"(?<![\w.+-])[\w.+-]+@(?:[\w-]+\.)+[A-Za-z]{2,}(?![\w.-])")
+EMAIL = re.compile(r"(?<![\w.+-])[\w.+-]+@(?:[\w-]+\.)+[A-Za-z]{2,}(?![\w-])")
 PHONE = re.compile(r"(?<!\d)(?:\+?1[\s.-]?)?\(?[2-9]\d{2}\)?[\s.-]?[2-9]\d{2}[\s.-]?\d{4}(?!\d)")
 ALLOWED_ROLES = {
     "developer", "partner", "general_contractor", "construction_manager",
@@ -93,6 +93,13 @@ def _rank_hits(response, companies, project):
         score += 5 if any(k in teaser for k in ("contact", "team", "leadership", "staff")) else 0
         score += 3 if project.casefold() in teaser else 0
         score += 2 if any(x in host for x in ("linkedin.com", ".ca")) else 0
+        # Prefer primary developer over investment partner when citations
+        # have equal contact relevance. The model still receives actual
+        # indexed source URLs; this is only discovery ordering.
+        for rank, company in enumerate(companies):
+            if company.casefold() in teaser:
+                score += max(1, 4 - rank)
+                break
         hits.append((score, url))
     return [x[1] for x in sorted(set(hits), key=lambda x: (-x[0], x[1]))]
 
