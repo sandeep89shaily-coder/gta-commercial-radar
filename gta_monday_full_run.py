@@ -229,6 +229,35 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
                     "status": "NO_CURRENT_COUNCIL_STAGE_DIAGNOSTIC",
                     "error_type": type(exc).__name__
                 }
+        if name == "council_agenda_intelligence" and not skip_collection:
+            # The AI shortlist assessor executes BEFORE the larger project
+            # research harness, while the seven-stage collection remains
+            # unchanged. One shared ledger and the same cross-process lock
+            # guard all model requests. Never claim a model hypothesis is a
+            # verified buyer, open contract or first-publication date.
+            if report.get("fresh_collection_verified"):
+                try:
+                    from gta_ai_top10_reranker import run as run_ai_preselection
+                    pre = run_ai_preselection(results, paid=True)
+                    report["ai_top10_preselection"] = {
+                        "status": pre["status"],
+                        "candidate_count": pre["candidate_count"],
+                        "reviewed_count": pre["reviewed_count"],
+                        "paid_model_calls": pre["paid_model_calls"],
+                        "source_snapshot_only": True,
+                        "applies_to_top10": pre.get("applies_to_top10", False),
+                        "verified_buyers": 0,
+                        "verified_supplier_contracts": 0,
+                    }
+                except (OSError, ValueError, TypeError, ImportError, RuntimeError) as exc:
+                    report["ai_top10_preselection"] = {
+                        "status": "SAFE_FALLBACK_DETERMINISTIC_ONLY",
+                        "error_type": type(exc).__name__,
+                        "verified_buyers": 0,
+                    }
+            else:
+                report["ai_top10_preselection"] = {
+                    "status": "SKIPPED_NO_FRESH_COLLECTION"}
         if name in ("ai_harness_adaptive", "ai_harness_free"):
             # Exit code 0 is not evidence that DeepSeek ran or was billed.
             # The harness's own manifest explicitly reports attempts and
