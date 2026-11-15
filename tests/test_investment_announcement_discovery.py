@@ -12,7 +12,7 @@ from pathlib import Path
 
 from gta_investment_announcement_discovery import (
     _citation_claims, _municipal_candidates, _safe_rows, run,
-    search_queries,
+    search_queries, reconcile_saved,
 )
 
 DAY = dt.date(2026, 11, 15)
@@ -176,6 +176,63 @@ class GenericInvestmentDiscoveryTests(unittest.TestCase):
         self.assertEqual(
             {x["subject"] for x in findings[0]["companies"]},
             {"Harbourlight Developments"})
+
+    def test_birchmount_style_name_recovered_from_developer_quote(self):
+        source = [{"url": "https://example.org/developer",
+                   "content": "Storytime Developments is pleased to announce "
+                              "the acquisition of Ace Brampton, an approximately "
+                              "six-acre industrial development site in Brampton, "
+                              "Ontario, in partnership with Fiera Real Estate."}]
+        data = {"data": {"projects": [{
+            "project_name": "Ace Brampton", "city": "Brampton",
+            "location_text": "", "construction_timing": "UNKNOWN",
+            "claims": [
+                {"kind": "developer", "subject": "Storytime Developments",
+                 "source_index": 0,
+                 "quote": source[0]["content"]},
+                {"kind": "partner", "subject": "Fiera Real Estate",
+                 "source_index": 0,
+                 "quote": "in partnership with Fiera Real Estate"},
+                {"kind": "project", "subject": "Ace Brampton",
+                 "source_index": 0,
+                 "quote": "six-acre industrial development site in Brampton"},
+            ]}]}}
+        found = _citation_claims(data, source, "Brampton")
+        self.assertEqual(len(found), 1)
+        self.assertEqual(found[0]["project_name"], "Ace Brampton")
+        self.assertEqual([x["subject"] for x in found[0]["companies"]],
+                         ["Storytime Developments", "Fiera Real Estate"])
+        self.assertFalse(found[0]["verified_buyers"])
+
+    def test_reconcile_saved_report_without_provider_calls(self):
+        folder = self.root / "GTA_RADAR_INVESTMENT_DISCOVERY"
+        folder.mkdir()
+        source = {"url": "https://example.org/ace",
+                  "content": "Storytime Developments announced the acquisition "
+                             "of Ace Brampton in Brampton, Ontario, with "
+                             "Fiera Real Estate."}
+        payload = {"projects": [{
+            "project_name": "Ace Brampton", "city": "Brampton",
+            "location_text": "", "construction_timing": "UNKNOWN",
+            "claims": [
+                {"kind": "developer", "subject": "Storytime Developments",
+                 "source_index": 0, "quote": source["content"]},
+                {"kind": "partner", "subject": "Fiera Real Estate",
+                 "source_index": 0, "quote": "with Fiera Real Estate"}
+            ]}]}
+        original = folder / "INVESTMENT_fakedigest.json"
+        original.write_text(json.dumps({
+            "city": "Brampton", "model_status": "OK",
+            "model_output_excerpt": json.dumps(payload),
+            "source_pages": [source], "discovered_projects": [{
+                "project_name": "UNNAMED_PROJECT"}]}), encoding="utf-8")
+        report = reconcile_saved(self.root, city="Brampton")
+        self.assertEqual(report["paid_calls"], 0)
+        self.assertEqual(report["discovered_projects"][0]["project_name"],
+                         "Ace Brampton")
+        self.assertEqual(json.loads(original.read_text())[
+            "discovered_projects"][0]["project_name"], "UNNAMED_PROJECT")
+        self.assertFalse((self.root / "v5_ai_budget.sqlite").exists())
 
     def test_exact_civic_mismatch_is_rejected(self):
         project = {"city": "Brampton", "location_text": "75 Willow Drive"}
