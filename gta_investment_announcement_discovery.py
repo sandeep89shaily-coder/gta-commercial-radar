@@ -238,8 +238,8 @@ def _message(sources, city):
                          {"role": "user", "content": json.dumps(packet)}]}
 
 
-def _bill(db, day, name, reserve, key, endpoint, payload, transport):
-    if not native.ledger_claim(db, day, name, reserve, 0):
+def _bill(db, day, name, reserve, legacy, key, endpoint, payload, transport):
+    if not native.ledger_claim(db, day, name, reserve, legacy):
         return None, "LEDGER_HELD_OR_ALREADY_USED"
     try:
         response = native.request(endpoint, payload, key, transport)
@@ -302,11 +302,13 @@ def run(results, *, city="Brampton", paid=False, today=None,
         try:
             record["status"] = "IN_PROGRESS"
             _write_json(output, record)
+            legacy = v5._legacy_reserved(
+                root / "deepseek_budget.sqlite", day.isoformat())
             urls = []
             for i, query in enumerate(queries[:MAX_SEARCH]):
                 response, result = _bill(
                     db, day.isoformat(), "investment_search_" + fingerprint + "_" + str(i),
-                    native.SEARCH_COST, key, "/v1/tools/search",
+                    native.SEARCH_COST, legacy, key, "/v1/tools/search",
                     {"query": query[:128], "count": 10, "need_content": True},
                     transport)
                 record["search_calls"] += bool(response)
@@ -322,7 +324,7 @@ def run(results, *, city="Brampton", paid=False, today=None,
             for i, url in enumerate(urls[:MAX_FETCH]):
                 response, result = _bill(
                     db, day.isoformat(), "investment_fetch_" + fingerprint + "_" + str(i),
-                    native.FETCH_COST, key, "/v1/tools/fetch", {"url": url},
+                    native.FETCH_COST, legacy, key, "/v1/tools/fetch", {"url": url},
                     transport)
                 record["fetch_calls"] += bool(response)
                 record.setdefault("fetch_statuses", []).append(result)
@@ -342,7 +344,7 @@ def run(results, *, city="Brampton", paid=False, today=None,
                 return record
             response, result = _bill(
                 db, day.isoformat(), "investment_model_" + fingerprint,
-                MODEL_RESERVE, key, "/chat/completions",
+                MODEL_RESERVE, legacy, key, "/chat/completions",
                 _message(record["source_pages"], city), transport)
             record["model_calls"] += bool(response)
             record["model_status"] = result
