@@ -7,6 +7,7 @@ import unittest
 from pathlib import Path
 
 from gta_ai_ten_capabilities import STAGES, run, _evidence, _verified_claims
+from gta_commercial_qualification_review import build as qualification_build
 
 TODAY = dt.date(2026, 11, 15)
 SOURCE_QUOTE = ("The previous proposal for a self-storage facility was "
@@ -94,6 +95,48 @@ class TenCapabilityTests(unittest.TestCase):
         self.assertEqual(again["results"][0]["stages"],
                          first["results"][0]["stages"])
         self.assertEqual(len(called), 10)
+
+    def test_canonical_qualification_uses_ai_hold_without_claiming_buyer(self):
+        v8 = self.root / "GTA_RADAR_V8_PENDING_QUEUE.csv"
+        with v8.open("w", newline="", encoding="utf-8") as stream:
+            writer = csv.DictWriter(stream, fieldnames=[
+                "project_id", "city", "address", "source_keys",
+                "description", "record_source_url", "current_source_status"])
+            writer.writeheader()
+            writer.writerow({
+                "project_id": self.record["record_id"],
+                "city": "Toronto", "address": self.record["address"],
+                "source_keys": self.record["application_id"],
+                "description": self.record["project_description"],
+                "record_source_url": self.record["source_url"],
+                "current_source_status": "Under Review"})
+            writer.writerow({
+                "project_id": "test:active:2026",
+                "city": "Toronto", "address": "99 Example Rd",
+                "source_keys": "26-987654",
+                "description": "New industrial warehouse",
+                "record_source_url": "https://example.org/newpermit",
+                "current_source_status": "Under Review"})
+        overlay = {"projects": {self.record["record_id"]: {
+            **self.record, "ai_lifecycle_review_hold": True,
+            "ai_lifecycle_proposal": "SUPERSEDED",
+            "ai_stage_status": {"project_lifecycle_supersession":
+                                "SOURCE_GROUNDED_REVIEW_ONLY"},
+            "ai_company_source_claims": [{"subject": "Talus",
+                                           "source_url":
+                                           "https://example.org/report"}],
+            "verified_buyer": False}}}
+        (self.root / "GTA_RADAR_AI_TEN_CAPABILITIES_OVERLAY.json").write_text(
+            json.dumps(overlay), encoding="utf-8")
+        qualified = qualification_build(self.root, today=TODAY, apply_ai=False)
+        self.assertEqual(qualified["ai_ten_projects_integrated"], 1)
+        self.assertEqual(qualified["ai_ten_lifecycle_review_holds"], 1)
+        self.assertEqual([x["record_id"] for x in qualified["top10"]],
+                         ["test:active:2026"])
+        held = next(x for x in qualified["all_candidates"]
+                    if x["record_id"] == self.record["record_id"])
+        self.assertTrue(held["ai_ten_lifecycle_hold"])
+        self.assertFalse(held["buyer_verified"])
 
     def test_quote_hallucination_is_not_supported(self):
         sources = _evidence(self.root, self.record, TODAY)
