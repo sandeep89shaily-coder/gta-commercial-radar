@@ -43,6 +43,9 @@ def run(results, workspace=None, *, today=None):
         "supplier_role_review_queue": len(gate.get("role_queue", [])),
         "supplier_procurement_review_queue": len(gate.get("tender_queue", [])),
         "internal_commercial_review_top10": qualification["internal_top_10_count"],
+        "top10_export_status": qualification["top10_export_status"],
+        "canonical_top10_updated": qualification["canonical_top10_updated"],
+        "latest_top10_analyst_csv": qualification["outputs"]["top10_analyst_csv"],
         "qualified_sale_ready_leads": 0,
         "verified_buyers": 0, "verified_open_supplier_contracts": 0,
         "new_paid_ai_calls": 0, "live_source_fetches": 0,
@@ -57,7 +60,7 @@ def run(results, workspace=None, *, today=None):
             "bridge": "GTA_RADAR_AI_PROJECT_EVIDENCE_BRIDGE.json",
             "graph": "GTA_RADAR_PROJECT_COMPANY_EVIDENCE_GRAPH.json",
             "procurement_review": "GTA_RADAR_COMPANY_PROCUREMENT_REVIEW_STATUS.json",
-            "commercial_analyst_top10": "GTA_RADAR_COMMERCIAL_TOP10_ANALYST_REVIEW.csv",
+            "commercial_analyst_top10": qualification["outputs"]["top10_analyst_csv"],
             "commercial_qualification": "GTA_RADAR_COMMERCIAL_QUALIFICATION_STATUS.json",
         },
     }
