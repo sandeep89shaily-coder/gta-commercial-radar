@@ -19,7 +19,8 @@ import v8_deepseek_native as native
 from gta_ai_top10_company_probe import _rows
 from gta_top10_live_source_recheck import (
     check_one as live_source_check, _identity as validate_source_identity)
-from gta_ai_ten_source_enrichment import enrich as enrich_stage_sources
+from gta_ai_ten_source_enrichment import (
+    enrich as enrich_stage_sources, site_company_candidates)
 from radar_run_lock import once_lock
 
 OVERLAY = "GTA_RADAR_AI_TEN_CAPABILITIES_OVERLAY.json"
@@ -331,7 +332,17 @@ def _render_brief(row, dossier):
         "**Application:** " + row["application_id"],
         "**Scope in source record:** " + row["project_description"][:350],
         "",
+        "## Site-company research leads (not verified permit roles)",
+        "",
     ]
+    for lead in dossier.get("site_company_candidates", []):
+        lines.extend([
+            "- " + lead["company"] + " — " + lead["association"],
+            "  - Source: " + str(lead.get("source_url") or ""),
+            "  - Quote: " + str(lead.get("literal_quote") or "")[:250],
+            "  - Exact application role and purchasing authority: UNVERIFIED",
+        ])
+    lines.append("")
     for stage in STAGES:
         data = dossier["stages"].get(stage, {})
         lines.extend(["## " + stage.replace("_", " ").title(),
@@ -500,6 +511,7 @@ def _overlay_item(row, dossier):
                                 for term in explicit) for c in linked))
     companies = stages.get("company_entity_relationships", {}).get("claims", [])
     contacts = stages.get("buyer_contact_path", {}).get("claims", [])
+    site_leads = dossier.get("site_company_candidates") or []
     return {
         "record_id": row["record_id"], "city": row["city"],
         "address": row["address"],
@@ -510,6 +522,7 @@ def _overlay_item(row, dossier):
         "ai_lifecycle_evidence": linked[:3],
         "ai_lifecycle_review_hold": hold,
         "ai_company_source_claims": companies[:5],
+        "ai_site_company_candidates": site_leads[:8],
         "ai_contact_source_claims": contacts[:5],
         "ai_procurement_review":
             stages.get("procurement_award_status", {}),
@@ -616,6 +629,8 @@ def run(results, *, paid=False, limit=2, start_index=0,
                         "verified_buyer": False,
                         "open_contract_verified": False,
                         "outreach_authorized": False}
+                dossier["site_company_candidates"] = site_company_candidates(
+                    evidence, row)
                 for stage in STAGES:
                     previous_stage = dossier["stages"].get(stage)
                     if previous_stage:
@@ -644,6 +659,8 @@ def run(results, *, paid=False, limit=2, start_index=0,
                                 evidence.append(source)
                                 current_urls.add(source["url"])
                         dossier["evidence"] = evidence
+                        dossier["site_company_candidates"] = (
+                            site_company_candidates(evidence, row))
                         _write_json(path, dossier)
                     result = _stage_model(
                         row, evidence, stage, profile, dossier["stages"], key,
