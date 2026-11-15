@@ -55,6 +55,15 @@ def _validated(records, row):
         if not native.safe_url(url) or not body or url in seen:
             continue
         identity, _ = _identity(body, row)
+        if not identity and src.get("identity") == (
+                "SAME_NAMED_COMPANY_CONTACT_CONTEXT_NOT_BUYER"):
+            # A corporate contact page can lack the project address.
+            # Accept only when it names a company independently found
+            # in earlier exact-site source text; never confer buyer role.
+            names = [c["company"] for c in site_company_candidates(sources, row)]
+            if any(len(name) >= 4 and name.casefold() in body.casefold()
+                   for name in names):
+                identity = "SAME_NAMED_COMPANY_CONTACT_CONTEXT_NOT_BUYER"
         if not identity:
             continue
         seen.add(url)
@@ -299,7 +308,10 @@ def investigate(results, record_id, *, paid=False, customer_profile="",
                 state["analysis"] = analysis["data"]
                 state["accepted_claims"] = _claim_validation(
                     analysis["data"], evidence)
-                state["status"] = "SOURCE_BACKED_REVIEW_COMPLETE"
+                state["status"] = ("SOURCE_BACKED_REVIEW_COMPLETE"
+                                   if state["accepted_claims"] or
+                                   state["dossier"]["site_company_leads"]
+                                   else "NO_USEFUL_SOURCE_BACKED_FINDINGS")
             else:
                 state["status"] = "ANALYSIS_" + analysis["status"]
             _save(path, state)
