@@ -66,7 +66,7 @@ class TenCapabilityTests(unittest.TestCase):
                     stage == "project_lifecycle_supersession" else "REVIEW",
                 "rationale": "An independently fetched source describes change.",
                 "claims": [{
-                    "subject": "Former self-storage proposal",
+                    "subject": "self-storage facility",
                     "relationship": "Historical change",
                     "source_index": 0, "quote": SOURCE_QUOTE}],
                 "unresolved": ["Official current permit status"],
@@ -184,6 +184,17 @@ class TenCapabilityTests(unittest.TestCase):
             "source_index": 0, "quote":
                 "Imaginary contractor won all unawarded trade packages"}]},
             sources), [])
+
+    def test_company_name_must_appear_in_literal_quote(self):
+        sources = _evidence(self.root, self.record, TODAY)
+        answer = {"claims": [{
+            "subject": "Fabricated Construction Inc.",
+            "relationship": "Developer",
+            "source_index": 0, "quote": SOURCE_QUOTE}]}
+        self.assertEqual(_verified_claims(
+            answer, sources, "company_entity_relationships"), [])
+        self.assertEqual(_verified_claims(
+            answer, sources, "buyer_contact_path"), [])
 
     def test_missing_source_never_spends_on_invented_evidence(self):
         self.probe.unlink()
