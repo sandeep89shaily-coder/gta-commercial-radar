@@ -164,6 +164,35 @@ class LiveTopTenProjectCheckTests(unittest.TestCase):
                 "SELECT status,reserved,actual FROM spends").fetchall()
         self.assertEqual(statuses,[("NONBILLABLE",0.0,0.0)])
 
+
+    def test_incomplete_checkpoint_reuses_existing_evidence_without_paid_retry(self):
+        from gta_top10_live_source_recheck import _checkpoint
+        import v8_deepseek_native as native
+        record = row(source_url="https://www.toronto.ca/planning/25249692ESC21CD/")
+        record["source_specificity"] = "PROJECT_SPECIFIC_URL_REVIEW"
+        _, stamp = _checkpoint(self.root, record, TODAY)
+        claim = "top10live_search_" + stamp + "_0"
+        self.assertTrue(native.ledger_claim(
+            self.db, TODAY.isoformat(), claim, native.SEARCH_COST, 0,
+            daily_limit=native.DAILY_LIMIT))
+        calls = []
+        def api(path, payload):
+            calls.append(path)
+            self.assertEqual(path, "/v1/tools/fetch")
+            return {"content": "Application 25249692ESC21CD at 1430 Birchmount Road"}
+        initial, reused = check_one(
+            self.root, record, "testkey", self.db, TODAY, 0, transport=api)
+        self.assertFalse(reused)
+        self.assertFalse(initial["complete"])
+        self.assertEqual(len(initial["sources"]), 1)
+        self.assertIn("SEARCH_LEDGER_HELD_OR_PREVIOUS", initial["issues"])
+        again, cached = check_one(
+            self.root, record, "testkey", self.db, TODAY, 0,
+            transport=lambda *_: self.fail("Never repeat a billable request"))
+        self.assertTrue(cached)
+        self.assertEqual(again, initial)
+        self.assertEqual(calls, ["/v1/tools/fetch"])
+
     def test_failed_or_missing_search_is_not_promotion_to_current(self):
         def api(path,payload):
             return {"results":[]} if path=="/v1/tools/search" else {"content":""}
