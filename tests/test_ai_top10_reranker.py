@@ -189,6 +189,108 @@ class AITopTenSelectionTests(unittest.TestCase):
         self.assertEqual(parsed[0]["cited_source"]["quote"],
                          "Registered owner: Acme Development Inc.")
 
+
+    def test_company_search_queries_fit_deepseek_api_limit(self):
+        from gta_top10_live_source_recheck import _queries, _identity
+        row = {"address": "238 Glidden Road, Brampton",
+               "city": "Brampton",
+               "application_id": "26-185633-000-00"}
+        queries = _queries(row)
+        self.assertTrue(all(1 <= len(q) <= 128 for q in queries))
+        self.assertTrue(any("company business occupant" in q for q in queries))
+        identity, excerpt = _identity(
+            "Brenntag Canada Inc. 238 Glidden Road Brampton. Contact our office.", row)
+        self.assertEqual(identity, "SAME_ADDRESS_COMPANY_CONTEXT_NOT_LINKED")
+        self.assertIn("Brenntag Canada Inc.", excerpt)
+        identity, _ = _identity(
+            "26-185633-000-00 238 Glidden Road addition shell", row)
+        self.assertEqual(identity, "EXACT_APPLICATION_ID_IN_FETCHED_TEXT")
+
+    def test_site_company_evidence_cannot_claim_a_buyer(self):
+        from gta_ai_company_role_evidence import check_site_mentions
+        sources = [{
+            "url": "https://example.org/company",
+            "identity": "SAME_ADDRESS_COMPANY_CONTEXT_NOT_LINKED",
+            "excerpt": "Brenntag Canada Inc. 238 Glidden Road, Brampton.",
+            "role_excerpt": "",
+        }]
+        claims, rejected = check_site_mentions([
+            {"organization": "Brenntag Canada Inc.", "source_j": 0,
+             "quote": "Brenntag Canada Inc. 238 Glidden Road"},
+            {"organization": "Invented Buyer Ltd.", "source_j": 0,
+             "quote": "Invented Buyer Ltd."}], sources)
+        self.assertEqual((len(claims), rejected), (1, 1))
+        self.assertFalse(claims[0]["project_role_supported_for_review"])
+        self.assertFalse(claims[0]["buyer_verified"])
+
+    def test_optional_web_research_uses_independent_fetch_and_checkpoint(self):
+        from gta_top10_live_source_recheck import model_directed_company_search
+        import v5_investigator as v5
+        calls = []
+        row = {
+            "record_id": "A", "city": "Brampton",
+            "address": "238 Glidden Road",
+            "application_id": "26-185633-000-00",
+            "project_description": "Industrial addition",
+            "source_url": "https://example.org/original",
+        }
+        def transport(path, payload):
+            calls.append(path)
+            if path == "/chat/completions":
+                self.assertTrue(any(
+                    x["type"] == "deepseek_web_search"
+                    for x in payload["tools"]))
+                self.assertNotIn("response_format", payload)
+                return {
+                    "choices": [{"finish_reason": "stop", "message": {
+                        "content": "Company appears at address, not tied to permit.",
+                        "annotations": [{"url_citation": {
+                            "url": "https://example.org/brenntag"}}]}}],
+                    "usage": {"prompt_tokens": 1100, "completion_tokens": 130,
+                              "server_tool_use": {"tool_search": 1, "tool_fetch": 1}},
+                }
+            if path == "/v1/tools/fetch":
+                return {"content": "Brenntag Canada Inc., 238 Glidden Road, Brampton. Contact."}
+            self.fail("unexpected request " + path)
+        db = v5._ledger(self.root / "v5_ai_budget.sqlite")
+        try:
+            first = model_directed_company_search(
+                self.root, row, "test", db, DAY, 0, transport=transport)
+            second = model_directed_company_search(
+                self.root, row, "test", db, DAY, 0,
+                transport=lambda *_: self.fail("Paid web research was repeated"))
+        finally:
+            db.close()
+        self.assertEqual(first["status"], "FETCHED_CONTEXT_ONLY")
+        self.assertEqual(len(first["sources"]), 1)
+        self.assertEqual(first["sources"][0]["identity"],
+                         "SAME_ADDRESS_COMPANY_CONTEXT_NOT_LINKED")
+        self.assertEqual(second["record_id"], "A")
+        self.assertEqual(calls, ["/chat/completions", "/v1/tools/fetch"])
+
+    def test_qualification_retains_site_name_without_selling_lead(self):
+        from gta_ai_company_role_evidence import check_site_mentions
+        from gta_ai_top10_reranker import _validate
+        row = {"city": "Brampton", "record_id": "A"}
+        source = {
+            "url": "https://example.org/company",
+            "identity": "SAME_ADDRESS_COMPANY_CONTEXT_NOT_LINKED",
+            "excerpt": "Brenntag Canada Inc. 238 Glidden Road Brampton.",
+            "role_excerpt": "",
+        }
+        answer = {"choices": [{"finish_reason": "stop",
+            "message": {"content": json.dumps({"reviews": [{
+                "i": 0, "decision": "NEUTRAL", "reason": "Company at site",
+                "investigate": "Confirm the permit applicant",
+                "site_company_mentions": [{
+                    "organization": "Brenntag Canada Inc.", "source_j": 0,
+                    "quote": "Brenntag Canada Inc. 238 Glidden Road"}]
+            }]})}}]}
+        checked = _validate(answer, 1, [row],
+                            {("brampton", "A"): {"sources": [source]}})
+        self.assertEqual(len(checked[0]["site_company_candidates"]), 1)
+        self.assertEqual(checked[0]["role_candidates"], [])
+
     def test_http402_is_not_a_charge_and_prevents_result(self):
         self.write([self.row("A"),self.row("B")])
         def reject(path,payload):
