@@ -419,13 +419,69 @@ def run(results, *, city="Brampton", paid=False, today=None,
             db.close()
 
 
+def reconcile_saved(results, *, city="Brampton"):
+    """Re-evaluate an already-paid response with fixed claim/name handling.
+
+    This only reads original source text and the model response returned by
+    the prior run; never invokes DeepSeek or changes the spending ledger.
+    """
+    root = Path(results)
+    original = sorted((root / OUT).glob("INVESTMENT_*.json"),
+                      key=lambda x: x.stat().st_mtime, reverse=True)
+    for path in original:
+        if path.name.endswith("_RECONCILED.json"):
+            continue
+        report = _read_json(path)
+        if report.get("city") != city or not report.get("source_pages"):
+            continue
+        if report.get("model_status") != "OK":
+            continue
+        raw = str(report.get("model_output_excerpt") or "")
+        try:
+            data = native.parse_model_json(raw)
+        except (TypeError, ValueError):
+            continue
+        updated = _citation_claims(
+            {"data": data}, report["source_pages"], city)
+        for project in updated:
+            project["municipal_possible_links"] = _municipal_candidates(
+                project, _safe_rows(root))
+            project["exact_municipal_application_confirmed"] = False
+        repaired = {
+            **report, "discovered_projects": updated,
+            "status": ("SOURCE_BACKED_DISCOVERY_NOT_SALE_QUALIFIED"
+                       if updated else
+                       "NO_ACCEPTED_SOURCE_BACKED_ANNOUNCEMENTS"),
+            "reconciled_from": str(path),
+            "reconciliation": "OFFLINE_MODEL_TEXT_AND_SOURCES_ONLY_NO_SPEND",
+            "reconciliation_paid_calls": 0,
+        }
+        dest = path.with_name(path.stem + "_RECONCILED.json")
+        _write_json(dest, repaired)
+        return {
+            "status": repaired["status"],
+            "reconciled_file": str(dest),
+            "discovered_projects": repaired["discovered_projects"],
+            "paid_calls": 0,
+        }
+    raise ValueError("NO_SAVED_COMPLETED_MODEL_RESPONSE_FOR_CITY")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--results", required=True)
     parser.add_argument("--city", choices=["Brampton", "Mississauga", "Toronto"],
                         default="Brampton")
     parser.add_argument("--paid", action="store_true")
+    parser.add_argument("--reconcile-saved", action="store_true",
+                        help="Fix extraction of existing source/model evidence "
+                             "without paid API requests")
     a = parser.parse_args()
+    if a.reconcile_saved:
+        if a.paid:
+            parser.error("--reconcile-saved cannot be combined with --paid")
+        print(json.dumps(reconcile_saved(a.results, city=a.city), indent=2))
+        return
     value = run(a.results, city=a.city, paid=a.paid)
     print(json.dumps({
         "status": value["status"], "city": value["city"],
