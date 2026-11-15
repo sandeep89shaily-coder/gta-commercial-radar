@@ -421,7 +421,7 @@ def run(results, *, paid=False, key=None, transport=None, today=None):
     # Reuse the existing read-only bridge -> company graph -> procurement
     # review pipeline; it verifies quotes again without further model calls.
     from gta_ai_project_intelligence_refresh import run as refresh_graph
-    refreshed = refresh_graph(root)
+    refreshed = refresh_graph(root, today=day)
     state["company_review_graph_refresh"] = {
         "status": refreshed["status"],
         "ai_top10_role_review_candidates": refreshed.get(
