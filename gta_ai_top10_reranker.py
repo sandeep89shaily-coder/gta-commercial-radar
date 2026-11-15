@@ -418,6 +418,18 @@ def run(results, *, paid=False, key=None, transport=None, today=None):
                    encoding="utf-8")
     tmp.replace(out)
     regenerate_shortlist(root, today=day)
+    # Reuse the existing read-only bridge -> company graph -> procurement
+    # review pipeline; it verifies quotes again without further model calls.
+    from gta_ai_project_intelligence_refresh import run as refresh_graph
+    refreshed = refresh_graph(root)
+    state["company_review_graph_refresh"] = {
+        "status": refreshed["status"],
+        "ai_top10_role_review_candidates": refreshed.get(
+            "ai_top10_quote_supported_role_candidates", 0),
+        "verified_buyers": 0,
+        "verified_open_supplier_contracts": 0,
+        "additional_paid_ai_calls": 0,
+    }
     save_attempt()
     return state
 
