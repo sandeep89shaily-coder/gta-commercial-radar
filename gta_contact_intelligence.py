@@ -146,39 +146,102 @@ def _quote(source, match, radius=130):
                 min(len(body), match.end() + radius)][:390]
 
 
+def _looks_masked_or_example(body, match):
+    """Deny partial unlock-site emails, illustrative formats and glued labels."""
+    raw = match.group()
+    prior = body[max(0, match.start() - 80):match.start()]
+    trail = body[match.end():match.end() + 35]
+    # Asterisks in the same apparent token mean the regex captured only
+    # the unmasked tail of a private/unavailable email.
+    if re.search(r"[\w*.+-]*\*+[\w*.+-]*$", prior):
+        return True
+    if re.match(r"(?i)(?:Email|ContactEmail)[A-Z]?[a-z]+@", raw):
+        return True
+    if re.search(r"(?i)(?:ex\.?|example|format|pattern|structure)\s*[:(]?\s*$",
+                 prior):
+        return True
+    local = raw.split("@", 1)[0].lower()
+    if local in ("first.last", "john.smith", "jsmith", "name.surname",
+                 "firstlast", "firstname.lastname"):
+        return True
+    if re.match(r"(?i)^(?:Winter|Summer|Spring|Autumn)\b", trail):
+        return True
+    return False
+
+
+def _email_candidate(body, match, company, source_url):
+    """Keep only actual published company channels, not masked guesses."""
+    raw = match.group().strip().strip(".,;:")
+    if _looks_masked_or_example(body, match):
+        return None
+    local, sep, domain = raw.partition("@")
+    if not sep or len(local) < 2 or len(domain) < 5:
+        return None
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._%+-]*", local):
+        return None
+    if not re.fullmatch(r"(?:[A-Za-z0-9-]+\.)+[A-Za-z]{2,}", domain):
+        return None
+    if domain.lower() in ("gmail.com", "yahoo.com", "yahoo.ca",
+                          "hotmail.com", "outlook.com", "aol.com",
+                          "rogers.com", "uwaterloo.ca", "brampton.ca",
+                          "queensu.ca", "uqtr.ca"):
+        return None
+    # The address should visibly belong to the company. Other domains
+    # could be affiliated, but cannot be labeled as confirmed here.
+    company_key = re.sub(r"[^a-z0-9]", "", company.lower())
+    site_host = re.sub(r"[^a-z0-9]", "", urlparse(source_url).netloc.lower())
+    mail_host = re.sub(r"[^a-z0-9]", "", domain.lower())
+    brand = company_key[:min(len(company_key), 7)]
+    if not (company_key in mail_host or
+            (brand and brand in mail_host and brand in site_host)):
+        return None
+    return raw
+
+
 def _public_channels(sources, companies):
-    """Literal publicly displayed business contacts, separate from people."""
+    """Independent public company channels; no masked/unverified emails."""
     out, seen = [], set()
     for source in sources:
         named = source.get("companies_mentioned") or []
         if len(named) != 1:
-            # One multi-company announcement can't establish whose inbox it is.
             continue
         company = named[0]
-        body = source["content"]
+        body = str(source.get("content") or "")
         contact_context = bool(re.search(
             r"\b(contact|telephone|phone|tel|email|e-mail|reach us|office)\b",
             body, re.I))
         if not contact_context:
             continue
+        # Some article extractors join plain-text labels to email local parts:
+        # "Contact Emailinfo@..." is not an email "Emailinfo@...".
+        clean = re.sub(
+            r"(?i)\b(Contact\s+Email|Email)(?=[a-z0-9._%+-]+@)",
+            lambda m: m.group() + " ", body)
         for kind, matcher in (("PUBLIC_EMAIL", EMAIL), ("PUBLIC_PHONE", PHONE)):
-            for match in matcher.finditer(body):
-                channel = match.group().strip()
-                if kind == "PUBLIC_EMAIL" and any(
-                    channel.lower().endswith("@" + x) for x in
-                    ("gmail.com", "yahoo.com", "hotmail.com", "outlook.com")):
-                    # Consumer email is not automatically corporate contact.
-                    continue
+            for match in matcher.finditer(clean):
+                if kind == "PUBLIC_EMAIL":
+                    channel = _email_candidate(clean, match, company,
+                                               source["url"])
+                    if not channel:
+                        continue
+                else:
+                    channel = match.group().strip()
+                    # Exclude samples/examples in mailing list pages.
+                    if re.search(r"(?i)(?:example|placeholder|sample)\s*[: ]{0,3}$",
+                                 clean[max(0, match.start() - 30):match.start()]):
+                        continue
                 ident = (company.casefold(), kind, channel.casefold())
                 if ident in seen:
                     continue
                 seen.add(ident)
                 out.append({
                     "company": company, "type": kind, "value": channel,
-                    "source_url": source["url"], "literal_quote": _quote(source, match),
+                    "source_url": source["url"],
+                    "literal_quote": _quote({"content": clean}, match),
                     "public_business_channel": True,
                     "assigned_to_named_person": False,
                     "project_purchasing_role_verified": False,
+                    "needs_live_business_verification": True,
                 })
     return out[:35]
 
@@ -558,15 +621,79 @@ def investigate(results, *, project_name, city="Brampton", paid=False,
             db.close()
 
 
+def reconcile_saved(results, *, project_name, city="Brampton"):
+    """Regenerate source-cleaned contacts after an earlier paid investigation.
+
+    Do not mutate the original report or call a provider/ledger. The new
+    verified output goes to a separate _RECONCILED file.
+    """
+    root = Path(results)
+    folder = root / OUT
+    if not folder.is_dir():
+        raise ValueError("CONTACT_REPORT_DIRECTORY_MISSING")
+    possible = sorted(
+        (p for p in folder.glob("*.json")
+         if not p.stem.endswith("_RECONCILED") and p.is_file()),
+        key=lambda p: p.stat().st_mtime, reverse=True)
+    for original in possible:
+        data = _read_json(original)
+        project = data.get("project") if isinstance(data, dict) else {}
+        if (not isinstance(project, dict) or
+                project.get("project_name", "").casefold() !=
+                project_name.casefold() or
+                project.get("city", "").casefold() != city.casefold()):
+            continue
+        sources = data.get("evidence") or []
+        companies = _company_names(project)
+        new_channels = _public_channels(sources, companies)
+        # Model output is already paid and preserved in this report.
+        raw = data.get("model_output_excerpt")
+        if raw:
+            try:
+                model = native.parse_model_json(raw)
+                new_people = _verified_people(model, sources, companies)
+            except (ValueError, TypeError):
+                new_people = data.get("people", [])
+        else:
+            new_people = data.get("people", [])
+        updated = {
+            **data, "public_channels": new_channels, "people": new_people,
+            "reconciled_from": str(original),
+            "paid_calls_during_reconciliation": 0,
+            "contact_source_quality": "COMPLETE_EMAILS_ONLY_NO_MASKS_OR_EXAMPLES",
+            "status": (
+                "NAMED_CONTACTS_AND_BUSINESS_CHANNELS_REVIEW"
+                if new_people and new_channels else
+                "NAMED_CONTACTS_REVIEW" if new_people else
+                "PUBLIC_COMPANY_CHANNELS_ONLY" if new_channels else
+                "NO_VERIFIED_PUBLIC_CONTACTS"),
+        }
+        newpath = original.with_name(original.stem + "_RECONCILED.json")
+        updated["report_path"] = str(newpath)
+        updated["brief_path"] = str(newpath.with_suffix(".md"))
+        _save(newpath, updated)
+        _publish(root, updated)
+        return updated
+    raise ValueError("NO_SAVED_PROJECT_CONTACT_REPORT")
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--results", required=True)
     p.add_argument("--project-name", required=True)
     p.add_argument("--city", default="Brampton")
     p.add_argument("--paid", action="store_true")
+    p.add_argument("--reconcile-saved", action="store_true",
+                   help="Clean previous paid contact findings without API calls")
     a = p.parse_args()
-    result = investigate(a.results, project_name=a.project_name,
-                         city=a.city, paid=a.paid)
+    if a.reconcile_saved:
+        if a.paid:
+            p.error("--reconcile-saved cannot be combined with --paid")
+        result = reconcile_saved(
+            a.results, project_name=a.project_name, city=a.city)
+    else:
+        result = investigate(a.results, project_name=a.project_name,
+                             city=a.city, paid=a.paid)
     print(json.dumps({
         "status": result["status"],
         "project": result["project"]["project_name"],
