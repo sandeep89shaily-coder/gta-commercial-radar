@@ -17,7 +17,7 @@ import v8_deepseek_native as native
 from gta_top10_live_source_recheck import _identity
 
 SOURCE_STAGES = (
-    "buyer_contact_path", "procurement_award_status",
+    "company_entity_relationships", "buyer_contact_path", "procurement_award_status",
     "project_lifecycle_supersession", "cross_source_project_matching",
     "technical_documents_equipment", "early_investment_signals",
 )
@@ -40,6 +40,8 @@ def _query(row, stage, previous):
     companies = previous.get("company_entity_relationships", {}).get("claims", [])
     names = [str(c.get("subject") or "").strip()[:90]
              for c in companies if c.get("subject") and c.get("literal_quote")]
+    if stage == "company_entity_relationships":
+        return f'"{address}" {city} business operator owner developer industrial'
     if stage == "buyer_contact_path":
         if not names:
             return ""
@@ -123,16 +125,28 @@ def enrich(root, row, stage, previous, sources, key, db, day, legacy,
         status["issues"].append(type(exc).__name__)
         _write(path, status)
         return [], status["status"]
-    urls = []
+    # Do not fetch the first arbitrary search hits. Prioritize snippets
+    # that mention the FULL site address or exact permit. Search snippets
+    # are only discovery hints and still require independent page fetching.
+    ranked = []
     already = {x["url"] for x in sources}
     for result in results:
         if not isinstance(result, dict):
             continue
         url = str(result.get("url") or "")
-        if native.safe_url(url) and url not in already and url not in urls:
-            urls.append(url)
-        if len(urls) >= MAX_RETRIEVED:
-            break
+        if not native.safe_url(url) or url in already:
+            continue
+        snippet = " ".join(str(result.get(k) or "")[:1200]
+                           for k in ("title", "snippet", "content"))
+        candidate_identity, _ = _identity(snippet, row)
+        score = (10 if candidate_identity.startswith("EXACT") else
+                 6 if candidate_identity.startswith("SAME_ADDRESS") else 0)
+        if stage == "buyer_contact_path" and "contact" in snippet.casefold():
+            score += 2
+        ranked.append((score, url))
+    urls = [url for score, url in sorted(
+        set(ranked), key=lambda pair: (-pair[0], pair[1]))
+        if score > 0 or stage == "buyer_contact_path"][:MAX_RETRIEVED]
     for index, url in enumerate(urls):
         bill = "ai10_source_fetch_" + stamp + "_" + str(index)
         if not native.ledger_claim(db, ledger_day, bill,

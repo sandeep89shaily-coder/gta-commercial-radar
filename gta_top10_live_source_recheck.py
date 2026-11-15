@@ -102,8 +102,9 @@ def _company_role_excerpt(body, row=None):
     if not matches:
         return ""
     addr = _street((row or {}).get("address"))
-    address_match = re.search(re.escape(addr).replace(r"\ ", r"\s+"),
-                              text, flags=re.I) if addr else None
+    address_match = re.search(
+        r"(?<![A-Za-z0-9])" + re.escape(addr).replace(r"\ ", r"\s+") +
+        r"(?![A-Za-z0-9])", text, flags=re.I) if addr else None
     near = min(matches, key=lambda m: abs(m.start()-address_match.start())
                ) if address_match else matches[0]
     return _excerpt(text, near, length=1200)
@@ -120,8 +121,12 @@ def _identity(text, row):
     address = _street(row.get("address"))
     compact_text = " ".join(str(text).split())
     if address:
-        found = re.search(re.escape(address).replace(r"\ ", r"\s+"),
-                          compact_text, flags=re.I)
+        # A street-number substring is NOT a site match: "75 Advance"
+        # must not match "175 Advance" (a costly real-world false positive).
+        found = re.search(
+            r"(?<![A-Za-z0-9])" +
+            re.escape(address).replace(r"\ ", r"\s+") +
+            r"(?![A-Za-z0-9])", compact_text, flags=re.I)
         if found:
             near = compact_text[max(0, found.start()-450):found.end()+450]
             identity = ("SAME_ADDRESS_PROJECT_CONTEXT_NOT_LINKED"

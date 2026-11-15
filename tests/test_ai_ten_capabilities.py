@@ -141,6 +141,76 @@ class TenCapabilityTests(unittest.TestCase):
         self.assertTrue(held["ai_ten_lifecycle_hold"])
         self.assertFalse(held["buyer_verified"])
 
+    def test_official_permit_only_skips_wasteful_model_stages(self):
+        self.probe.write_text(json.dumps({"reviews": [{
+            "record_id": self.record["record_id"], "city": "Toronto",
+            "independently_fetched_context": [{
+                "url": "https://example.org/permit",
+                "identity": "EXACT_OFFICIAL_ARCGIS_APPLICATION",
+                "excerpt": 'PERMITNUMBER 21170364S4505TLAB; '
+                           '611 Keele St, Toronto, ON. Applied',
+                "role_excerpt": "", "retrieved_on": "2026-11-15"
+            }]
+        }]}), encoding="utf-8")
+        calls = []
+        def provider(path, payload):
+            self.assertEqual(path, "/chat/completions")
+            calls.append(json.loads(payload["messages"][1]["content"])["stage"])
+            return {"choices": [{"finish_reason": "stop", "message": {
+                "content": json.dumps({"classification": "UNKNOWN",
+                                       "claims": []})}}],
+                "usage": {"prompt_tokens": 700, "completion_tokens": 60}}
+        output = run(self.root, paid=True, token="test", today=TODAY,
+                     discover=False, enrich_sources=False,
+                     transport=provider)
+        dossier = json.loads(Path(output["results"][0]["dossier"]).read_text())
+        self.assertNotIn("buyer_contact_path", calls)
+        self.assertNotIn("procurement_award_status", calls)
+        self.assertNotIn("technical_documents_equipment", calls)
+        self.assertNotIn("early_investment_signals", calls)
+        self.assertEqual(dossier["stages"]["procurement_award_status"]["status"],
+                         "INSUFFICIENT_SOURCE_CONTEXT_NO_MODEL_CALL")
+
+    def test_stale_different_house_number_is_not_source_evidence(self):
+        self.probe.write_text(json.dumps({"reviews": [{
+            "record_id": self.record["record_id"], "city": "Toronto",
+            "independently_fetched_context": [{
+                "url": "https://example.org/nearby",
+                "identity": "SAME_ADDRESS_COMPANY_CONTEXT_NOT_LINKED",
+                "excerpt": "1611 Keele St, Toronto, ON — Nearby Trading Inc.",
+                "role_excerpt": "", "retrieved_on": "2026-11-15"}]
+        }]}), encoding="utf-8")
+        self.assertEqual(_evidence(self.root, self.record, TODAY), [])
+
+    def test_company_enrichment_finds_source_without_prior_company_name(self):
+        db = v5._ledger(self.root / "v5_ai_budget.sqlite")
+        calls = []
+        try:
+            def provider(endpoint, payload):
+                calls.append(endpoint)
+                if endpoint == "/v1/tools/search":
+                    return {"results": [
+                        {"url": "https://example.org/irrelevant",
+                         "snippet": "Unrelated real estate elsewhere"},
+                        {"url": "https://example.org/business",
+                         "snippet": "611 Keele St Toronto development company"}
+                    ]}
+                if endpoint == "/v1/tools/fetch":
+                    self.assertEqual(payload["url"],
+                                     "https://example.org/business")
+                    return {"content":
+                        "611 Keele St Toronto: Acme Group is the developer"}
+                self.fail(endpoint)
+            docs, status = source_enrich(
+                self.root, self.record, "company_entity_relationships",
+                {}, [], "test", db, TODAY, 0, transport=provider)
+            self.assertEqual(status, "FETCHED_SOURCE_CONTEXT")
+            self.assertEqual(len(docs), 1)
+            self.assertIn("Acme Group", docs[0]["content"])
+            self.assertEqual(calls, ["/v1/tools/search", "/v1/tools/fetch"])
+        finally:
+            db.close()
+
     def test_company_contact_source_enrichment_uses_fetch_not_snippets(self):
         previous = {"company_entity_relationships": {"claims": [{
             "subject": "Business Point",
