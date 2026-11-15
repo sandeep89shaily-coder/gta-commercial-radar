@@ -44,6 +44,8 @@ def _facts(row, number, recheck=None):
     return {
         "live_recheck_date": current.get("checked_on", ""),
         "live_recheck_complete": current.get("complete") is True,
+        "official_live_status": str(current.get("official_current_status_literal") or "")[:150],
+        "official_status_differs_from_saved": bool(current.get("official_status_change_review")),
         "live_sources": [
             {"j":j,"url":str(src.get("url",""))[:230],
              "identity":str(src.get("identity",""))[:65],
@@ -337,6 +339,12 @@ def run(results, *, paid=False, key=None, transport=None, today=None):
                                 (row["city"].casefold(),row["record_id"])]["sources"],
                             "issues": live_checks[
                                 (row["city"].casefold(),row["record_id"])]["issues"],
+                            "official_current_status_literal": live_checks[
+                                (row["city"].casefold(),row["record_id"])].get(
+                                "official_current_status_literal", ""),
+                            "official_status_change_review": live_checks[
+                                (row["city"].casefold(),row["record_id"])].get(
+                                "official_status_change_review"),
                         },
                         "model_origin": "DEEPSEEK_PRESELECTION_HYPOTHESIS_ONLY",
                         "buyer_verified": False, "supplier_available_verified": False,
