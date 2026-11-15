@@ -372,11 +372,16 @@ def _apply_ai(pool, all_rows, review, today):
         cited = data.get("cited_live_source")
         row["ai_live_checked_on"] = _clean(recheck.get("checked_on"))
         row["ai_live_source_count"] = len(sources)
-        row["ai_live_evidence_url"] = _url(cited.get("url")) if isinstance(cited,dict) else ""
+        first_source = sources[0] if sources and isinstance(sources[0],dict) else {}
+        # Show the independently fetched URL even when the model did not
+        # cite it; an empty quote means no literal citation was established.
+        row["ai_live_evidence_url"] = _url(
+            cited.get("url") if isinstance(cited,dict) else first_source.get("url"))
         row["ai_live_evidence_quote"] = _clean(
             cited.get("quote"), 220) if isinstance(cited,dict) else ""
         row["ai_live_evidence_identity"] = _clean(
-            cited.get("identity")) if isinstance(cited,dict) else ""
+            cited.get("identity") if isinstance(cited,dict)
+            else first_source.get("identity"))
         if any(s.get("identity") == "SAME_ADDRESS_PROJECT_CONTEXT_NOT_LINKED"
                for s in sources):
             row["ai_live_project_version_review"] = "UNLINKED_NEWER_ADDRESS_CONTEXT_REVIEW"
