@@ -439,12 +439,20 @@ def model_directed_company_search(root, row, key, db, day, legacy, *,
         save()
         return state
     state["paid_model_calls"] = 1
+    # DeepSeek omits usage.server_tool_use when no tool call succeeds.
+    # Retain model findings if usage cannot be reconciled, as hypotheses only.
+    choices = response.get("choices") if isinstance(response, dict) else None
+    if isinstance(choices, list) and choices:
+        message = choices[0].get("message") if isinstance(choices[0], dict) else None
+        if isinstance(message, dict):
+            state["model_research_summary"] = str(message.get("content") or "")[:10000]
     usage = response.get("usage") if isinstance(response, dict) else None
     usage = usage if isinstance(usage, dict) else {}
-    counts = usage.get("server_tool_use")
+    state["provider_usage_fields"] = sorted(usage.keys())
+    counts = usage.get("server_tool_use", {})
     try:
         if not isinstance(counts, dict):
-            raise ValueError("MISSING_WEB_TOOL_USAGE")
+            raise ValueError("INVALID_WEB_TOOL_USAGE")
         billable_searches = int(counts.get("tool_search", 0))
         billable_fetches = int(counts.get("tool_fetch", 0))
         if min(billable_searches, billable_fetches) < 0:
@@ -468,6 +476,7 @@ def model_directed_company_search(root, row, key, db, day, legacy, *,
     except (ValueError, TypeError, KeyError) as exc:
         native.ledger_finish(db, day.isoformat(), claim, "UNKNOWN")
         state["status"] = "UNKNOWN_PROVIDER_USAGE_NO_RETRY"
+        state["usage_error_detail"] = str(exc)[:160]
         state["issues"].append(type(exc).__name__)
         save()
         return state

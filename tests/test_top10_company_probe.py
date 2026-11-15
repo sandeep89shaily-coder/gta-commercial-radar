@@ -36,6 +36,39 @@ class DirectTop10CompanyProbeTests(unittest.TestCase):
                           "GTA_RADAR_TOP10_DEEPSEEK_COMPANY_PROBE_2026-11-15.json"
                           ).exists())
 
+    def test_no_web_tool_use_field_does_not_block_model_response(self):
+        def send(path, payload):
+            self.assertEqual(path, "/chat/completions")
+            return {"choices": [{"finish_reason": "stop", "message": {
+                "content": "No linked public company identified."}}],
+                "usage": {"prompt_tokens": 750, "completion_tokens": 80}}
+        result = run(self.root, paid=True, token="test", today=TODAY,
+                     transport=send)
+        self.assertEqual(result["status"], "ALL_TOP10_RESEARCH_ATTEMPTED")
+        self.assertEqual(result["attempted_count"], 1)
+        self.assertEqual(result["completed_fetch_evidence"], 0)
+        self.assertIn("No linked public company",
+                      result["reviews"][0]["model_summary_research_hint_not_verified"])
+
+    def test_missing_usage_preserves_hypothesis_and_no_retry(self):
+        calls = []
+        def send(path, payload):
+            calls.append(path)
+            return {"choices": [{"finish_reason": "stop", "message": {
+                "content": "Possible public contact at business office."}}]}
+        result = run(self.root, paid=True, token="test", today=TODAY,
+                     transport=send)
+        self.assertEqual(result["status"],
+                         "STOPPED_UNKNOWN_PROVIDER_USAGE_NO_RETRY")
+        self.assertEqual(result["attempted_count"], 1)
+        self.assertIn("Possible public contact",
+                      result["reviews"][0]["model_summary_research_hint_not_verified"])
+        again = run(self.root, paid=True, token="test", today=TODAY,
+                    transport=lambda *_: self.fail("No paid retry allowed"))
+        self.assertEqual(again["status"],
+                         "STOPPED_UNKNOWN_PROVIDER_USAGE_NO_RETRY")
+        self.assertEqual(calls, ["/chat/completions"])
+
     def test_paid_probe_fetches_evidence_separately_and_reuses_checkpoint(self):
         calls = []
         def send(path, payload):
