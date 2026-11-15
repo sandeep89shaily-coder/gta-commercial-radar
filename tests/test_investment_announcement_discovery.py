@@ -152,6 +152,31 @@ class GenericInvestmentDiscoveryTests(unittest.TestCase):
         }]}}
         self.assertEqual(_citation_claims(answer, source, "Brampton"), [])
 
+    def test_unrelated_same_city_investor_is_not_joined_to_named_project(self):
+        pages = [
+            {"url": "https://example.org/northfield", "content": NEWS},
+            {"url": "https://example.org/other-development",
+             "content": "Atlas Capital is developing South Dock industrial "
+                        "warehouses in Brampton with another company."},
+        ]
+        proposal = {"data": {"projects": [{
+            "project_name": "Northfield Works", "city": "Brampton",
+            "location_text": "Willow Drive, Brampton",
+            "construction_timing": "Q3 2027",
+            "claims": [
+                CLAIMS[0], CLAIMS[2], CLAIMS[3],
+                {"kind": "partner", "subject": "Atlas Capital",
+                 "source_index": 1,
+                 "quote": "Atlas Capital is developing South Dock industrial "
+                          "warehouses in Brampton"},
+            ],
+        }]}}
+        findings = _citation_claims(proposal, pages, "Brampton")
+        self.assertEqual(len(findings), 1)
+        self.assertEqual(
+            {x["subject"] for x in findings[0]["companies"]},
+            {"Harbourlight Developments"})
+
     def test_exact_civic_mismatch_is_rejected(self):
         project = {"city": "Brampton", "location_text": "75 Willow Drive"}
         links = _municipal_candidates(project, _safe_rows(self.root))
