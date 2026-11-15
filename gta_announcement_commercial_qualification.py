@@ -398,8 +398,73 @@ def _publish(root, state):
     os.replace(temp, out)
 
 
+def _synthesize_saved(root, path, state, discovery, sources, profile,
+                      key, db, day, legacy, transport):
+    """One paid synthesis, even when Fetch has partial failures.
+
+    Never repeats Search/Fetch or previously held model ledger claims.
+    """
+    digest = path.stem
+    companies = [x["subject"] for x in discovery["companies"]]
+    state["public_contact_routes"] = _public_contacts(sources, companies)
+    state["possible_municipal_links"] = _potential_municipal_links(
+        sources, discovery)
+    state["evidence"] = sources
+    state["source_coverage"] = (
+        "PARTIAL_FETCH_FAILURES" if state.get("fetch_failures")
+        else "FETCHES_COMPLETED")
+    _save(path, state)
+    response, status = _bill(
+        db, day.isoformat(),
+        "announcement_qualification_model_" + digest, .018, legacy,
+        key, "/chat/completions",
+        _response(discovery, sources, profile), transport)
+    state["model_calls"] = int(response is not None)
+    if status != "OK":
+        state["status"] = "MODEL_" + status
+        _save(path, state)
+        return state
+    choices = response.get("choices") if isinstance(response, dict) else None
+    choice = (choices[0] if isinstance(choices, list) and
+              len(choices) == 1 and isinstance(choices[0], dict) else {})
+    message = choice.get("message")
+    message = message if isinstance(message, dict) else {}
+    content = str(message.get("content") or "")
+    state["model_response_excerpt"] = content[:6500]
+    if choice.get("finish_reason") != "stop":
+        state["status"] = "INCOMPLETE_MODEL_NO_RETRY"
+        _save(path, state)
+        return state
+    try:
+        model = native.parse_model_json(content)
+    except (TypeError, ValueError):
+        state["status"] = "INVALID_MODEL_JSON_NO_RETRY"
+        _save(path, state)
+        return state
+    if not isinstance(model, dict):
+        state["status"] = "INVALID_MODEL_OBJECT_NO_RETRY"
+        _save(path, state)
+        return state
+    state["accepted_claims"] = _accepted_claims(model, sources)
+    opinion = str(model.get("classification") or "").upper()
+    state["assessment"] = {
+        **model, "classification": opinion if opinion in ALLOWED else "UNKNOWN",
+        "procurement_status": "UNKNOWN",
+        "buyer_verified": False, "open_supplier_contract_verified": False,
+        "source_quoted_claim_count": len(state["accepted_claims"]),
+    }
+    state["status"] = (
+        "RESEARCH_READY_HUMAN_COMMERCIAL_REVIEW"
+        if state["public_contact_routes"] and state["accepted_claims"]
+        else "RESEARCH_INCOMPLETE_CONTACT_OR_EVIDENCE")
+    _save(path, state)
+    _publish(root, state)
+    return state
+
+
 def qualify(results, *, project_name, city="Brampton", paid=False,
-            customer_profile="", day=None, token=None, transport=None):
+            customer_profile="", day=None, token=None, transport=None,
+            resume_saved=False):
     root = Path(results)
     stamp = day or dt.date.today()
     report_path, report, discovery = _discovery(root, project_name, city)
@@ -410,7 +475,17 @@ def qualify(results, *, project_name, city="Brampton", paid=False,
     ).encode()).hexdigest()[:24]
     path = root / OUT / (digest + ".json")
     saved = _read_json(path)
-    if saved.get("project", {}).get("project_name") == discovery["project_name"]:
+    same = saved.get("project", {}).get("project_name") == discovery["project_name"]
+    if resume_saved:
+        if not same or saved.get("originating_discovery_file") != str(report_path):
+            raise ValueError("NO_MATCHING_SAVED_INVESTIGATION_TO_RESUME")
+        if saved.get("model_calls") or saved.get("assessment"):
+            raise ValueError("MODEL_ALREADY_ATTEMPTED_NO_RETRY")
+        if not str(saved.get("status") or "").startswith(("FETCH_", "SEARCH_")):
+            raise ValueError("NOT_A_PARTIAL_SOURCE_FAILURE_CHECKPOINT")
+        if not paid:
+            return {**saved, "resume_preflight_no_spend": True}
+    elif same:
         return {**saved, "checkpoint_reused": True}
     state = {
         "date": stamp.isoformat(), "status": "PREFLIGHT_NO_SPEND",
@@ -437,6 +512,20 @@ def qualify(results, *, project_name, city="Brampton", paid=False,
         try:
             legacy = v5._legacy_reserved(
                 root / "deepseek_budget.sqlite", stamp.isoformat())
+            if resume_saved:
+                # Preserve every prior search/fetch result and uncertain
+                # provider charge. NEVER repeat those requests.
+                state = saved
+                state.setdefault("fetch_failures", []).append({
+                    "status": "EARLIER_FETCH_ERROR_NO_RETRY",
+                    "source": "SAVED_CHECKPOINT",
+                })
+                source_set = state.get("evidence")
+                if not isinstance(source_set, list) or not source_set:
+                    source_set = sources
+                return _synthesize_saved(
+                    root, path, state, discovery, source_set, profile,
+                    key, db, stamp, legacy, transport)
             _save(path, state)
             queries = _queries(discovery, city)
             companies = [x["subject"] for x in discovery["companies"]]
@@ -468,9 +557,20 @@ def qualify(results, *, project_name, city="Brampton", paid=False,
                     str(i), native.FETCH_COST, legacy, key,
                     "/v1/tools/fetch", {"url": url}, transport)
                 if status != "OK":
-                    state["status"] = "FETCH_" + status
+                    state.setdefault("fetch_failures", []).append({
+                        "url": url, "status": status,
+                        "ledger": "PRESERVED_UNKNOWN_CHARGE_IF_UNCERTAIN",
+                        "retried": False,
+                    })
                     _save(path, state)
-                    return state
+                    if status in ("HTTP_402", "LEDGER_HELD_OR_ALREADY_USED"):
+                        state["status"] = "FETCH_" + status
+                        _save(path, state)
+                        return state
+                    # Bad/unavailable web pages are not a reason to discard
+                    # the independently fetched developer announcement.
+                    # Do not retry the failed URL; keep its ledger hold.
+                    continue
                 body = str(response.get("content") or "")[:5000]
                 relation, names = _evidence_match(
                     body, discovery, companies)
@@ -485,53 +585,9 @@ def qualify(results, *, project_name, city="Brampton", paid=False,
                 fetched.add(url)
                 state["evidence"] = sources
                 _save(path, state)
-            state["public_contact_routes"] = _public_contacts(
-                sources, companies)
-            state["possible_municipal_links"] = _potential_municipal_links(
-                sources, discovery)
-            _save(path, state)
-            response, status = _bill(
-                db, stamp.isoformat(),
-                "announcement_qualification_model_" + digest, .018,
-                legacy, key, "/chat/completions",
-                _response(discovery, sources, profile), transport)
-            state["model_calls"] = int(response is not None)
-            if status != "OK":
-                state["status"] = "MODEL_" + status
-                _save(path, state)
-                return state
-            choices = response.get("choices") if isinstance(response, dict) else None
-            choice = choices[0] if isinstance(choices, list) and len(choices) == 1 and isinstance(choices[0], dict) else {}
-            content = (choice.get("message") or {}).get("content") or ""
-            state["model_response_excerpt"] = str(content)[:6500]
-            if choice.get("finish_reason") != "stop":
-                state["status"] = "INCOMPLETE_MODEL_NO_RETRY"
-                _save(path, state)
-                return state
-            try:
-                model = native.parse_model_json(content)
-            except (TypeError, ValueError):
-                state["status"] = "INVALID_MODEL_JSON_NO_RETRY"
-                _save(path, state)
-                return state
-            state["accepted_claims"] = _accepted_claims(model, sources)
-            opinion = str(model.get("classification") or "").upper()
-            state["assessment"] = {
-                **model, "classification": (
-                    opinion if opinion in ALLOWED else "UNKNOWN"),
-                "procurement_status": "UNKNOWN",
-                "buyer_verified": False,
-                "open_supplier_contract_verified": False,
-                "source_quoted_claim_count": len(state["accepted_claims"]),
-            }
-            state["status"] = (
-                "RESEARCH_READY_HUMAN_COMMERCIAL_REVIEW"
-                if state["public_contact_routes"] and
-                state["accepted_claims"]
-                else "RESEARCH_INCOMPLETE_CONTACT_OR_EVIDENCE")
-            _save(path, state)
-            _publish(root, state)
-            return state
+            return _synthesize_saved(
+                root, path, state, discovery, sources, profile,
+                key, db, stamp, legacy, transport)
         finally:
             db.close()
 
@@ -543,10 +599,16 @@ def main():
     p.add_argument("--city", default="Brampton")
     p.add_argument("--customer-profile", default="")
     p.add_argument("--paid", action="store_true")
+    p.add_argument("--resume-saved", action="store_true",
+                   help="Resume only final synthesis after a previously "
+                        "failed Fetch/Search, without repeating paid requests")
     a = p.parse_args()
+    if a.resume_saved and not a.paid:
+        p.error("--resume-saved requires explicit --paid")
     result = qualify(
         a.results, project_name=a.project_name, city=a.city,
-        customer_profile=a.customer_profile, paid=a.paid)
+        customer_profile=a.customer_profile, paid=a.paid,
+        resume_saved=a.resume_saved)
     print(json.dumps({
         "status": result["status"],
         "project_name": result["project"]["project_name"],
