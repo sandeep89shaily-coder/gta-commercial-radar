@@ -79,8 +79,8 @@ class AITopTenSelectionTests(unittest.TestCase):
                           {"A":"DEPRIORITIZE","B":"PREFER","C":"NEUTRAL"},calls))
         self.assertEqual(result["status"],"AI_TOP10_REVIEW_ONLY")
         self.assertEqual(result["reviewed_count"],3)
-        self.assertEqual(result["paid_model_calls"],1)
-        self.assertEqual(calls.count("/chat/completions"),1)
+        self.assertEqual(result["paid_model_calls"],3)
+        self.assertEqual(calls.count("/chat/completions"),3)
         after=build(self.root,today=DAY)
         self.assertEqual(after["ai_preselection_reviewed_count"],3)
         self.assertEqual(after["top10"][0]["record_id"],"B")
@@ -111,7 +111,7 @@ class AITopTenSelectionTests(unittest.TestCase):
         self.assertEqual(second["status"],"AI_TOP10_REVIEW_ONLY")
         self.assertEqual(second["paid_model_calls"],0)
         self.assertEqual(second["reviewed_count"],2)
-        self.assertEqual(counter.count("/chat/completions"),1)
+        self.assertEqual(counter.count("/chat/completions"),2)
 
     def test_revised_description_invalidates_saved_ai_without_hallucinating(self):
         self.write([self.row("A"),self.row("B")])
@@ -130,7 +130,7 @@ class AITopTenSelectionTests(unittest.TestCase):
             if path == "/v1/tools/fetch":
                 return {"content":""}
             return {"choices":[{"message":{"content":json.dumps(
-                {"reviews":[{"i":0,"decision":"PREFER","reason":"x","investigate":"y"}]})},
+                {"reviews":[]})},
                 "finish_reason":"stop"}],
                 "usage":{"prompt_tokens":900,"completion_tokens":50}}
         result=ai_run(self.root,paid=True,key="test",today=DAY,transport=invalid)

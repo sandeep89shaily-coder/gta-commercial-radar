@@ -25,11 +25,11 @@ import v8_deepseek_native as native
 from gta_commercial_qualification_review import ai_fingerprint
 
 CHECKPOINT_DIR = "AI_TOP10_LIVE_SOURCE_CHECKS"
-SEARCH_LIMIT = 2
-FETCH_LIMIT = 2
+SEARCH_LIMIT = 3
+FETCH_LIMIT = 4
 MAX_RESULTS = 8
 MAX_CONTENT = 8000
-MAX_EXCERPT = 470
+MAX_EXCERPT = 900
 OFFICIAL_SUFFIXES = (
     "toronto.ca", "brampton.ca", "mississauga.ca",
     "burlington.ca", "oakville.ca", "vaughan.ca",
@@ -100,7 +100,7 @@ def _company_role_excerpt(body):
     m = ROLE_CUES.search(body or "")
     if not m:
         return ""
-    return _excerpt(body, m, length=600)
+    return _excerpt(body, m, length=1050)
 
 
 def _identity(text, row):
@@ -133,6 +133,9 @@ def _queries(row):
     if address:
         queries.append('"' + address[:78] + '" ' + city +
                        " developer owner tenant operator contractor architect approval 2026")
+    if address:
+        queries.append('"' + address[:78] + '" ' + city +
+                       " general contractor procurement equipment supplier tenant")
     return [q[:175] for q in dict.fromkeys(queries)][:SEARCH_LIMIT]
 
 
@@ -245,13 +248,13 @@ def check_one(root, row, key, db, day, legacy, *, transport=None,
                 state["sources"].append({
                     "url":url,"identity":"EXACT_OFFICIAL_ARCGIS_APPLICATION",
                     "authority":"OFFICIAL_ARCGIS_EXACT_ID",
-                    "excerpt":str(raw)[:950],
+                    "excerpt":str(raw)[:1500],
                     "role_excerpt":json.dumps({
                         name:str(value)[:200] for name,value in fields.items()
                         if any(term in name.upper() for term in (
                             "OWNER","DEVELOPER","APPLICANT","AGENT",
                             "CONTRACTOR","ARCHITECT","TENANT","OPERATOR"))
-                    },ensure_ascii=False)[:650],
+                    },ensure_ascii=False)[:1050],
                     "official_status_fields": {
                         name:str(fields[name])[:150] for name in (
                             "STATUS_DESC","STATUS","STATUS_GROUP",
