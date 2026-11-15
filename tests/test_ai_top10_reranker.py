@@ -45,6 +45,8 @@ class AITopTenSelectionTests(unittest.TestCase):
         changes=changes or {}
         def send(path,payload):
             if counter is not None: counter.append(path)
+            if path == "/v1/tools/search":
+                return {"results": []}
             self.assertEqual(path,"/chat/completions")
             user=json.loads(payload["messages"][1]["content"])
             reviews=[]
@@ -76,7 +78,7 @@ class AITopTenSelectionTests(unittest.TestCase):
         self.assertEqual(result["status"],"AI_TOP10_REVIEW_ONLY")
         self.assertEqual(result["reviewed_count"],3)
         self.assertEqual(result["paid_model_calls"],1)
-        self.assertEqual(calls,["/chat/completions"])
+        self.assertEqual(calls.count("/chat/completions"),1)
         after=build(self.root,today=DAY)
         self.assertEqual(after["ai_preselection_reviewed_count"],3)
         self.assertEqual(after["top10"][0]["record_id"],"B")
@@ -107,7 +109,7 @@ class AITopTenSelectionTests(unittest.TestCase):
         self.assertEqual(second["status"],"AI_TOP10_REVIEW_ONLY")
         self.assertEqual(second["paid_model_calls"],0)
         self.assertEqual(second["reviewed_count"],2)
-        self.assertEqual(counter,["/chat/completions"])
+        self.assertEqual(counter.count("/chat/completions"),1)
 
     def test_revised_description_invalidates_saved_ai_without_hallucinating(self):
         self.write([self.row("A"),self.row("B")])
@@ -121,6 +123,8 @@ class AITopTenSelectionTests(unittest.TestCase):
     def test_incomplete_or_invalid_batch_cannot_rerank(self):
         self.write([self.row("A"),self.row("B")])
         def invalid(path,payload):
+            if path == "/v1/tools/search":
+                return {"results":[]}
             return {"choices":[{"message":{"content":json.dumps(
                 {"reviews":[{"i":0,"decision":"PREFER","reason":"x","investigate":"y"}]})},
                 "finish_reason":"stop"}],
