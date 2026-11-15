@@ -141,18 +141,33 @@ def _citation_claims(response, sources, city):
                 "verified_on_exact_municipal_file": False,
                 "procurement_open_verified": False,
             })
-        project_name = str(item.get("project_name") or "")[:150]
+        proposed_name = str(item.get("project_name") or "").strip()[:150]
+        project_named = any(
+            claim["kind"] == "project" and
+            claim["subject"].casefold() == proposed_name.casefold()
+            for claim in claims)
         companies = [x for x in claims if x["kind"] in ("developer", "partner")]
         proof = [x for x in claims if x["kind"] in (
             "project", "developer", "partner", "scope", "construction")]
         if not companies or not proof:
             continue
+        # Model-proposed identifiers and timelines must themselves be
+        # backed by independently fetched literal source quotations.
+        location = str(item.get("location_text") or "").strip()[:180]
+        if not any(location.casefold() in source["content"].casefold()
+                   for source in sources if location):
+            location = ""
+        construction = str(item.get("construction_timing") or "").strip()[:100]
+        if not any(
+                c["kind"] == "construction" and
+                construction.casefold() in c["quote"].casefold()
+                for c in claims):
+            construction = "UNKNOWN"
         accepted.append({
-            "project_name": project_name or "UNNAMED_PROJECT",
+            "project_name": proposed_name if project_named else "UNNAMED_PROJECT",
             "city": city_name,
-            "location_text": str(item.get("location_text") or "")[:180],
-            "reported_construction": str(
-                item.get("construction_timing") or "UNKNOWN")[:100],
+            "location_text": location,
+            "reported_construction": construction,
             "companies": companies,
             "claims": claims,
             "sources_used": sorted({c["source_url"] for c in claims}),
