@@ -261,7 +261,7 @@ def run(results, *, paid=False, key=None, transport=None, today=None):
                     len(v.get("issues", [])) for v in live_checks.values())
                 save_attempt()
                 return state
-            state["source_snapshot_only"] = False
+            state["source_snapshot_only"] = state["live_sources_retrieved"] == 0
             for start in range(0, len(pool), BATCH_SIZE):
                 batch = pool[start:start + BATCH_SIZE]
                 fingerprint = ai_fingerprint(batch)
