@@ -226,6 +226,12 @@ def _public_channels(sources, companies):
                         continue
                 else:
                     channel = match.group().strip()
+                    # A UK number written '+44 2074095500' is NOT a
+                    # Canadian 207-409-5500 phone. Reject matches that
+                    # begin after a visibly different country code.
+                    phone_prior = clean[max(0, match.start() - 8):match.start()]
+                    if re.search(r"\+(?!1\b)\d{1,3}[\s.-]*$", phone_prior):
+                        continue
                     # Exclude samples/examples in mailing list pages.
                     if re.search(r"(?i)(?:example|placeholder|sample)\s*[: ]{0,3}$",
                                  clean[max(0, match.start() - 30):match.start()]):
