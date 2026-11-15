@@ -156,7 +156,9 @@ def _fetch(url, row, key, db, day, legacy, stamp, index, transport, state):
         # Provider status unknown, reservation must not be treated as $0.
         native.ledger_finish(db,day.isoformat(),name,"UNKNOWN")
         state["issues"].append("FETCH_" + type(exc).__name__)
-        state["complete"] = False
+        # A source may be inaccessible (e.g. municipal 403/SSL). This is not
+        # verified live evidence but must not block all other candidate reviews.
+        # Keep the unknown usage reservation and the source error visible.
         return
     identity, excerpt = _identity(body,row)
     if identity and excerpt:
@@ -277,8 +279,9 @@ def check_one(root, row, key, db, day, legacy, *, transport=None,
         except Exception as exc:
             native.ledger_finish(db,day.isoformat(),name,"UNKNOWN")
             state["issues"].append("SEARCH_" + type(exc).__name__)
-            state["complete"] = False
-            break
+            # Preserve an explicit inaccessible-source warning; continue the
+            # bounded alternative query, not a claimed successful verification.
+            continue
         for item in found[:MAX_RESULTS]:
             if not isinstance(item,dict):
                 continue
