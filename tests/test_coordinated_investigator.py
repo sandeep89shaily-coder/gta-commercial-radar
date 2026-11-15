@@ -127,7 +127,7 @@ class CoordinatedInvestigatorTests(unittest.TestCase):
             self.fail(endpoint)
         result = investigate(self.root, BIRCHMOUNT["record_id"], paid=True,
                              token="test", today=DAY, transport=provider)
-        self.assertEqual(result["status"], "SOURCE_BACKED_REVIEW_COMPLETE")
+        self.assertEqual(result["status"], "RESEARCH_COMPLETE_CONTACT_REVIEW_REQUIRED")
         self.assertEqual(result["model_calls"], 2)
         self.assertEqual(api, ["/chat/completions", "/v1/tools/search",
                                "/v1/tools/fetch", "/chat/completions"])
@@ -141,7 +141,7 @@ class CoordinatedInvestigatorTests(unittest.TestCase):
             (self.root / "GTA_RADAR_COORDINATED_PROJECT_OVERLAY.json")
             .read_text(encoding="utf-8"))
         published = overlay["projects"][BIRCHMOUNT["record_id"]]
-        self.assertEqual(published["status"], "SOURCE_BACKED_REVIEW_COMPLETE")
+        self.assertEqual(published["status"], "RESEARCH_COMPLETE_CONTACT_REVIEW_REQUIRED")
         self.assertEqual(published["source_count"], 3)
         self.assertEqual(published["company_site_leads"][0]["company"],
                          "Business Point")
@@ -173,7 +173,7 @@ class CoordinatedInvestigatorTests(unittest.TestCase):
         overlay = {
             "projects": {BIRCHMOUNT["record_id"]: {
                 **BIRCHMOUNT,
-                "status": "SOURCE_BACKED_REVIEW_COMPLETE",
+                "status": "RESEARCH_COMPLETE_CONTACT_REVIEW_REQUIRED",
                 "company_site_leads": [{
                     "company": "Business Point",
                     "association": "GROUNDBREAKING_SITE_ASSOCIATION",
