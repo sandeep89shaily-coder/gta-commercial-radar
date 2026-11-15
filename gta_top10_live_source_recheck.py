@@ -405,7 +405,7 @@ def model_directed_company_search(root, row, key, db, day, legacy, *,
         save()
         return state
     payload = {
-        "model": native.MODEL, "thinking": {"type": "enabled"},
+        "model": native.MODEL, "thinking": {"type": "disabled"},
         "tools": [{"type": "deepseek_web_search"},
                   {"type": "deepseek_read_url"}],
         "max_tokens": 3500, "stream": False,
@@ -514,16 +514,22 @@ def model_directed_company_search(root, row, key, db, day, legacy, *,
             if isinstance(url, str) and native.safe_url(url)
             and url != row.get("source_url")]
     state["discovered_urls"] = urls[:12]
-    if response.get("error") or len(choices) != 1 or (
-            state["finish_reason"] != "stop"):
-        state["status"] = ("INCOMPLETE_WEB_RESEARCH_" +
-                           str(state["finish_reason"]).upper())
-        save()
-        return state
+    # The previous code threw away every URL and company lead if a web
+    # response ended with finish_reason=length. Independently verify links
+    # even from a truncated response; classify the final dossier as partial.
+    # A provider error without a choice is retained, not promoted as proof.
+    incomplete = bool(response.get("error") or len(choices) != 1 or
+                      state["finish_reason"] != "stop")
+    state["model_answer_complete"] = not incomplete
+    save()
     for i, url in enumerate(urls[:3]):
         _fetch(url, row, key, db, day, legacy, "web_" + stamp,
                i, transport, state)
-    state["status"] = ("FETCHED_CONTEXT_ONLY" if state["sources"]
-                       else "NO_NEW_INDEPENDENT_SOURCE")
+    if incomplete:
+        state["status"] = ("PARTIAL_WEB_RESEARCH_" +
+                           str(state["finish_reason"]).upper())
+    else:
+        state["status"] = ("FETCHED_CONTEXT_ONLY" if state["sources"]
+                           else "NO_NEW_INDEPENDENT_SOURCE")
     save()
     return state

@@ -44,8 +44,9 @@ def _rows(root):
     return selected
 
 
-def _output(root, day):
-    return root / (OUT_PREFIX + day.isoformat() + ".json")
+def _output(root, day, start_index=0, limit=2):
+    return root / (OUT_PREFIX + day.isoformat() +
+                   "_FROM_" + str(start_index + 1) + "_COUNT_" + str(limit) + ".json")
 
 
 def _save(path, report):
@@ -55,15 +56,24 @@ def _save(path, report):
     temp.replace(path)
 
 
-def run(root, *, paid=False, token=None, today=None, transport=None):
+def run(root, *, paid=False, start_index=0, limit=2,
+        token=None, today=None, transport=None):
+    if type(start_index) is not int or start_index < 0:
+        raise ValueError("START_INDEX_MUST_BE_NONNEGATIVE")
+    if type(limit) is not int or limit not in (1, 2):
+        raise ValueError("LIMIT_MUST_BE_ONE_OR_TWO")
     root = Path(root)
-    rows = _rows(root)
+    all_rows = _rows(root)
+    rows = all_rows[start_index:start_index + limit]
+    if not rows:
+        raise ValueError("NO_PROJECTS_AT_SELECTED_INDEX")
     day = today or dt.date.today()
     digest = hashlib.sha256(json.dumps(rows, sort_keys=True).encode()).hexdigest()
-    path = _output(root, day)
+    path = _output(root, day, start_index, limit)
     report = {"status": "PREFLIGHT_ONLY", "date": day.isoformat(),
               "input": INPUT, "input_fingerprint": digest,
-              "selected_count": len(rows), "attempted_count": 0,
+              "selected_count": len(rows), "start_index": start_index,
+              "attempted_count": 0,
               "completed_fetch_evidence": 0, "verified_buyers": 0,
               "contact_verification": "NONE_AUTOMATED",
               "not_authorized_for_outreach": True,
@@ -137,7 +147,12 @@ if __name__ == "__main__":
     parser.add_argument("--results", required=True)
     parser.add_argument("--paid", action="store_true",
                         help="Allow paid DeepSeek research under shared daily budget")
+    parser.add_argument("--start-index", type=int, default=0,
+                        help="Zero-based index into the current Top 10")
+    parser.add_argument("--limit", type=int, choices=(1, 2), default=2,
+                        help="Investigate one or two projects per invocation")
     args = parser.parse_args()
-    result = run(args.results, paid=args.paid)
+    result = run(args.results, paid=args.paid,
+                 start_index=args.start_index, limit=args.limit)
     print(json.dumps({k: v for k, v in result.items() if k != "reviews"},
                      indent=2))

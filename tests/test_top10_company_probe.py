@@ -33,7 +33,7 @@ class DirectTop10CompanyProbeTests(unittest.TestCase):
         self.assertEqual(result["status"], "PREFLIGHT_ONLY")
         self.assertFalse((self.root / "v5_ai_budget.sqlite").exists())
         self.assertFalse((self.root /
-                          "GTA_RADAR_TOP10_DEEPSEEK_COMPANY_PROBE_2026-11-15.json"
+                          "GTA_RADAR_TOP10_DEEPSEEK_COMPANY_PROBE_2026-11-15_FROM_1_COUNT_2.json"
                           ).exists())
 
     def test_no_web_tool_use_field_does_not_block_model_response(self):
@@ -73,7 +73,10 @@ class DirectTop10CompanyProbeTests(unittest.TestCase):
         calls = []
         def send(path, payload):
             calls.append(path)
+            if path == "/v1/tools/fetch":
+                return {"content": "Unrelated building at different address."}
             self.assertEqual(path, "/chat/completions")
+            self.assertEqual(payload["thinking"], {"type": "disabled"})
             return {
                 "choices": [{"finish_reason": "length", "message": {
                     "content": "Potential facility operator at this address",
@@ -90,13 +93,39 @@ class DirectTop10CompanyProbeTests(unittest.TestCase):
         self.assertEqual(result["status"], "ALL_TOP10_RESEARCH_ATTEMPTED")
         record = result["reviews"][0]
         self.assertEqual(record["research_status"],
-                         "INCOMPLETE_WEB_RESEARCH_LENGTH")
+                         "PARTIAL_WEB_RESEARCH_LENGTH")
         self.assertEqual(record["discovered_urls_unverified"],
                          ["https://example.org/company"])
         self.assertIn("Potential facility operator",
                       record["model_summary_research_hint_not_verified"])
         self.assertEqual(result["completed_fetch_evidence"], 0)
-        self.assertEqual(calls, ["/chat/completions"])
+        self.assertEqual(calls, ["/chat/completions", "/v1/tools/fetch"])
+
+    def test_only_selected_two_records_are_investigated(self):
+        path = self.root / "GTA_RADAR_COMMERCIAL_TOP10_ANALYST_REVIEW.csv"
+        with path.open("a", encoding="utf-8", newline="") as stream:
+            writer = csv.writer(stream)
+            for index in range(1, 7):
+                writer.writerow([f"brampton:{index}", "Brampton",
+                                 f"{index} Test Road", f"26-{index}",
+                                 "Industrial alteration", "https://example.org/permit"])
+        queries = []
+        def send(api, payload):
+            if api == "/chat/completions":
+                queries.append(payload["messages"][1]["content"])
+                self.assertEqual(payload["thinking"], {"type": "disabled"})
+                return {"choices": [{"finish_reason": "stop", "message": {
+                    "content": "No document-backed company found."}}],
+                    "usage": {"prompt_tokens": 450, "completion_tokens": 50}}
+            self.fail("No paid web fetch when model supplies no URL")
+        output = run(self.root, paid=True, token="test", today=TODAY,
+                     start_index=5, limit=2, transport=send)
+        self.assertEqual(output["selected_count"], 2)
+        self.assertEqual(output["attempted_count"], 2)
+        self.assertEqual(len(queries), 2)
+        self.assertEqual([p["record_id"] for p in output["reviews"]],
+                         ["brampton:5", "brampton:6"])
+        self.assertIn("_FROM_6_COUNT_2.json", output["report_path"])
 
     def test_paid_probe_fetches_evidence_separately_and_reuses_checkpoint(self):
         calls = []
@@ -131,7 +160,7 @@ class DirectTop10CompanyProbeTests(unittest.TestCase):
         self.assertEqual(again["completed_fetch_evidence"], 1)
         self.assertEqual(calls, ["/chat/completions", "/v1/tools/fetch"])
         saved = json.loads((self.root /
-            "GTA_RADAR_TOP10_DEEPSEEK_COMPANY_PROBE_2026-11-15.json"
+            "GTA_RADAR_TOP10_DEEPSEEK_COMPANY_PROBE_2026-11-15_FROM_1_COUNT_2.json"
             ).read_text(encoding="utf-8"))
         self.assertEqual(saved["attempted_count"], 1)
 
