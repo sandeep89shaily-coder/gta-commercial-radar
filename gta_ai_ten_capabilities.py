@@ -8,6 +8,7 @@ No free invocation spends money; --paid is required, with shared budget.
 from __future__ import annotations
 
 import argparse
+import csv
 import datetime as dt
 import hashlib
 import json
@@ -22,6 +23,8 @@ from radar_run_lock import once_lock
 
 OVERLAY = "GTA_RADAR_AI_TEN_CAPABILITIES_OVERLAY.json"
 DOSSIERS = "GTA_RADAR_AI_TEN_CAPABILITIES_DOSSIERS"
+BRIEFS = "GTA_RADAR_AI_TEN_CAPABILITIES_BRIEFS"
+FEEDBACK = "GTA_RADAR_PILOT_CUSTOMER_FEEDBACK.csv"
 STAGES = (
     "company_entity_relationships",
     "project_lifecycle_supersession",
@@ -177,7 +180,31 @@ def _discover_original_sources(root, row, key, db, day, legacy, transport):
     return found, list(data.get("issues") or []), bool(data.get("complete"))
 
 
-def _project_payload(row, evidence, stage, profile, prior):
+def _feedback(root, row):
+    path = Path(root) / FEEDBACK
+    if not path.is_file() or path.is_symlink() or path.stat().st_size > 500_000:
+        return []
+    with path.open(newline="", encoding="utf-8-sig") as stream:
+        reader = csv.DictReader(stream)
+        result = []
+        for data in reader:
+            if (str(data.get("record_id") or "") != row["record_id"] or
+                    str(data.get("city") or "").casefold() !=
+                    row["city"].casefold()):
+                continue
+            result.append({
+                "supplier_segment": str(
+                    data.get("supplier_segment") or "")[:120],
+                "useful": str(data.get("useful") or "")[:20],
+                "reason": str(data.get("reason") or "")[:380],
+                "follow_up": str(data.get("follow_up") or "")[:250],
+            })
+            if len(result) >= 12:
+                break
+    return result
+
+
+def _project_payload(row, evidence, stage, profile, prior, feedback=None):
     """No internet tools: reason strictly over independently fetched evidence."""
     return {
         "model": native.MODEL, "thinking": {"type": "disabled"},
@@ -202,6 +229,10 @@ def _project_payload(row, evidence, stage, profile, prior):
                              for i, src in enumerate(evidence)],
                 "supplier_profile": profile if stage ==
                     "customer_specific_supplier_fit" else "",
+                "customer_feedback_from_user_records": (
+                    feedback or []) if stage in (
+                        "customer_specific_supplier_fit",
+                        "customer_brief_and_feedback") else [],
                 "previous_evaluations": [
                     {"stage": name, "classification": value.get(
                         "classification", "UNKNOWN")}
@@ -257,6 +288,48 @@ def _verified_claims(answer, evidence):
     return accepted
 
 
+def _render_brief(row, dossier):
+    lines = [
+        "# GTA Radar — AI Research Dossier",
+        "",
+        "**Review-only: not verified purchasing intelligence or an open bid.**",
+        "",
+        "**Project:** " + row["record_id"],
+        "**Location:** " + row["address"] + ", " + row["city"],
+        "**Application:** " + row["application_id"],
+        "**Scope in source record:** " + row["project_description"][:350],
+        "",
+    ]
+    for stage in STAGES:
+        data = dossier["stages"].get(stage, {})
+        lines.extend(["## " + stage.replace("_", " ").title(),
+                      "**Status:** " + str(data.get("status") or "NOT_RUN"),
+                      "**AI classification (review only):** " +
+                      str(data.get("classification") or "UNKNOWN"),
+                      str(data.get("rationale_unverified") or "")[:450],
+                      ""])
+        for claim in data.get("claims", [])[:5]:
+            lines.extend([
+                "- " + str(claim.get("subject") or "")[:130] +
+                " — " + str(claim.get("relationship_proposed") or "")[:140],
+                "  - Literal source quote: " +
+                str(claim.get("literal_quote") or "")[:400],
+                "  - URL: " + str(claim.get("source_url") or ""),
+            ])
+        if data.get("next_action"):
+            lines.append("Next check: " + str(data["next_action"])[:240])
+        lines.append("")
+    lines.extend(["## Evidence caveats", "",
+                  "- Site association does not prove involvement in the "
+                  "exact application.",
+                  "- A published company contact is not a verified buyer.",
+                  "- No trade is open or unawarded without independent proof.",
+                  "- Event/filing/fetch timestamps are distinct.",
+                  "- Human commercial review is required before outreach.",
+                  ""])
+    return "\n".join(lines)
+
+
 def _cost(usage):
     if not isinstance(usage, dict):
         return None
@@ -277,7 +350,7 @@ def _cost(usage):
 
 
 def _stage_model(row, evidence, stage, profile, prior,
-                 key, db, day, legacy, token, transport):
+                 key, db, day, legacy, token, transport, feedback=None):
     fingerprint = hashlib.sha256(
         json.dumps([row, evidence, stage, profile, token],
                    sort_keys=True).encode()).hexdigest()[:28]
@@ -298,7 +371,7 @@ def _stage_model(row, evidence, stage, profile, prior,
     try:
         response = native.request(
             "/chat/completions",
-            _project_payload(row, evidence, stage, profile, prior),
+            _project_payload(row, evidence, stage, profile, prior, feedback),
             key, transport)
     except native.DeepSeekAccountBalanceError:
         native.ledger_finish(db, day.isoformat(), claim, "NONBILLABLE")
@@ -451,6 +524,7 @@ def run(results, *, paid=False, limit=2, start_index=0,
                         "verified_buyer": False,
                         "open_contract_verified": False,
                         "outreach_authorized": False}
+                feedback = _feedback(root, row)
                 for stage in STAGES:
                     if stage in dossier["stages"]:
                         continue  # never duplicate a completed/uncertain call
@@ -473,7 +547,8 @@ def run(results, *, paid=False, limit=2, start_index=0,
                         _write_json(path, dossier)
                     result = _stage_model(
                         row, evidence, stage, profile, dossier["stages"], key,
-                        db, day, legacy, fingerprint, transport)
+                        db, day, legacy, fingerprint, transport,
+                        feedback=feedback)
                     result["source_enrichment_status"] = research_state
                     dossier["stages"][stage] = result
                     _write_json(path, dossier)
@@ -482,6 +557,13 @@ def run(results, *, paid=False, limit=2, start_index=0,
                         "REQUEST_FAILED_UNCERTAIN_BILLING",
                         "USAGE_UNCERTAIN_EVIDENCE_RETAINED"):
                         break
+                brief_path = root / BRIEFS / (
+                    hashlib.sha256((row["record_id"] + ":" +
+                                    row["city"]).encode()).hexdigest()[:24]
+                    + ".md")
+                brief_path.parent.mkdir(parents=True, exist_ok=True)
+                brief_path.write_text(_render_brief(row, dossier),
+                                      encoding="utf-8")
                 projects[row["record_id"]] = _overlay_item(row, dossier)
                 report["results"].append({
                     "record_id": row["record_id"],
@@ -489,6 +571,8 @@ def run(results, *, paid=False, limit=2, start_index=0,
                     "stages": {name: item["status"] for name, item
                                in dossier["stages"].items()},
                     "dossier": str(path),
+                    "analyst_brief": str(brief_path),
+                    "customer_feedback_count": len(feedback),
                 })
                 _write_json(root / OVERLAY, {
                     "version": 1, "review_only": True,
