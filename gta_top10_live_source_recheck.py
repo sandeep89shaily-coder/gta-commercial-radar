@@ -241,6 +241,16 @@ def check_one(root, row, key, db, day, legacy, *, transport=None,
                 state["issues"].append("OFFICIAL_ARCGIS_NO_EXACT_ID")
         except (OSError,ValueError,TypeError) as exc:
             state["issues"].append("OFFICIAL_ARCGIS_"+type(exc).__name__)
+    # Revisit the original project-specific page as well as discovering
+    # newer pages. A general municipal portal or unvalidated GIS query is not
+    # a direct project page and must not be treated as a current permit source.
+    fetched_urls = set()
+    if (not arcgis.is_official_query(url)
+            and row.get("source_specificity") == "PROJECT_SPECIFIC_URL_REVIEW"
+            and native.safe_url(url)):
+        _fetch(url,row,key,db,day,legacy,stamp,0,transport,state)
+        fetched_urls.add(url)
+
     query_list = _queries(row)
     possibilities = {}
     for number, query in enumerate(query_list):
@@ -292,8 +302,13 @@ def check_one(root, row, key, db, day, legacy, *, transport=None,
     # fallback only if it has a project-specific URL, never a bare portal.
     ranked = sorted(possibilities,
                     key=lambda uri:(-possibilities[uri],uri))
-    for index, uri in enumerate(ranked[:FETCH_LIMIT]):
-        _fetch(uri,row,key,db,day,legacy,stamp,index,transport,state)
+    for uri in ranked:
+        if len(fetched_urls) >= FETCH_LIMIT:
+            break
+        if uri in fetched_urls:
+            continue
+        _fetch(uri,row,key,db,day,legacy,stamp,len(fetched_urls),transport,state)
+        fetched_urls.add(uri)
     state["source_count"] = len(state["sources"])
     state["has_exact_current_application"] = any(
         str(s.get("identity","")).startswith("EXACT") for s in state["sources"])
