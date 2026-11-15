@@ -142,6 +142,50 @@ class CoordinatedInvestigatorTests(unittest.TestCase):
                             self.fail("No repeat paid call"))
         self.assertTrue(again["checkpoint_reused"])
 
+    def test_coordinated_report_joins_canonical_top10_by_exact_identity(self):
+        from gta_commercial_qualification_review import build
+        # One realistic municipal source record, then the coordinated
+        # overlay; do not let a model claim turn into a buyer.
+        pending = self.root / "GTA_RADAR_V8_PENDING_QUEUE.csv"
+        with pending.open("w", newline="", encoding="utf-8") as stream:
+            writer = csv.DictWriter(stream, fieldnames=[
+                "project_id", "city", "address", "source_keys",
+                "description", "record_source_url", "current_source_status"])
+            writer.writeheader()
+            writer.writerow({
+                "project_id": BIRCHMOUNT["record_id"],
+                "city": BIRCHMOUNT["city"],
+                "address": BIRCHMOUNT["address"],
+                "source_keys": BIRCHMOUNT["application_id"],
+                "description": BIRCHMOUNT["project_description"],
+                "record_source_url": BIRCHMOUNT["source_url"],
+                "current_source_status": "Under Review"})
+        overlay = {
+            "projects": {BIRCHMOUNT["record_id"]: {
+                **BIRCHMOUNT,
+                "status": "SOURCE_BACKED_REVIEW_COMPLETE",
+                "company_site_leads": [{
+                    "company": "Business Point",
+                    "association": "GROUNDBREAKING_SITE_ASSOCIATION",
+                    "source_url": COMPANY["url"]}],
+                "source_backed_claims": [],
+                "ai_commercial_classification_unverified": "HOLD",
+                "source_count": 2,
+                "report_path": "example.json",
+                "verified_buyer": False,
+                "outreach_authorized": False}}}
+        (self.root / "GTA_RADAR_COORDINATED_PROJECT_OVERLAY.json").write_text(
+            json.dumps(overlay), encoding="utf-8")
+        result = build(self.root, today=DAY, apply_ai=False)
+        self.assertEqual(result["coordinated_projects_integrated"], 1)
+        selected = next(x for x in result["all_candidates"]
+                        if x["record_id"] == BIRCHMOUNT["record_id"])
+        self.assertEqual(selected["coordinated_company_leads"][0]["company"],
+                         "Business Point")
+        self.assertEqual(selected["coordinated_assessment_unverified"],
+                         "HOLD")
+        self.assertFalse(selected.get("buyer_verified", False))
+
     def test_five_failure_cases_require_correct_independent_evidence(self):
         rows = [
             BIRCHMOUNT,
