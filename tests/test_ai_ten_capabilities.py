@@ -8,6 +8,8 @@ from pathlib import Path
 
 from gta_ai_ten_capabilities import STAGES, run, _evidence, _verified_claims
 from gta_commercial_qualification_review import build as qualification_build
+from gta_ai_ten_source_enrichment import enrich as source_enrich
+import v5_investigator as v5
 
 TODAY = dt.date(2026, 11, 15)
 SOURCE_QUOTE = ("The previous proposal for a self-storage facility was "
@@ -138,6 +140,41 @@ class TenCapabilityTests(unittest.TestCase):
                     if x["record_id"] == self.record["record_id"])
         self.assertTrue(held["ai_ten_lifecycle_hold"])
         self.assertFalse(held["buyer_verified"])
+
+    def test_company_contact_source_enrichment_uses_fetch_not_snippets(self):
+        previous = {"company_entity_relationships": {"claims": [{
+            "subject": "Business Point",
+            "literal_quote": "Business Point is the developer",
+            "source_url": "https://example.org/project"}]}}
+        requests = []
+        def provider(endpoint, payload):
+            requests.append(endpoint)
+            if endpoint == "/v1/tools/search":
+                self.assertIn("Business Point", payload["query"])
+                return {"results": [{"url": "https://businesspoint.example/contact",
+                                     "snippet": "Business Point official contact"}]}
+            if endpoint == "/v1/tools/fetch":
+                return {"content": "Business Point contact us: info@businesspoint.example"}
+            self.fail(endpoint)
+        db = v5._ledger(self.root / "v5_ai_budget.sqlite")
+        try:
+            sources, status = source_enrich(
+                self.root, self.record, "buyer_contact_path", previous, [],
+                "test", db, TODAY, 0, transport=provider)
+            self.assertEqual(status, "FETCHED_SOURCE_CONTEXT")
+            self.assertEqual(len(sources), 1)
+            self.assertEqual(sources[0]["identity"],
+                             "SAME_NAMED_COMPANY_CONTACT_CONTEXT_NOT_BUYER")
+            self.assertIn("info@businesspoint.example", sources[0]["content"])
+            self.assertFalse(sources[0]["project_role_verified"])
+            again, _ = source_enrich(
+                self.root, self.record, "buyer_contact_path", previous, [],
+                "test", db, TODAY, 0,
+                transport=lambda *_: self.fail("No paid repeat"))
+            self.assertEqual(sources, again)
+            self.assertEqual(requests, ["/v1/tools/search", "/v1/tools/fetch"])
+        finally:
+            db.close()
 
     def test_quote_hallucination_is_not_supported(self):
         sources = _evidence(self.root, self.record, TODAY)
