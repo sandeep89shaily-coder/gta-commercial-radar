@@ -723,6 +723,8 @@ if __name__ == "__main__":
                         "building worklist; uses shared daily budget")
     p.add_argument("--ai-limit", type=int, default=2)
     p.add_argument("--ai-start-index", type=int, default=0)
+    p.add_argument("--ai-record-id", default="",
+                   help="Select one current Top 10 opportunity by exact record ID")
     p.add_argument("--customer-profile", default="")
     a = p.parse_args()
     report = run(a.results)
@@ -730,6 +732,7 @@ if __name__ == "__main__":
         from gta_ai_ten_capabilities import run as ai_run
         ai_report = ai_run(a.results, paid=True, limit=a.ai_limit,
                            start_index=a.ai_start_index,
+                           record_id=a.ai_record_id,
                            customer_profile=a.customer_profile)
         report = run(a.results)
         report["ai_ten_execution"] = ai_report
