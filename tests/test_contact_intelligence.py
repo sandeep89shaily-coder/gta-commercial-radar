@@ -225,6 +225,25 @@ class ContactInvestigationTests(unittest.TestCase):
             ]}, [src], ["Harbourlight Developments"])
         self.assertEqual(validated, [])
 
+    def test_official_corporate_domain_contact_page_with_brand_only(self):
+        companies = ["Harbourlight Developments"]
+        hits = _rank_hits({"results": [{
+            "url": "https://www.harbourlightdevelopments.ca/contact",
+            "title": "Contact us", "snippet": "Get in touch with our team"}]},
+            companies, "Northfield Works")
+        self.assertEqual(hits, [
+            "https://www.harbourlightdevelopments.ca/contact"])
+        page = _source_page(
+            hits[0], "Harbourlight contact. Office enquiries: "
+            "info@harbourlightdevelopments.ca or 416-555-0145.",
+            companies, "Northfield Works", DAY)
+        self.assertIsNotNone(page)
+        self.assertEqual(page["companies_mentioned"], companies)
+        channels = _public_channels([page], companies)
+        self.assertEqual(len(channels), 2)
+        self.assertTrue(all(not x["project_purchasing_role_verified"]
+                            for x in channels))
+
     def test_public_phone_not_treated_as_personal_procurement_direct_line(self):
         src = _source_page(
             "https://harbourlight.example/contact", COMPANY_PAGE,
