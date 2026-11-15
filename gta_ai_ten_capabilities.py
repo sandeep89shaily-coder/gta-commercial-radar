@@ -306,12 +306,21 @@ def _overlay_item(row, dossier):
     classification = lifecycle.get("classification", "UNKNOWN")
     # A model classification cannot autonomously prove supersession.
     linked = lifecycle.get("claims", [])
+    # A lifecycle HOLD requires a relevant independently fetched literal
+    # quote, not just the model's classification. Still needs human signoff.
+    explicit = ("replaced", "superseded", "withdrawn", "cancelled",
+                "previous proposal", "past requests", "current application",
+                "no longer", "formerly", "since then")
     hold = bool(classification in ("SUPERSEDED", "WITHDRAWN", "COMPLETED")
-                and linked)
+                and any(any(term in str(c.get("literal_quote") or "").casefold()
+                                for term in explicit) for c in linked))
     companies = stages.get("company_entity_relationships", {}).get("claims", [])
     contacts = stages.get("buyer_contact_path", {}).get("claims", [])
     return {
         "record_id": row["record_id"], "city": row["city"],
+        "address": row["address"],
+        "application_id": row["application_id"],
+        "project_description": row["project_description"],
         "input_fingerprint": dossier["input_fingerprint"],
         "ai_lifecycle_proposal": classification,
         "ai_lifecycle_evidence": linked[:3],
