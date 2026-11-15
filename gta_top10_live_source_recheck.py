@@ -25,9 +25,9 @@ import v8_deepseek_native as native
 from gta_commercial_qualification_review import ai_fingerprint
 
 CHECKPOINT_DIR = "AI_TOP10_LIVE_SOURCE_CHECKS"
-SEARCH_LIMIT = 3
+SEARCH_LIMIT = 5
 FETCH_LIMIT = 4
-MAX_RESULTS = 8
+MAX_RESULTS = 12
 MAX_CONTENT = 8000
 MAX_EXCERPT = 900
 OFFICIAL_SUFFIXES = (
@@ -40,7 +40,7 @@ PROJECT_WORDS = re.compile(
     r"\b(development|redevelopment|construction|site.plan|"
     r"planning application|building permit|approved|zoning|"
     r"warehouse|industrial|mixed.use|storeys|stories|"
-    r"completed|occupancy|tenant.fit.out|facility)\b", re.I
+    r"completed|occupancy|tenant.fit.out|facility|shell.building|addition|renovation)\b", re.I
 )
 
 
@@ -95,15 +95,22 @@ ROLE_CUES = re.compile(
     re.I)
 
 
-def _company_role_excerpt(body):
-    """Independent literal passage for AI to investigate, not role proof."""
-    m = ROLE_CUES.search(body or "")
-    if not m:
+def _company_role_excerpt(body, row=None):
+    """Literal company/role passage near an address, preserving source case."""
+    text = str(body or "")
+    matches = list(ROLE_CUES.finditer(text))
+    if not matches:
         return ""
-    return _excerpt(body, m, length=1050)
+    addr = _street((row or {}).get("address"))
+    address_match = re.search(re.escape(addr).replace(r"\ ", r"\s+"),
+                              text, flags=re.I) if addr else None
+    near = min(matches, key=lambda m: abs(m.start()-address_match.start())
+               ) if address_match else matches[0]
+    return _excerpt(text, near, length=1200)
 
 
 def _identity(text, row):
+    """Exact permit identity is distinct from project and business site context."""
     if not text:
         return "", ""
     pattern = _identity_pattern(row.get("application_id"))
@@ -111,38 +118,42 @@ def _identity(text, row):
     if match:
         return "EXACT_APPLICATION_ID_IN_FETCHED_TEXT", _excerpt(text, match)
     address = _street(row.get("address"))
-    normal = " ".join(str(text).casefold().split())
-    # Project-context-only evidence cannot certify status of this permit.
-    if address and address in normal:
-        match_address = re.search(re.escape(address), normal)
-        if match_address and PROJECT_WORDS.search(normal[
-                max(0,match_address.start()-450):match_address.end()+450]):
-            return "SAME_ADDRESS_PROJECT_CONTEXT_NOT_LINKED", _excerpt(
-                normal, match_address)
+    compact_text = " ".join(str(text).split())
+    if address:
+        found = re.search(re.escape(address).replace(r"\ ", r"\s+"),
+                          compact_text, flags=re.I)
+        if found:
+            near = compact_text[max(0, found.start()-450):found.end()+450]
+            identity = ("SAME_ADDRESS_PROJECT_CONTEXT_NOT_LINKED"
+                        if PROJECT_WORDS.search(near) else
+                        "SAME_ADDRESS_COMPANY_CONTEXT_NOT_LINKED")
+            return identity, _excerpt(compact_text, found)
     return "", ""
 
 
 def _queries(row):
+    """Search 128-character queries for permit AND company address evidence."""
     ident = str(row.get("application_id") or "").strip()
     address = _street(row.get("address"))
-    city = re.sub(r"[^A-Za-z0-9 -]", " ", str(row.get("city") or ""))[:42]
+    city = re.sub(r"[^A-Za-z0-9 -]", " ", str(row.get("city") or ""))[:32]
     queries = []
     if _identity_pattern(ident):
-        queries.append('"' + ident[:64] + '" ' + city +
-                       " site plan building permit approval status")
+        queries.append(f'"{ident[:56]}" {city} planning permit applicant')
     if address:
-        queries.append('"' + address[:78] + '" ' + city +
-                       " developer owner tenant operator contractor architect approval 2026")
-    if address:
-        queries.append('"' + address[:78] + '" ' + city +
-                       " general contractor procurement equipment supplier tenant")
-    return [q[:175] for q in dict.fromkeys(queries)][:SEARCH_LIMIT]
+        address = address[:75]
+        queries.extend((
+            f'"{address}" {city} company business occupant',
+            f'"{address}" {city} owner developer tenant',
+            f'"{address}" {city} contractor industrial building',
+            f'"{address}" {city} leasing facility operations'
+        ))
+    return [q[:128] for q in dict.fromkeys(queries) if q.strip()][:SEARCH_LIMIT]
 
 
 def _checkpoint(root, row, day):
     identity = ai_fingerprint([row])
     stamp = hashlib.sha256(
-        (day.isoformat() + ":" + identity).encode("utf-8")).hexdigest()[:28]
+        ("company_discovery_v5:" + day.isoformat() + ":" + identity).encode("utf-8")).hexdigest()[:28]
     return root / CHECKPOINT_DIR / ("LIVE_" + stamp + ".json"), stamp
 
 
@@ -185,7 +196,7 @@ def _fetch(url, row, key, db, day, legacy, stamp, index, transport, state):
             "authority": ("OFFICIAL_OR_MUNICIPAL_HOST" if _official(url)
                           else "NONOFFICIAL_PROJECT_CONTEXT"),
             "excerpt": excerpt,
-            "role_excerpt": _company_role_excerpt(body),
+            "role_excerpt": _company_role_excerpt(body, row),
             "retrieved_on": day.isoformat(),
             "date_is_fetch_day_not_publication": True,
         })
@@ -231,7 +242,7 @@ def check_one(root, row, key, db, day, legacy, *, transport=None,
                 fields = attributes[0] if attributes and isinstance(
                     attributes[0],dict) else {}
                 status = next((str(fields[name]) for name in (
-                    "STATUS_DESC","STATUS","STATUS_GROUP",
+                    "STATUS_DESC","STATUSDESC","STATUS","STATUS_GROUP",
                     "LATEST_MILESTONE","APPLICATION_STATUS","PERMIT_STATUS")
                     if fields.get(name)), "")
                 state["official_current_status_literal"] = status[:180]
@@ -320,10 +331,15 @@ def check_one(root, row, key, db, day, legacy, *, transport=None,
             identity, _ = _identity(snippet,row)
             if not identity:
                 continue
-            score = 3 if identity.startswith("EXACT") else 1
+            # Ranking a search hint is not verifying its company/project claim.
+            score = (9 if identity.startswith("EXACT") else
+                     5 if identity == "SAME_ADDRESS_PROJECT_CONTEXT_NOT_LINKED" else 3)
             if _official(uri):
-                score += 2
-            possibilities[uri] = score
+                score += 3
+            if any(term in snippet.casefold() for term in
+                   ("contact", "company", "operations", "facility", "head office")):
+                score += 1
+            possibilities[uri] = max(possibilities.get(uri, 0), score)
 
     # First fetch project-specific hits; an unlinked same-address hit is not
     # silently joined to the old permit. Keep the original source as possible
@@ -337,6 +353,9 @@ def check_one(root, row, key, db, day, legacy, *, transport=None,
             continue
         _fetch(uri,row,key,db,day,legacy,stamp,len(fetched_urls),transport,state)
         fetched_urls.add(uri)
+    state["company_context_sources"] = sum(
+        src.get("identity") == "SAME_ADDRESS_COMPANY_CONTEXT_NOT_LINKED"
+        for src in state["sources"])
     state["source_count"] = len(state["sources"])
     state["has_exact_current_application"] = any(
         str(s.get("identity","")).startswith("EXACT") for s in state["sources"])
