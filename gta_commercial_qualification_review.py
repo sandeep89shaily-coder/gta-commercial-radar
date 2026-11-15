@@ -28,6 +28,7 @@ ALL_OUT = "GTA_RADAR_COMMERCIAL_QUALIFICATION_RESEARCH.csv"
 TOP_OUT = "GTA_RADAR_COMMERCIAL_TOP10_ANALYST_REVIEW.csv"
 REPORT = "GTA_RADAR_COMMERCIAL_QUALIFICATION_STATUS.json"
 AI_REVIEW = "GTA_RADAR_AI_TOP10_REVIEW_STATUS.json"
+AI_TEN_OVERLAY = "GTA_RADAR_AI_TEN_CAPABILITIES_OVERLAY.json"
 
 MAX_BYTES = 24_000_000
 MAX_RECORDS = 5000
@@ -520,6 +521,45 @@ def build(results, *, today=None, apply_ai=True):
                 -r["internal_research_priority_score_not_sale_probability"],
                 r["city"], r["record_id"]))
 
+    # Join the unified ten-capability investigator by exact saved record
+    # identity. Never import claims by shared address alone, nor treat
+    # company mentions as independently verified procurement authority.
+    ai_ten = _read_json(root, AI_TEN_OVERLAY)
+    ai_ten_projects = ai_ten.get("projects", {})
+    if not isinstance(ai_ten_projects, dict):
+        ai_ten_projects = {}
+    integrated_count, lifecycle_holds = 0, 0
+    for row in deduped:
+        item = ai_ten_projects.get(row["record_id"])
+        if not isinstance(item, dict) or not all(
+                str(item.get(k) or "") == str(row.get(k) or "")
+                for k in ("record_id", "city", "address",
+                          "application_id", "project_description")):
+            continue
+        integrated_count += 1
+        row["ai_ten_stage_status"] = item.get("ai_stage_status", {})
+        row["ai_ten_lifecycle_proposal"] = str(
+            item.get("ai_lifecycle_proposal") or "UNKNOWN")
+        row["ai_ten_company_source_claims"] = item.get(
+            "ai_company_source_claims", [])
+        row["ai_ten_contact_source_claims"] = item.get(
+            "ai_contact_source_claims", [])
+        row["ai_ten_procurement_review"] = item.get(
+            "ai_procurement_review", {})
+        row["ai_ten_supplier_fit_review"] = item.get(
+            "ai_supplier_fit_review", {})
+        row["ai_ten_lifecycle_hold"] = bool(
+            item.get("ai_lifecycle_review_hold"))
+        if row["ai_ten_lifecycle_hold"]:
+            lifecycle_holds += 1
+            row["commercial_qualification"] = (
+                "AI_LIFECYCLE_HOLD_PENDING_HUMAN_REVIEW")
+            row["next_verification_action"] = (
+                "Confirm latest municipal version; check evidence of "
+                "supersession, withdrawal or completion")
+        # Never auto-populate contact_phone/email from an unreviewed AI
+        # claim. They remain in the sourced research fields above.
+
     # Small geographically balanced analyst worklist; do not fabricate a
     # fixed city minimum when no viable source-backed candidates exist.
     top = []
@@ -527,6 +567,8 @@ def build(results, *, today=None, apply_ai=True):
     for row in deduped:
         if len(top) >= 10:
             break
+        if row.get("ai_ten_lifecycle_hold"):
+            continue
         if city_counts.get(row["city"].casefold(), 0) >= 4:
             continue
         if row["sector"] not in ("INDUSTRIAL_EQUIPMENT_WAREHOUSE",
@@ -546,6 +588,8 @@ def build(results, *, today=None, apply_ai=True):
         "ai_preselection_input_fingerprint": pool_hash,
         "ai_preselection_status": ai_status if apply_ai else "DISABLED_BASELINE",
         "ai_preselection_reviewed_count": applied,
+        "ai_ten_projects_integrated": integrated_count,
+        "ai_ten_lifecycle_review_holds": lifecycle_holds,
         "ai_preselection_not_independent_verification": True,
         "ai_recheck_evidence_note": (
             "Current Search/Fetch may return updated evidence. Source retrieval "
@@ -596,7 +640,11 @@ FIELDS = ("analyst_queue_rank", "record_id", "origin", "city", "address",
           "ai_company_roles_review", "ai_company_roles_exact_id_count",
           "ai_company_roles_context_only_count",
           "ai_company_role_proposals_rejected",
-          "ai_buying_function_hypothesis")
+          "ai_buying_function_hypothesis",
+          "ai_ten_stage_status", "ai_ten_lifecycle_proposal",
+          "ai_ten_lifecycle_hold",
+          "ai_ten_company_source_claims", "ai_ten_contact_source_claims",
+          "ai_ten_procurement_review", "ai_ten_supplier_fit_review")
 
 
 def _csv_safe(value):
@@ -617,7 +665,12 @@ def _write_csv(path, records):
                            else []), ensure_ascii=False)
                          if key in ("exact_project_roles", "ai_conflicts",
                                     "ai_company_roles_review",
-                                    "ai_buying_function_hypothesis")
+                                    "ai_buying_function_hypothesis",
+                                    "ai_ten_stage_status",
+                                    "ai_ten_company_source_claims",
+                                    "ai_ten_contact_source_claims",
+                                    "ai_ten_procurement_review",
+                                    "ai_ten_supplier_fit_review")
                    else record.get(key, ""))
                    for key in FIELDS}
             writer.writerow({k: _csv_safe(v) for k,v in row.items()})
@@ -665,5 +718,19 @@ def run(results, *, today=None):
 if __name__ == "__main__":
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--results", required=True)
+    p.add_argument("--paid-ai-ten", action="store_true",
+                   help="Run ten-stage source-grounded DeepSeek review after "
+                        "building worklist; uses shared daily budget")
+    p.add_argument("--ai-limit", type=int, default=2)
+    p.add_argument("--ai-start-index", type=int, default=0)
+    p.add_argument("--customer-profile", default="")
     a = p.parse_args()
-    print(json.dumps(run(a.results), indent=2))
+    report = run(a.results)
+    if a.paid_ai_ten:
+        from gta_ai_ten_capabilities import run as ai_run
+        ai_report = ai_run(a.results, paid=True, limit=a.ai_limit,
+                           start_index=a.ai_start_index,
+                           customer_profile=a.customer_profile)
+        report = run(a.results)
+        report["ai_ten_execution"] = ai_report
+    print(json.dumps(report, indent=2))
