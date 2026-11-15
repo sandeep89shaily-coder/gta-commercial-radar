@@ -208,14 +208,18 @@ def check_one(root, row, key, db, day, legacy, *, transport=None,
     if checkpoint.exists():
         try:
             saved = json.loads(checkpoint.read_text(encoding="utf-8"))
-            if (saved.get("input_fingerprint") == ai_fingerprint([row])
+            if (isinstance(saved, dict)
+                    and saved.get("input_fingerprint") == ai_fingerprint([row])
                     and saved.get("checked_on") == day.isoformat()
-                    and saved.get("complete") is True):
+                    and isinstance(saved.get("sources"), list)
+                    and isinstance(saved.get("issues"), list)):
+                # A partial checkpoint is valuable evidence, not a reason to
+                # erase valid source records or reissue a billable request.
+                # Keep complete=False and all original warnings visible.
                 return saved, True
         except (OSError, ValueError, TypeError):
             pass
-        # A prior request may have completed but its file was not committed;
-        # never retry paid work against the same day/ID without reconciliation.
+        # Never retry an unconfirmed paid request or trust a stale checkpoint.
         return {
             "record_id":row["record_id"],"city":row["city"],
             "checked_on":day.isoformat(),"complete":False,
