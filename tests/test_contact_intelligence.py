@@ -158,7 +158,10 @@ class ContactInvestigationTests(unittest.TestCase):
         self.assertEqual(result["people"][0]["email"],
                          "office@harbourlight.example")
         self.assertEqual(result["people"][0]["purchasing_authority"], "UNKNOWN")
-        self.assertFalse(result["people"][0]["direct_business_contact_verified"] is False)
+        # Generic office@ is a legitimate published company route, not
+        # Morgan Reid's personally assigned direct email.
+        self.assertFalse(result["people"][0]["direct_business_contact_verified"])
+        self.assertTrue(result["people"][0]["public_channel_mentioned_with_person"])
         self.assertTrue(any(c["type"] == "PUBLIC_PHONE"
                             for c in result["public_channels"]))
         self.assertFalse(result["outreach_authorized"])
