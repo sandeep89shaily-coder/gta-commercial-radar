@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import datetime as dt
 import json
 import re
@@ -24,6 +25,7 @@ PREVIOUS = "GTA_RADAR_CLIENT_PREVIOUSLY_REPORTED.csv"
 ALL_OUT = "GTA_RADAR_COMMERCIAL_QUALIFICATION_RESEARCH.csv"
 TOP_OUT = "GTA_RADAR_COMMERCIAL_TOP10_ANALYST_REVIEW.csv"
 REPORT = "GTA_RADAR_COMMERCIAL_QUALIFICATION_STATUS.json"
+AI_REVIEW = "GTA_RADAR_AI_TOP10_REVIEW_STATUS.json"
 
 MAX_BYTES = 24_000_000
 MAX_RECORDS = 5000
@@ -284,7 +286,72 @@ def _score(row):
     return row
 
 
-def build(results, *, today=None):
+def ai_candidate_pool(rows, limit=24):
+    """Source-backed sector-relevant candidate pool before AI reranking."""
+    ranked = sorted(
+        (r for r in rows if r["sector"] in (
+            "INDUSTRIAL_EQUIPMENT_WAREHOUSE",
+            "COMMERCIAL_BUILDING_SERVICES")),
+        key=lambda r: (-r["internal_research_priority_score_not_sale_probability"],
+                       r["city"].casefold(), r["record_id"]))
+    return ranked[:limit]
+
+
+def ai_fingerprint(pool):
+    """Version the candidate source snapshots; never reuse stale AI judgments."""
+    columns = ("record_id", "origin", "city", "address", "application_id",
+               "project_description", "source_url", "source_date", "date_basis",
+               "radar_first_seen_local", "source_stage", "sector",
+               "exact_project_roles", "ai_conflicts", "was_previously_reported")
+    return hashlib.sha256(json.dumps(
+        [{k: row.get(k) for k in columns} for row in pool],
+        sort_keys=True, ensure_ascii=True,
+        separators=(",", ":")).encode("ascii")).hexdigest()
+
+
+def _apply_ai(pool, all_rows, review):
+    """Only a complete, source-input-matched AI batch may affect ordering."""
+    if (review.get("status") != "AI_TOP10_REVIEW_ONLY"
+            or review.get("source_snapshot_only") is not True
+            or review.get("applies_to_top10") is not True
+            or review.get("input_fingerprint") != ai_fingerprint(pool)):
+        return 0
+    records = review.get("reviews")
+    if not isinstance(records, list) or len(records) != len(pool):
+        return 0
+    expected = {(r["city"].casefold(), r["record_id"]) for r in pool}
+    allowed = {"PREFER": 8, "NEUTRAL": 0,
+               "CHECK_CONFLICT": -8, "DEPRIORITIZE": -12}
+    reviewed = {}
+    for rec in records:
+        if not isinstance(rec, dict):
+            return 0
+        identity = (str(rec.get("city") or "").casefold(),
+                    str(rec.get("record_id") or ""))
+        if (identity not in expected or identity in reviewed
+                or rec.get("decision") not in allowed
+                or not isinstance(rec.get("reason"), str)
+                or not rec["reason"].strip()
+                or not isinstance(rec.get("next_check"), str)):
+            return 0
+        reviewed[identity] = rec
+    if set(reviewed) != expected:
+        return 0
+    for row in all_rows:
+        data = reviewed.get((row["city"].casefold(), row["record_id"]))
+        if not data:
+            continue
+        # The model can nudge an internal research queue, never certify sale
+        # readiness or override source-record dates/verified buying authority.
+        row["ai_preselection_decision"] = data["decision"]
+        row["ai_preselection_reason"] = _clean(data["reason"], 140)
+        row["ai_preselection_next_check"] = _clean(data["next_check"], 140)
+        row["ai_preselection_score_adjustment"] = allowed[data["decision"]]
+        row["internal_research_priority_score_not_sale_probability"] += allowed[data["decision"]]
+    return len(reviewed)
+
+
+def build(results, *, today=None, apply_ai=True):
     root = Path(results)
     if not root.is_dir():
         raise FileNotFoundError("EXISTING_RADAR_RESULTS_REQUIRED")
@@ -319,8 +386,11 @@ def build(results, *, today=None):
     suppressed = 0
     for row in rows:
         application = row["application_id"].strip().casefold()
-        if application and "|" not in application and ";" not in application:
-            token = (row["city"].casefold(), "APP", application)
+        # Real-world municipal IDs are often presented with different spacing.
+        # Do NOT remove hyphens or merge two unrelated records by address.
+        normalized_app = re.sub(r"\s+", "", application)
+        if application and not any(d in application for d in ("|", ";", ",", "/")):
+            token = (row["city"].casefold(), "APP", normalized_app)
         elif row["source_specificity"] == "PROJECT_SPECIFIC_URL_REVIEW":
             token = (row["city"].casefold(), "URL", row["source_url"].casefold())
         else:
@@ -330,6 +400,21 @@ def build(results, *, today=None):
             continue
         seen.add(token)
         deduped.append(row)
+
+    pool = ai_candidate_pool(deduped)
+    pool_hash = ai_fingerprint(pool)
+    applied = 0
+    ai_status = "NOT_RUN_OR_STALE"
+    if apply_ai:
+        review = _read_json(root, AI_REVIEW)
+        applied = _apply_ai(pool, deduped, review)
+        ai_status = "APPLIED_TO_RESEARCH_RANK" if applied else (
+            "STALE_OR_INCOMPLETE_REVIEW_IGNORED" if review
+            else "NO_AI_PRESELECTION_REVIEW")
+        if applied:
+            deduped.sort(key=lambda r: (
+                -r["internal_research_priority_score_not_sale_probability"],
+                r["city"], r["record_id"]))
 
     # Small geographically balanced analyst worklist; do not fabricate a
     # fixed city minimum when no viable source-backed candidates exist.
@@ -353,6 +438,11 @@ def build(results, *, today=None):
         "source_rows": counts,
         "deduplicated_review_candidates": len(deduped),
         "presentation_duplicates_suppressed": suppressed,
+        "ai_preselection_pool_count": len(pool),
+        "ai_preselection_input_fingerprint": pool_hash,
+        "ai_preselection_status": ai_status if apply_ai else "DISABLED_BASELINE",
+        "ai_preselection_reviewed_count": applied,
+        "ai_preselection_not_independent_verification": True,
         "internal_top_10_count": len(top),
         "source_supported_ai_company_roles": sum(len(r["exact_project_roles"]) for r in deduped),
         "projects_with_ai_conflicts": sum(bool(r["ai_conflicts"]) for r in deduped),
@@ -377,7 +467,9 @@ FIELDS = ("analyst_queue_rank", "record_id", "origin", "city", "address",
           "role_evidence_level", "exact_project_roles", "ai_conflicts",
           "commercial_qualification", "procurement_status",
           "contact_email", "contact_phone", "missing_required_proof",
-          "next_verification_action")
+          "next_verification_action",
+          "ai_preselection_decision", "ai_preselection_reason",
+          "ai_preselection_next_check", "ai_preselection_score_adjustment")
 
 
 def _csv_safe(value):
