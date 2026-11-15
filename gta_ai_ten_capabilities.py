@@ -490,8 +490,9 @@ def run(results, *, paid=False, limit=2, start_index=0,
                     evidence, discovery_issues, discovery_complete = (
                         _discover_original_sources(
                             root, row, key, db, day, legacy, transport))
+                feedback = _feedback(root, row)
                 fingerprint = hashlib.sha256(json.dumps(
-                    [row, evidence, profile], sort_keys=True).encode()
+                    [row, evidence, profile, feedback], sort_keys=True).encode()
                     ).hexdigest()
                 path = root / DOSSIERS / (
                     hashlib.sha256((row["record_id"] + ":" +
@@ -524,7 +525,6 @@ def run(results, *, paid=False, limit=2, start_index=0,
                         "verified_buyer": False,
                         "open_contract_verified": False,
                         "outreach_authorized": False}
-                feedback = _feedback(root, row)
                 for stage in STAGES:
                     if stage in dossier["stages"]:
                         continue  # never duplicate a completed/uncertain call
