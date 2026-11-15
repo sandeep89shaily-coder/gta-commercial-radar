@@ -24,7 +24,7 @@ from gta_commercial_qualification_review import (
     AI_REVIEW, run as regenerate_shortlist,
 )
 from gta_top10_live_source_recheck import check_one as recheck_project
-from gta_ai_company_role_evidence import check_roles, buyer_hypothesis
+from gta_ai_company_role_evidence import check_roles, check_site_mentions, buyer_hypothesis
 
 MAX_CANDIDATES = 24
 BATCH_SIZE = 1
@@ -89,7 +89,13 @@ def _payload(items, live_checks=None):
         "which might describe a different project. Extract ALL explicitly "
         "evidenced owner, developer, tenant, operator, general contractor, "
         "construction manager, applicant and architect relationships (up to "
-        "eight). Never conflate roles. Each role_claims quote must be a "
+        "eight). Never conflate roles. Also identify source-supported "
+        "site_company_mentions when a company appears at the same address "
+        "without proof of involvement in this specific permit. Preserve "
+        "these names as SITE ASSOCIATIONS, never owners, developers or buyers "
+        "unless an explicit project role is documented. Include up to eight "
+        "such names with source_j and literal quoted company name. "
+        "Each role_claims quote must be a "
         "literal contiguous source passage containing BOTH company name "
         "AND explicit role wording, with the live_sources index. "
         "If absent return no role claim, not an invented company. "
@@ -104,6 +110,8 @@ def _payload(items, live_checks=None):
         "investigate:'specific next document or business to investigate',"
         "role_claims:[{organization:'Company Ltd',role:'OWNER',source_j:0,"
         "quote:'literal source passage'}],"
+        "site_company_mentions:[{organization:'Company Ltd',source_j:0,"
+        "quote:'literal text naming company'}],"
         "buyer_function:{function:'UNKNOWN',reason:'commercial rationale'}}]}. "
         "Decisions: PREFER, NEUTRAL, CHECK_CONFLICT, DEPRIORITIZE. "
         "PREFER requires source-backed recent supplier-relevant work; "
@@ -199,14 +207,19 @@ def _validate(answer, count, batch=None, live_checks=None):
                                                   "sources", [])
             roles, rejected = check_roles(item.get("role_claims", []),
                                           original_sources)
+            sites, site_rejected = check_site_mentions(
+                item.get("site_company_mentions", []), original_sources)
             hypothesis = buyer_hypothesis(item.get("buyer_function"))
         else:
             roles, rejected = [], 0
+            sites, site_rejected = [], 0
             hypothesis = buyer_hypothesis(None)
         result[i] = {"decision": item["decision"], "reason": reason,
                      "next_check": next_check, "cited_source": matched_source,
                      "role_candidates": roles,
                      "role_proposals_rejected": rejected,
+                     "site_company_candidates": sites,
+                     "site_company_rejections": site_rejected,
                      "buyer_function_hypothesis": hypothesis}
     return result
 
@@ -293,7 +306,7 @@ def run(results, *, paid=False, key=None, transport=None, today=None):
                 evidence_fingerprint = hashlib.sha256(json.dumps(
                     [live_checks[(r["city"].casefold(),r["record_id"])]
                      for r in batch], sort_keys=True).encode("utf-8")).hexdigest()
-                claim = "ai_top10_company_v4_" + hashlib.sha256(
+                claim = "ai_top10_company_v5_" + hashlib.sha256(
                     (digest + ":" + fingerprint + ":" + evidence_fingerprint
                      + ":" + day.isoformat()).encode()).hexdigest()[:26]
                 immutable = review_root / (claim + ".json")
@@ -366,6 +379,8 @@ def run(results, *, paid=False, key=None, transport=None, today=None):
                         "cited_live_source": rec["cited_source"],
                         "company_role_candidates": rec["role_candidates"],
                         "company_role_rejections": rec["role_proposals_rejected"],
+                        "site_company_candidates": rec["site_company_candidates"],
+                        "site_company_rejections": rec["site_company_rejections"],
                         "buyer_function_hypothesis": rec["buyer_function_hypothesis"],
                         "live_recheck": {
                             "checked_on": day.isoformat(),
