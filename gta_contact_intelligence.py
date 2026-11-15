@@ -86,10 +86,18 @@ def _rank_hits(response, companies, project):
         teaser = " ".join(str(item.get(k) or "")[:900]
                           for k in ("title", "snippet", "content")).casefold()
         mentioned = [n for n in companies if n.casefold() in teaser]
-        if not mentioned and project.casefold() not in teaser:
-            continue
         host = urlparse(url).netloc.lower()
-        score = 12 if any(n.casefold() in teaser for n in companies) else 0
+        normalized_host = re.sub(r"[^a-z0-9]", "", host)
+        domain_named = [n for n in companies
+                        if re.sub(r"[^a-z0-9]", "", n.casefold())
+                        in normalized_host]
+        # Some search results return only "Contact us" but the corporate
+        # domain contains the documented company name. Fetch and verify
+        # the page itself; never accept the result snippet as evidence.
+        if not mentioned and not domain_named and (
+                project.casefold() not in teaser):
+            continue
+        score = 12 if mentioned else (9 if domain_named else 0)
         score += 5 if any(k in teaser for k in ("contact", "team", "leadership", "staff")) else 0
         score += 3 if project.casefold() in teaser else 0
         score += 2 if any(x in host for x in ("linkedin.com", ".ca")) else 0
@@ -108,6 +116,18 @@ def _source_page(url, body, companies, project, checked):
     """Require actual page content naming the project/company."""
     content = " ".join(str(body or "")[:6500].split())
     named = [n for n in companies if n.casefold() in content.casefold()]
+    # On a short corporate contact page, the company may display its brand
+    # (Storytime) rather than registered full name (Storytime Developments).
+    # Permit a *candidate* business channel only when brand AND near-exact
+    # corporate domain both match; these remain review-only, never buyer proof.
+    host = re.sub(r"[^a-z0-9]", "", urlparse(url).netloc.casefold())
+    for name in companies:
+        normalized = re.sub(r"[^a-z0-9]", "", name.casefold())
+        brand = re.findall(r"[a-z0-9]+", name.casefold())[0]
+        if (name not in named and normalized in host and len(brand) >= 5
+                and re.search(r"\b" + re.escape(brand) + r"\b",
+                              content, re.I)):
+            named.append(name)
     project_mentioned = project.casefold() in content.casefold()
     if not named and not project_mentioned:
         return None
