@@ -19,7 +19,8 @@ import v8_deepseek_native as native
 from gta_ai_top10_company_probe import _rows
 from gta_top10_live_source_recheck import (
     check_one as live_source_check, _identity as validate_source_identity)
-from gta_ai_ten_source_enrichment import enrich as enrich_stage_sources
+from gta_ai_ten_source_enrichment import (
+    enrich as enrich_stage_sources, site_company_candidates)
 from radar_run_lock import once_lock
 
 OVERLAY = "GTA_RADAR_AI_TEN_CAPABILITIES_OVERLAY.json"
@@ -331,7 +332,17 @@ def _render_brief(row, dossier):
         "**Application:** " + row["application_id"],
         "**Scope in source record:** " + row["project_description"][:350],
         "",
+        "## Site-company research leads (not verified permit roles)",
+        "",
     ]
+    for lead in dossier.get("site_company_candidates", []):
+        lines.extend([
+            "- " + lead["company"] + " — " + lead["association"],
+            "  - Source: " + str(lead.get("source_url") or ""),
+            "  - Quote: " + str(lead.get("literal_quote") or "")[:250],
+            "  - Exact application role and purchasing authority: UNVERIFIED",
+        ])
+    lines.append("")
     for stage in STAGES:
         data = dossier["stages"].get(stage, {})
         lines.extend(["## " + stage.replace("_", " ").title(),
@@ -500,6 +511,7 @@ def _overlay_item(row, dossier):
                                 for term in explicit) for c in linked))
     companies = stages.get("company_entity_relationships", {}).get("claims", [])
     contacts = stages.get("buyer_contact_path", {}).get("claims", [])
+    site_leads = dossier.get("site_company_candidates") or []
     return {
         "record_id": row["record_id"], "city": row["city"],
         "address": row["address"],
@@ -510,6 +522,7 @@ def _overlay_item(row, dossier):
         "ai_lifecycle_evidence": linked[:3],
         "ai_lifecycle_review_hold": hold,
         "ai_company_source_claims": companies[:5],
+        "ai_site_company_candidates": site_leads[:8],
         "ai_contact_source_claims": contacts[:5],
         "ai_procurement_review":
             stages.get("procurement_award_status", {}),
@@ -521,6 +534,49 @@ def _overlay_item(row, dossier):
         "verified_open_supplier_contract": False,
         "outreach_authorized": False,
         "human_confirmation_required": True,
+    }
+
+
+def reconcile_saved(results, record_id):
+    """Refresh existing source-quoted leads and briefs: NO network or AI calls."""
+    root = Path(results)
+    matches = [row for row in _rows(root)
+               if row["record_id"] == record_id]
+    if len(matches) != 1:
+        raise ValueError("EXACT_CURRENT_TOP10_RECORD_REQUIRED")
+    row = matches[0]
+    identifier = hashlib.sha256(
+        (row["record_id"] + ":" + row["city"]).encode()).hexdigest()[:24]
+    path = root / DOSSIERS / (identifier + ".json")
+    dossier = _read_json(path)
+    if not dossier or not all(
+            dossier.get(k) == row.get(k) for k in
+            ("record_id", "city", "address", "application_id")):
+        raise ValueError("SAVED_DOSSIER_IDENTITY_MISMATCH_OR_NOT_FOUND")
+    original_sources = dossier.get("evidence")
+    if not isinstance(original_sources, list):
+        raise ValueError("SAVED_DOSSIER_EVIDENCE_INVALID")
+    leads = site_company_candidates(original_sources, row)
+    dossier["site_company_candidates"] = leads
+    _write_json(path, dossier)
+    brief_path = root / BRIEFS / (identifier + ".md")
+    brief_path.parent.mkdir(parents=True, exist_ok=True)
+    brief_path.write_text(_render_brief(row, dossier), encoding="utf-8")
+    existing_overlay = _read_json(root / OVERLAY)
+    projects = existing_overlay.get("projects")
+    if not isinstance(projects, dict):
+        projects = {}
+    projects[row["record_id"]] = _overlay_item(row, dossier)
+    _write_json(root / OVERLAY, {
+        "version": 1, "review_only": True, "projects": projects,
+        "verified_buyers": 0, "outreach_authorized": False})
+    return {
+        "status": "SAVED_DOSSIER_RECONCILED_NO_SPEND",
+        "record_id": record_id, "address": row["address"],
+        "source_count": len(original_sources),
+        "site_company_leads": leads, "analyst_brief": str(brief_path),
+        "paid_requests": 0,
+        "outreach_authorized": False,
     }
 
 
@@ -616,6 +672,8 @@ def run(results, *, paid=False, limit=2, start_index=0,
                         "verified_buyer": False,
                         "open_contract_verified": False,
                         "outreach_authorized": False}
+                dossier["site_company_candidates"] = site_company_candidates(
+                    evidence, row)
                 for stage in STAGES:
                     previous_stage = dossier["stages"].get(stage)
                     if previous_stage:
@@ -644,6 +702,8 @@ def run(results, *, paid=False, limit=2, start_index=0,
                                 evidence.append(source)
                                 current_urls.add(source["url"])
                         dossier["evidence"] = evidence
+                        dossier["site_company_candidates"] = (
+                            site_company_candidates(evidence, row))
                         _write_json(path, dossier)
                     result = _stage_model(
                         row, evidence, stage, profile, dossier["stages"], key,
@@ -691,6 +751,9 @@ def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--results", required=True)
     p.add_argument("--paid", action="store_true")
+    p.add_argument("--reconcile-saved", action="store_true",
+                   help="Refresh existing saved source-based site company "
+                        "leads without any API request or daily budget usage")
     p.add_argument("--limit", type=int, default=2)
     p.add_argument("--start-index", type=int, default=0)
     p.add_argument("--record-id", default="",
@@ -702,6 +765,12 @@ def main():
     p.add_argument("--no-source-enrichment", action="store_true",
                    help="Use existing source passages only, no stage searches")
     args = p.parse_args()
+    if args.reconcile_saved:
+        if args.paid or not args.record_id:
+            p.error("--reconcile-saved requires --record-id and forbids --paid")
+        print(json.dumps(reconcile_saved(args.results, args.record_id),
+                         indent=2))
+        return
     print(json.dumps(run(args.results, paid=args.paid, limit=args.limit,
                          start_index=args.start_index,
                          record_id=args.record_id,
