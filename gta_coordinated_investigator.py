@@ -157,8 +157,11 @@ def _paid_model(db, day, legacy, key, transport, name, request):
     native.ledger_finish(db, day.isoformat(), name,
                          "DONE" if charge is not None else "UNKNOWN", charge)
     choices = response.get("choices") if isinstance(response, dict) else None
-    choice = choices[0] if isinstance(choices, list) and len(choices) == 1 else {}
-    raw = str((choice.get("message") or {}).get("content") or "")[:6000]
+    choice = (choices[0] if isinstance(choices, list) and len(choices) == 1
+              and isinstance(choices[0], dict) else {})
+    message = choice.get("message")
+    message = message if isinstance(message, dict) else {}
+    raw = str(message.get("content") or "")[:6000]
     data = None
     if choice.get("finish_reason") == "stop":
         try:
