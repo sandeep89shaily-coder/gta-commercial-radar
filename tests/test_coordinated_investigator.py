@@ -137,6 +137,16 @@ class CoordinatedInvestigatorTests(unittest.TestCase):
         self.assertFalse(result["outreach_authorized"])
         self.assertFalse(result["dossier"]["buyer_verified"])
         self.assertEqual(result["analysis"]["procurement_status"], "UNKNOWN")
+        overlay = json.loads(
+            (self.root / "GTA_RADAR_COORDINATED_PROJECT_OVERLAY.json")
+            .read_text(encoding="utf-8"))
+        published = overlay["projects"][BIRCHMOUNT["record_id"]]
+        self.assertEqual(published["status"], "SOURCE_BACKED_REVIEW_COMPLETE")
+        self.assertEqual(published["source_count"], 3)
+        self.assertEqual(published["company_site_leads"][0]["company"],
+                         "Business Point")
+        self.assertFalse(published["verified_buyer"])
+        self.assertFalse(published["outreach_authorized"])
         again = investigate(self.root, BIRCHMOUNT["record_id"], paid=True,
                             token="test", today=DAY, transport=lambda *_:
                             self.fail("No repeat paid call"))
