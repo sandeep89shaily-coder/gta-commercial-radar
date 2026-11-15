@@ -15,6 +15,7 @@ import json
 import re
 from pathlib import Path
 from urllib.parse import urlsplit
+from gta_ai_company_role_evidence import check_roles, buyer_hypothesis
 
 CLIENT = "GTA_RADAR_CLIENT_FRESH_NONREPEAT_TOP_10.csv"
 PRIVATE = "GTA_RADAR_PRIVATE_DEVELOPMENT_REVIEW.csv"
@@ -394,6 +395,38 @@ def _apply_ai(pool, all_rows, review, today):
         else:
             row["ai_live_project_version_review"] = "NO_CURRENT_CORROBORATING_PROJECT_PAGE"
         row["next_verification_action"] = _clean(data["next_check"], 260)
+        # Re-check every saved model quote against the current source excerpt.
+        # These are document-scoped relationship candidates; no buying
+        # authority or actual tender is promoted.
+        saved_claims = data.get("company_role_candidates")
+        proposals = []
+        if isinstance(saved_claims, list):
+            for claim in saved_claims[:3]:
+                if not isinstance(claim, dict):
+                    continue
+                uri = claim.get("source_url")
+                indices = [i for i,src in enumerate(sources)
+                           if isinstance(src,dict) and src.get("url") == uri
+                           and src.get("identity") == claim.get("source_identity")]
+                if indices:
+                    proposals.append({
+                        "role":claim.get("role"),
+                        "organization":claim.get("organization"),
+                        "source_j":indices[0],
+                        "quote":claim.get("evidence_quote"),
+                    })
+        accepted, rejections = check_roles(proposals, sources)
+        row["ai_company_roles_review"] = accepted
+        row["ai_company_roles_exact_id_count"] = sum(
+            c["project_role_supported_for_review"] for c in accepted)
+        row["ai_company_roles_context_only_count"] = len(accepted) - row[
+            "ai_company_roles_exact_id_count"]
+        row["ai_company_role_proposals_rejected"] = (
+            int(data.get("company_role_rejections") or 0)+rejections)
+        row["ai_buying_function_hypothesis"] = buyer_hypothesis(
+            data.get("buyer_function_hypothesis"))
+        row["procurement_status"] = "UNKNOWN_NOT_EVIDENCED"
+        row["buyer_verified"] = False
     return len(reviewed)
 
 
@@ -495,6 +528,11 @@ def build(results, *, today=None, apply_ai=True):
             "or unawarded supplier procurement. Exact-ID evidence and URL shown "
             "separately, and past AI assessments expire by local day."),
         "internal_top_10_count": len(top),
+        "ai_exact_application_role_candidates": sum(
+            r.get("ai_company_roles_exact_id_count",0) for r in top),
+        "ai_same_address_company_mentions": sum(
+            r.get("ai_company_roles_context_only_count",0) for r in top),
+        "verified_purchasing_authorities": 0,
         "source_supported_ai_company_roles": sum(len(r["exact_project_roles"]) for r in deduped),
         "projects_with_ai_conflicts": sum(bool(r["ai_conflicts"]) for r in deduped),
         "verified_buyers": 0, "verified_open_supplier_contracts": 0,
@@ -524,7 +562,11 @@ FIELDS = ("analyst_queue_rank", "record_id", "origin", "city", "address",
           "ai_live_checked_on", "ai_live_source_count", "ai_live_evidence_url",
           "ai_live_evidence_quote", "ai_live_evidence_identity",
           "ai_live_project_version_review",
-          "ai_official_status_fetched", "ai_official_status_differs_from_saved")
+          "ai_official_status_fetched", "ai_official_status_differs_from_saved",
+          "ai_company_roles_review", "ai_company_roles_exact_id_count",
+          "ai_company_roles_context_only_count",
+          "ai_company_role_proposals_rejected",
+          "ai_buying_function_hypothesis")
 
 
 def _csv_safe(value):
@@ -541,7 +583,10 @@ def _write_csv(path, records):
         writer.writeheader()
         for record in records:
             row = {key: (json.dumps(record[key], ensure_ascii=False)
-                         if key in ("exact_project_roles", "ai_conflicts") else record.get(key, ""))
+                         if key in ("exact_project_roles", "ai_conflicts",
+                                    "ai_company_roles_review",
+                                    "ai_buying_function_hypothesis")
+                   else record.get(key, ""))
                    for key in FIELDS}
             writer.writerow({k: _csv_safe(v) for k,v in row.items()})
     tmp.replace(path)
