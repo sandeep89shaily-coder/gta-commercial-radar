@@ -73,6 +73,42 @@ class TenCapabilityTests(unittest.TestCase):
                 start_index=1, today=TODAY, paid=True, token="test",
                 transport=lambda *_: self.fail("No paid call"))
 
+    def test_model_input_is_complete_json_even_with_long_project_text(self):
+        from gta_ai_ten_capabilities import _project_payload
+        row = {**self.record, "project_description": "warehouse " * 6000}
+        sources = [{"url": "https://example.org/doc",
+                    "identity": "SAME_ADDRESS_PROJECT_CONTEXT_NOT_LINKED",
+                    "content": "611 Keele St " + "very long passage " * 1000}]
+        payload = _project_payload(row, sources, "project_lifecycle_supersession",
+                                   "", {})
+        self.assertEqual(payload["response_format"], {"type": "json_object"})
+        loaded = json.loads(payload["messages"][1]["content"])
+        self.assertEqual(loaded["project"]["record_id"], self.record["record_id"])
+        self.assertEqual(len(loaded["evidence"]), 1)
+        self.assertTrue(loaded["evidence"][0]["content"].startswith(
+            "611 Keele St"))
+
+    def test_invalid_model_json_is_preserved_without_paid_retry(self):
+        responses = []
+        def malformed(path, payload):
+            responses.append(path)
+            return {"choices": [{"finish_reason": "stop",
+                                 "message": {"content": '{"classification":'}}],
+                    "usage": {"prompt_tokens": 400, "completion_tokens": 30}}
+        first = run(self.root, paid=True, today=TODAY, token="test",
+                    discover=False, enrich_sources=False, transport=malformed)
+        dossier = json.loads(Path(first["results"][0]["dossier"]).read_text())
+        item = dossier["stages"]["company_entity_relationships"]
+        self.assertEqual(item["status"], "INCOMPLETE_OR_INVALID_INVALID_JSON")
+        self.assertEqual(item["response_diagnostic"]["content_excerpt"],
+                         '{"classification":')
+        self.assertTrue(item["response_diagnostic"]["usage_present"])
+        second = run(self.root, paid=True, today=TODAY, token="test",
+                     discover=False, enrich_sources=False,
+                     transport=lambda *_: self.fail("No paid retry"))
+        self.assertEqual(len(second["results"]), 1)
+        self.assertEqual(len(responses), 10)
+
     def test_preflight_is_free_and_exposes_ten_stages(self):
         result = run(self.root, today=TODAY)
         self.assertEqual(result["status"], "PREFLIGHT_NO_SPEND")
