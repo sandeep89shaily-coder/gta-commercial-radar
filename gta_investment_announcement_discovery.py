@@ -146,6 +146,21 @@ def _citation_claims(response, sources, city):
             claim["kind"] == "project" and
             claim["subject"].casefold() == proposed_name.casefold()
             for claim in claims)
+        # Brampton has multiple UNRELATED condominium developments on
+        # nearby streets, sometimes with the same institutional investor.
+        # A company cited from a different project's page is not a
+        # developer/partner of this named project.
+        if project_named:
+            project_sources = {
+                c["source_url"] for c in claims if c["kind"] == "project"
+                and c["subject"].casefold() == proposed_name.casefold()}
+            claims = [
+                c for c in claims
+                if c["kind"] not in ("developer", "partner") or
+                (c["source_url"] in project_sources or any(
+                    p["url"] == c["source_url"] and
+                    proposed_name.casefold() in p["content"].casefold()
+                    for p in sources))]
         companies = [x for x in claims if x["kind"] in ("developer", "partner")]
         proof = [x for x in claims if x["kind"] in (
             "project", "developer", "partner", "scope", "construction")]
