@@ -294,7 +294,25 @@ def ai_candidate_pool(rows, limit=24):
             "COMMERCIAL_BUILDING_SERVICES")),
         key=lambda r: (-r["internal_research_priority_score_not_sale_probability"],
                        r["city"].casefold(), r["record_id"]))
-    return ranked[:limit]
+    # First pass protects regional diversity when Toronto dominates the
+    # source volume. Fill any remaining slots with the best remaining records
+    # rather than inventing regional quotas or excluding valid one-city work.
+    picked, count = [], {}
+    for row in ranked:
+        city = row["city"].casefold()
+        if count.get(city, 0) >= 8:
+            continue
+        picked.append(row)
+        count[city] = count.get(city, 0) + 1
+        if len(picked) == limit:
+            return picked
+    used = {(r["city"].casefold(),r["record_id"]) for r in picked}
+    for row in ranked:
+        if len(picked) == limit:
+            break
+        if (row["city"].casefold(),row["record_id"]) not in used:
+            picked.append(row)
+    return picked
 
 
 def ai_fingerprint(pool):
