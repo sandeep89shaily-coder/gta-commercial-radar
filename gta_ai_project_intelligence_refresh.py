@@ -18,14 +18,14 @@ from gta_commercial_qualification_review import run as qualification_run
 REPORT = "GTA_RADAR_AI_PROJECT_INTEGRATION_STATUS.json"
 
 
-def run(results, workspace=None):
+def run(results, workspace=None, *, today=None):
     root = Path(results)
     if not root.is_dir():
         raise FileNotFoundError("EXISTING_RESULTS_DIRECTORY_REQUIRED")
     bridge = bridge_run(root)
-    graph = graph_run(root)
+    graph = graph_run(root, today=today)
     gate = supplier_run(root, workspace)
-    qualification = qualification_run(root)
+    qualification = qualification_run(root, today=today)
     report = {
         "status": "AI_PROJECT_GRAPH_AND_SUPPLIER_REVIEW_REFRESHED",
         "ai_review_projects": bridge.get("project_candidates", 0),
@@ -35,6 +35,11 @@ def run(results, workspace=None):
             "projects_with_address_or_lifecycle_conflicts", 0),
         "graph_projects": graph.get("project_candidates", 0),
         "graph_role_claims": graph.get("claimed_relationships", 0),
+        "ai_top10_quote_supported_role_candidates": graph.get(
+            "ai_top10_quote_supported_role_review_candidates", 0),
+        "ai_top10_report_role_candidates": qualification.get(
+            "ai_exact_application_role_candidates", 0),
+        "verified_purchasing_authorities": 0,
         "supplier_role_review_queue": len(gate.get("role_queue", [])),
         "supplier_procurement_review_queue": len(gate.get("tender_queue", [])),
         "internal_commercial_review_top10": qualification["internal_top_10_count"],

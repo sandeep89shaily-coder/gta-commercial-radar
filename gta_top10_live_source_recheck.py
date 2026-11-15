@@ -88,6 +88,21 @@ def _excerpt(content, match, length=MAX_EXCERPT):
     return " ".join(content[start:end].split())[:length]
 
 
+ROLE_CUES = re.compile(
+    r"\b(registered owner|property owner|owner of|applicant(?: company)?|"
+    r"developer|developed by|tenant|leased to|occupant|contractor|builder|"
+    r"architect|operator|operated by|construction manager|general contractor)\b",
+    re.I)
+
+
+def _company_role_excerpt(body):
+    """Independent literal passage for AI to investigate, not role proof."""
+    m = ROLE_CUES.search(body or "")
+    if not m:
+        return ""
+    return _excerpt(body, m, length=600)
+
+
 def _identity(text, row):
     if not text:
         return "", ""
@@ -117,7 +132,7 @@ def _queries(row):
                        " site plan building permit approval status")
     if address:
         queries.append('"' + address[:78] + '" ' + city +
-                       " development planning approval construction completed 2026")
+                       " developer owner tenant operator contractor architect approval 2026")
     return [q[:175] for q in dict.fromkeys(queries)][:SEARCH_LIMIT]
 
 
@@ -167,6 +182,7 @@ def _fetch(url, row, key, db, day, legacy, stamp, index, transport, state):
             "authority": ("OFFICIAL_OR_MUNICIPAL_HOST" if _official(url)
                           else "NONOFFICIAL_PROJECT_CONTEXT"),
             "excerpt": excerpt,
+            "role_excerpt": _company_role_excerpt(body),
             "retrieved_on": day.isoformat(),
             "date_is_fetch_day_not_publication": True,
         })
@@ -230,6 +246,12 @@ def check_one(root, row, key, db, day, legacy, *, transport=None,
                     "url":url,"identity":"EXACT_OFFICIAL_ARCGIS_APPLICATION",
                     "authority":"OFFICIAL_ARCGIS_EXACT_ID",
                     "excerpt":str(raw)[:950],
+                    "role_excerpt":json.dumps({
+                        name:str(value)[:200] for name,value in fields.items()
+                        if any(term in name.upper() for term in (
+                            "OWNER","DEVELOPER","APPLICANT","AGENT",
+                            "CONTRACTOR","ARCHITECT","TENANT","OPERATOR"))
+                    },ensure_ascii=False)[:650],
                     "official_status_fields": {
                         name:str(fields[name])[:150] for name in (
                             "STATUS_DESC","STATUS","STATUS_GROUP",

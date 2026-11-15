@@ -260,6 +260,42 @@ def build(results, *, now=None):
         if issue.get("reason") not in ("RESIDENTIAL_DOMINANT_NOT_AUTO_COMMERCIAL_PRIORITY",):
             hold("AI_BRIDGE_" + issue["reason"], issue.get("project_id") or issue.get("file"))
 
+    # AI's source-backed preselection roles join the SAME project/role
+    # review graph, but remain proposals. Use the existing qualification
+    # fingerprint/date gate; never trust old or raw model JSON directly.
+    # Avoid promoting same-address context or guessed purchasing functions.
+    from gta_commercial_qualification_review import build as build_qual_review
+    if now is None:
+        qual_date = dt.datetime.now(dt.timezone.utc).date()
+    else:
+        qual_date = dt.date.fromisoformat(str(now)[:10])
+    qual = build_qual_review(root, today=qual_date)
+    ai_role_added = 0
+    source_roles = {"OWNER":"PROPERTY_OWNER", "DEVELOPER":"DEVELOPER",
+                    "TENANT":"TENANT", "OPERATOR":"OPERATOR",
+                    "CONTRACTOR":"CONTRACTOR", "ARCHITECT":"ARCHITECT",
+                    "APPLICANT":"APPLICANT"}
+    for candidate in qual.get("all_candidates", []):
+        for claim in candidate.get("ai_company_roles_review", []):
+            if (not claim.get("project_role_supported_for_review")
+                    or claim.get("evidence_level") !=
+                    "EXACT_APPLICATION_ROLE_SOURCE_REVIEW_ONLY"):
+                continue
+            role = source_roles.get(claim.get("role"))
+            if not role:
+                continue
+            role_edge(
+                candidate["city"], candidate["record_id"],
+                claim["organization"], role,
+                "AI_TOP10_EXACT_ID_QUOTED_ROLE_REVIEW_ONLY",
+                claim["source_url"],
+                source_record_id=candidate["application_id"],
+                evidence_id="ai_role:" + _hash(claim["evidence_quote"],
+                                               claim["source_url"]),
+                quote_present=True,
+            )
+            ai_role_added += 1
+
     # Site-local mentions are not project associations. They never link to a
     # project node, even when another record shares site_id or organization.
     for record in events or []:
@@ -343,6 +379,8 @@ def build(results, *, now=None):
         "ai_review_project_candidates": ai_bridge.get("project_candidates", 0),
         "ai_source_supported_role_claims": ai_bridge.get(
             "source_supported_role_claims_not_legal_verification", 0),
+        "ai_top10_quote_supported_role_review_candidates": ai_role_added,
+        "ai_top10_buyers_verified": 0,
         "ai_review_conflict_candidates": ai_bridge.get(
             "projects_with_address_or_lifecycle_conflicts", 0),
         "role_conflicts": len(conflicts),
@@ -377,9 +415,11 @@ def build(results, *, now=None):
     }
 
 
-def run(results):
+def run(results, *, today=None):
     root = Path(results)
-    report = build(root)
+    timestamp = (dt.datetime.combine(today, dt.time(12), dt.timezone.utc).isoformat()
+                 if today else None)
+    report = build(root, now=timestamp)
     path = root / OUTPUT
     tmp = path.with_suffix(".json.tmp")
     tmp.write_text(json.dumps(report, ensure_ascii=False, indent=2),
