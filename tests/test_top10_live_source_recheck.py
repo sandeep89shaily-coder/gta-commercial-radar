@@ -149,8 +149,12 @@ class LiveTopTenProjectCheckTests(unittest.TestCase):
                                 "evidence_j":0,
                                 "evidence_quote":"building completed in 2026"
                             }]})}}]}
-        with self.assertRaisesRegex(ValueError,"LIVE_CITATION_NOT_IN"):
-            _validate(output,1,[item],checks)
+        recovered = _validate(output, 1, [item], checks)[0]
+        self.assertEqual(recovered["decision"], "CHECK_CONFLICT")
+        self.assertTrue(recovered["rejected_live_citation"])
+        self.assertIsNone(recovered["cited_source"])
+        self.assertEqual(recovered["source_citation_status"],
+                         "REJECTED_QUOTE_NOT_IN_FETCHED_SOURCE_NO_SCORE_BONUS")
 
     def test_http_402_releases_reservation_and_stops_recheck(self):
         def reject(path,payload):
