@@ -96,7 +96,7 @@ class November16EvidenceGateTests(unittest.TestCase):
                 writer.writerow({
                     "url": "https://www.toronto.ca/legdocs/mmis/2026/ph/bgrd/test.pdf",
                     "status": "CAPTURED", "sha256": sha,
-                    "saved_path": "C:\\\\Desktop\\\\GTA_RADAR_RESULTS\\\\DAILY_INTEGRATED_REVIEW\\\\TORONTO_DOCUMENTS\\\\pdfs\\\\captured.pdf",
+                    "saved_path": "C:/Desktop/GTA_RADAR_RESULTS/DAILY_INTEGRATED_REVIEW/TORONTO_DOCUMENTS/pdfs/captured.pdf",
                     "city": "Toronto"})
             with (root / "GTA_RADAR_PRIVATE_TOP_10.csv").open("w", newline="") as f:
                 w = csv.DictWriter(f, fieldnames=["application_ids"])
@@ -128,7 +128,7 @@ class November16EvidenceGateTests(unittest.TestCase):
                     "city": "Mississauga",
                     "url": "https://www.mississauga.ca/agenda/test.pdf",
                     "status": "CAPTURED", "sha256": "a"*64,
-                    "saved_path": "C:\\\\new data\\\\GTA_RADAR_RESULTS\\\\missing.pdf"})
+                    "saved_path": "C:/new data/GTA_RADAR_RESULTS/missing.pdf"})
             r = review(root)
             self.assertEqual(r["city_counts"]["Mississauga"], 1)
             self.assertEqual(r["documents"][0]["status"],
