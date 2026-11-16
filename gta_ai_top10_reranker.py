@@ -181,6 +181,7 @@ def _validate(answer, count, batch=None, live_checks=None):
         if not reason or not next_check:
             raise ValueError("AI_PRESELECTION_EXPLANATION_MISSING")
         matched_source = None
+        rejected_source_citation = False
         cited = item.get("evidence_j")
         quote = _safe_text(item.get("evidence_quote"), 160)
         if cited is not None or quote:
@@ -193,14 +194,19 @@ def _validate(answer, count, batch=None, live_checks=None):
                     not any(quote.casefold() in " ".join(
                         str(source[cited].get(field, "")).split()).casefold()
                         for field in ("excerpt", "role_excerpt"))):
-                raise ValueError("LIVE_CITATION_NOT_IN_SUPPLIED_SOURCE_PASSAGE")
-            matched_source = {
-                "url": source[cited]["url"],
-                "identity": source[cited]["identity"],
-                "quote": quote,
-                "retrieved_on": source[cited]["retrieved_on"],
-                "date_basis": "RETRIEVAL_DATE_NOT_PUBLICATION",
-            }
+                # A model sometimes quotes the project's own input
+                # description, NOT any independently fetched live page.
+                # Reject that citation and downgrade the individual review;
+                # do not erase earlier valid research or pay to rerun it.
+                rejected_source_citation = True
+            else:
+                matched_source = {
+                    "url": source[cited]["url"],
+                    "identity": source[cited]["identity"],
+                    "quote": quote,
+                    "retrieved_on": source[cited]["retrieved_on"],
+                    "date_basis": "RETRIEVAL_DATE_NOT_PUBLICATION",
+                }
         if batch and live_checks:
             row = batch[i]
             original_sources = (live_checks.get((row["city"].casefold(),
@@ -215,8 +221,16 @@ def _validate(answer, count, batch=None, live_checks=None):
             roles, rejected = [], 0
             sites, site_rejected = [], 0
             hypothesis = buyer_hypothesis(None)
-        result[i] = {"decision": item["decision"], "reason": reason,
+        result[i] = {"decision": ("CHECK_CONFLICT" if rejected_source_citation
+                                   else item["decision"]),
+                     "reason": reason,
                      "next_check": next_check, "cited_source": matched_source,
+                     "rejected_live_citation": rejected_source_citation,
+                     "source_citation_status": (
+                         "REJECTED_QUOTE_NOT_IN_FETCHED_SOURCE_NO_SCORE_BONUS"
+                         if rejected_source_citation else
+                         "MATCHED_LIVE_SOURCE" if matched_source else
+                         "NO_LIVE_SOURCE_CLAIM"),
                      "role_candidates": roles,
                      "role_proposals_rejected": rejected,
                      "site_company_candidates": sites,
