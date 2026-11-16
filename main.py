@@ -1,5 +1,5 @@
 from __future__ import annotations
-import argparse, json, sys, shutil, sqlite3, os, time
+import argparse, json, sys, shutil, sqlite3, os
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from lead_candidates import export_candidates
@@ -8,6 +8,8 @@ from radar import (Http, collect_source, latest_changes, open_db, process_snapsh
                    register_sources, source_status, write_csv, write_dashboard, clear_source_current,
                    set_source_state, source_universe_hash, previous_run_metadata, current_active_count,
                    last_successful_run)
+
+from peel_poll_recovery import collect_with_safe_peel_retry
 
 ROOT=Path(__file__).resolve().parent
 DEFAULT_DATA=ROOT/"data"
@@ -60,30 +62,6 @@ def collection_plan(con, source, *, force_full=False, now=None):
     except (ValueError,TypeError):return 'full'
     now=now or datetime.now(timezone.utc)
     return 'skip' if now-last_dt<timedelta(days=int(source.get('snapshot_interval_days',7))) else 'full'
-
-def collect_with_safe_peel_retry(source, http, *, collect=collect_source,
-                                 sleep=time.sleep, client_factory=Http, **kwargs):
-    """Retry ONE unstable Peel page scan from page 1, before DB snapshot commit.
-
-    An unstable municipal directory must never be silently deduplicated or
-    committed as complete. No retry for unrelated errors, non-Peel sources,
-    persistent duplication or policy/permission failures.
-    """
-    try:
-        return collect(source, http, **kwargs)
-    except RuntimeError as exc:
-        if (source.get('collector') != 'peel_health' or
-                str(exc) not in (
-                    'Peel pagination repeated a facility; directory changed during scan; retry',
-                    'Peel directory page count changed during scan; retry before committing',
-                    'Peel server returned a different page than requested')):
-            raise
-        print('  !! Peel directory shifted during pagination; one clean retry '
-              'from page 1 before committing data.', flush=True)
-        sleep(1.0)
-        # Isolate disclaimer cookies and partial page state, not the database.
-        return collect(source, client_factory(), **kwargs)
-
 
 def do_poll(args, *, force_full=False):
     data=Path(args.data_dir)
