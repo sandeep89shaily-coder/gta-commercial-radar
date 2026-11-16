@@ -16,8 +16,8 @@ class MondayIntegrationTests(unittest.TestCase):
             self.assertEqual([s[0] for s in stages], [
                 "daily_radar", "industrial_equipment", "commercial_activation",
                 "facility_evidence", "toronto_20_source_research",
-                "council_agenda_intelligence", "ai_harness_adaptive",
-                "industrial_investment_and_contacts"])
+                "council_agenda_intelligence",
+                "industrial_investment_and_contacts", "ai_harness_adaptive"])
             self.assertEqual(sum("gta_total_intelligence_run.py" in s[1]
                                  for s in stages), 1)
             self.assertEqual(sum("gta_agent_harness.py" in s[1]
