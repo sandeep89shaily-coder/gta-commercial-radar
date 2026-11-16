@@ -46,21 +46,19 @@ def stages(workspace, results, *, industrial_limit=10, skip_collection=False):
         ("toronto_20_source_research", ["gta_toronto_20_commercial_review.py",
                                        "--out", str(results / "TORONTO_20_COMMERCIAL_REVIEW")], False),
         ("council_agenda_intelligence", council_args, False),
-        # Allow source-backed research beyond the former 2-project limit on
-        # explicit full manual runs. The existing executor's per-request
-        # US$1/day shared ledger, idempotency and source gate remain mandatory.
-        # A max of 10 is a research-queue bound, not a spending target.
-        # Saved-data review remains free.
+        # Source-backed investment/company/contact discovery has commercial
+        # priority over broad optional AI research. Both use the identical
+        # V5+legacy ledger; put it first so later general analysis cannot
+        # exhaust the shared ceiling before contact research is attempted.
+        ("industrial_investment_and_contacts",
+         ["gta_investment_contact_daily_bridge.py", "--results", out] +
+         (["--paid"] if not skip_collection else []), False),
+        # The project harness remains capped and idempotent; its paid requests
+        # run AFTER the industrial/contact lane, never in historical review.
         ("ai_harness_adaptive" if not skip_collection else "ai_harness_free",
          ["gta_agent_harness.py", "--results", out] +
          (["--paid", "--max-projects", "10"] if not skip_collection else []),
          False),
-        # Separate generic investment announcement + company/buyer contact
-        # research. Runs last, sharing the existing V5 paid ledger. Only
-        # operator-initiated fresh collection may authorize provider calls.
-        ("industrial_investment_and_contacts",
-         ["gta_investment_contact_daily_bridge.py", "--results", out] +
-         (["--paid"] if not skip_collection else []), False),
     ]
     if skip_collection:
         base = base[1:]
