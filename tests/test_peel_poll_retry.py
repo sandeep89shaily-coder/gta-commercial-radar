@@ -1,6 +1,6 @@
 """Regression: transient Peel Health directory shifts retry once without data loss."""
 import unittest
-from main import collect_with_safe_peel_retry
+from peel_poll_recovery import collect_with_safe_peel_retry
 
 PEEL = {"collector": "peel_health", "id": "peel_health_food"}
 DUP = ("Peel pagination repeated a facility; "
