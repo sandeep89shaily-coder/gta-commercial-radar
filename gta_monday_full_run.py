@@ -376,6 +376,35 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
     else:
         report["source_quality"] = {"status": "NOT_RUN_HISTORICAL_MODE"}
 
+    # The existing daily collector already captures vetted official PDF
+    # files, but the council agenda parser only consumed an owner-created
+    # input manifest. Preserve that strict parser AND bridge its existing
+    # SHA-checked capture audits into a separate page-cited evidence queue.
+    # No new downloads, no guessed publication dates or project joins.
+    if not skip_collection:
+        try:
+            from gta_council_captured_pdf_bridge import review as review_captured_pdf
+            cpdf = review_captured_pdf(results)
+            report["council_captured_pdf_evidence"] = {
+                "status": "CAPTURED_SOURCE_EVIDENCE_REVIEW_ONLY",
+                "captured_official_pdfs_inspected":
+                    cpdf["captured_official_pdfs_inspected"],
+                "pdfs_with_keyword_evidence":
+                    cpdf["pdfs_with_keyword_evidence"],
+                "page_cited_segments": cpdf["page_cited_segments"],
+                "exact_application_id_text_mentions_for_review":
+                    cpdf["exact_application_id_text_mentions_for_review"],
+                "verified_project_links": 0,
+                "new_paid_calls": 0,
+            }
+        except (OSError, ValueError, TypeError, ImportError) as exc:
+            report["council_captured_pdf_evidence"] = {
+                "status": "CAPTURED_PDF_BRIDGE_HELD",
+                "error_type": type(exc).__name__}
+    else:
+        report["council_captured_pdf_evidence"] = {
+            "status": "NOT_RUN_HISTORICAL_MODE"}
+
     # Read-only registry and explicitly registered PDF evidence review.
     # No new source fetch, extra stage, AI spend, or outreach.
     try:
