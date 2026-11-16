@@ -9,6 +9,8 @@ from radar import (Http, collect_source, latest_changes, open_db, process_snapsh
                    set_source_state, source_universe_hash, previous_run_metadata, current_active_count,
                    last_successful_run)
 
+from peel_poll_recovery import collect_with_safe_peel_retry
+
 ROOT=Path(__file__).resolve().parent
 DEFAULT_DATA=ROOT/"data"
 
@@ -81,7 +83,9 @@ def do_poll(args, *, force_full=False):
                 must_full=(plan=='full')
                 since=None if must_full else smart_since_date(con,s)
                 prev={} if must_full else previous_run_metadata(con,s['id'])
-                snap=collect_source(s,http,progress=True,smart=not must_full,since_date=since,previous_metadata=prev,force_full=must_full)
+                snap=collect_with_safe_peel_retry(
+                    s,http,progress=True,smart=not must_full,since_date=since,
+                    previous_metadata=prev,force_full=must_full)
                 r=process_snapshot(con,snap,data/"raw_deltas",emit_baseline=args.emit_baseline)
                 results.append(r)
                 state="BASELINE" if r['baseline'] and not args.emit_baseline else "DIFF"
