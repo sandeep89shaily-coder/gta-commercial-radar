@@ -1,5 +1,5 @@
 from __future__ import annotations
-import argparse, json, sys, shutil, sqlite3, os
+import argparse, json, sys, shutil, sqlite3, os, time
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from lead_candidates import export_candidates
@@ -61,6 +61,30 @@ def collection_plan(con, source, *, force_full=False, now=None):
     now=now or datetime.now(timezone.utc)
     return 'skip' if now-last_dt<timedelta(days=int(source.get('snapshot_interval_days',7))) else 'full'
 
+def collect_with_safe_peel_retry(source, http, *, collect=collect_source,
+                                 sleep=time.sleep, client_factory=Http, **kwargs):
+    """Retry ONE unstable Peel page scan from page 1, before DB snapshot commit.
+
+    An unstable municipal directory must never be silently deduplicated or
+    committed as complete. No retry for unrelated errors, non-Peel sources,
+    persistent duplication or policy/permission failures.
+    """
+    try:
+        return collect(source, http, **kwargs)
+    except RuntimeError as exc:
+        if (source.get('collector') != 'peel_health' or
+                str(exc) not in (
+                    'Peel pagination repeated a facility; directory changed during scan; retry',
+                    'Peel directory page count changed during scan; retry before committing',
+                    'Peel server returned a different page than requested')):
+            raise
+        print('  !! Peel directory shifted during pagination; one clean retry '
+              'from page 1 before committing data.', flush=True)
+        sleep(1.0)
+        # Isolate disclaimer cookies and partial page state, not the database.
+        return collect(source, client_factory(), **kwargs)
+
+
 def do_poll(args, *, force_full=False):
     data=Path(args.data_dir)
     con=open_db(data/"radar.sqlite")
@@ -81,7 +105,9 @@ def do_poll(args, *, force_full=False):
                 must_full=(plan=='full')
                 since=None if must_full else smart_since_date(con,s)
                 prev={} if must_full else previous_run_metadata(con,s['id'])
-                snap=collect_source(s,http,progress=True,smart=not must_full,since_date=since,previous_metadata=prev,force_full=must_full)
+                snap=collect_with_safe_peel_retry(
+                    s,http,progress=True,smart=not must_full,since_date=since,
+                    previous_metadata=prev,force_full=must_full)
                 r=process_snapshot(con,snap,data/"raw_deltas",emit_baseline=args.emit_baseline)
                 results.append(r)
                 state="BASELINE" if r['baseline'] and not args.emit_baseline else "DIFF"
