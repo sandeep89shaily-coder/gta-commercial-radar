@@ -15,7 +15,7 @@ import io
 import json
 import re
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, unquote
 
 from pypdf import PdfReader
 from gta_registered_document_evidence import TERMS
@@ -120,7 +120,7 @@ def review(results, *, now=None):
                 if hashlib.sha256(body).hexdigest() != sha:
                     item["status"] = "CAPTURED_SOURCE_SHA_MISMATCH"
                     continue
-                if any(word in url.lower() for word in HOLD_WORDS):
+                if any(word in unquote(url).lower() for word in HOLD_WORDS):
                     item["status"] = "PROCEDURAL_DOCUMENT_HELD"
                     continue
                 try:
