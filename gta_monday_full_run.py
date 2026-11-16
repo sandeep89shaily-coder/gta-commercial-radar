@@ -563,7 +563,8 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
         }
 
     passed = sum(x["status"] == "PASSED" for x in report["stages"])
-    failed = [x["name"] for x in report["stages"] if x["status"] != "PASSED"]
+    failed = [x["name"] for x in report["stages"]
+              if x["status"] == "FAILED"]
     report["stage_successes"] = passed
     report["failed_stages"] = failed
     integrated_diag=report.get("daily_radar_diagnostics",{}).get("integrated",{})
