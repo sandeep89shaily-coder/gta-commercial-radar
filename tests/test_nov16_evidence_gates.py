@@ -63,7 +63,8 @@ class November16EvidenceGateTests(unittest.TestCase):
         self.assertEqual(result["cited_source"]["url"], source["url"])
 
     def test_captured_pdf_sha_gate_and_no_false_project_match(self):
-        from reportlab.pdfgen.canvas import Canvas
+        from pypdf import PdfWriter
+        from pypdf.generic import NameObject, DictionaryObject, DecodedStreamObject
         import io
         with tempfile.TemporaryDirectory() as td:
             root = Path(td) / "GTA_RADAR_RESULTS"
@@ -71,9 +72,20 @@ class November16EvidenceGateTests(unittest.TestCase):
             pdfdir.mkdir(parents=True)
             path = pdfdir / "captured.pdf"
             data = io.BytesIO()
-            canvas = Canvas(data)
-            canvas.drawString(36, 730, "Industrial warehouse Site Plan application 25 249692 ESC 21 CD")
-            canvas.save()
+            writer = PdfWriter()
+            page = writer.add_blank_page(width=612, height=792)
+            font = DictionaryObject({
+                NameObject("/Type"): NameObject("/Font"),
+                NameObject("/Subtype"): NameObject("/Type1"),
+                NameObject("/BaseFont"): NameObject("/Helvetica")})
+            page[NameObject("/Resources")] = DictionaryObject({
+                NameObject("/Font"): DictionaryObject({NameObject("/F1"): font})})
+            stream = DecodedStreamObject()
+            stream.set_data(
+                b"BT /F1 12 Tf 50 700 Td "
+                b"(Industrial warehouse Site Plan application 25 249692 ESC 21 CD) Tj ET")
+            page[NameObject("/Contents")] = writer._add_object(stream)
+            writer.write(data)
             path.write_bytes(data.getvalue())
             sha = hashlib.sha256(path.read_bytes()).hexdigest()
             audit = pdfdir.parent / "COMBINED_PDF_FETCH_AUDIT.csv"
