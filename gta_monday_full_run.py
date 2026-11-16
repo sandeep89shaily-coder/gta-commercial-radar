@@ -405,6 +405,21 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
         report["council_captured_pdf_evidence"] = {
             "status": "NOT_RUN_HISTORICAL_MODE"}
 
+    # Reconcile saved official planning IDs with city-scoped private projects.
+    # Review-only, no new downloads or buyer/open-contract assertions.
+    if not skip_collection:
+        try:
+            from gta_project_document_reconciliation import review as reconcile_documents
+            joins = reconcile_documents(results)
+            report["project_document_reconciliation"] = joins
+        except (OSError, ValueError, TypeError, ImportError) as exc:
+            report["project_document_reconciliation"] = {
+                "status": "PROJECT_DOCUMENT_RECONCILIATION_HELD",
+                "error_type": type(exc).__name__}
+    else:
+        report["project_document_reconciliation"] = {
+            "status": "NOT_RUN_HISTORICAL_MODE"}
+
     # Read-only registry and explicitly registered PDF evidence review.
     # No new source fetch, extra stage, AI spend, or outreach.
     try:
