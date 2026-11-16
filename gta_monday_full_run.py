@@ -46,11 +46,15 @@ def stages(workspace, results, *, industrial_limit=10, skip_collection=False):
         ("toronto_20_source_research", ["gta_toronto_20_commercial_review.py",
                                        "--out", str(results / "TORONTO_20_COMMERCIAL_REVIEW")], False),
         ("council_agenda_intelligence", council_args, False),
-        # Allow source-backed research beyond the former 2-project limit on
-        # explicit full manual runs. The existing executor's per-request
-        # US$1/day shared ledger, idempotency and source gate remain mandatory.
-        # A max of 10 is a research-queue bound, not a spending target.
-        # Saved-data review remains free.
+        # Source-backed investment/company/contact discovery has commercial
+        # priority over broad optional AI research. Both use the identical
+        # V5+legacy ledger; put it first so later general analysis cannot
+        # exhaust the shared ceiling before contact research is attempted.
+        ("industrial_investment_and_contacts",
+         ["gta_investment_contact_daily_bridge.py", "--results", out] +
+         (["--paid"] if not skip_collection else []), False),
+        # The project harness remains capped and idempotent; its paid requests
+        # run AFTER the industrial/contact lane, never in historical review.
         ("ai_harness_adaptive" if not skip_collection else "ai_harness_free",
          ["gta_agent_harness.py", "--results", out] +
          (["--paid", "--max-projects", "10"] if not skip_collection else []),
@@ -170,6 +174,23 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
             skip_collection=skip_collection):
         log = logs / (name + ".log")
         cmd = [sys.executable, str(ROOT / args[0]), *args[1:]]
+        # Running paid company research after a failed primary collector
+        # could re-label historical research as today's discovery. Do not.
+        # Historical-only review is allowed but MUST have no --paid flag.
+        if (name == "industrial_investment_and_contacts" and
+                not skip_collection and not report["fresh_collection_verified"]):
+            log.write_text("SKIPPED_NO_FRESH_COLLECTION; NO_SPEND\n",
+                           encoding="utf-8")
+            report["stages"].append({
+                "name": name, "status": "SKIPPED_NO_FRESH_COLLECTION",
+                "exit_code": None, "critical": False,
+                "log": str(log)})
+            report["investment_contact_diagnostics"] = {
+                "status": "SKIPPED_NO_FRESH_COLLECTION",
+                "paid_calls": 0, "verified_buyers": 0,
+                "outreach_authorized": False}
+            save()
+            continue
         try:
             with log.open("w", encoding="utf-8") as stream:
                 result = run(cmd, cwd=ROOT, stdout=stream, stderr=subprocess.STDOUT)
@@ -279,6 +300,28 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
                     "status": "HARNESS_REPORT_MISSING_OR_UNREADABLE",
                     "error_type": type(exc).__name__,
                 }
+        if name == "industrial_investment_and_contacts":
+            bridge_path = (results / "GTA_RADAR_INVESTMENT_CONTACT_BRIDGE" /
+                           "INVESTMENT_CONTACT_INTEGRATION_STATUS.json")
+            try:
+                if bridge_path.stat().st_mtime < (
+                        dt.datetime.fromisoformat(started).timestamp() - 3):
+                    raise ValueError("OLDER_INVESTMENT_BRIDGE_REPORT")
+                info = json.loads(bridge_path.read_text(encoding="utf-8"))
+                report["investment_contact_diagnostics"] = {
+                    "status": info.get("status", "UNKNOWN"),
+                    "project": info.get("project", "UNKNOWN"),
+                    "discovery": info.get("discovery", {}),
+                    "qualification": info.get("qualification", {}),
+                    "contacts": info.get("contacts", {}),
+                    "buyer_verified": False,
+                    "open_supplier_contract_verified": False,
+                    "outreach_authorized": False,
+                }
+            except (OSError, ValueError, TypeError) as exc:
+                report["investment_contact_diagnostics"] = {
+                    "status": "NO_CURRENT_INVESTMENT_CONTACT_REPORT",
+                    "error_type": type(exc).__name__}
         if name == "daily_radar":
             # Discovery itself refuses missing/stale daily output. Its success
             # does not mean evidence/commercial gates have been satisfied.
@@ -518,7 +561,8 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
         }
 
     passed = sum(x["status"] == "PASSED" for x in report["stages"])
-    failed = [x["name"] for x in report["stages"] if x["status"] != "PASSED"]
+    failed = [x["name"] for x in report["stages"]
+              if x["status"] == "FAILED"]
     report["stage_successes"] = passed
     report["failed_stages"] = failed
     integrated_diag=report.get("daily_radar_diagnostics",{}).get("integrated",{})

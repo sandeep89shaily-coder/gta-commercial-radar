@@ -12,7 +12,7 @@ import re
 import zipfile
 from pathlib import Path
 
-EXTENSIONS={".csv",".json",".html",".pdf",".txt"}
+EXTENSIONS={".csv",".json",".html",".pdf",".txt",".md"}
 FOLDERS={
     "MONDAY_FULL_RADAR",
     "COUNCIL_INTELLIGENCE_REVIEW",
@@ -22,6 +22,12 @@ FOLDERS={
     "TORONTO_20_COMMERCIAL_REVIEW",
     "FACILITY_EVIDENCE_REVIEW",
     "TOTAL_INTELLIGENCE_REVIEW",
+    # Bounded JSON/Markdown outputs of the new independently sourced
+    # investment and company contact lane. No saved API tokens or SQLite.
+    "GTA_RADAR_INVESTMENT_DISCOVERY",
+    "GTA_RADAR_ANNOUNCEMENT_QUALIFICATION",
+    "GTA_RADAR_CONTACT_INTELLIGENCE",
+    "GTA_RADAR_INVESTMENT_CONTACT_BRIDGE",
 }
 MAX_FILE_BYTES=55_000_000
 MAX_TOTAL_BYTES=250_000_000
