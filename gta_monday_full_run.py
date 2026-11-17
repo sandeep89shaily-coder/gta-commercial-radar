@@ -460,6 +460,39 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
             "status": "NOT_RUN_HISTORICAL_INJECTED_OR_NO_FRESH_COLLECTION",
             "municipalities_added_to_verified_16_city_count": 0}
 
+    # Owner-approved northern MAJOR-city source pilot. Keep it separate from
+    # the original sixteen-city coverage denominator and prior GGH Barrie
+    # baseline. Run ONLY in a real manual collection; injected CI/historical
+    # reviews must not unexpectedly fetch external websites.
+    if not skip_collection and runner is None and report.get("fresh_collection_verified"):
+        try:
+            from gta_northern_major_cities import run as northern_city_review
+            north = northern_city_review(results)
+            report["northern_major_city_sources"] = {
+                "status": north["status"],
+                "total_evidence_records": north["total_evidence_records"],
+                "source_changed_not_new_publications": north["source_changed_not_new_publications"],
+                "source_details": north["source_details"],
+                "new_cities_added_to_core_16": 0,
+                "buyers_verified": 0,
+                "first_project_publications_verified": 0,
+                "open_procurement_verified": 0,
+                "paid_ai_calls": 0,
+                "output": str(results / "GTA_RADAR_NORTHERN_MAJOR_CITY_EVIDENCE.csv"),
+            }
+        except (OSError, ValueError, TypeError, RuntimeError, ImportError) as exc:
+            report["northern_major_city_sources"] = {
+                "status": "NORTHERN_MAJOR_CITY_SOURCE_HELD",
+                "error_type": type(exc).__name__,
+                "new_cities_added_to_core_16": 0,
+                "buyers_verified": 0, "paid_ai_calls": 0,
+            }
+    else:
+        report["northern_major_city_sources"] = {
+            "status":"NOT_RUN_HISTORICAL_INJECTED_OR_NO_COLLECTION",
+            "new_cities_added_to_core_16":0,
+        }
+
     # Read-only quality report is part of post-run evidence accounting, not a
     # new collector/stage. Preserve the established seven-stage contract.
     if not skip_collection:
