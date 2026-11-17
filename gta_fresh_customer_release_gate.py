@@ -136,7 +136,8 @@ def _inventory(root):
                 name = str(item.get("project_name") or "").strip()
                 city = str(item.get("city") or "").strip()
                 urls = [u for u in item.get("sources_used", []) if _https(u)]
-                if not (name and city and urls):
+                if (not name or name.upper() in {"UNNAMED_PROJECT",
+                        "UNKNOWN", "TBD"} or len(name) < 6 or not city or not urls):
                     continue
                 original = f"{city}|{name}|{urls[0]}".casefold()
                 key = "ANNOUNCEMENT:" + hashlib.sha256(original.encode()).hexdigest()[:20]
