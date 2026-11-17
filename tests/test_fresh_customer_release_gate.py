@@ -200,6 +200,26 @@ class FreshReleaseGateTests(unittest.TestCase):
         self.assertEqual(len(list(csv.DictReader(
             (self.root / OPEN).open(encoding="utf-8-sig")))), 1)
 
+    def test_unnamed_investment_is_not_counted_as_a_real_project(self):
+        folder = self.root / "GTA_RADAR_INVESTMENT_DISCOVERY"
+        folder.mkdir()
+        (folder / "INVESTMENT_sample.json").write_text(json.dumps({
+            "discovered_projects": [
+                {"project_name": "UNNAMED_PROJECT", "city": "Brampton",
+                 "sources_used": ["https://news.example.com/article"]},
+                {"project_name": "Ace Brampton", "city": "Brampton",
+                 "location_text": "Mayfield Road",
+                 "sources_used": ["https://developer.example.com/announcement"]},
+            ]
+        }))
+        items = _inventory(self.root)
+        self.assertEqual(len(items), 2)
+        self.assertEqual(sum(x["origin"] == "INDEPENDENT_ANNOUNCEMENT_INVESTIGATION"
+                             for x in items.values()), 1)
+        result = run(self.root, workspace=self.owner, today=DAY)
+        self.assertEqual(result["candidates_considered"], 2)
+        self.assertEqual(result["reviewed_source_matched_early_warnings"], 0)
+
     def test_stale_source_snapshot_rejected(self):
         case = review(self.candidate)
         snap(self.owner, retrieved="2026-11-12")
