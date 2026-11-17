@@ -135,18 +135,17 @@ def _freshness(row,event,today):
     # Best available evidence: independently verified official posting,
     # otherwise a dated municipal permit/application event. Only the former
     # can say "publication". Never substitute crawler first-seen date.
-    published=_date(row.get("source_date")) if row.get(
-        "freshness_class")=="OFFICIAL_PUBLICATION_WITHIN_7_DAYS" else None
-    if published and 0<=(today-published).days<=7:
-        return 0, published, "OFFICIAL_FIRST_PUBLICATION_VERIFIED", 50
+    # This input table contains project/event dates, never independently
+    # authenticated first-publication evidence. Leave verified publication to
+    # the separate reviewed-release gate instead of trusting a string label.
     if event:
         days=(today-event["date"]).days
         if days<=7:
-            return 1,event["date"],event["basis"],47
+            return 1,event["date"],event["basis"],15
         if days<=30:
-            return 2,event["date"],event["basis"],34
+            return 2,event["date"],event["basis"],9
         if days<=90:
-            return 3,event["date"],event["basis"],21
+            return 3,event["date"],event["basis"],3
     # A changed page without a dated source event is not a fresh project.
     return 9,None,"NO_RECENT_DOCUMENTED_SOURCE_EVENT",0
 
@@ -249,7 +248,7 @@ def run(results, *, today=None):
     _write(root/CLIENT_TOP,FIELDS,chosen)
     _write(root/CLIENT_EXCLUDED,EXCLUSIONS,removed)
     result={
-        "status":"FRESHNESS_FIRST_CLIENT_INVESTIGATION_REVIEW_ONLY",
+        "status":"SOURCE_EVENT_RANKED_INTERNAL_INVESTIGATION_NOT_CUSTOMER_RELEASE",
         "date":today.isoformat(),
         "top_count":len(chosen),
         "eligible_recent_unreported":len(ranked),
@@ -259,8 +258,9 @@ def run(results, *, today=None):
         "rejected_by_reason":dict(counts),
         "region_distribution":dict(Counter(x["region"] for x in chosen)),
         "freshness_primary":True,
+        "customer_release_requires":"GTA_RADAR_FRESH_RELEASE_STATUS.json",
         "score_weights":{"freshness":50,"scope_size":25,"stage":15,"verified_contacts":10},
-        "source_date_warning":"Permit/application event date is not verified first-publication date.",
+        "source_date_warning":"Only publisher-date evidence through the independent customer release gate can verify first publication; permit/application dates get reduced research-only weight.",
         "buyer_verified_by_this_stage":False,
         "open_unawarded_package_verified_by_this_stage":False,
         "report_history_input":[str(SEED_HISTORY.name),ADDITIONAL_HISTORY],
@@ -275,7 +275,7 @@ def run(results, *, today=None):
         "<style>body{font:15px Segoe UI,Arial;max-width:1160px;margin:28px auto;color:#263238}"
         "table{width:100%;border-collapse:collapse}td,th{padding:10px;border-bottom:1px solid #ddd}"
         "th{background:#edf2f5}a{color:#116389}</style></head><body>",
-        "<h1>Freshness-first client research shortlist</h1>",
+        "<h1>Internal research — source event priority, NOT customer ready</h1>",
         "<p>Non-repeating relative to documented November 10–12 client reports and "
         "the optional local history file. Recent source event is NOT proof of a new "
         "public announcement, buyer, open bid or available contract.</p>",
