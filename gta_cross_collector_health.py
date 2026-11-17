@@ -68,6 +68,28 @@ def extra_source_failures(root):
                 "access_failure": any(x in reason.upper() for x in
                     ("ROBOTS", "HTTP_403", "ACCESS_DENIED", "PERMISSION")),
             })
+    # Meeting-index failures are independent of successfully extracted
+    # planning applications; e.g. Oakville TLS failure and Vaughan 403.
+    integrated = _json(root / "GTA_RADAR_INTEGRATED_INTELLIGENCE_STATUS.json")
+    for stage in integrated.get("stages", []):
+        if not isinstance(stage, dict):
+            continue
+        name = str(stage.get("stage") or "")
+        if not name.startswith("meeting_") or not _is_failed(stage.get("status")):
+            continue
+        city = name.split("meeting_", 1)[1].replace("_", " ").title()
+        if not city:
+            continue
+        reason = str(stage.get("error") or "")[:250]
+        source_id = "MUNICIPAL_MEETING_INDEX:" + name
+        errors.setdefault(city, []).append({
+            "city": city, "source_id": source_id,
+            "status": str(stage.get("status") or "")[:90],
+            "reason": reason,
+            "access_failure": any(word in reason.upper() for word in (
+                "HTTP 403", "HTTP_403", "ROBOTS", "ACCESS_DENIED", "PERMISSION",
+                "CERTIFICATE_VERIFY_FAILED")),
+        })
     return errors
 
 
