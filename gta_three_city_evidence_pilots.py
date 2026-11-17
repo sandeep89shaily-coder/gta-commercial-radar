@@ -269,7 +269,7 @@ def parse_stc(markup, url, *, today=None):
     # historical application date deep inside the proposal. Never use a
     # generic first date on the page as posting evidence.
     near = content[content.find(title) + len(title):][:75] if title in content else ""
-    dates = re.match(r"^\\s*(?:-\\s*)?(" + PUB_SHORT.pattern + "|" + PUB_LONG.pattern + r")", near, re.I)
+    dates = re.match(r"^\s*(?:-\s*)?(" + PUB_SHORT.pattern + "|" + PUB_LONG.pattern + r")", near, re.I)
     posted = _date(dates.group(1)) if dates else ""
     if posted and today and posted > today.isoformat():
         raise ValueError("FUTURE_NOTICE_POSTING")
@@ -292,7 +292,7 @@ def parse_stc(markup, url, *, today=None):
     addr = re.search(r"\blands located at\s+([^.]{7,95})", content, re.I)
     result = _new("St. Catharines", "STC_PLANNING_NOTICE", ident, url,
         address=_clean(addr.group(1)) if addr else title.split(" - ")[-1][:110],
-        scope=scope[:1250], planner_name=re.sub(r"^(?:Contact|Email|Please)\\s+",
+        scope=scope[:1250], planner_name=re.sub(r"^(?:Contact|Email|Please)\s+",
                     "", person.group(1)) if person else "",
         planner_email_public=email.group() if email else "",
         contact_role="MUNICIPAL_PLANNER_NOT_PROJECT_BUYER" if email else "",
