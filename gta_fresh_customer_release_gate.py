@@ -80,6 +80,25 @@ def _csv(path):
         return list(csv.DictReader(handle))
 
 
+def _already_reported_index(root, owner):
+    """Use both the run's exclusions and the persistent report history."""
+    ids, sites = set(), set()
+    for folder, name in (
+        (root, "GTA_RADAR_CLIENT_PREVIOUSLY_REPORTED.csv"),
+        (root, "GTA_RADAR_CLIENT_REPORT_HISTORY.csv"),
+        (owner, "GTA_RADAR_CLIENT_REPORT_HISTORY.csv"),
+    ):
+        for entry in _csv(folder / name):
+            project_id = str(entry.get("opportunity_id") or "").strip()
+            if project_id:
+                ids.add(project_id)
+            city = _clean(entry.get("city"))
+            address = re.sub(r"[^a-z0-9]", "", _clean(entry.get("address")))
+            if city and len(address) >= 10:
+                sites.add((city, address))
+    return ids, sites
+
+
 def _inventory(root):
     candidates = {}
     for row in _csv(root / CLIENT):
@@ -331,6 +350,7 @@ def run(results, *, workspace=None, today=None):
     today = _day(today) or dt.date.today()
     owner = Path(workspace) if workspace is not None else root
     inventory = _inventory(root)
+    reported_ids, reported_sites = _already_reported_index(root, owner)
     reviews_path = owner / REVIEW
     source_dir = owner / EVIDENCE_DIR
     raw = json.loads(reviews_path.read_text(encoding="utf-8")) if reviews_path.is_file() else {}
@@ -358,6 +378,10 @@ def run(results, *, workspace=None, today=None):
             open_documented = False
         else:
             reasons, open_documented = _verify(review, candidate, source_dir, today)
+        site = (_clean(candidate["city"]), re.sub(r"[^a-z0-9]", "",
+                                      _clean(candidate["address"])))
+        if key in reported_ids or site in reported_sites:
+            reasons.append("PROJECT_PREVIOUSLY_REPORTED_TO_CLIENT")
         if reasons:
             counts.update(reasons)
         else:
