@@ -221,7 +221,7 @@ def parse_niagara(markup, source_row):
             siblings.append(_clean(node.get_text(" ", strip=True)))
         ctext = " ".join(siblings)
     bodytext = _clean(main.get_text(" ", strip=True))
-    planner = re.search(r"\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,2})\s+Planner\s*\d", ctext)
+    planner = re.search(r"\b([A-Z][a-z]+(?:\s+[A-Z][a-zA-Z]+){1,2})\s+Planner\s*\d", ctext or bodytext)
     email = NIAGARA_EMAIL.search(ctext)
     docsection = next((h for h in main.find_all(["h2", "h3", "h4"])
                        if "associated files" in _clean(h.get_text(" ", strip=True)).lower()), None)
@@ -234,7 +234,7 @@ def parse_niagara(markup, source_row):
             href = urljoin(url, str(node.get("href") or ""))
             if name and _safe(href, "webpublic.niagarafalls.ca", "/Files/Planning/Applications/"):
                 docs.append(name[:90])
-    meeting = re.search(r"\bMeeting Date\s+(" + DATE_TEXT + r")", bodytext, re.I)
+    meeting = re.search(r"\bMeeting Date\s+(?:(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),?\s+)?(" + DATE_TEXT + r")", bodytext, re.I)
     return _new("Niagara Falls", "NIAGARA_APPLICATION_DETAIL", ident, url,
         address=source_row.get("address") or heading.split("(")[0],
         scope=scope, applicant_name_source_claim="",
@@ -404,7 +404,7 @@ def _fetch_brantford(layer, *, json_fetch=None, today=None):
     for offset in (0, 100):
         query = {
             "f":"json", "where":"1=1", "outFields":"*",
-            "returnGeometry":"false", "orderByFields":oid,
+            "returnGeometry":"false", "orderByFields":oid + " DESC",
             "resultOffset":str(offset), "resultRecordCount":str(limit),
         }
         response = getter(base, query)
