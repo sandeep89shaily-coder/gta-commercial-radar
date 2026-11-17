@@ -130,6 +130,14 @@ def _aggregate(records):
             r["record_kind"]=="APPLICATION_ID",
             len(r["description"]),bool(r["source_url"])),reverse=True)
         best=ranked[0]
+        # An official date may be carried on a shorter source row. Do not
+        # discard it merely because a second source has a longer description.
+        # A filing/received/circulation date is NOT original publication.
+        valid_dates = sorted((r for r in members
+            if re.fullmatch(r"20\\d{2}-\\d{2}-\\d{2}", r["date"])
+            and r["date"] <= dt.date.today().isoformat()),
+            key=lambda r:(r["date"], r["source"]))
+        dated = valid_dates[0] if valid_dates else None
         sources=sorted(set(r["source"] for r in members))
         links=sorted(set(r["source_url"] for r in members if r["source_url"]))
         observed=[r["first_seen_local"] for r in members if r["first_seen_local"]]
@@ -160,8 +168,9 @@ def _aggregate(records):
         allrows.append({"canonical_id":key,"city":best["city"],
             "record_kind":best["record_kind"],"application_id":best["application_id"],
             "address":best["address"],"description":best["description"],
-            "current_status":best["current_status"],"date":best["date"],
-            "date_basis":best["date_basis"],
+            "current_status":best["current_status"],
+            "date":dated["date"] if dated else best["date"],
+            "date_basis":dated["date_basis"] if dated else best["date_basis"],
             "application_year_hint":best["application_year_hint"],
             "source_count":len(sources),"source_types":"; ".join(sources),
             "evidence_urls":"; ".join(links),
