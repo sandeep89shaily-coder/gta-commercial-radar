@@ -89,6 +89,44 @@ class SourceHealthTruthTests(unittest.TestCase):
         self.assertEqual(miss["reconciled_access_failures"],2)
         self.assertEqual(miss["extra_council_gis_failures"],2)
 
+    def test_meeting_failures_count_when_planning_source_succeeds(self):
+        write(self.root/"GTA_RADAR_INTEGRATED_INTELLIGENCE_STATUS.json", {
+            "stages": [
+                {"stage":"meeting_oakville", "status":"FAILED",
+                 "error":"SSL: CERTIFICATE_VERIFY_FAILED"},
+                {"stage":"meeting_vaughan", "status":"BLOCKED",
+                 "error":"Official meeting source returned HTTP 403 Forbidden"}]})
+        output=collection(self.root)
+        oakville=next(x for x in output["per_city"] if x["city"]=="Oakville")
+        vaughan=next(x for x in output["per_city"] if x["city"]=="Vaughan")
+        self.assertGreaterEqual(oakville["source_failures"],1)
+        self.assertGreaterEqual(vaughan["access_failures"],1)
+
+    def test_short_dated_official_record_not_lost_to_longer_source(self):
+        csv_write(self.root/"GTA_RADAR_GUELPH_GIS_APPLICATIONS.csv", [{
+            "project_id":"GIS:G1", "city":"Guelph", "application_id":"OZS26-021",
+            "description":"Industrial warehouse",
+            "source_record_date":"2026-11-13",
+            "source_record_date_basis":"OFFICIAL_GIS_INDATE_NOT_FIRST_PUBLICATION",
+            "source_url":"https://guelph.ca/notice/21",
+            "observation":"UNCHANGED"}])
+        csv_write(self.root/"GTA_RADAR_MUNICIPAL_PROJECT_FEED.csv", [{
+            "project_id":"HTML:G1", "city":"Guelph", "application_id":"OZS26-021",
+            "description":"Industrial warehouse manufacturing plant with additional "
+                          "office support and extended loading dock",
+            "source_url":"https://guelph.ca/development/21",
+            "observation":"UNCHANGED"}])
+        report=collection(self.root)
+        with (self.root/"GTA_RADAR_COLLECTION_MASTER.csv").open(
+                encoding="utf-8-sig",newline="") as fp:
+            rows=list(csv.DictReader(fp))
+        guelph=next(x for x in rows if x["city"]=="Guelph" and
+                    x["application_id"]=="OZS26-021")
+        self.assertEqual(guelph["date"],"2026-11-13")
+        self.assertEqual(guelph["date_basis"],
+                         "OFFICIAL_GIS_INDATE_NOT_FIRST_PUBLICATION")
+        self.assertEqual(report["new_or_changed_commercial_manual_review"],0)
+
     def test_missing_other_source_files_do_not_invent_success(self):
         self.assertEqual(len(extra_source_failures(self.root)["Mississauga"]),2)
         self.assertEqual(len(extra_source_failures(self.root)["Brampton"]),3)
