@@ -65,7 +65,7 @@ def _clean(text):
 def _ident(candidate):
     values = (
         candidate["record_id"], candidate["city"], candidate["address"],
-        candidate["description"], candidate["source_url"],
+        candidate["project_name"], candidate["description"], candidate["source_url"],
     )
     return hashlib.sha256(json.dumps(values, ensure_ascii=False,
                                      separators=(",", ":")).encode("utf-8")).hexdigest()
@@ -89,6 +89,7 @@ def _inventory(root):
         candidate = {
             "record_id": key, "origin": "PERMIT_APPLICATION_INVESTIGATION",
             "city": str(row["city"]), "address": str(row["address"]),
+            "project_name": str(row.get("project_name") or ""),
             "description": str(row.get("nature_of_work") or ""),
             "source_url": str(row.get("source_url") or ""),
             "application_ids": str(row.get("application_ids") or ""),
@@ -123,6 +124,7 @@ def _inventory(root):
                 candidate = {
                     "record_id": key, "origin": "INDEPENDENT_ANNOUNCEMENT_INVESTIGATION",
                     "city": city, "address": str(item.get("location_text") or ""),
+                    "project_name": name,
                     "description": str(item.get("reported_construction") or name),
                     "source_url": urls[0], "application_ids": "",
                     "source_event_date": "", "source_date_basis": "UNVERIFIED_ANNOUNCEMENT_DATE",
@@ -172,6 +174,24 @@ def _support(case, key, source_dir, today, *, literal=None):
     return source, quote
 
 
+def _is_same_project_publisher_context(candidate, text):
+    # Never treat an unrelated dated announcement or same-city corporate
+    # webpage as evidence for this exact project.
+    app_ids = [a.strip() for a in re.split(r"[;|,]", candidate.get("application_ids") or "")
+               if len(a.strip()) >= 8]
+    squeeze = lambda value: re.sub(r"[^a-z0-9]", "", str(value).casefold())
+    content = squeeze(text)
+    if any(squeeze(app) in content for app in app_ids):
+        return True
+    name = _clean(candidate.get("project_name"))
+    address = _clean(candidate.get("address"))
+    city = _clean(candidate["city"])
+    if candidate["origin"] == "INDEPENDENT_ANNOUNCEMENT_INVESTIGATION":
+        return bool(name and len(name) >= 7 and name in _clean(text) and city in _clean(text))
+    return bool(address and len(address) >= 10 and
+                (address in _clean(text) or squeeze(address) in content))
+
+
 def _publication_date_quoted(quote, date):
     # Avoid interpreting model/retrieval/permit dates as publisher publication.
     formats = (date.isoformat(), f"{date:%B} {date.day}, {date.year}",
@@ -204,7 +224,9 @@ def _verify(case, candidate, source_dir, today):
             "OFFICIAL_POSTING_DATE_ON_ORIGINAL_NOTICE"):
         fail("PUBLISHER_FIRST_PUBLICATION_BASIS_MISSING")
     try:
-        _, pubquote = _support(case, "publication", source_dir, today)
+        pubsrc, pubquote = _support(case, "publication", source_dir, today)
+        if not _is_same_project_publisher_context(candidate, pubsrc["text"]):
+            fail("PUBLISHER_SOURCE_DOES_NOT_IDENTIFY_SAME_PROJECT")
         if date and not _publication_date_quoted(pubquote, date):
             fail("PUBLICATION_DATE_NOT_QUOTED_IN_PRIMARY_SOURCE")
         if case["publication"].get("is_retrieval_date"):
@@ -353,7 +375,7 @@ def run(results, *, workspace=None, today=None):
         })
     for key in cases_by_id.keys() - inventory.keys():
         counts["REVIEW_CASE_NO_CURRENT_SOURCE_CANDIDATE"] += 1
-    candidate_fields = ("record_id", "origin", "city", "address", "description",
+    candidate_fields = ("record_id", "origin", "city", "address", "project_name", "description",
                         "source_url", "source_event_date", "source_date_basis",
                         "application_ids", "candidate_fingerprint")
     _write(root / WORKLIST, candidate_fields, list(inventory.values()))
