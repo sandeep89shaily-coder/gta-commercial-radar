@@ -247,10 +247,17 @@ def _verify(case, candidate, source_dir, today):
             len(str(historical.get("note") or "").strip()) < 30):
         fail("OLDER_PROJECT_VERSION_REVIEW_REQUIRED")
     if scope_kind == "MATERIAL_NEW_SCOPE":
-        if not historical.get("previous_scope_source_url") or not (
-                _https(historical.get("previous_scope_source_url")) and
-                len(str(historical.get("distinguishing_change") or "")) >= 25):
+        prior = historical.get("prior_scope_evidence") or {}
+        if not isinstance(prior, dict) or len(str(
+                historical.get("distinguishing_change") or "")) < 25:
             fail("OLD_AND_NEW_SCOPE_NOT_DISTINGUISHED")
+        else:
+            try:
+                _support({"prior": prior}, "prior", source_dir, today)
+                if _clean(prior.get("quote")) == _clean((case.get("scope") or {}).get("quote")):
+                    fail("NO_DISTINCT_MATERIAL_SCOPE_CHANGE")
+            except (OSError, ValueError, TypeError, KeyError) as exc:
+                fail("PRIOR_SCOPE_" + str(exc))
     org = case.get("organization") or {}
     if org.get("role") not in ROLES or not org.get("name"):
         fail("PROJECT_TEAM_OR_OWNER_UNIDENTIFIED")
@@ -288,8 +295,21 @@ def _verify(case, candidate, source_dir, today):
     open_documented = False
     if status == "OPEN_PACKAGE_DOCUMENTED":
         closing = _day(proc.get("closing_on"))
-        open_documented = bool(proc.get("package_id") and proc.get("purchaser") and
-                               closing and closing >= today and reviewed == today)
+        try:
+            document, _ = _support(case, "procurement", source_dir, today)
+            text = _clean(document["text"])
+            package_id = str(proc.get("package_id") or "")
+            purchaser = str(proc.get("purchaser") or "")
+            dated = closing and _publication_date_quoted(document["text"], closing)
+            contains_status = any(token in text for token in (
+                "open tender", "open request for proposals", "rfq open", "bid closes"))
+            open_documented = bool(package_id and purchaser and dated and
+                _clean(package_id) in text and _clean(purchaser) in text and
+                contains_status and closing >= today and reviewed == today)
+        except (OSError, ValueError, TypeError, KeyError):
+            open_documented = False
+        if not open_documented:
+            fail("OPEN_PACKAGE_NOT_SUPPORTED_BY_LIVE_DATED_SOURCE_TEXT")
     return reasons, open_documented
 
 
