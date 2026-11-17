@@ -1,27 +1,27 @@
 # GTA Radar — genuinely fresh opportunity release policy (November 16, 2026)
 
-The internal source-event-ranked file \`GTA_RADAR_CLIENT_FRESH_NONREPEAT_TOP_10.csv\`
+The internal source-event-ranked file `GTA_RADAR_CLIENT_FRESH_NONREPEAT_TOP_10.csv`
 is an **investigation queue, not a customer-ready list**. A November permit
 status update, file retrieval, AI research run, first Radar observation or
 same-address company record is **not** proof of a newly announced project.
 
-The one-click Monday pipeline now runs \`gta_fresh_customer_release_gate.py\`
+The one-click Monday pipeline now runs `gta_fresh_customer_release_gate.py`
 and produces independent outputs, **without adding any paid calls**:
 
-- \`GTA_RADAR_FRESH_EVIDENCE_WORKLIST.csv\`: permit/application research
+- `GTA_RADAR_FRESH_EVIDENCE_WORKLIST.csv`: permit/application research
   shortlist plus independently discovered industrial investment projects.
-  Contains stable \`record_id\` and \`candidate_fingerprint\`.
-- \`GTA_RADAR_FRESH_RELEASE_DECISIONS.csv\`: every case either reviewed
+  Contains stable `record_id` and `candidate_fingerprint`.
+- `GTA_RADAR_FRESH_RELEASE_DECISIONS.csv`: every case either reviewed
   or held with named reasons.
-- \`GTA_RADAR_REVIEWED_FRESH_EARLY_WARNINGS.csv\`: **only** cases with
+- `GTA_RADAR_REVIEWED_FRESH_EARLY_WARNINGS.csv`: **only** cases with
   recent original publisher evidence, material scope, project team, public
   business contact and documented procurement status, signed off by a reviewer.
-  An \`UNKNOWN_CHECKED\` procurement state stays explicitly **unknown**.
-- \`GTA_RADAR_REVIEWED_OPEN_PACKAGES.csv\`: additionally requires a
+  An `UNKNOWN_CHECKED` procurement state stays explicitly **unknown**.
+- `GTA_RADAR_REVIEWED_OPEN_PACKAGES.csv`: additionally requires a
   current, explicitly dated tender listing with package ID, purchaser
   and a future closing date. These are still **reviewed listings needing
   an independent live recheck**, not verified unawarded contracts.
-- \`GTA_RADAR_FRESH_RELEASE_STATUS.json\`: counts, blocked reasons and warnings.
+- `GTA_RADAR_FRESH_RELEASE_STATUS.json`: counts, blocked reasons and warnings.
 
 **Do not advertise any of these as independently authenticated, current, unawarded
 contracts without a live official-source confirmation.** Matching user-provided
@@ -29,28 +29,28 @@ source text and SHA-256 does not prove that its origin or timestamp is genuine.
 
 ## Operator review inputs — persistent outside the daily ZIP
 
-Place \`GTA_RADAR_FRESH_RELEASE_REVIEWS.json\` in the established
-\`--workspace\` directory. Put each captured public source snapshot under the
-same workspace's \`GTA_RADAR_FRESH_SOURCE_SNAPSHOTS/\` folder. The pipeline
+Place `GTA_RADAR_FRESH_RELEASE_REVIEWS.json` in the established
+`--workspace` directory. Put each captured public source snapshot under the
+same workspace's `GTA_RADAR_FRESH_SOURCE_SNAPSHOTS/` folder. The pipeline
 reads these evidence inputs but **never invents or overwrites them**. A corrupt
 manifest blocks customer release, and missing evidence produces **zero**
 reviewed early-warning rows; there is no forced quota of ten.
 
-Use the worklist's *exact* \`record_id\`, \`candidate_fingerprint\`, city
+Use the worklist's *exact* `record_id`, `candidate_fingerprint`, city
 and address. Source snapshots are UTF-8 JSON files of this form:
 
-\`\`\`json
+```json
 {
   "url": "https://publisher.example/project-specific-announcement",
   "retrieved_on": "2026-11-16",
   "text": "Full independently captured publisher excerpt including original date, named site, scope and team.",
   "sha256": "<SHA-256 of the exact UTF-8 text value>"
 }
-\`\`\`
+```
 
 The publisher/date quote must literally appear in the snapshot and show a
 publisher-posted original date **within seven days**, not a permit's
-\`DATE_RECEIVED\`, page fetch time or Radar first-seen timestamp. The
+`DATE_RECEIVED`, page fetch time or Radar first-seen timestamp. The
 publisher's document must also identify the exact project/address (or, for
 independent investment discoveries, both project name and city). Every
 review includes an evidence citation for the work scope, project organization,
@@ -58,7 +58,7 @@ public contact channel and procurement status.
 
 One case in the review manifest has these keys:
 
-\`\`\`json
+```json
 {
   "cases": [{
     "record_id": "<from worklist>",
@@ -109,13 +109,13 @@ One case in the review manifest has these keys:
     }
   }]
 }
-\`\`\`
+```
 
 All example values above are schematic, **not real project evidence**.
-Publication basis may also be \`OFFICIAL_POSTING_DATE_ON_ORIGINAL_NOTICE\`.
-Project scope type may be \`MATERIAL_NEW_SCOPE\`, but then the case additionally
-requires \`historical_review.prior_scope_evidence\` with a captured original
-older-source quote and a substantive \`distinguishing_change\` explanation.
+Publication basis may also be `OFFICIAL_POSTING_DATE_ON_ORIGINAL_NOTICE`.
+Project scope type may be `MATERIAL_NEW_SCOPE`, but then the case additionally
+requires `historical_review.prior_scope_evidence` with a captured original
+older-source quote and a substantive `distinguishing_change` explanation.
 
 A project is **not** released merely because the review file exists: stale
 snapshots (>2 days), invalid hashes, mismatched exact source URLs, unrelated
@@ -126,15 +126,15 @@ ledger; do not reset it to manufacture fresh opportunities.
 
 ## Commands
 
-Normal daily launch (unchanged): \`RUN_GTA_RADAR_TODAY.bat\` or the established
-\`gta_monday_full_run.py\` manual invocation.
+Normal daily launch (unchanged): `RUN_GTA_RADAR_TODAY.bat` or the established
+`gta_monday_full_run.py` manual invocation.
 
 Review just a saved archive and owner-supplied evidence without any paid or
 network calls:
 
-\`\`\`bash
+```bash
 python gta_fresh_customer_release_gate.py --results "GTA_RADAR_RESULTS" --workspace "<your Radar workspace>"
-\`\`\`
+```
 
 **Acceptance target:** 10 independently date-verified recent project or
 material-scope announcements with project identity, role, public business
