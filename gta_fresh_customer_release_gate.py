@@ -338,7 +338,8 @@ def _write(path, fields, rows):
         writer = csv.DictWriter(handle, fieldnames=fields, extrasaction="ignore")
         writer.writeheader()
         for record in rows:
-            clean = {k: str(record.get(k) or "") for k in fields}
+            clean = {k: ("" if record.get(k) is None else str(record.get(k, "")))
+                     for k in fields}
             # Formulas must not execute when exported CSV is opened in Excel.
             writer.writerow({k: "'" + v if v.lstrip().startswith(
                 ("=", "+", "-", "@", "\t", "\r")) else v for k, v in clean.items()})
