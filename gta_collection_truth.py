@@ -261,7 +261,10 @@ def build(results):
                        "new_or_changed_review":sum(r["review_priority"]=="MANUAL_REVIEW" for r in items),
                        "official_sources_with_records":len(sources_with_records),
                        "source_failures":len(failures),
-                       "access_failures":sum("ROBOTS" in x or "HTTP_403" in x for x in failures),
+                       "access_failures":sum(any(code in x.upper() for code in
+                            ("ROBOTS", "HTTP_403", "HTTP 403",
+                             "CERTIFICATE_VERIFY_FAILED", "ACCESS_DENIED",
+                             "PERMISSION")) for x in failures),
                        "source_notes":"; ".join(failures)[:1200],
                        "quality_status":state})
     _write(root/OUTPUT_ALL,FIELDS,master)
