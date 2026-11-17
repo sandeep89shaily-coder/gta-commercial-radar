@@ -134,8 +134,13 @@ class NorthernMajorCityTests(unittest.TestCase):
         self.assertEqual(records[0]["source_date"],"2026-10-31")
         self.assertEqual(records[0]["source_date_basis"],
                          "OFFICIAL_APPLICATION_RECEIVED_NOT_PUBLICATION")
-        self.assertEqual(n._sudbury(SUDBURY_HTML.replace(
-            "PL-ZBA-2026-00123","No file number issued")),[])
+        fallback=n._sudbury(SUDBURY_HTML.replace(
+            "PL-ZBA-2026-00123","No file number issued"))
+        self.assertEqual(len(fallback),1)
+        self.assertEqual(fallback[0]["application_id"],"")
+        self.assertEqual(fallback[0]["record_kind"],
+                         "PENDING_PROJECT_SIGNAL_NO_EXACT_FILE_ID")
+        self.assertEqual(fallback[0]["publication_date_verified"],"False")
 
     def test_northbay_notice_exact_id_not_original_publication(self):
         links=n._nb_links(NB_INDEX)
