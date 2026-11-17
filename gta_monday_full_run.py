@@ -7,6 +7,7 @@ Each stage gets a log and status; failed stages never become verified leads.
 """
 from __future__ import annotations
 import argparse
+import csv
 import datetime as dt
 import html
 import json
@@ -354,6 +355,77 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
                 "error_type": type(exc).__name__,
                 "provider_billing_verified": False,
             }
+
+    # New source quality: municipal application details were previously lost
+    # behind the Mississauga index's 30-row history and blocked ArcGIS feeds.
+    # Only the user's actual run may fetch source pages; injected test runners
+    # and historical replays perform NO network access.
+    if not skip_collection and report.get("fresh_collection_verified") and runner is None:
+        try:
+            from gta_mississauga_detail_recovery import run as get_mississauga_details
+            details = get_mississauga_details(results)
+            report["mississauga_official_detail_recovery"] = {
+                key: details.get(key) for key in (
+                    "status", "eligible_index_application_links",
+                    "pages_attempted", "pages_collected", "pages_with_posted_date",
+                    "pages_with_named_applicant", "pages_with_planner_email",
+                    "changed_detail_pages_not_new_projects", "page_failures",
+                    "publisher_first_construction_disclosures_verified",
+                    "buyers_verified")}
+        except (OSError, ValueError, TypeError, RuntimeError, ImportError) as exc:
+            report["mississauga_official_detail_recovery"] = {
+                "status": "MISSISSAUGA_DETAIL_SOURCE_HELD",
+                "error_type": type(exc).__name__,
+                "new_project_publications_verified": 0, "buyers_verified": 0}
+    else:
+        report["mississauga_official_detail_recovery"] = {
+            "status": "NOT_RUN_HISTORICAL_OR_INJECTED_RUN"}
+
+    # The usual collection truth is assembled during daily_radar, BEFORE the
+    # other municipal council/GIS collectors run. Refresh it after those
+    # independent stages so a successful HTML source cannot hide later GIS
+    # access failures. Read-only with respect to the persistent source ledgers.
+    if not skip_collection and runner is None:
+        try:
+            from gta_collection_truth import build as rebuild_collection_truth
+            from gta_city_coverage_report import build as rebuild_city_coverage
+            from gta_municipal_recovery_scorecard import build as rebuild_recovery
+            from gta_cross_collector_health import build as build_cross_health
+
+            def source_status(name):
+                path = results / name
+                if not path.is_file():
+                    return {}
+                value = json.loads(path.read_text(encoding="utf-8"))
+                return value if isinstance(value, dict) else {}
+
+            collection = rebuild_collection_truth(results)
+            rebuild_city_coverage(results,
+                source_status("GTA_RADAR_EARLY_APPLICATION_SOURCE_STATUS.json"),
+                source_status("GTA_RADAR_STRUCTURED_APPLICATION_SOURCE_STATUS.json"),
+                source_status("GTA_RADAR_ADDITIONAL_CITY_GIS_STATUS.json"),
+                source_status("GTA_RADAR_MARKHAM_CIRCULATION_STATUS.json"),
+                municipal=source_status("GTA_RADAR_MUNICIPAL_PROJECT_FEED_STATUS.json"),
+                toronto_csv=source_status("GTA_RADAR_TORONTO_OPEN_DATA_STATUS.json"),
+                guelph_gis=source_status("GTA_RADAR_GUELPH_GIS_STATUS.json"),
+                five_city=source_status("GTA_RADAR_FIVE_CITY_RECOVERY_STATUS.json"))
+            health = build_cross_health(results)
+            rebuild_recovery(results)
+            report["post_council_collector_truth"] = {
+                "status": "ALL_COLLECTOR_STATUSES_RECONCILED",
+                "unique_application_files": collection.get("unique_application_files", 0),
+                "cities_with_any_failed_source": health["cities_with_any_failed_source"],
+                "verified_citywide_complete_coverage": 0,
+                "paid_calls": 0}
+        except (OSError, ValueError, TypeError, RuntimeError, ImportError,
+                KeyError, csv.Error) as exc:
+            report["post_council_collector_truth"] = {
+                "status": "RECONCILIATION_HELD_USE_INDIVIDUAL_SOURCE_STATUS",
+                "error_type": type(exc).__name__,
+                "verified_citywide_complete_coverage": 0}
+    else:
+        report["post_council_collector_truth"] = {
+            "status": "NOT_RUN_HISTORICAL_OR_INJECTED_RUN"}
 
     # Read-only quality report is part of post-run evidence accounting, not a
     # new collector/stage. Preserve the established seven-stage contract.
