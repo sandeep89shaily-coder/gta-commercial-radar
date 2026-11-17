@@ -39,8 +39,11 @@ SPECIAL_ACTIONS = {
                   "file IDs against City originals and distinguish index-only pages."),
     "Burlington": ("Repeat two separate owner-side official page runs, compare exact "
                    "application IDs, decision stages and original publication dates."),
-    "Mississauga": ("Join the existing V6 official site-plan records to municipal "
-                    "application and company/source records; verify current stage."),
+    "Mississauga": ("Use the official 30-row HTML application index and its "
+                    "same-host individual detail pages for dated postings, "
+                    "named applicants, project documents and city-planner contacts. "
+                    "Official site-plan/rezoning ArcGIS sources remain robots-blocked; "
+                    "request an authorized City export rather than bypassing access."),
 }
 
 
