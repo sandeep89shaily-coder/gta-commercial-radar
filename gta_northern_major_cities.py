@@ -304,18 +304,25 @@ def _sudbury(markup):
         if not m:
             continue
         address = _clean(m.group(1))
-        scope = _clean(block.split("Application :",1)[-1])[:1100]
-        ids = SUDBURY_FILE.findall(block)
-        if not ids or not COMMERCIAL.search(scope):
-            # Unknown exact file IDs or unqualified residential proposals
-            # must not become candidate application numbers.
+        chunks = re.split(r"\bApplication\s*:", block, maxsplit=1, flags=re.I)
+        scope = _clean(chunks[-1])[:1100]
+        ids = list(dict.fromkeys(SUDBURY_FILE.findall(block)))
+        if not COMMERCIAL.search(scope):
             continue
         head = _clean(block[:m.start()]).strip(" :;-")[:180]
+        if not head or len(head) < 4:
+            continue
         date_m = re.search(r"\b(?:Date Received|Received|Application Received)\s*:\s*("
                             + DATE_TEXT.pattern + r")", block, re.I)
-        for ident in dict.fromkeys(ids):
-            found.append(_make("Greater Sudbury", "SUDBURY_PENDING_PLANNING",
-                ident.upper(), SUDBURY, record_kind="OFFICIAL_PENDING_PLANNING_APPLICATION",
+        # An unnumbered but named official project is still worth research,
+        # but is explicitly NOT an application-ID record or verified new lead.
+        for ident in ids or [head + "|" + address]:
+            exact = bool(ids)
+            result = _make("Greater Sudbury", "SUDBURY_PENDING_PLANNING",
+                ident.upper() if exact else ident, SUDBURY,
+                record_kind=("OFFICIAL_PENDING_PLANNING_APPLICATION" if exact
+                             else "PENDING_PROJECT_SIGNAL_NO_EXACT_FILE_ID"),
+                application_id=ident.upper() if exact else "",
                 project_title=head, address=address, scope=scope,
                 applicant_name_source_claim=head,
                 source_date=_date(date_m.group(1)) if date_m else "",
@@ -323,7 +330,11 @@ def _sudbury(markup):
                                    if date_m else "NO_VERIFIED_SOURCE_DATE"),
                 current_status="PENDING_APPLICATION_NOT_AN_APPROVAL",
                 source_index_url=SUDBURY,
-                source_evidence_basis="EXACT_FILE_NUMBER_IN_OFFICIAL_PENDING_PAGE"))
+                source_evidence_basis=("EXACT_FILE_NUMBER_IN_OFFICIAL_PENDING_PAGE"
+                    if exact else "NAMED_PROJECT_NO_EXACT_APPLICATION_ID"))
+            if not exact:
+                result["application_id"] = ""
+            found.append(result)
     return list({x["candidate_id"]:x for x in found}.values())
 
 
