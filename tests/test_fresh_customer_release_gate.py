@@ -172,12 +172,27 @@ class FreshReleaseGateTests(unittest.TestCase):
         result = run(self.root, workspace=self.owner, today=DAY)
         self.assertIn("OLD_AND_NEW_SCOPE_NOT_DISTINGUISHED", result["hold_reasons"])
 
-    def test_open_package_not_auto_verified(self):
+    def test_open_package_claim_without_a_dated_original_listing_is_held(self):
         case = review(self.candidate)
         case["procurement"].update(
             {"status": "OPEN_PACKAGE_DOCUMENTED", "checked_on": "2026-11-16",
              "package_id": "RFQ-001", "purchaser": "Test Industrial Developments",
              "closing_on": "2026-11-30"})
+        self.persist(case)
+        result = run(self.root, workspace=self.owner, today=DAY)
+        self.assertEqual(result["reviewed_source_matched_early_warnings"], 0)
+        self.assertIn("OPEN_PACKAGE_NOT_SUPPORTED_BY_LIVE_DATED_SOURCE_TEXT",
+                      result["hold_reasons"])
+
+    def test_dated_open_package_is_still_not_independently_live_verified(self):
+        case = review(self.candidate)
+        line = ("Open tender RFQ-001 for mechanical equipment at 123 Test Road. "
+                "Purchaser Test Industrial Developments. Bid closes November 30, 2026.")
+        snap(self.owner, body=BODY + " " + line)
+        case["procurement"].update(
+            {"status": "OPEN_PACKAGE_DOCUMENTED", "checked_on": "2026-11-16",
+             "quote": line, "package_id": "RFQ-001",
+             "purchaser": "Test Industrial Developments", "closing_on": "2026-11-30"})
         self.persist(case)
         result = run(self.root, workspace=self.owner, today=DAY)
         self.assertEqual(result["reviewed_open_listings_pending_live_recheck"], 1)
