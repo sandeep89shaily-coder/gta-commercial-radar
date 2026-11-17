@@ -427,6 +427,39 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
         report["post_council_collector_truth"] = {
             "status": "NOT_RUN_HISTORICAL_OR_INJECTED_RUN"}
 
+    # Experimental expansion pilots are separate from the sixteen-city
+    # measured core. Run once AFTER the daily GGH and next-four index stages.
+    # Historical replay and injected CI runners must not make web requests.
+    if not skip_collection and runner is None and report.get("fresh_collection_verified"):
+        try:
+            from gta_three_city_evidence_pilots import run as run_three_city
+            exp = run_three_city(results)
+            report["experimental_three_city_evidence"] = {
+                "status": exp["status"],
+                "candidate_rows": exp["candidate_rows"],
+                "changed_source_rows_not_new_project_proof": exp[
+                    "changed_source_rows_not_new_project_proof"],
+                "original_publisher_first_disclosures_verified": 0,
+                "verified_project_buyers": 0,
+                "verified_open_supplier_packages": 0,
+                "municipalities_added_to_verified_16_city_count": 0,
+                "sources": exp["sources"],
+                "output": str(results / "GTA_RADAR_THREE_CITY_EVIDENCE_CANDIDATES.csv"),
+                "paid_calls": 0,
+            }
+        except (OSError, ValueError, TypeError, RuntimeError, ImportError) as exc:
+            report["experimental_three_city_evidence"] = {
+                "status": "EXPERIMENTAL_SOURCE_PILOT_HELD",
+                "error_type": type(exc).__name__,
+                "municipalities_added_to_verified_16_city_count": 0,
+                "verified_project_buyers": 0,
+                "paid_calls": 0,
+            }
+    else:
+        report["experimental_three_city_evidence"] = {
+            "status": "NOT_RUN_HISTORICAL_INJECTED_OR_NO_FRESH_COLLECTION",
+            "municipalities_added_to_verified_16_city_count": 0}
+
     # Read-only quality report is part of post-run evidence accounting, not a
     # new collector/stage. Preserve the established seven-stage contract.
     if not skip_collection:
