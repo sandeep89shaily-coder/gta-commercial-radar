@@ -134,7 +134,7 @@ def _aggregate(records):
         # discard it merely because a second source has a longer description.
         # A filing/received/circulation date is NOT original publication.
         valid_dates = sorted((r for r in members
-            if re.fullmatch(r"20\\d{2}-\\d{2}-\\d{2}", r["date"])
+            if re.fullmatch(r"20\d{2}-\d{2}-\d{2}", r["date"])
             and r["date"] <= dt.date.today().isoformat()),
             key=lambda r:(r["date"], r["source"]))
         dated = valid_dates[0] if valid_dates else None
