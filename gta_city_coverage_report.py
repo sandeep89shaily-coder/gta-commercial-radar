@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv,json
 from pathlib import Path
 from gta_early_applications import SOURCES
+from gta_cross_collector_health import extra_source_failures
 
 OUTPUT="GTA_RADAR_CITY_COVERAGE_AUDIT.csv"
 STATUS="GTA_RADAR_CITY_COVERAGE_STATUS.json"
@@ -29,6 +30,7 @@ def build(root,html_status,toronto_brampton_gis,other_gis,markham,municipal=None
     municipal_map={r['city']:r for r in (municipal or {}).get('source_status',[])}
     live={r.get("city"):r for r in (five_city or {}).get("source_status",[])
           if isinstance(r,dict) and r.get("automated_source_recovered_this_stage")}
+    council_failures = extra_source_failures(root)
     results=[]
     for city,url in SOURCES.items():
         h=html.get(city,{})
@@ -46,7 +48,10 @@ def build(root,html_status,toronto_brampton_gis,other_gis,markham,municipal=None
         live_n=int(live.get(city,{}).get("application_id_rows_this_stage",0) or 0)
         total=html_n+gis_n+pdf_n+mun_n+csv_n+live_n
         index_status=h.get("fetch_status","NOT_RUN")
-        if total>0:
+        if total>0 and council_failures.get(city):
+            measured="PARTIAL_APPLICATION_CANDIDATES_PARALLEL_GIS_BLOCKED"
+            missing="Parallel official GIS sources blocked; application details and complete citywide coverage unverified"
+        elif total>0:
             measured="APPLICATION_CANDIDATES_EXTRACTED_NOT_CITYWIDE_COMPLETE"
             missing="Actual project verification, reliable posting/change dates and full citywide coverage"
         elif index_status=="FETCH_FAILED" and not any(r["status"] in
@@ -57,6 +62,9 @@ def build(root,html_status,toronto_brampton_gis,other_gis,markham,municipal=None
             measured="NO_APPLICATION_RECORDS_EXTRACTED"
             missing="Official application-level adapter; index response alone is insufficient"
         details=" | ".join(r["source"]+":"+r["status"] for r in layers)
+        if council_failures.get(city):
+            details += " | " + " | ".join(x["source_id"]+":"+x["status"]
+                                      for x in council_failures[city])
         if mun:details+=" | MunicipalFeed:"+mun.get("state","UNKNOWN")
         if city=="Toronto" and toronto_csv:details+=" | TorontoCKAN:"+toronto_csv.get("status","UNKNOWN")
         if live_n:details+=" | LiveOfficialNotice:"+str(live_n)

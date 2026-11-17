@@ -15,6 +15,7 @@ from collections import defaultdict
 from pathlib import Path
 
 from gta_early_applications import SOURCES
+from gta_cross_collector_health import extra_source_failures
 
 INPUTS={
     "TORONTO_CKAN":"GTA_RADAR_TORONTO_OPEN_DATA_APPLICATIONS.csv",
@@ -22,6 +23,7 @@ INPUTS={
     "BURLINGTON_GIS":"GTA_RADAR_BURLINGTON_GIS_PROJECTS.csv",
     "MUNICIPAL_HTML":"GTA_RADAR_MUNICIPAL_PROJECT_FEED.csv",
     "EARLY_HTML":"GTA_RADAR_EARLY_APPLICATION_CANDIDATES.csv",
+    "MISSISSAUGA_HTML_DETAIL":"GTA_RADAR_MISSISSAUGA_DETAIL_APPLICATIONS.csv",
     "TORONTO_BRAMP_GIS":"GTA_RADAR_STRUCTURED_APPLICATIONS_TORONTO_BRAMPTON.csv",
     "HAMILTON_KITCHENER_GIS":"GTA_RADAR_ADDITIONAL_CITY_GIS_APPLICATIONS.csv",
     "MARKHAM_CIRCULATION_PDF":"GTA_RADAR_MARKHAM_CIRCULATED_APPLICATIONS.csv",
@@ -128,6 +130,14 @@ def _aggregate(records):
             r["record_kind"]=="APPLICATION_ID",
             len(r["description"]),bool(r["source_url"])),reverse=True)
         best=ranked[0]
+        # An official date may be carried on a shorter source row. Do not
+        # discard it merely because a second source has a longer description.
+        # A filing/received/circulation date is NOT original publication.
+        valid_dates = sorted((r for r in members
+            if re.fullmatch(r"20\d{2}-\d{2}-\d{2}", r["date"])
+            and r["date"] <= dt.date.today().isoformat()),
+            key=lambda r:(r["date"], r["source"]))
+        dated = valid_dates[0] if valid_dates else None
         sources=sorted(set(r["source"] for r in members))
         links=sorted(set(r["source_url"] for r in members if r["source_url"]))
         observed=[r["first_seen_local"] for r in members if r["first_seen_local"]]
@@ -158,8 +168,9 @@ def _aggregate(records):
         allrows.append({"canonical_id":key,"city":best["city"],
             "record_kind":best["record_kind"],"application_id":best["application_id"],
             "address":best["address"],"description":best["description"],
-            "current_status":best["current_status"],"date":best["date"],
-            "date_basis":best["date_basis"],
+            "current_status":best["current_status"],
+            "date":dated["date"] if dated else best["date"],
+            "date_basis":dated["date_basis"] if dated else best["date_basis"],
             "application_year_hint":best["application_year_hint"],
             "source_count":len(sources),"source_types":"; ".join(sources),
             "evidence_urls":"; ".join(links),
@@ -204,6 +215,9 @@ def build(results):
     ckan=_json(root/"GTA_RADAR_TORONTO_OPEN_DATA_STATUS.json")
     guelph=_json(root/"GTA_RADAR_GUELPH_GIS_STATUS.json")
     burlington=_json(root/"GTA_RADAR_BURLINGTON_GIS_STATUS.json")
+    # Read separate council GIS status reports as well as core collector logs.
+    # A working HTML index must not hide an unsuccessful official GIS feed.
+    council_gis_failures = extra_source_failures(root)
     health=[]
     for city in SOURCES:
         items=by_city[city]
@@ -228,10 +242,17 @@ def build(results):
                 failures.append("GUELPH_GIS:"+_text(gi.get("error")))
         if city=="Toronto" and ckan.get("status")=="FAILED":
             failures.append("CKAN:"+_text(ckan.get("error")))
+        for item in council_gis_failures.get(city, []):
+            failures.append(_text(item["source_id"]) + ":" +
+                            _text(item["status"]) + ":" + _text(item["reason"]))
+        # Distinct recorded source attempts only; a related successful HTML
+        # source does not nullify other policy-blocked layers.
+        failures = list(dict.fromkeys(failures))
         n_app=sum(r["record_kind"]=="APPLICATION_ID" for r in items)
         n_signal=sum(r["record_kind"]=="PROJECT_ONLY_SIGNAL" for r in items)
         # A city's application feed is not automatically exhaustive.
-        state=("APPLICATION_RECORDS_EXTRACTED_NOT_CITYWIDE_VERIFIED" if n_app else
+        state=("PARTIAL_APPLICATION_RECORDS_WITH_SOURCE_FAILURES" if n_app and failures else
+               "APPLICATION_RECORDS_EXTRACTED_NOT_CITYWIDE_VERIFIED" if n_app else
                "PROJECT_SIGNALS_ONLY" if n_signal else
                "SOURCE_FAILURE_NO_RECORDS" if failures else
                "NO_RECORDS_VERIFIED")
@@ -240,7 +261,10 @@ def build(results):
                        "new_or_changed_review":sum(r["review_priority"]=="MANUAL_REVIEW" for r in items),
                        "official_sources_with_records":len(sources_with_records),
                        "source_failures":len(failures),
-                       "access_failures":sum("ROBOTS" in x or "HTTP_403" in x for x in failures),
+                       "access_failures":sum(any(code in x.upper() for code in
+                            ("ROBOTS", "HTTP_403", "HTTP 403",
+                             "CERTIFICATE_VERIFY_FAILED", "ACCESS_DENIED",
+                             "PERMISSION")) for x in failures),
                        "source_notes":"; ".join(failures)[:1200],
                        "quality_status":state})
     _write(root/OUTPUT_ALL,FIELDS,master)
