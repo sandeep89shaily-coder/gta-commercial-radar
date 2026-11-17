@@ -604,6 +604,42 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
             "error_type": type(exc).__name__,
         }
 
+    # Customer evidence release is SEPARATE from freshness-ranked internal
+    # research. No buyer or live open tender may be certified by source dates,
+    # model text, corporate contact pages or same-address records alone.
+    if not skip_collection:
+        try:
+            from gta_fresh_customer_release_gate import run as release_fresh
+            customer_release = release_fresh(results, workspace=ws)
+            report["fresh_customer_release_gate"] = {
+                "status": customer_release["status"],
+                "candidates_considered": customer_release["candidates_considered"],
+                "reviewed_source_matched_early_warnings": customer_release[
+                    "reviewed_source_matched_early_warnings"],
+                "held_research_candidates": customer_release["held_research_candidates"],
+                "reviewed_open_listings_pending_live_recheck": customer_release[
+                    "reviewed_open_listings_pending_live_recheck"],
+                "independently_live_verified_open_supplier_contracts": 0,
+                "outreach_authorized": False, "paid_calls": 0,
+            }
+        except (OSError, ValueError, TypeError, KeyError, ImportError) as exc:
+            # If a review manifest is corrupt, never leave a stale READY CSV
+            # from a previous run in the current export directory.
+            from gta_fresh_customer_release_gate import EARLY, OPEN
+            for name in (EARLY, OPEN):
+                (results / name).write_text("", encoding="utf-8")
+            report["fresh_customer_release_gate"] = {
+                "status": "EVIDENCE_GATE_FAILURE_CUSTOMER_RELEASE_BLOCKED",
+                "error_type": type(exc).__name__,
+                "independently_live_verified_open_supplier_contracts": 0,
+                "outreach_authorized": False,
+            }
+    else:
+        report["fresh_customer_release_gate"] = {
+            "status": "HISTORICAL_MODE_NO_CURRENT_CUSTOMER_RELEASE",
+            "outreach_authorized": False,
+        }
+
     passed = sum(x["status"] == "PASSED" for x in report["stages"])
     failed = [x["name"] for x in report["stages"]
               if x["status"] == "FAILED"]
