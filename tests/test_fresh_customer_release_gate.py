@@ -214,6 +214,19 @@ class FreshReleaseGateTests(unittest.TestCase):
         result = run(self.root, workspace=self.owner, today=DAY)
         self.assertIn("CANDIDATE_SOURCE_SNAPSHOT_CHANGED", result["hold_reasons"])
 
+    def test_previously_reported_candidate_cannot_be_released_twice(self):
+        case = review(self.candidate)
+        self.persist(case)
+        save_csv(self.owner / "GTA_RADAR_CLIENT_REPORT_HISTORY.csv", [{
+            "report_date": "2026-11-15", "report_name": "Already sent",
+            "opportunity_id": self.candidate["record_id"],
+            "city": self.candidate["city"],
+            "address": self.candidate["address"],
+        }])
+        outcome = run(self.root, workspace=self.owner, today=DAY)
+        self.assertEqual(outcome["reviewed_source_matched_early_warnings"], 0)
+        self.assertIn("PROJECT_PREVIOUSLY_REPORTED_TO_CLIENT", outcome["hold_reasons"])
+
     def test_duplicate_review_cases_fail_closed(self):
         case = review(self.candidate)
         (self.owner / REVIEW).write_text(json.dumps({"cases": [case, case]}))
