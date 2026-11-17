@@ -15,6 +15,7 @@ from collections import defaultdict
 from pathlib import Path
 
 from gta_early_applications import SOURCES
+from gta_cross_collector_health import extra_source_failures
 
 INPUTS={
     "TORONTO_CKAN":"GTA_RADAR_TORONTO_OPEN_DATA_APPLICATIONS.csv",
@@ -204,6 +205,9 @@ def build(results):
     ckan=_json(root/"GTA_RADAR_TORONTO_OPEN_DATA_STATUS.json")
     guelph=_json(root/"GTA_RADAR_GUELPH_GIS_STATUS.json")
     burlington=_json(root/"GTA_RADAR_BURLINGTON_GIS_STATUS.json")
+    # Read separate council GIS status reports as well as core collector logs.
+    # A working HTML index must not hide an unsuccessful official GIS feed.
+    council_gis_failures = extra_source_failures(root)
     health=[]
     for city in SOURCES:
         items=by_city[city]
@@ -228,10 +232,17 @@ def build(results):
                 failures.append("GUELPH_GIS:"+_text(gi.get("error")))
         if city=="Toronto" and ckan.get("status")=="FAILED":
             failures.append("CKAN:"+_text(ckan.get("error")))
+        for item in council_gis_failures.get(city, []):
+            failures.append(_text(item["source_id"]) + ":" +
+                            _text(item["status"]) + ":" + _text(item["reason"]))
+        # Distinct recorded source attempts only; a related successful HTML
+        # source does not nullify other policy-blocked layers.
+        failures = list(dict.fromkeys(failures))
         n_app=sum(r["record_kind"]=="APPLICATION_ID" for r in items)
         n_signal=sum(r["record_kind"]=="PROJECT_ONLY_SIGNAL" for r in items)
         # A city's application feed is not automatically exhaustive.
-        state=("APPLICATION_RECORDS_EXTRACTED_NOT_CITYWIDE_VERIFIED" if n_app else
+        state=("PARTIAL_APPLICATION_RECORDS_WITH_SOURCE_FAILURES" if n_app and failures else
+               "APPLICATION_RECORDS_EXTRACTED_NOT_CITYWIDE_VERIFIED" if n_app else
                "PROJECT_SIGNALS_ONLY" if n_signal else
                "SOURCE_FAILURE_NO_RECORDS" if failures else
                "NO_RECORDS_VERIFIED")
