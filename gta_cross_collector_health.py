@@ -93,19 +93,21 @@ def build(results):
         base = int(src.get("source_failures") or 0)
         access = int(src.get("access_failures") or 0)
         applications = int(src.get("application_files") or 0)
+        existing_notes = str(src.get("source_notes") or "")
+        missing_from_consolidated = [x for x in extra if x["source_id"] not in existing_notes]
+        newly_exposed_access = sum(x["access_failure"] for x in missing_from_consolidated)
         cities.append({
             "city": city,
             "canonical_application_files_not_new_projects": applications,
             "original_reported_failed_sources": base,
             "extra_council_gis_failures": len(extra),
-            "reconciled_source_failures": base + len(extra),
-            "reconciled_access_failures": access + sum(
-                1 for item in extra if item["access_failure"]),
+            "reconciled_source_failures": base + len(missing_from_consolidated),
+            "reconciled_access_failures": access + newly_exposed_access,
             "source_coverage": (
                 "PARTIAL_APPLICATION_RECORDS_WITH_FAILED_PARALLEL_FEEDS"
-                if applications and base + len(extra) else
+                if applications and base + len(missing_from_consolidated) else
                 "SOURCE_FAILURE_NO_CONFIRMED_APPLICATION_RECORDS"
-                if base + len(extra) else
+                if base + len(missing_from_consolidated) else
                 "SOME_APPLICATION_RECORDS_NOT_CITYWIDE_COMPLETE"
                 if applications else "NO_APPLICATION_RECORDS_COVERAGE_UNKNOWN"),
             "live_feed_completeness_verified": False,
