@@ -276,4 +276,25 @@ def finalize(results, *, state=None, pool=None, today=None):
     }
     (root/FINAL_STATUS).write_text(json.dumps(summary,indent=2),
                                    encoding="utf-8")
+    combined_status_path = root / "GTA_RADAR_COMBINED_24_CITY_STATUS.json"
+    try:
+        combined = json.loads(combined_status_path.read_text(encoding="utf-8"))
+        if isinstance(combined, dict) and combined.get("configured_city_count")==24:
+            combined.update({
+                "paid_ai_review_scope":"COMBINED_16_PLUS_8",
+                "standard_paid_ai_top10_already_runs_in_upstream_daily_stage":False,
+                "standard_paid_ai_top10_includes_expansion":matched,
+                "combined_model_decisions_applied":matched,
+                "combined_ai_top10_status":origin,
+                "combined_final_top10_csv":FINAL_TOP10,
+                "combined_research_top10_is_offline_not_deepseek_approved":not matched,
+                "verified_buyers":0, "verified_new_publications":0,
+                "verified_open_supplier_contracts":0,
+            })
+            combined_status_path.write_text(json.dumps(combined,indent=2),
+                                           encoding="utf-8")
+    except (OSError, ValueError, TypeError):
+        # The separate AI status file still documents the model outcome;
+        # never invent a success flag when a prior status is malformed.
+        pass
     return summary
