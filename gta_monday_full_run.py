@@ -582,6 +582,45 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
             "status": "NOT_RUN_HISTORICAL_OR_INJECTED_RUN",
         }
 
+    # Real per-source evidence is different from a configured city count.
+    # Audit all 24 cities even when a source is blocked or produces only
+    # an index page. The combined master can preserve historical files
+    # without claiming those files were newly fetched or published today.
+    if (not skip_collection and runner is None and
+            report.get("combined_24_city_collection", {}).get("status") ==
+            "COMBINED_16_PLUS_8_RESEARCH_ONLY_NOT_CUSTOMER_RELEASE"):
+        try:
+            from gta_24_city_source_readiness import run as check_city_readiness
+            audit24 = check_city_readiness(results)
+            report["combined_24_city_source_readiness"] = {
+                "status": audit24["status"],
+                "configured_cities": audit24["configured_cities"],
+                "cities_with_reported_live_application_source_rows": audit24[
+                    "cities_with_reported_live_application_source_rows"],
+                "cities_with_failed_or_blocked_source_lanes": audit24[
+                    "cities_with_failed_or_blocked_source_lanes"],
+                "cities_without_live_application_source_rows": audit24[
+                    "cities_without_live_application_source_rows"],
+                "blocked_city_names": audit24["blocked_city_names"],
+                "citywide_complete_coverage_verified": 0,
+                "report": str(results / "GTA_RADAR_COMBINED_24_CITY_LIVE_SOURCE_READINESS.csv"),
+                "paid_calls": 0,
+            }
+            print("24-CITY SOURCE READINESS: live application source rows in "
+                  + str(audit24["cities_with_reported_live_application_source_rows"])
+                  + "/24 cities; blocked/failed sources in "
+                  + str(audit24["cities_with_failed_or_blocked_source_lanes"])
+                  + " cities; verified citywide complete: 0/24.", flush=True)
+        except (OSError, ValueError, TypeError, KeyError, ImportError) as exc:
+            report["combined_24_city_source_readiness"] = {
+                "status":"24_CITY_SOURCE_READINESS_AUDIT_FAILED",
+                "error_type":type(exc).__name__,
+                "citywide_complete_coverage_verified":0,
+            }
+    else:
+        report["combined_24_city_source_readiness"] = {
+            "status":"NOT_RUN_COMBINED_COLLECTION_UNAVAILABLE_OR_HISTORICAL"}
+
     # This is now the ONLY paid Top 10 model assessment on real full runs.
     # It begins after the combined 24-city input is built; legacy stage above
     # is intentionally deferred so the owner does not pay for two 24-project
