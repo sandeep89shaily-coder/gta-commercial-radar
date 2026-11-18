@@ -142,6 +142,17 @@ class NorthernMajorCityTests(unittest.TestCase):
                          "PENDING_PROJECT_SIGNAL_NO_EXACT_FILE_ID")
         self.assertEqual(fallback[0]["publication_date_verified"],"False")
 
+    def test_sudbury_notice_document_index_is_not_an_application(self):
+        url=n.SUDBURY_DOC_INDEX+"noc-nov-16-2026/"
+        body = '<main><a href="' + url + '">' + (
+            'noc nov 16 2026</a><a href="/about">General information</a></main>')
+        docs=n._sudbury_official_notice_documents(body)
+        self.assertEqual(len(docs),1)
+        self.assertEqual(docs[0]["planning_application_id"],"")
+        self.assertEqual(docs[0]["source_published_date"],"")
+        self.assertEqual(docs[0]["record_classification"],
+                         "OFFICIAL_NOTICE_DOCUMENT_LINK_NOT_PROJECT")
+
     def test_northbay_notice_exact_id_not_original_publication(self):
         links=n._nb_links(NB_INDEX)
         self.assertEqual(links,[(NB_NOTICE,
@@ -161,6 +172,23 @@ class NorthernMajorCityTests(unittest.TestCase):
         self.assertEqual(record["record_kind"],
                          "OFFICIAL_NOTICE_LINK_ONLY_NO_APPLICATION_ID")
         self.assertEqual(record["source_date"],"")
+
+    def test_citywide_policy_notice_not_project_lead(self):
+        generic = """<html><h1>Notice Of Public Meeting In The Matter Of Proposed
+        Amendments To The Official Plan To Implement Policies And Regulations
+        For Additional Dwelling Units and Delegated Approval</h1>
+        <div>Citywide zoning policy regulations for accessory dwelling units.
+        No specific applicant or civic property is identified.</div></html>"""
+        with self.assertRaisesRegex(ValueError,
+                "NON_PROJECT_POLICY_NOTICE_NO_FILE_ID_OR_CIVIC_SITE"):
+            n._nb_detail(generic,NB_NOTICE)
+        def mock(url):
+            return generic if url == NB_NOTICE else html(url)
+        result=n.run(self.root,today=self.today,html_fetch=mock,json_fetch=gis)
+        nb=next(x for x in result["source_details"] if x["city"]=="North Bay")
+        self.assertEqual(nb["records"],0)
+        self.assertEqual(nb["policy_notices_excluded"],1)
+        self.assertEqual(nb["status"],"NO_EXACT_PLANNING_NOTICES_DISCOVERED")
 
     def test_first_run_baseline_is_not_new_publication(self):
         first=n.run(self.root,today=self.today,html_fetch=html,json_fetch=gis)

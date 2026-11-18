@@ -127,6 +127,15 @@ def _applicant(h1):
     for value in seen:
         if value in STAGES or len(value) > 110:
             continue
+        # Heading text was falsely counted as an applicant on SIX of the
+        # thirty pages in the Nov 17 operator archive (6/30 false names).
+        # Keep missing names blank rather than inventing a firm/role.
+        if value.strip().casefold() in (
+                "active development applications",
+                "development applications",
+                "planning and development",
+                "current development applications"):
+            continue
         if value.lower().startswith(("skip to", "menu", "back", "search")):
             continue
         if (re.search(r"\b(?:inc\.?|corp\.?|corporation|ltd\.?|limited|"

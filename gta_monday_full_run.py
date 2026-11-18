@@ -493,6 +493,32 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
             "new_cities_added_to_core_16":0,
         }
 
+    # The raw Barrie permit feed is thousands of mostly historical records.
+    # Make a narrow commercial research queue without promoting permits or
+    # applicant/agent source claims to buyer-ready leads. No network/AI.
+    if not skip_collection and runner is None:
+        try:
+            from gta_northern_commercial_research import run as northern_research
+            review_north = northern_research(results)
+            report["northern_commercial_research_quality"] = {
+                "status": review_north["status"],
+                "private_research_worklist_rows": review_north[
+                    "private_research_worklist_rows"],
+                "historical_issued_permits_excluded_from_early_research":
+                    review_north["historical_issued_permits_excluded_from_early_research"],
+                "verified_buyers": 0,
+                "new_paid_ai_calls": 0,
+            }
+        except (OSError, ValueError, TypeError, RuntimeError, ImportError) as exc:
+            report["northern_commercial_research_quality"] = {
+                "status": "NORTH_RESEARCH_QUALITY_HELD",
+                "error_type": type(exc).__name__,
+                "verified_buyers": 0, "new_paid_ai_calls": 0,
+            }
+    else:
+        report["northern_commercial_research_quality"] = {
+            "status": "NOT_RUN_HISTORICAL_OR_TEST_INJECTED"}
+
     # Read-only quality report is part of post-run evidence accounting, not a
     # new collector/stage. Preserve the established seven-stage contract.
     if not skip_collection:
