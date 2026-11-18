@@ -74,6 +74,9 @@ def _model_row(row):
             not row.get("application_id") or not row.get("address") or
             len(row.get("scope") or "") < 42 or not _source_url(row)):
         return None
+    if str(row.get("scope") or "").lstrip().upper().startswith((
+            "INACTIVE ", "CLOSED ", "WITHDRAWN ", "CANCELLED ", "CANCELED ")):
+        return None
     ident = row["canonical_id"]
     description = row["scope"]
     result = {
