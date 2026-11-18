@@ -381,6 +381,11 @@ def _nb_detail(markup, url):
     scope = body[body.find(title)+len(title):][:1100] if title in body else body[:1100]
     addr = re.search(r"\b(?:located at|lands at|property at)\s+([0-9]{1,5}\s+[^.,;]{4,100})",
                      body, re.I)
+    # The November 17 source scan mistakenly accepted a citywide ADU zoning
+    # POLICY consultation as a development lead. Require a specific planning
+    # file ID or civic project site before retaining notice evidence.
+    if not file_id and not addr:
+        raise ValueError("NON_PROJECT_POLICY_NOTICE_NO_FILE_ID_OR_CIVIC_SITE")
     return _make("North Bay","NORTH_BAY_OFFICIAL_PLANNING_NOTICE",
         file_id or url, url,
         record_kind=("EXACT_APPLICATION_FILE_ID" if file_id
@@ -453,7 +458,8 @@ def run(results, *, today=None, html_fetch=None, json_fetch=None):
     sources.append(sud)
     nb = {"city":"North Bay","lane":"PUBLIC_PLANNING_NOTICES",
           "source":NORTH_BAY,"records":0,"status":"SOURCE_HELD",
-          "notices_examined":0,"detail_errors":[]}
+          "notices_examined":0,"detail_errors":[],
+          "policy_notices_excluded":0}
     try:
         links = []
         for pg in range(1,MAX_NB_PAGES+1):
@@ -465,6 +471,12 @@ def run(results, *, today=None, html_fetch=None, json_fetch=None):
                 row=_nb_detail(fetch_html(url),url)
                 keep(row)
                 nb["records"]+=1
+            except ValueError as exc:
+                if str(exc) == "NON_PROJECT_POLICY_NOTICE_NO_FILE_ID_OR_CIVIC_SITE":
+                    nb["policy_notices_excluded"] += 1
+                else:
+                    nb["detail_errors"].append({"url":url,"error":
+                        type(exc).__name__+":"+str(exc)[:150]})
             except Exception as exc:
                 nb["detail_errors"].append({"url":url,"error":
                     type(exc).__name__+":"+str(exc)[:150]})
