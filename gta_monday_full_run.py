@@ -878,6 +878,10 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
         else "REVIEW_COMPLETED_WITH_FAILURES" if failed
         else "SAVED_DATA_REVIEW_ONLY_NO_NEW_COLLECTION"
     )
+    if (not skip_collection and runner is None and
+            report.get("combined_24_city_collection", {}).get("status") !=
+            "COMBINED_16_PLUS_8_RESEARCH_ONLY_NOT_CUSTOMER_RELEASE"):
+        report["status"] = "COMBINED_24_CITY_INTEGRATION_FAILED"
     report["finished_utc"] = dt.datetime.now(dt.timezone.utc).isoformat()
     report["report_html"] = str(index)
     save()
