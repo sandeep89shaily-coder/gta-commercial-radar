@@ -272,7 +272,7 @@ def parse_stc(markup, url, *, today=None):
     # label between it and the title. Search only the bounded pre-PROPOSAL
     # article metadata, never the application-completion paragraph.
     near = content[content.find(title) + len(title):][:220] if title in content else ""
-    cutoff = re.search(r"\\bPROPOSAL\\b|\\bThe Planning and Building Services\\b", near, re.I)
+    cutoff = re.search(r"\bPROPOSAL\b|\bThe Planning and Building Services\b", near, re.I)
     if cutoff:
         near = near[:cutoff.start()]
     dates = PUB_SHORT.search(near) or PUB_LONG.search(near)
@@ -298,7 +298,7 @@ def parse_stc(markup, url, *, today=None):
     addr = re.search(r"\blands located at\s+([^.]{7,95})", content, re.I)
     result = _new("St. Catharines", "STC_PLANNING_NOTICE", ident, url,
         address=_clean(addr.group(1)) if addr else title.split(" - ")[-1][:110],
-        scope=scope[:1250], planner_name=re.sub(r"^(?:Contact|Email|Please)\\s+",
+        scope=scope[:1250], planner_name=re.sub(r"^(?:Contact|Email|Please)\s+",
                     "", person.group(1), flags=re.I) if person else "",
         planner_email_public=email.group() if email else "",
         contact_role="MUNICIPAL_PLANNER_NOT_PROJECT_BUYER" if email else "",
