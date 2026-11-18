@@ -43,8 +43,12 @@ INDEX = ("INDEX_ONLY", "NO_APPLICATION_ID", "NO_EXACT", "PROJECT_SIGNALS_ONLY",
          "SOURCE_BLOCKED_OR_UNSUPPORTED")
 
 
-def _obj(path):
+def _obj(path, *, not_before=None):
     try:
+        # A prior day's successful source status must not count as today's
+        # collection merely because its historical JSON remains on disk.
+        if not_before is not None and path.stat().st_mtime < not_before:
+            return {}
         j = json.loads(path.read_text(encoding="utf-8"))
         return j if isinstance(j, dict) else {}
     except (OSError, ValueError, UnicodeError):
@@ -90,21 +94,23 @@ def _check(city, source, status, count, observations):
     }
 
 
-def _sources(root):
+def _sources(root, *, not_before):
     out = defaultdict(list)
+    def current(name):
+        return _obj(root/name, not_before=not_before)
     def add(city, source, status, count=0, note=""):
         item = _check(city, source, status, count, note)
         if item is not None:
             out[city].append(item)
     # Old 16-city collectors. One HTML index can coexist with separate
     # functioning municipal/GIS/permit feeds: do not erase either.
-    early = _obj(root/"GTA_RADAR_EARLY_APPLICATION_SOURCE_STATUS.json")
+    early = current("GTA_RADAR_EARLY_APPLICATION_SOURCE_STATUS.json")
     for x in early.get("city_status",[]):
         if isinstance(x,dict):
             add(x.get("city"), "CORE_HTML_INDEX",
                 x.get("fetch_status"), x.get("actual_application_rows"),
                 x.get("reason",""))
-    municipal = _obj(root/"GTA_RADAR_MUNICIPAL_PROJECT_FEED_STATUS.json")
+    municipal = current("GTA_RADAR_MUNICIPAL_PROJECT_FEED_STATUS.json")
     for x in municipal.get("source_status",[]):
         if isinstance(x,dict):
             add(x.get("city"), "CORE_MUNICIPAL_PAGES",
@@ -114,7 +120,7 @@ def _sources(root):
             "GTA_RADAR_STRUCTURED_APPLICATION_SOURCE_STATUS.json",
             "GTA_RADAR_ADDITIONAL_CITY_GIS_STATUS.json",
             "GTA_RADAR_FIVE_CITY_RECOVERY_STATUS.json"):
-        result = _obj(root/name)
+        result = current(name)
         for x in result.get("source_status",[]):
             if isinstance(x,dict):
                 add(x.get("city"),name,
@@ -122,11 +128,11 @@ def _sources(root):
                     x.get("application_id_rows_this_stage") or
                     x.get("commercial_candidates") or x.get("records") or 0,
                     x.get("error",""))
-    ckan = _obj(root/"GTA_RADAR_TORONTO_OPEN_DATA_STATUS.json")
+    ckan = current("GTA_RADAR_TORONTO_OPEN_DATA_STATUS.json")
     add("Toronto","TORONTO_CKAN",ckan.get("status","NOT_REPORTED"),
         ckan.get("commercial_candidates",0))
     # Source-specific expansion lanes, not synthetic coverage counts.
-    ggh = _obj(root/"GTA_RADAR_GGH_EXPANSION_SOURCE_STATUS.json")
+    ggh = current("GTA_RADAR_GGH_EXPANSION_SOURCE_STATUS.json")
     for x in ggh.get("source_status",[]):
         if isinstance(x,dict) and x.get("city") in EXPANSION_CITIES:
             add(x["city"],"GGH_APPLICATION",x.get("state"),
@@ -139,7 +145,7 @@ def _sources(root):
         ident = str(item.get("application_id") or "").strip()
         if city in EXPANSION_CITIES and ident:
             three_detail_ids[city].add(ident.upper())
-    three = _obj(root/"GTA_RADAR_THREE_CITY_EVIDENCE_STATUS.json")
+    three = current("GTA_RADAR_THREE_CITY_EVIDENCE_STATUS.json")
     for x in three.get("sources",[]):
         if not isinstance(x,dict):
             continue
@@ -150,7 +156,7 @@ def _sources(root):
             "Niagara Falls","St. Catharines") else 0
         add(city,x.get("source_lane","THREE_CITY"),
             x.get("status"),count,x.get("failures",""))
-    northern = _obj(root/"GTA_RADAR_NORTHERN_MAJOR_CITY_STATUS.json")
+    northern = current("GTA_RADAR_NORTHERN_MAJOR_CITY_STATUS.json")
     for x in northern.get("source_details",[]):
         if not isinstance(x,dict):
             continue
@@ -158,7 +164,7 @@ def _sources(root):
         lane=x.get("lane")
         count=x.get("records") if (city=="Barrie" and lane=="PLANNING") else 0
         add(city,"NORTHERN_"+str(lane),x.get("status"),count,x.get("error",""))
-    nxt = _obj(root/"GTA_RADAR_NEXT_FOUR_MUNICIPALITIES_STATUS.json")
+    nxt = current("GTA_RADAR_NEXT_FOUR_MUNICIPALITIES_STATUS.json")
     for x in nxt.get("source_status",[]):
         if isinstance(x,dict) and x.get("city") in EXPANSION_CITIES:
             add(x["city"],"NEXT_FOUR_NOTICE",x.get("status"),
@@ -174,7 +180,13 @@ def run(results, *, today=None):
     coverage = _rows(root/COVERAGE)
     if len(coverage)!=24 or {r.get("city") for r in coverage}!=set(CITIES):
         raise ValueError("COMBINED_24_CITY_COVERAGE_MISSING_OR_INVALID")
-    per = _sources(root)
+    manifest = _obj(root/"MONDAY_FULL_RADAR"/"MONDAY_FULL_RADAR_STATUS.json")
+    started = manifest.get("started_utc")
+    try:
+        start = dt.datetime.fromisoformat(str(started)).timestamp() - 3
+    except (ValueError, TypeError, OverflowError):
+        raise ValueError("CURRENT_INTEGRATED_RUN_START_TIME_REQUIRED")
+    per = _sources(root, not_before=start)
     core = {r["city"]:r for r in coverage}
     allrows = []
     for city in CITIES:
@@ -230,6 +242,7 @@ def run(results, *, today=None):
             x["live_sources_with_application_ids"]==0 and
             x["blocked_or_failed_lanes"]==0 for x in allrows),
         "citywide_complete_coverage_verified":0,
+        "source_status_files_must_be_newer_than_integrated_run_start":True,
         "source_health_checked_for_every_configured_city":len(allrows)==24,
         "blocked_city_names":[x["city"] for x in allrows if
                               x["blocked_or_failed_lanes"]],
