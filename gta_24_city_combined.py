@@ -175,6 +175,19 @@ def _record(city, lane, ident, *, record_kind="APPLICATION", address="",
     }
 
 
+def _explicit_source_change(value):
+    """Only actual source-change states qualify; UNCHANGED is never CHANGED.
+
+    Nov 18 operator archive showed all 250 research queue rows labelled
+    SOURCE_CHANGED_NEEDS_REVIEW because substring \"CHANG\" matched UNCHANGED.
+    These are source-content changes, not original public project disclosures.
+    """
+    status = _clean(value).upper()
+    return status in ("CHANGED", "UPDATED", "SOURCE_UPDATED", "NEW_OR_CHANGED") or \
+        status.startswith(("SOURCE_CHANGED", "DETAIL_PAGE_CHANGED",
+                           "APPLICATION_CHANGED", "CHANGED_"))
+
+
 def _merge(records):
     buckets = defaultdict(list)
     for row in records:
@@ -212,7 +225,8 @@ def _merge(records):
             r["official_evidence_urls"] for r in members if r["official_evidence_urls"]))[:2500]
         obs = [r["source_observation"] for r in members]
         base["source_observation"] = (
-            "SOURCE_CHANGED_NEEDS_REVIEW" if any("CHANG" in v.upper() for v in obs)
+            "SOURCE_CHANGED_NEEDS_REVIEW" if any(
+                _explicit_source_change(v) for v in obs)
             else "FIRST_OBSERVED_NOT_FIRST_PUBLICATION"
             if any(v == "FIRST_OBSERVED" for v in obs)
             else "HISTORICAL_OR_UNCHANGED_BASELINE")
@@ -232,6 +246,13 @@ def _rank(row, day):
     if CLOSED.search(row["current_status"]):
         return None
     scope = row["scope"]
+    # Official Toronto records can say INACTIVE in description while
+    # a separate lifecycle field still says Under Review. Never let the
+    # more optimistic field override explicit inactive-source evidence.
+    if scope.lstrip().upper().startswith(("INACTIVE ", "CLOSED ",
+                                          "WITHDRAWN ", "CANCELLED ",
+                                          "CANCELED ")):
+        return None
     if len(scope) < 42:
         return None
     stage = row["current_status"].casefold()
@@ -247,8 +268,10 @@ def _rank(row, day):
         score += 12
     if "industrial" in scope.casefold() or "manufactur" in scope.casefold():
         score += 12
-    if "FIRST_OBSERVED" in row["source_observation"] or "CHANGED" in row["source_observation"]:
-        score += 7   # source event, NOT verified first publication
+    if row["source_observation"] in (
+            "FIRST_OBSERVED_NOT_FIRST_PUBLICATION",
+            "SOURCE_CHANGED_NEEDS_REVIEW"):
+        score += 7   # explicit source event; NOT first publication proof
     try:
         age = (day - dt.date.fromisoformat(row["source_date"])).days
         if 0 <= age <= 60:
