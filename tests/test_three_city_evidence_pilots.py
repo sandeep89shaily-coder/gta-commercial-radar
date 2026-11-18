@@ -142,6 +142,17 @@ class ThreeCityEvidenceTests(unittest.TestCase):
         self.assertIn("106602 OP",got["application_id"])
         self.assertFalse(got["first_project_publication_verified"]=="True")
 
+    def test_stc_live_article_metadata_date_and_lowercase_contact_name(self):
+        # November 17 run returned blank dates despite the official news
+        # pages showing dates just above the notice category/PROPOSAL heading.
+        page=stc_page().replace("<p>Nov 12, 2026</p>",
+            "<p>Nov 12, 2026</p><div>Public Notices</div>")
+        page=page.replace("Contact Dasha Litviniuc", "contact Dasha Litviniuc")
+        record=p.parse_stc(page,STC_URL,today=dt.date(2026,11,17))
+        self.assertEqual(record["notice_posted_date"],"2026-11-12")
+        self.assertEqual(record["application_complete_date"],"2025-10-16")
+        self.assertEqual(record["planner_name"],"Dasha Litviniuc")
+
     def test_date_is_not_fabricated_when_notice_lacks_posting(self):
         got=p.parse_stc(stc_page().replace("Nov 12, 2026",""),STC_URL,
                         today=dt.date(2026,11,17))
