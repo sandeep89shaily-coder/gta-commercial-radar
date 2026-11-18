@@ -11,7 +11,8 @@ import gta_24_city_combined as m
 
 def write_csv(path, rows):
     with path.open("w", encoding="utf-8", newline="") as fp:
-        writer = csv.DictWriter(fp, fieldnames=list(rows[0]))
+        fields = list(dict.fromkeys(k for r in rows for k in r))
+        writer = csv.DictWriter(fp, fieldnames=fields)
         writer.writeheader()
         writer.writerows(rows)
 
