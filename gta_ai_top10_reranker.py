@@ -245,17 +245,31 @@ def _validate(answer, count, batch=None, live_checks=None):
 
 
 def run(results, *, paid=False, deep_research=False, deep_project_limit=4,
-        key=None, transport=None, today=None):
+        key=None, transport=None, today=None, combined_24=False):
     root = Path(results)
     if not root.is_dir():
         raise ValueError("EXISTING_RADAR_RESULTS_REQUIRED")
     day = today or dt.date.today()
-    base = base_build(root, today=day, apply_ai=False)
-    pool = ai_candidate_pool(base["all_candidates"], MAX_CANDIDATES)
+    if combined_24:
+        from gta_24_city_ai_selection import candidates as combined_candidates
+        pool = combined_candidates(root, today=day, limit=MAX_CANDIDATES)
+        out = root / "GTA_RADAR_COMBINED_24_CITY_AI_TOP10_REVIEW.json"
+        batch_folder = "AI_COMBINED_24_REVIEW_BATCHES"
+        attempt_file = "GTA_RADAR_COMBINED_24_CITY_AI_TOP10_ATTEMPT_STATUS.json"
+    else:
+        base = base_build(root, today=day, apply_ai=False)
+        pool = ai_candidate_pool(base["all_candidates"], MAX_CANDIDATES)
+        out = root / AI_REVIEW
+        batch_folder = BATCH_DIR
+        attempt_file = ATTEMPT
     digest = ai_fingerprint(pool)
-    out = root / AI_REVIEW
     state = {
         "status": "FREE_PREFLIGHT_NOT_SUBMITTED" if not paid else "PENDING",
+        "selection_scope": "COMBINED_16_PLUS_8" if combined_24 else "LEGACY_CORE_ONLY",
+        "candidate_cities": list(dict.fromkeys(row["city"] for row in pool)),
+        "candidate_cohorts": dict((cohort, sum(1 for row in pool if
+            row.get("cohort")==cohort)) for cohort in ("CORE_16","EXPANSION_8"))
+            if combined_24 else {},
         "input_fingerprint": digest, "candidate_count": len(pool),
         "reviewed_count": 0, "accepted_batches": 0,
         "paid_model_calls": 0, "paid_search_fetch_calls": 0,
@@ -272,29 +286,42 @@ def run(results, *, paid=False, deep_research=False, deep_project_limit=4,
         "source_evidence_incomplete": False,
     }
     def save_attempt():
-        target = root / ATTEMPT
+        target = root / attempt_file
         tmp_attempt = target.with_suffix(".json.tmp")
         tmp_attempt.write_text(json.dumps(
             {k:v for k,v in state.items() if k != "reviews"},
             ensure_ascii=False, indent=2), encoding="utf-8")
         tmp_attempt.replace(target)
 
+    def finalize_combined():
+        if not combined_24:
+            return
+        from gta_24_city_ai_selection import finalize
+        selection = finalize(root, state=state, pool=pool, today=day)
+        state["combined_final_status"] = selection["status"]
+        state["combined_final_top10"] = str(root / "GTA_RADAR_COMBINED_24_CITY_TOP10.csv")
+        state["combined_model_applied"] = selection["model_decisions_applied"]
+        save_attempt()
+
     if not paid or not pool:
         state["status"] = "NO_CANDIDATES" if not pool else "FREE_PREFLIGHT_NOT_SUBMITTED"
         save_attempt()
+        if combined_24:
+            finalize_combined()
         return state
 
     token = v5.key_from_windows() if key is None else key
     if not token:
         state["status"] = "MISSING_API_KEY_NO_PAID_REVIEW"
         save_attempt()
+        finalize_combined()
         return state
 
     with once_lock(root):
         db = v5._ledger(root / "v5_ai_budget.sqlite")
         try:
             legacy = v5._legacy_reserved(root / "deepseek_budget.sqlite", day.isoformat())
-            review_root = root / BATCH_DIR
+            review_root = root / batch_folder
             review_root.mkdir(exist_ok=True)
             status = "AI_PRESELECTION_REVIEW_ONLY"
             live_checks = {}
@@ -331,6 +358,7 @@ def run(results, *, paid=False, deep_research=False, deep_project_limit=4,
                 state["live_recheck_issue_count"] = sum(
                     len(v.get("issues", [])) for v in live_checks.values())
                 save_attempt()
+                finalize_combined()
                 return state
             # Opt-in DeepSeek web research: model discovers URLs, then Radar
             # independently Fetches and rechecks them for permit/site identity.
@@ -378,7 +406,8 @@ def run(results, *, paid=False, deep_research=False, deep_project_limit=4,
                 evidence_fingerprint = hashlib.sha256(json.dumps(
                     [live_checks[(r["city"].casefold(),r["record_id"])]
                      for r in batch], sort_keys=True).encode("utf-8")).hexdigest()
-                claim = "ai_top10_company_v5_" + hashlib.sha256(
+                claim = ("ai24_company_v5_" if combined_24 else
+                         "ai_top10_company_v5_") + hashlib.sha256(
                     (digest + ":" + fingerprint + ":" + evidence_fingerprint
                      + ":" + day.isoformat()).encode()).hexdigest()[:26]
                 immutable = review_root / (claim + ".json")
@@ -499,6 +528,7 @@ def run(results, *, paid=False, deep_research=False, deep_project_limit=4,
         state["status"] = "AI_PRESELECTION_INCOMPLETE_" + state["status"]
         state["applies_to_top10"] = False
         save_attempt()
+        finalize_combined()
         return state
     state["status"] = "AI_TOP10_REVIEW_ONLY"
     state["applies_to_top10"] = True
@@ -506,6 +536,9 @@ def run(results, *, paid=False, deep_research=False, deep_project_limit=4,
     tmp.write_text(json.dumps(state, ensure_ascii=False, indent=2),
                    encoding="utf-8")
     tmp.replace(out)
+    if combined_24:
+        finalize_combined()
+        return state
     exported = regenerate_shortlist(root, today=day)
     state["top10_export_status"] = exported["top10_export_status"]
     state["latest_top10_analyst_csv"] = exported["outputs"]["top10_analyst_csv"]
