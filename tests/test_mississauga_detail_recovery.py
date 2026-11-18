@@ -75,6 +75,13 @@ class MississaugaDetailTests(unittest.TestCase):
         self.assertEqual(record["buyer_verified"], "False")
         self.assertEqual(record["publisher_first_construction_disclosure_verified"], "False")
 
+    def test_navigation_heading_is_not_a_named_company(self):
+        bogus = html().replace("2849404 Ontario Inc.", "Active development applications")
+        record = parse_detail(bogus, candidate(), today=date(2026, 11, 17))
+        self.assertEqual(record["applicant_name_source_claim"], "")
+        self.assertEqual(record["buyer_verified"], "False")
+        self.assertEqual(record["city_planner_email"], "connor.dipietro@mississauga.ca")
+
     def test_first_detail_crawl_baseline_not_new_project(self):
         called = []
         def fetch(url):
