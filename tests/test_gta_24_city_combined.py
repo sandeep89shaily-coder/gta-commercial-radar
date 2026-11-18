@@ -277,6 +277,45 @@ class Combined24CityTests(unittest.TestCase):
         self.assertEqual(status["blocked_or_failed_lanes"],"0")
         self.assertEqual(result["citywide_complete_coverage_verified"],0)
 
+    def test_unchanged_must_not_falsely_become_changed_and_gain_rank_points(self):
+        self.assertFalse(m._explicit_source_change("UNCHANGED"))
+        self.assertFalse(m._explicit_source_change("INITIAL_BASELINE_NOT_NEW"))
+        self.assertFalse(m._explicit_source_change("HISTORICAL_OR_UNCHANGED_BASELINE"))
+        self.assertTrue(m._explicit_source_change("SOURCE_CHANGED_NOT_VERIFIED_NEW_PROJECT"))
+        self.assertTrue(m._explicit_source_change("DETAIL_PAGE_CHANGED_NOT_NEW_PUBLICATION"))
+        m.run(self.root,today=dt.date(2026,11,18))
+        master=read_csv(self.root/m.MASTER)
+        miss=next(row for row in master if row["city"]=="Mississauga")
+        niag=next(row for row in master if row["city"]=="Niagara Falls")
+        self.assertEqual(miss["source_observation"],
+                         "HISTORICAL_OR_UNCHANGED_BASELINE")
+        self.assertEqual(niag["source_observation"],
+                         "HISTORICAL_OR_UNCHANGED_BASELINE")
+        older=dict(miss)
+        changed=dict(miss)
+        changed["source_observation"]="SOURCE_CHANGED_NEEDS_REVIEW"
+        self.assertEqual(m._rank(changed,dt.date(2026,11,18))-
+                         m._rank(older,dt.date(2026,11,18)), 7)
+
+    def test_explicit_inactive_project_is_excluded_even_if_stage_under_review(self):
+        from gta_24_city_ai_selection import _model_row
+        original={
+            "canonical_id":"TORONTO:FILE:12228867ESC40SA",
+            "city":"Toronto","cohort":"CORE_16","application_id":"12 228867 ESC 40 SA",
+            "record_kind":"APPLICATION","address":"30 Progress Avenue",
+            "scope":"INACTIVE Proposed place of worship in existing industrial building",
+            "project_title":"", "current_status":"Under Review",
+            "source_date":"", "source_date_basis":"UNKNOWN",
+            "official_evidence_urls":"https://open.toronto.ca/dataset/development-applications/",
+            "source_observation":"HISTORICAL_OR_UNCHANGED_BASELINE",
+            "applicant_or_agent_source_claim":"", "published_contact_email":"",
+        }
+        self.assertIsNone(m._rank(original,dt.date(2026,11,18)))
+        self.assertIsNone(_model_row(original))
+        original["scope"]="ACTIVE Site plan proposal for a new industrial building"
+        self.assertIsNotNone(m._rank(original,dt.date(2026,11,18)))
+        self.assertIsNotNone(_model_row(original))
+
     def test_core16_required_cannot_replace_with_eight_pilots(self):
         (self.root/"GTA_RADAR_COLLECTION_HEALTH.csv").unlink()
         with self.assertRaisesRegex(ValueError,"CORE_16_COLLECTION_MISSING"):
