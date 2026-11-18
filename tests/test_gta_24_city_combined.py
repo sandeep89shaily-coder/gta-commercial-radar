@@ -308,6 +308,7 @@ class Combined24CityTests(unittest.TestCase):
             "source_date":"", "source_date_basis":"UNKNOWN",
             "official_evidence_urls":"https://open.toronto.ca/dataset/development-applications/",
             "source_observation":"HISTORICAL_OR_UNCHANGED_BASELINE",
+            "commercial_text_match":"True",
             "applicant_or_agent_source_claim":"", "published_contact_email":"",
         }
         self.assertIsNone(m._rank(original,dt.date(2026,11,18)))
