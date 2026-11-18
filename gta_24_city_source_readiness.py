@@ -55,8 +55,10 @@ def _obj(path, *, not_before=None):
         return {}
 
 
-def _rows(path):
+def _rows(path, *, not_before=None):
     try:
+        if not_before is not None and path.stat().st_mtime < not_before:
+            return []
         with path.open(encoding="utf-8-sig", newline="") as fp:
             return list(csv.DictReader(fp))
     except (OSError, csv.Error, UnicodeError):
@@ -140,7 +142,8 @@ def _sources(root, *, not_before):
     # Check actual city-specific application IDs, not merely the number of
     # notice or detail pages fetched (St Catharines, Niagara Falls).
     three_detail_ids = defaultdict(set)
-    for item in _rows(root/"GTA_RADAR_THREE_CITY_EVIDENCE_CANDIDATES.csv"):
+    for item in _rows(root/"GTA_RADAR_THREE_CITY_EVIDENCE_CANDIDATES.csv",
+                      not_before=not_before):
         city = item.get("city")
         ident = str(item.get("application_id") or "").strip()
         if city in EXPANSION_CITIES and ident:
