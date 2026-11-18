@@ -125,6 +125,13 @@ class Combined24CityTests(unittest.TestCase):
             json.dumps({"sources":[{"city":"Brantford","source_lane":"PLANNING",
                 "status":"SOURCE_BLOCKED_OR_UNSUPPORTED",
                 "failures":["ROBOTS_ACCESS_DENIED"]}]}))
+        # Real source readiness is accepted only when status files are newer
+        # than this integrated full run's reported start time.
+        (self.root/"MONDAY_FULL_RADAR").mkdir(exist_ok=True)
+        (self.root/"MONDAY_FULL_RADAR"/"MONDAY_FULL_RADAR_STATUS.json").write_text(
+            json.dumps({"started_utc": (
+                dt.datetime.now(dt.timezone.utc)-dt.timedelta(seconds=60)
+                ).isoformat()}))
         (self.root/"GTA_RADAR_NORTHERN_MAJOR_CITY_STATUS.json").write_text(
             json.dumps({"source_details":[
                 {"city":"Greater Sudbury","lane":"PENDING_PLANNING",
@@ -254,6 +261,21 @@ class Combined24CityTests(unittest.TestCase):
             "measured_source_readiness"])
         self.assertEqual(next(r for r in rows if r["city"]=="Greater Sudbury")[
             "live_sources_with_application_ids"],"0")
+
+    def test_stale_source_status_not_mistaken_for_current_collection(self):
+        import os
+        from gta_24_city_source_readiness import run as source_readiness, OUTPUT
+        m.run(self.root,today=dt.date(2026,11,18))
+        path=self.root/"GTA_RADAR_THREE_CITY_EVIDENCE_STATUS.json"
+        start=json.loads((self.root/"MONDAY_FULL_RADAR"/
+            "MONDAY_FULL_RADAR_STATUS.json").read_text())["started_utc"]
+        old=dt.datetime.fromisoformat(start).timestamp()-3600
+        os.utime(path, (old,old))
+        result=source_readiness(self.root,today=dt.date(2026,11,18))
+        status=next(r for r in read_csv(self.root/OUTPUT)
+                    if r["city"]=="Brantford")
+        self.assertEqual(status["blocked_or_failed_lanes"],"0")
+        self.assertEqual(result["citywide_complete_coverage_verified"],0)
 
     def test_core16_required_cannot_replace_with_eight_pilots(self):
         (self.root/"GTA_RADAR_COLLECTION_HEALTH.csv").unlink()
