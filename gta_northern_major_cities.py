@@ -30,6 +30,8 @@ BARRIE = {
 }
 SUDBURY = ("https://www.greatersudbury.ca/do-business/planning-and-development/"
            "pending-planning-applications/")
+SUDBURY_DOC_INDEX = SUDBURY + "upcoming-docs/"
+SUDBURY_DOC_LINKS = "GTA_RADAR_SUDBURY_OFFICIAL_NOTICE_DOCUMENT_LINKS.csv"
 NORTH_BAY = "https://northbay.ca/city-government/media-room/public-notices/"
 SOURCE_FILE = "GTA_RADAR_NORTHERN_MAJOR_CITY_EVIDENCE.csv"
 CHANGED_FILE = "GTA_RADAR_NORTHERN_MAJOR_CITY_SOURCE_CHANGES.csv"
@@ -338,6 +340,42 @@ def _sudbury(markup):
     return list({x["candidate_id"]:x for x in found}.values())
 
 
+def _sudbury_official_notice_documents(markup):
+    # The main Sudbury pending-applications page returned a JS/index shell in
+    # the Nov 17 live crawl. Its sibling upcoming-docs directory does publish
+    # official dated notice PDFs. These are DOCUMENT LINKS, NOT applications.
+    soup = BeautifulSoup(markup, "html.parser")
+    main = soup.find("main") or soup
+    result = []
+    seen = set()
+    for a in main.find_all("a", href=True):
+        title = _clean(a.get_text(" ", strip=True))
+        url = urljoin(SUDBURY_DOC_INDEX, str(a["href"]))
+        parsed = urlsplit(url)
+        if (not _safe_url(url, "www.greatersudbury.ca",
+                          urlsplit(SUDBURY_DOC_INDEX).path)
+                or parsed.query or parsed.path.rstrip("/") ==
+                    urlsplit(SUDBURY_DOC_INDEX).path.rstrip("/")
+                or url in seen or not title):
+            continue
+        # No PDF is parsed here, no file ID is fabricated from a date/slug.
+        seen.add(url)
+        result.append({
+            "city": "Greater Sudbury", "document_label": title[:150],
+            "official_document_url": url,
+            "publisher_index_url": SUDBURY_DOC_INDEX,
+            "planning_application_id": "",
+            "project_name": "", "source_published_date": "",
+            "record_classification": "OFFICIAL_NOTICE_DOCUMENT_LINK_NOT_PROJECT",
+            "verification_required":
+                "Inspect official PDF, extract exact project application IDs, "
+                "site, applicant, proposal, and original public notice date."
+        })
+        if len(result) >= 30:
+            break
+    return result
+
+
 def _nb_links(markup):
     soup = BeautifulSoup(markup, "html.parser")
     main = soup.find("main") or soup
@@ -456,6 +494,27 @@ def run(results, *, today=None, html_fetch=None, json_fetch=None):
     except Exception as exc:
         sud["error"]=type(exc).__name__+":"+str(exc)[:170]
     sources.append(sud)
+    # Save official notice PDF link INDEX as a bounded human-research queue.
+    # Empty main-page HTML does not establish that no applications exist.
+    official_docs=[]
+    try:
+        official_docs=_sudbury_official_notice_documents(fetch_html(SUDBURY_DOC_INDEX))
+        sud["supplemental_document_index_status"] = (
+            "OFFICIAL_NOTICE_DOCUMENT_LINKS_ONLY" if official_docs else
+            "NO_OFFICIAL_NOTICE_DOCUMENT_LINKS_FOUND")
+    except Exception as exc:
+        sud["supplemental_document_index_status"]="NOTICE_DOCUMENT_INDEX_HELD"
+        sud["supplemental_document_index_error"] = type(exc).__name__+":"+str(exc)[:150]
+    sud["supplemental_notice_document_links"] = len(official_docs)
+    with (root / SUDBURY_DOC_LINKS).open("w", encoding="utf-8-sig", newline="") as stream:
+        doc_fields = ("city", "document_label", "official_document_url",
+            "publisher_index_url", "planning_application_id", "project_name",
+            "source_published_date", "record_classification", "verification_required")
+        writer = csv.DictWriter(stream, fieldnames=doc_fields)
+        writer.writeheader()
+        for line in official_docs:
+            writer.writerow({key: (("'" + str(line[key])) if str(line[key]).lstrip().startswith(
+                ("=", "+", "-", "@", "\\t", "\\r")) else line[key]) for key in doc_fields})
     nb = {"city":"North Bay","lane":"PUBLIC_PLANNING_NOTICES",
           "source":NORTH_BAY,"records":0,"status":"SOURCE_HELD",
           "notices_examined":0,"detail_errors":[],
