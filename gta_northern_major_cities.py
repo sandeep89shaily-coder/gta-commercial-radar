@@ -569,7 +569,7 @@ def run(results, *, today=None, html_fetch=None, json_fetch=None):
                   "North Bay planning notice dates and local first-observed dates "
                   "are NOT confirmed first public construction announcements. "
                   "Application IDs not disclosed by the City are never invented.",
-        "outputs":[SOURCE_FILE,CHANGED_FILE,STATUS_FILE],
+        "outputs":[SOURCE_FILE, CHANGED_FILE, STATUS_FILE, SUDBURY_DOC_LINKS],
     }
     (root/STATUS_FILE).write_text(json.dumps(audit,indent=2),
                                   encoding="utf-8")
