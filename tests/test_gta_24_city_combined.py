@@ -179,6 +179,82 @@ class Combined24CityTests(unittest.TestCase):
         self.assertTrue(all(r["purchasing_contact_verified"]=="False" for r in chosen))
         self.assertTrue(all(r["open_supplier_contract_verified"]=="False" for r in chosen))
 
+    def test_paid_ai_candidate_pool_uses_original_and_expansion_cities(self):
+        from gta_24_city_ai_selection import candidates
+        m.run(self.root,today=dt.date(2026,11,18))
+        selected=candidates(self.root,today=dt.date(2026,11,18))
+        self.assertGreaterEqual(len(selected),3)
+        self.assertEqual({r["cohort"] for r in selected},
+                         {"CORE_16","EXPANSION_8"})
+        self.assertTrue(all(r["origin"]=="COMBINED_24" for r in selected))
+        self.assertTrue(all(r["application_id"] and r["record_id"] and
+                            r["source_url"].startswith("https://")
+                            for r in selected))
+        self.assertNotIn("PMT26-0331",{r["application_id"] for r in selected})
+
+    def test_final_combined_ai_top10_evidence_guard_and_fallback(self):
+        from gta_24_city_ai_selection import (
+            candidates, finalize, FINAL_TOP10, FINAL_STATUS)
+        from gta_commercial_qualification_review import ai_fingerprint
+        m.run(self.root,today=dt.date(2026,11,18))
+        day=dt.date(2026,11,18)
+        pool=candidates(self.root,today=day)
+        bad=finalize(self.root,pool=pool,today=day,state={
+            "status":"AI_PRESELECTION_INCOMPLETE", "reviewed_count":1,
+            "reviews":[{"record_id":pool[0]["record_id"],"decision":"PREFER"}],
+            "input_fingerprint":ai_fingerprint(pool),
+        })
+        self.assertFalse(bad["model_decisions_applied"])
+        self.assertEqual(bad["top10_count"],len(read_csv(self.root/m.TOP10)))
+        self.assertTrue(all(x["ai_reviewed"]=="False" for x in
+                            read_csv(self.root/FINAL_TOP10)))
+        reviews=[
+            {"record_id":p["record_id"],
+             "decision":"PREFER" if i==0 else "NEUTRAL",
+             "reason":"Verify exact project role and original notice",
+             "next_check":"Search original applicant and construction firm",
+             "cited_live_source":{"url":p["source_url"],
+                "quote":"Literal independently fetched project text"}
+                    if i==0 else None,
+             "buyer_function_hypothesis":{"function":"UNKNOWN"}}
+            for i,p in enumerate(pool)
+        ]
+        state={
+            "status":"AI_TOP10_REVIEW_ONLY","input_fingerprint":ai_fingerprint(pool),
+            "reviewed_count":len(pool),"applies_to_top10":True,
+            "recheck_date":day.isoformat(),"reviews":reviews}
+        good=finalize(self.root,pool=pool,today=day,state=state)
+        self.assertTrue(good["model_decisions_applied"])
+        self.assertEqual(good["candidate_pool_count"],len(pool))
+        selected=read_csv(self.root/FINAL_TOP10)
+        self.assertTrue(all(x["ai_reviewed"]=="True" for x in selected))
+        self.assertTrue(all(x["purchasing_contact_verified"]=="False" and
+                            x["open_supplier_contract_verified"]=="False"
+                            for x in selected))
+        canonical=json.loads((self.root/"GTA_RADAR_COMBINED_24_CITY_STATUS.json").read_text())
+        self.assertTrue(canonical["standard_paid_ai_top10_includes_expansion"])
+        self.assertFalse(canonical["standard_paid_ai_top10_already_runs_in_upstream_daily_stage"])
+
+    def test_all_24_sources_report_live_readiness_not_fictitious_citywide(self):
+        from gta_24_city_source_readiness import run as source_readiness
+        from gta_24_city_source_readiness import OUTPUT
+        m.run(self.root,today=dt.date(2026,11,18))
+        report=source_readiness(self.root,today=dt.date(2026,11,18))
+        self.assertEqual(report["configured_cities"],24)
+        self.assertTrue(report["source_health_checked_for_every_configured_city"])
+        self.assertEqual(report["citywide_complete_coverage_verified"],0)
+        self.assertIn("Brantford",report["blocked_city_names"])
+        self.assertIn("Greater Sudbury",
+                      report["cities_without_live_application_source_rows"])
+        rows=read_csv(self.root/OUTPUT)
+        self.assertEqual(len(rows),24)
+        self.assertTrue(all(x["citywide_complete_coverage_verified"]=="False"
+                            for x in rows))
+        self.assertIn("FAILED",next(r for r in rows if r["city"]=="Brantford")[
+            "measured_source_readiness"])
+        self.assertEqual(next(r for r in rows if r["city"]=="Greater Sudbury")[
+            "live_sources_with_application_ids"],"0")
+
     def test_core16_required_cannot_replace_with_eight_pilots(self):
         (self.root/"GTA_RADAR_COLLECTION_HEALTH.csv").unlink()
         with self.assertRaisesRegex(ValueError,"CORE_16_COLLECTION_MISSING"):
