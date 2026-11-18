@@ -154,11 +154,26 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
             "<style>body{font:15px Arial;margin:2rem;max-width:1100px}"
             "table{border-collapse:collapse;width:100%}"
             "th,td{padding:9px;border:1px solid #bbb;text-align:left}</style>"
-            "</head><body><h1>GTA Radar — all-pilot manual run</h1>"
+            "</head><body><h1>GTA Radar — Combined 16 + 8 Municipalities</h1>"
             "<p>Status: <b>" + html.escape(report["status"]) + "</b></p>"
             "<p>Collector: " + ("fresh output required" if not skip_collection else
                                  "SKIPPED; saved evidence may be older") + "</p>"
             "<p>Source events are not verified buyers, openings or available contracts.</p>"
+            "<h2>Combined 24-city deliverables</h2>"
+            "<p><b>Primary cross-region Top 10:</b> "
+            "GTA_RADAR_COMBINED_24_CITY_TOP10.csv (DeepSeek only if all "
+            "reviewed candidates pass independent model/source checks).</p>"
+            "<p><b>Measured source coverage:</b> "
+            "GTA_RADAR_COMBINED_24_CITY_LIVE_SOURCE_READINESS.csv. "
+            "The 24 city entries are configured; citywide completeness "
+            "remains unverified when an official source is blocked.</p>"
+            "<p><b>DeepSeek outcome:</b> " + html.escape(str(
+                report.get("ai_top10_preselection", {}).get("status", "NOT_RUN")))
+            + " (candidate count " + html.escape(str(
+                report.get("ai_top10_preselection", {}).get("candidate_count", 0)))
+            + ", reviewed " + html.escape(str(
+                report.get("ai_top10_preselection", {}).get("reviewed_count", 0)))
+            + ").</p>"
             "<table><tr><th>Stage</th><th>Status</th><th>Exit</th><th>Log</th></tr>"
             + tr + "</table>"
             "<p>Review the individual pilot CSV/HTML reports under GTA_RADAR_RESULTS."
@@ -257,7 +272,15 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
             # unchanged. One shared ledger and the same cross-process lock
             # guard all model requests. Never claim a model hypothesis is a
             # verified buyer, open contract or first-publication date.
-            if report.get("fresh_collection_verified"):
+            if runner is None and report.get("fresh_collection_verified"):
+                # The paid run is moved AFTER the eight regional collectors
+                # and canonical 24-city dedup. No duplicate core-only spend.
+                report["ai_top10_preselection"] = {
+                    "status": "DEFERRED_TO_COMBINED_24_CITY_DEEPSEEK_STAGE",
+                    "paid_model_calls": 0,
+                    "verified_buyers": 0, "applies_to_top10": False,
+                }
+            elif report.get("fresh_collection_verified"):
                 try:
                     from gta_ai_top10_reranker import run as run_ai_preselection
                     pre = run_ai_preselection(results, paid=True)
@@ -574,6 +597,112 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
             "status": "NOT_RUN_HISTORICAL_OR_INJECTED_RUN",
         }
 
+    # Real per-source evidence is different from a configured city count.
+    # Audit all 24 cities even when a source is blocked or produces only
+    # an index page. The combined master can preserve historical files
+    # without claiming those files were newly fetched or published today.
+    if (not skip_collection and runner is None and
+            report.get("combined_24_city_collection", {}).get("status") ==
+            "COMBINED_16_PLUS_8_RESEARCH_ONLY_NOT_CUSTOMER_RELEASE"):
+        try:
+            from gta_24_city_source_readiness import run as check_city_readiness
+            audit24 = check_city_readiness(results)
+            report["combined_24_city_source_readiness"] = {
+                "status": audit24["status"],
+                "configured_cities": audit24["configured_cities"],
+                "cities_with_reported_live_application_source_rows": audit24[
+                    "cities_with_reported_live_application_source_rows"],
+                "cities_with_failed_or_blocked_source_lanes": audit24[
+                    "cities_with_failed_or_blocked_source_lanes"],
+                "cities_without_live_application_source_rows": audit24[
+                    "cities_without_live_application_source_rows"],
+                "blocked_city_names": audit24["blocked_city_names"],
+                "citywide_complete_coverage_verified": 0,
+                "report": str(results / "GTA_RADAR_COMBINED_24_CITY_LIVE_SOURCE_READINESS.csv"),
+                "paid_calls": 0,
+            }
+            print("24-CITY SOURCE READINESS: live application source rows in "
+                  + str(audit24["cities_with_reported_live_application_source_rows"])
+                  + "/24 cities; blocked/failed sources in "
+                  + str(audit24["cities_with_failed_or_blocked_source_lanes"])
+                  + " cities; verified citywide complete: 0/24.", flush=True)
+        except (OSError, ValueError, TypeError, KeyError, ImportError) as exc:
+            report["combined_24_city_source_readiness"] = {
+                "status":"24_CITY_SOURCE_READINESS_AUDIT_FAILED",
+                "error_type":type(exc).__name__,
+                "citywide_complete_coverage_verified":0,
+            }
+    else:
+        report["combined_24_city_source_readiness"] = {
+            "status":"NOT_RUN_COMBINED_COLLECTION_UNAVAILABLE_OR_HISTORICAL"}
+
+    # This is now the ONLY paid Top 10 model assessment on real full runs.
+    # It begins after the combined 24-city input is built; legacy stage above
+    # is intentionally deferred so the owner does not pay for two 24-project
+    # reviews or receive a legacy-only DeepSeek ranking.
+    if (not skip_collection and runner is None and
+            report.get("combined_24_city_collection", {}).get("status") ==
+                "COMBINED_16_PLUS_8_RESEARCH_ONLY_NOT_CUSTOMER_RELEASE"):
+        try:
+            from gta_ai_top10_reranker import run as review_deepseek_24
+            combined_ai = review_deepseek_24(results, paid=True, combined_24=True)
+            report["ai_top10_preselection"] = {
+                "status": combined_ai["status"],
+                "selection_scope": "COMBINED_16_PLUS_8",
+                "candidate_count": combined_ai["candidate_count"],
+                "candidate_cities": combined_ai.get("candidate_cities", []),
+                "candidate_cohorts": combined_ai.get("candidate_cohorts", {}),
+                "reviewed_count": combined_ai["reviewed_count"],
+                "paid_model_calls": combined_ai["paid_model_calls"],
+                "live_sources_retrieved": combined_ai.get("live_sources_retrieved", 0),
+                "applies_to_top10": combined_ai.get("combined_model_applied", False),
+                "final_top10_csv": combined_ai.get("combined_final_top10", ""),
+                "verified_buyers": 0, "verified_supplier_contracts": 0,
+                "outreach_authorized": False,
+            }
+            report["combined_24_city_collection"]["ai_model_scope"] = \
+                "COMBINED_16_PLUS_8"
+            report["combined_24_city_collection"]["model_decisions_applied"] = \
+                bool(combined_ai.get("combined_model_applied"))
+            report["combined_24_city_collection"]["upstream_deepseek_did_not_review_expansion_cities"] = \
+                not bool(combined_ai.get("combined_model_applied"))
+            report["combined_24_city_collection"]["final_top10"] = \
+                combined_ai.get("combined_final_top10", "")
+            print("24-CITY DEEPSEEK REVIEW: "
+                  + combined_ai["status"]
+                  + " | reviewed " + str(combined_ai["reviewed_count"])
+                  + "/" + str(combined_ai["candidate_count"])
+                  + " | model calls: " + str(combined_ai["paid_model_calls"])
+                  + " | AI applied: " + str(bool(combined_ai.get("combined_model_applied"))),
+                  flush=True)
+        except (OSError, ValueError, TypeError, RuntimeError, ImportError,
+                KeyError, AttributeError) as exc:
+            # Materialize a *clearly deterministic* final combined Top 10 in
+            # case paid review was missing/invalid, rather than resurfacing a
+            # stale previous AI-approved file.
+            try:
+                from gta_24_city_ai_selection import finalize
+                fallback = finalize(results)
+                fallback_status = fallback["status"]
+            except (OSError, ValueError, TypeError, KeyError, ImportError):
+                fallback_status = "FINAL_FALLBACK_NOT_WRITTEN"
+            report["ai_top10_preselection"] = {
+                "status": "COMBINED_24_AI_REVIEW_HELD",
+                "error_type": type(exc).__name__,
+                "selection_scope": "COMBINED_16_PLUS_8",
+                "final_fallback": fallback_status,
+                "applies_to_top10": False,
+                "verified_buyers": 0,
+            }
+            report["combined_24_city_collection"]["model_decisions_applied"] = False
+    else:
+        if not skip_collection and runner is None:
+            report["ai_top10_preselection"] = {
+                "status": "COMBINED_24_INPUT_INCOMPLETE_PAID_AI_NOT_STARTED",
+                "applies_to_top10": False,
+                "verified_buyers": 0,
+            }
+
     # Read-only quality report is part of post-run evidence accounting, not a
     # new collector/stage. Preserve the established seven-stage contract.
     if not skip_collection:
@@ -882,6 +1011,10 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
             report.get("combined_24_city_collection", {}).get("status") !=
             "COMBINED_16_PLUS_8_RESEARCH_ONLY_NOT_CUSTOMER_RELEASE"):
         report["status"] = "COMBINED_24_CITY_INTEGRATION_FAILED"
+    if (not skip_collection and runner is None and
+            report.get("combined_24_city_source_readiness", {}).get("status") !=
+            "24_CITY_SOURCE_READINESS_AUDITED_PARTIAL_UNLESS_PROVEN"):
+        report["status"] = "COMBINED_24_CITY_SOURCE_READINESS_AUDIT_FAILED"
     report["finished_utc"] = dt.datetime.now(dt.timezone.utc).isoformat()
     report["report_html"] = str(index)
     save()
@@ -907,9 +1040,12 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
     combined_success = (skip_collection or runner is not None or
         report.get("combined_24_city_collection", {}).get("status") ==
             "COMBINED_16_PLUS_8_RESEARCH_ONLY_NOT_CUSTOMER_RELEASE")
+    source_audit_success = (skip_collection or runner is not None or
+        report.get("combined_24_city_source_readiness", {}).get("status") ==
+            "24_CITY_SOURCE_READINESS_AUDITED_PARTIAL_UNLESS_PROVEN")
     if not combined_success:
         print("RUN NOT COMPLETE: 24-city integration failed. See manifest.", flush=True)
-    return 0 if not failed and combined_success and report["archive_status"] == "CREATED_REVIEW_ONLY" else 2
+    return 0 if not failed and combined_success and source_audit_success and report["archive_status"] == "CREATED_REVIEW_ONLY" else 2
 
 
 def main():
