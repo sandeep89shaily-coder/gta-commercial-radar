@@ -519,6 +519,61 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
         report["northern_commercial_research_quality"] = {
             "status": "NOT_RUN_HISTORICAL_OR_TEST_INJECTED"}
 
+    # Canonical deliverable: ONE combined 16-core + 8-regional city research
+    # universe. The individual collectors already ran above (and in daily_radar)
+    # but were previously NOT joined, so the final Top 10 excluded regions.
+    # This post-collection join is deterministic, offline and no added AI spend.
+    if not skip_collection and runner is None and report.get("fresh_collection_verified"):
+        try:
+            from gta_24_city_combined import run as build_24_city
+            together = build_24_city(results)
+            report["combined_24_city_collection"] = {
+                "status": together["status"],
+                "configured_city_count": together["configured_city_count"],
+                "core_city_count": together["core_city_count"],
+                "expansion_city_count": together["expansion_city_count"],
+                "municipalities_with_application_files":
+                    together["municipalities_with_application_files"],
+                "unique_application_files": together[
+                    "unique_application_files_in_combined_master"],
+                "historical_permits_separate": together[
+                    "historical_permit_records_separate_from_applications"],
+                "project_only_signals": together[
+                    "project_only_signals_not_applications"],
+                "combined_commercial_research_candidates": together[
+                    "combined_commercial_research_candidates"],
+                "combined_top10_count": together[
+                    "combined_research_top10_count"],
+                "combined_top10_cities": together["top10_cities"],
+                "all_citywide_coverage_verified": False,
+                "verified_new_publications": 0, "verified_buyers": 0,
+                "verified_open_supplier_contracts": 0,
+                "additional_paid_ai_calls": 0,
+                "upstream_deepseek_did_not_review_expansion_cities": True,
+                "outputs": together["outputs"],
+            }
+            print("COMBINED CITY UNIVERSE: 16 original + 8 expansion = 24 "
+                  "configured (not 24 verified-citywide), "
+                  + str(together["unique_application_files_in_combined_master"])
+                  + " joined application files; "
+                  + str(together["combined_research_top10_count"])
+                  + " research-only Top 10 entries.", flush=True)
+        except (OSError, ValueError, TypeError, KeyError, RuntimeError,
+                ImportError, csv.Error) as exc:
+            report["combined_24_city_collection"] = {
+                "status": "COMBINED_24_CITY_INTEGRATION_FAILED",
+                "error_type": type(exc).__name__,
+                "message": str(exc)[:180],
+                "buyer_verified": False,
+                "additional_paid_ai_calls": 0,
+            }
+            print("COMBINED 24-CITY INTEGRATION FAILED: "
+                  + type(exc).__name__ + ":" + str(exc)[:150], flush=True)
+    else:
+        report["combined_24_city_collection"] = {
+            "status": "NOT_RUN_HISTORICAL_OR_INJECTED_RUN",
+        }
+
     # Read-only quality report is part of post-run evidence accounting, not a
     # new collector/stage. Preserve the established seven-stage contract.
     if not skip_collection:
@@ -823,6 +878,10 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
         else "REVIEW_COMPLETED_WITH_FAILURES" if failed
         else "SAVED_DATA_REVIEW_ONLY_NO_NEW_COLLECTION"
     )
+    if (not skip_collection and runner is None and
+            report.get("combined_24_city_collection", {}).get("status") !=
+            "COMBINED_16_PLUS_8_RESEARCH_ONLY_NOT_CUSTOMER_RELEASE"):
+        report["status"] = "COMBINED_24_CITY_INTEGRATION_FAILED"
     report["finished_utc"] = dt.datetime.now(dt.timezone.utc).isoformat()
     report["report_html"] = str(index)
     save()
@@ -845,7 +904,12 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
     render()
     print("FULL RUN REPORT: " + str(index), flush=True)
     print("FULL RUN MANIFEST: " + str(manifest), flush=True)
-    return 0 if not failed and report["archive_status"] == "CREATED_REVIEW_ONLY" else 2
+    combined_success = (skip_collection or runner is not None or
+        report.get("combined_24_city_collection", {}).get("status") ==
+            "COMBINED_16_PLUS_8_RESEARCH_ONLY_NOT_CUSTOMER_RELEASE")
+    if not combined_success:
+        print("RUN NOT COMPLETE: 24-city integration failed. See manifest.", flush=True)
+    return 0 if not failed and combined_success and report["archive_status"] == "CREATED_REVIEW_ONLY" else 2
 
 
 def main():

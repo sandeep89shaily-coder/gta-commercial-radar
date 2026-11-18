@@ -12,10 +12,11 @@ echo =============================================================
 echo  GTA RADAR - ONE MANUAL FULL RUN TODAY
 echo =============================================================
 echo 1. Fast-forward installed CODE to verified GitHub main (only if safe).
-echo 2. Run original Radar collection ONCE and shared capped AI.
-echo 3. Run industrial, activation, facility, Toronto and council-item pilots.
-echo 4. Include Brampton, Toronto and Mississauga council review outputs.
-echo 5. Preserve dated results ZIP for upload and evidence review.
+echo 2. Run all ORIGINAL 16 municipal collectors ONCE and shared capped AI.
+echo 3. Run the 8 additional regional municipal source lanes.
+echo 4. JOIN 16 + 8 into one 24-city project master, coverage and research Top 10.
+echo 5. Run industrial, activation, facility, Toronto and council research.
+echo 6. Preserve dated ZIP with combined 24-city reports for evidence review.
 echo No daily scheduling, no automatic outreach, no extra AI budget.
 echo.
 where py >nul 2>nul
