@@ -257,7 +257,15 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
             # unchanged. One shared ledger and the same cross-process lock
             # guard all model requests. Never claim a model hypothesis is a
             # verified buyer, open contract or first-publication date.
-            if report.get("fresh_collection_verified"):
+            if runner is None and report.get("fresh_collection_verified"):
+                # The paid run is moved AFTER the eight regional collectors
+                # and canonical 24-city dedup. No duplicate core-only spend.
+                report["ai_top10_preselection"] = {
+                    "status": "DEFERRED_TO_COMBINED_24_CITY_DEEPSEEK_STAGE",
+                    "paid_model_calls": 0,
+                    "verified_buyers": 0, "applies_to_top10": False,
+                }
+            elif report.get("fresh_collection_verified"):
                 try:
                     from gta_ai_top10_reranker import run as run_ai_preselection
                     pre = run_ai_preselection(results, paid=True)
@@ -573,6 +581,71 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
         report["combined_24_city_collection"] = {
             "status": "NOT_RUN_HISTORICAL_OR_INJECTED_RUN",
         }
+
+    # This is now the ONLY paid Top 10 model assessment on real full runs.
+    # It begins after the combined 24-city input is built; legacy stage above
+    # is intentionally deferred so the owner does not pay for two 24-project
+    # reviews or receive a legacy-only DeepSeek ranking.
+    if (not skip_collection and runner is None and
+            report.get("combined_24_city_collection", {}).get("status") ==
+                "COMBINED_16_PLUS_8_RESEARCH_ONLY_NOT_CUSTOMER_RELEASE"):
+        try:
+            from gta_ai_top10_reranker import run as review_deepseek_24
+            combined_ai = review_deepseek_24(results, paid=True, combined_24=True)
+            report["ai_top10_preselection"] = {
+                "status": combined_ai["status"],
+                "selection_scope": "COMBINED_16_PLUS_8",
+                "candidate_count": combined_ai["candidate_count"],
+                "candidate_cities": combined_ai.get("candidate_cities", []),
+                "candidate_cohorts": combined_ai.get("candidate_cohorts", {}),
+                "reviewed_count": combined_ai["reviewed_count"],
+                "paid_model_calls": combined_ai["paid_model_calls"],
+                "live_sources_retrieved": combined_ai.get("live_sources_retrieved", 0),
+                "applies_to_top10": combined_ai.get("combined_model_applied", False),
+                "final_top10_csv": combined_ai.get("combined_final_top10", ""),
+                "verified_buyers": 0, "verified_supplier_contracts": 0,
+                "outreach_authorized": False,
+            }
+            report["combined_24_city_collection"]["ai_model_scope"] = \
+                "COMBINED_16_PLUS_8"
+            report["combined_24_city_collection"]["model_decisions_applied"] = \
+                bool(combined_ai.get("combined_model_applied"))
+            report["combined_24_city_collection"]["final_top10"] = \
+                combined_ai.get("combined_final_top10", "")
+            print("24-CITY DEEPSEEK REVIEW: "
+                  + combined_ai["status"]
+                  + " | reviewed " + str(combined_ai["reviewed_count"])
+                  + "/" + str(combined_ai["candidate_count"])
+                  + " | model calls: " + str(combined_ai["paid_model_calls"])
+                  + " | AI applied: " + str(bool(combined_ai.get("combined_model_applied"))),
+                  flush=True)
+        except (OSError, ValueError, TypeError, RuntimeError, ImportError,
+                KeyError, AttributeError) as exc:
+            # Materialize a *clearly deterministic* final combined Top 10 in
+            # case paid review was missing/invalid, rather than resurfacing a
+            # stale previous AI-approved file.
+            try:
+                from gta_24_city_ai_selection import finalize
+                fallback = finalize(results)
+                fallback_status = fallback["status"]
+            except (OSError, ValueError, TypeError, KeyError, ImportError):
+                fallback_status = "FINAL_FALLBACK_NOT_WRITTEN"
+            report["ai_top10_preselection"] = {
+                "status": "COMBINED_24_AI_REVIEW_HELD",
+                "error_type": type(exc).__name__,
+                "selection_scope": "COMBINED_16_PLUS_8",
+                "final_fallback": fallback_status,
+                "applies_to_top10": False,
+                "verified_buyers": 0,
+            }
+            report["combined_24_city_collection"]["model_decisions_applied"] = False
+    else:
+        if not skip_collection and runner is None:
+            report["ai_top10_preselection"] = {
+                "status": "COMBINED_24_INPUT_INCOMPLETE_PAID_AI_NOT_STARTED",
+                "applies_to_top10": False,
+                "verified_buyers": 0,
+            }
 
     # Read-only quality report is part of post-run evidence accounting, not a
     # new collector/stage. Preserve the established seven-stage contract.
