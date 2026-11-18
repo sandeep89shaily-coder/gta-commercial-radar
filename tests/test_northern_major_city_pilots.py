@@ -142,6 +142,17 @@ class NorthernMajorCityTests(unittest.TestCase):
                          "PENDING_PROJECT_SIGNAL_NO_EXACT_FILE_ID")
         self.assertEqual(fallback[0]["publication_date_verified"],"False")
 
+    def test_sudbury_notice_document_index_is_not_an_application(self):
+        body = """<main><a href="/do-business/planning-and-development/
+        pending-planning-applications/upcoming-docs/noc-nov-16-2026/">
+        noc nov 16 2026</a><a href="/about">General information</a></main>"""
+        docs=n._sudbury_official_notice_documents(body)
+        self.assertEqual(len(docs),1)
+        self.assertEqual(docs[0]["planning_application_id"],"")
+        self.assertEqual(docs[0]["source_published_date"],"")
+        self.assertEqual(docs[0]["record_classification"],
+                         "OFFICIAL_NOTICE_DOCUMENT_LINK_NOT_PROJECT")
+
     def test_northbay_notice_exact_id_not_original_publication(self):
         links=n._nb_links(NB_INDEX)
         self.assertEqual(links,[(NB_NOTICE,
