@@ -109,10 +109,13 @@ def _write(path, fields, rows):
         writer = csv.DictWriter(fp, fieldnames=fields, extrasaction="ignore")
         writer.writeheader()
         for row in rows:
-            writer.writerow({k: ("'" + _clean(row.get(k))
-                    if _clean(row.get(k)).lstrip().startswith(
-                        ("=", "+", "-", "@", "\t", "\r")) else _clean(row.get(k)))
-                for k in fields})
+            safe = {}
+            for field in fields:
+                raw = row.get(field)
+                value = "" if raw is None else " ".join(str(raw).split())
+                safe[field] = ("'" + value if value.lstrip().startswith(
+                    ("=", "+", "-", "@", "\t", "\r")) else value)
+            writer.writerow(safe)
 
 
 def _record(city, lane, ident, *, record_kind="APPLICATION", address="",
@@ -133,8 +136,14 @@ def _record(city, lane, ident, *, record_kind="APPLICATION", address="",
         return None
     if url and not url.startswith("https://"):
         url = ""
+    canonical = _id(city, ident, fallback)
+    if record_kind == "PERMIT" and ident:
+        # Planning IDs and permit numbers are distinct official identifier
+        # namespaces even if a city happens to reuse the same string.
+        canonical = city.upper().replace(" ", "_") + ":PERMIT:" + re.sub(
+            r"[^A-Z0-9]", "", ident.upper())
     return {
-        "canonical_id": _id(city, ident, fallback),
+        "canonical_id": canonical,
         "city": city,
         "cohort": "CORE_16" if core else "EXPANSION_8",
         "record_kind": record_kind,
