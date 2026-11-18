@@ -162,6 +162,23 @@ class NorthernMajorCityTests(unittest.TestCase):
                          "OFFICIAL_NOTICE_LINK_ONLY_NO_APPLICATION_ID")
         self.assertEqual(record["source_date"],"")
 
+    def test_citywide_policy_notice_not_project_lead(self):
+        generic = """<html><h1>Notice Of Public Meeting In The Matter Of Proposed
+        Amendments To The Official Plan To Implement Policies And Regulations
+        For Additional Dwelling Units and Delegated Approval</h1>
+        <div>Citywide zoning policy regulations for accessory dwelling units.
+        No specific applicant or civic property is identified.</div></html>"""
+        with self.assertRaisesRegex(ValueError,
+                "NON_PROJECT_POLICY_NOTICE_NO_FILE_ID_OR_CIVIC_SITE"):
+            n._nb_detail(generic,NB_NOTICE)
+        def mock(url):
+            return generic if url == NB_NOTICE else html(url)
+        result=n.run(self.root,today=self.today,html_fetch=mock,json_fetch=gis)
+        nb=next(x for x in result["source_details"] if x["city"]=="North Bay")
+        self.assertEqual(nb["records"],0)
+        self.assertEqual(nb["policy_notices_excluded"],1)
+        self.assertEqual(nb["status"],"NO_EXACT_PLANNING_NOTICES_DISCOVERED")
+
     def test_first_run_baseline_is_not_new_publication(self):
         first=n.run(self.root,today=self.today,html_fetch=html,json_fetch=gis)
         self.assertEqual(first["total_evidence_records"],4)
