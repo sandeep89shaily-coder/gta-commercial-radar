@@ -115,9 +115,13 @@ def candidates(results, *, limit=MAX_REVIEW, today=None):
     has no genuinely eligible source files. Use at most 6 per city.
     """
     root = Path(results)
+    if not (root/QUEUE).is_file():
+        raise ValueError("COMBINED_24_RESEARCH_QUEUE_MISSING")
     rows = _read(root, QUEUE)
     if not rows:
-        raise ValueError("COMBINED_24_RESEARCH_QUEUE_MISSING_OR_EMPTY")
+        # A quiet day must yield an honest zero-row Top 10 rather than
+        # fallback to stale legacy candidates or try a paid API call.
+        return []
     day = today or dt.date.today()
     models = []
     seen = set()
@@ -169,8 +173,8 @@ def finalize(results, *, state=None, pool=None, today=None):
     day = today or dt.date.today()
     inputs = _read(root, QUEUE)
     deterministic = _read(root, BASE_TOP10)
-    if not inputs:
-        raise ValueError("COMBINED_RESEARCH_INPUTS_NOT_FOUND")
+    if not (root/QUEUE).is_file() or not (root/BASE_TOP10).is_file():
+        raise ValueError("COMBINED_RESEARCH_INPUT_FILES_NOT_FOUND")
     state = state or {}
     pool = pool if pool is not None else candidates(root, today=day)
     review = state.get("reviews") or []
