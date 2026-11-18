@@ -143,9 +143,9 @@ class NorthernMajorCityTests(unittest.TestCase):
         self.assertEqual(fallback[0]["publication_date_verified"],"False")
 
     def test_sudbury_notice_document_index_is_not_an_application(self):
-        body = """<main><a href="/do-business/planning-and-development/
-        pending-planning-applications/upcoming-docs/noc-nov-16-2026/">
-        noc nov 16 2026</a><a href="/about">General information</a></main>"""
+        url=n.SUDBURY_DOC_INDEX+"noc-nov-16-2026/"
+        body = '<main><a href="' + url + '">' + (
+            'noc nov 16 2026</a><a href="/about">General information</a></main>')
         docs=n._sudbury_official_notice_documents(body)
         self.assertEqual(len(docs),1)
         self.assertEqual(docs[0]["planning_application_id"],"")
