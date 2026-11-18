@@ -154,11 +154,26 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
             "<style>body{font:15px Arial;margin:2rem;max-width:1100px}"
             "table{border-collapse:collapse;width:100%}"
             "th,td{padding:9px;border:1px solid #bbb;text-align:left}</style>"
-            "</head><body><h1>GTA Radar — all-pilot manual run</h1>"
+            "</head><body><h1>GTA Radar — Combined 16 + 8 Municipalities</h1>"
             "<p>Status: <b>" + html.escape(report["status"]) + "</b></p>"
             "<p>Collector: " + ("fresh output required" if not skip_collection else
                                  "SKIPPED; saved evidence may be older") + "</p>"
             "<p>Source events are not verified buyers, openings or available contracts.</p>"
+            "<h2>Combined 24-city deliverables</h2>"
+            "<p><b>Primary cross-region Top 10:</b> "
+            "GTA_RADAR_COMBINED_24_CITY_TOP10.csv (DeepSeek only if all "
+            "reviewed candidates pass independent model/source checks). "</p>"
+            "<p><b>Measured source coverage:</b> "
+            "GTA_RADAR_COMBINED_24_CITY_LIVE_SOURCE_READINESS.csv. "
+            "The 24 city entries are configured; citywide completeness "
+            "remains unverified when an official source is blocked.</p>"
+            "<p><b>DeepSeek outcome:</b> " + html.escape(str(
+                report.get("ai_top10_preselection", {}).get("status", "NOT_RUN")))
+            + " (candidate count " + html.escape(str(
+                report.get("ai_top10_preselection", {}).get("candidate_count", 0)))
+            + ", reviewed " + html.escape(str(
+                report.get("ai_top10_preselection", {}).get("reviewed_count", 0)))
+            + ").</p>"
             "<table><tr><th>Stage</th><th>Status</th><th>Exit</th><th>Log</th></tr>"
             + tr + "</table>"
             "<p>Review the individual pilot CSV/HTML reports under GTA_RADAR_RESULTS."
@@ -649,6 +664,8 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
                 "COMBINED_16_PLUS_8"
             report["combined_24_city_collection"]["model_decisions_applied"] = \
                 bool(combined_ai.get("combined_model_applied"))
+            report["combined_24_city_collection"]["upstream_deepseek_did_not_review_expansion_cities"] = \
+                not bool(combined_ai.get("combined_model_applied"))
             report["combined_24_city_collection"]["final_top10"] = \
                 combined_ai.get("combined_final_top10", "")
             print("24-CITY DEEPSEEK REVIEW: "
@@ -994,6 +1011,10 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
             report.get("combined_24_city_collection", {}).get("status") !=
             "COMBINED_16_PLUS_8_RESEARCH_ONLY_NOT_CUSTOMER_RELEASE"):
         report["status"] = "COMBINED_24_CITY_INTEGRATION_FAILED"
+    if (not skip_collection and runner is None and
+            report.get("combined_24_city_source_readiness", {}).get("status") !=
+            "24_CITY_SOURCE_READINESS_AUDITED_PARTIAL_UNLESS_PROVEN"):
+        report["status"] = "COMBINED_24_CITY_SOURCE_READINESS_AUDIT_FAILED"
     report["finished_utc"] = dt.datetime.now(dt.timezone.utc).isoformat()
     report["report_html"] = str(index)
     save()
@@ -1019,9 +1040,12 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
     combined_success = (skip_collection or runner is not None or
         report.get("combined_24_city_collection", {}).get("status") ==
             "COMBINED_16_PLUS_8_RESEARCH_ONLY_NOT_CUSTOMER_RELEASE")
+    source_audit_success = (skip_collection or runner is not None or
+        report.get("combined_24_city_source_readiness", {}).get("status") ==
+            "24_CITY_SOURCE_READINESS_AUDITED_PARTIAL_UNLESS_PROVEN")
     if not combined_success:
         print("RUN NOT COMPLETE: 24-city integration failed. See manifest.", flush=True)
-    return 0 if not failed and combined_success and report["archive_status"] == "CREATED_REVIEW_ONLY" else 2
+    return 0 if not failed and combined_success and source_audit_success and report["archive_status"] == "CREATED_REVIEW_ONLY" else 2
 
 
 def main():
