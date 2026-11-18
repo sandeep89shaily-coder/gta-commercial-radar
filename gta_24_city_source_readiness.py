@@ -131,6 +131,14 @@ def _sources(root):
         if isinstance(x,dict) and x.get("city") in EXPANSION_CITIES:
             add(x["city"],"GGH_APPLICATION",x.get("state"),
                 x.get("application_id_rows"),x.get("notice_page_errors",""))
+    # Check actual city-specific application IDs, not merely the number of
+    # notice or detail pages fetched (St Catharines, Niagara Falls).
+    three_detail_ids = defaultdict(set)
+    for item in _rows(root/"GTA_RADAR_THREE_CITY_EVIDENCE_CANDIDATES.csv"):
+        city = item.get("city")
+        ident = str(item.get("application_id") or "").strip()
+        if city in EXPANSION_CITIES and ident:
+            three_detail_ids[city].add(ident.upper())
     three = _obj(root/"GTA_RADAR_THREE_CITY_EVIDENCE_STATUS.json")
     for x in three.get("sources",[]):
         if not isinstance(x,dict):
@@ -138,7 +146,8 @@ def _sources(root):
         city=x.get("city")
         # St Catharines notices with explicit IDs get counted later from
         # the actual candidate file, never by pages fetched alone.
-        count = x.get("fetched") if city=="Niagara Falls" else 0
+        count = len(three_detail_ids[city]) if city in (
+            "Niagara Falls","St. Catharines") else 0
         add(city,x.get("source_lane","THREE_CITY"),
             x.get("status"),count,x.get("failures",""))
     northern = _obj(root/"GTA_RADAR_NORTHERN_MAJOR_CITY_STATUS.json")
