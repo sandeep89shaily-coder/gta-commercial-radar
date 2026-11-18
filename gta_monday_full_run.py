@@ -162,7 +162,7 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
             "<h2>Combined 24-city deliverables</h2>"
             "<p><b>Primary cross-region Top 10:</b> "
             "GTA_RADAR_COMBINED_24_CITY_TOP10.csv (DeepSeek only if all "
-            "reviewed candidates pass independent model/source checks). "</p>"
+            "reviewed candidates pass independent model/source checks).</p>"
             "<p><b>Measured source coverage:</b> "
             "GTA_RADAR_COMBINED_24_CITY_LIVE_SOURCE_READINESS.csv. "
             "The 24 city entries are configured; citywide completeness "
