@@ -757,6 +757,38 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
         report["combined_28_city_collection"]={
             "status":"NOT_RUN_24_CITY_SOURCE_UNAVAILABLE_OR_HISTORICAL"}
 
+    # WESTERN CORRIDOR, 28 existing + London/Sarnia/Chatham-Kent.
+    # Windsor already participates in the existing four-city collector.
+    # Newly researched municipal websites have licence/robots restrictions:
+    # never auto-scrape them. Only independently publisher-authorized,
+    # provenance-backed exports can add exact project records. This remains
+    # a source-audit/research universe until real live acceptance is proven.
+    if (not skip_collection and runner is None and
+            report.get("combined_28_city_collection",{}).get("status")==
+                "COMBINED_28_CITY_RESEARCH_ONLY_LIVE_SOURCE_GATED"):
+        try:
+            from gta_western_corridor_source_audit import run as west_audit
+            from gta_western_31_city_combined import run as west_join
+            corridor=west_audit(results)
+            joined=west_join(results)
+            report["western_31_city_corridor"]={
+                "status":joined["status"],
+                "configured_city_count":31,
+                "new_city_source_status":joined["new_city_source_status"],
+                "authorized_imported_new_city_rows":
+                    joined["authorized_imported_new_city_rows"],
+                "windsor_source_status":
+                    joined["windsor_existing_live_source_status"],
+                "commercial_ai_scope":joined["commercial_ai_scope"],
+                "new_verified_live_cities":0,"verified_buyers":0}
+        except (OSError,ValueError,TypeError,ImportError,KeyError) as exc:
+            report["western_31_city_corridor"]={
+                "status":"WESTERN_31_CITY_INTEGRATION_FAILED",
+                "error_type":type(exc).__name__}
+    else:
+        report["western_31_city_corridor"]={
+            "status":"NOT_RUN_WITHOUT_CURRENT_VALID_28_CITY_BASELINE"}
+
     # Metadata + explicitly linked public documents for already-collected
     # Toronto planning applications. The official AIC feature layer has
     # NO attachments; policy-blocked AIC HTML cannot be bypassed.
