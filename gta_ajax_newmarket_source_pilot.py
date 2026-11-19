@@ -44,10 +44,10 @@ FIELDS = ("city", "application_id", "address", "scope", "applicant_source_claim"
           "source_url", "original_publication_verified",
           "buying_role_verified", "open_supplier_package_verified",
           "record_status", "source_oid_for_diagnostics_only")
-TRADES = re.compile(r"\\b(?:industrial|manufactur\\w*|warehouse|logistic\\w*|"
+TRADES = re.compile(r"\b(?:industrial|manufactur\w*|warehouse|logistic\w*|"
                     r"commercial|retail|office|hotel|data.cent(?:re|er)|"
                     r"storage|institutional|mixed.use|factory|"
-                    r"distribution|medical|business.park)\\b", re.I)
+                    r"distribution|medical|business.park)\b", re.I)
 
 def _text(value, cap=500):
     return " ".join(str(value or "").split())[:cap]
@@ -60,7 +60,7 @@ def _date(value):
         except (OverflowError, ValueError, OSError):
             return ""
     raw = _text(value)
-    if re.fullmatch(r"20\\d{2}-\\d{2}-\\d{2}", raw):
+    if re.fullmatch(r"20\d{2}-\d{2}-\d{2}", raw):
         try:
             return dt.date.fromisoformat(raw).isoformat()
         except ValueError:
@@ -194,7 +194,7 @@ def write(root, rows, *, modes):
         for row in dedup.values():
             writer.writerow({key: ("'" + str(row.get(key) or "")
                 if str(row.get(key) or "").lstrip().startswith(
-                    ("=", "+", "-", "@", "\\t", "\\r"))
+                    ("=", "+", "-", "@", "\t", "\r"))
                 else str(row.get(key) or "")) for key in FIELDS})
     status = {
         "status": "ISOLATED_SOURCE_RESEARCH_NOT_PRODUCTION",
