@@ -13,8 +13,8 @@ from pathlib import Path
 
 from gta_24_city_combined import (_rank, _write, COLS, COVERAGE_COLS,
                                   CORE_CITIES, EXPANSION_CITIES)
-from gta_four_city_live_daily import CITIES as ADDED, MASTER as LIVE,
-                                       STATUS as LIVE_STATUS
+from gta_four_city_live_daily import (CITIES as ADDED, MASTER as LIVE,
+                                      STATUS as LIVE_STATUS)
 
 MASTER="GTA_RADAR_COMBINED_28_CITY_PROJECT_MASTER.csv"
 COVERAGE="GTA_RADAR_COMBINED_28_CITY_COVERAGE.csv"
