@@ -77,7 +77,7 @@ def run(results,*,today=None):
         ident=row["application_id"]
         canonical=city.upper().replace(" ","_")+":FILE:"+ "".join(
             ch for ch in ident.upper() if ch.isalnum())
-        if not canonical.endswith(":FILE:"):
+        if canonical.endswith(":FILE:"):
             continue
         scope=row["scope"]
         extra.append({
