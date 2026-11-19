@@ -632,6 +632,29 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
         report["peel_official_open_data_recovery"]={
             "status":"NOT_RUN_HISTORICAL_OR_INJECTED_RUN"}
 
+    # Independent authorized St. Catharines permit feed and Oakville's
+    # official civic publications / trust-store diagnostics. Does not
+    # substitute permits for new applications or pretend eSCRIBE was opened.
+    if not skip_collection and runner is None and report.get("fresh_collection_verified"):
+        try:
+            from gta_stc_oak_official_recovery import run as recover_stc_oak
+            recovery=recover_stc_oak(results)
+            report["stc_oak_official_source_recovery"]={
+                "status":recovery["status"],
+                "sources":recovery["sources"],
+                "stc_permit_ids":recovery["stc_permit_ids"],
+                "oakville_linked_official_pages":
+                    recovery["oakville_official_links_unverified_as_agendas"],
+                "oakville_actual_agendas_retrieved":0,
+                "verified_buyers":0,"paid_ai_calls":0}
+        except (OSError,ValueError,TypeError,ImportError) as exc:
+            report["stc_oak_official_source_recovery"]={
+                "status":"STC_OAK_RECOVERY_FAILED",
+                "error_type":type(exc).__name__}
+    else:
+        report["stc_oak_official_source_recovery"]={
+            "status":"NOT_RUN_HISTORICAL_OR_INJECTED_RUN"}
+
     # Canonical deliverable: ONE combined 16-core + 8-regional city research
     # universe. The individual collectors already ran above (and in daily_radar)
     # but were previously NOT joined, so the final Top 10 excluded regions.
