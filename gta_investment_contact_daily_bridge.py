@@ -29,8 +29,12 @@ OPPORTUNITIES = "GTA_RADAR_EQUIPMENT_INVESTMENT_OPPORTUNITIES.csv"
 MAX_PAID_PROJECTS = 3
 COLUMNS = ("project_name", "city", "company_source_claim", "project_address_source_claim",
            "equipment_or_investment_scope_quote", "source_urls", "published_date_verified",
-           "named_purchasing_person", "purchasing_email", "buyer_verified",
-           "open_package_verified", "research_status")
+           "public_professional_name", "public_professional_title",
+           "public_professional_email", "public_professional_source_url",
+           "professional_project_relationship", "public_company_channel",
+           "public_company_channel_source_url", "named_purchasing_person",
+           "purchasing_email", "buyer_verified", "open_package_verified",
+           "research_status")
 HOLD_PREFIXES = ("SEARCH_", "FETCH_", "MODEL_", "BLOCKED_")
 FATAL_PREFIXES = ("MISSING_API_KEY", "HTTP_402")
 
@@ -167,6 +171,27 @@ def run(results, *, paid=False, city="Brampton", today=None,
             record["contacts"]["named_people"] = len(response.get("people") or [])
             record["contacts"]["public_company_channels"] = len(
                 response.get("public_channels") or [])
+            # These are source-quoted professional contacts. An engineer,
+            # executive or general inbox is NOT the project's purchaser.
+            people = [p for p in response.get("people") or []
+                      if isinstance(p, dict) and p.get("person")
+                      and p["person"] != "NOT_NAMED"]
+            if people:
+                p = people[0]
+                exported[idx]["public_professional_name"] = p.get("person", "")
+                exported[idx]["public_professional_title"] = p.get("job_title", "")
+                exported[idx]["public_professional_email"] = (
+                    "" if p.get("email") == "NOT_PUBLICLY_VERIFIED" else
+                    p.get("email", ""))
+                exported[idx]["public_professional_source_url"] = p.get("source_url", "")
+                exported[idx]["professional_project_relationship"] = p.get(
+                    "project_relationship", "")
+            channels = [p for p in response.get("public_channels") or []
+                        if isinstance(p, dict) and p.get("source_url")]
+            if channels:
+                exported[idx]["public_company_channel"] = channels[0].get("value", "")
+                exported[idx]["public_company_channel_source_url"] = channels[0][
+                    "source_url"]
         except (ValueError, OSError, RuntimeError, KeyError, TypeError) as exc:
             record["contacts"] = {"status": "CONTACTS_ERROR_REVIEW",
                                   "error_type": type(exc).__name__}
@@ -182,6 +207,16 @@ def run(results, *, paid=False, city="Brampton", today=None,
                 "FETCH_", "LEDGER_")):
             had_error = True
         save()
+    # Refresh research CSV with cited PUBLIC contacts after model review.
+    # Purchasing fields and buyer flags deliberately remain unverified.
+    with (output.parent / OPPORTUNITIES).open(
+            "w", encoding="utf-8-sig", newline="") as fp:
+        writer = csv.DictWriter(fp, fieldnames=COLUMNS)
+        writer.writeheader()
+        for entry in exported:
+            writer.writerow({k: ("'" + str(v) if str(v).lstrip().startswith(
+                ("=", "+", "-", "@", "\\t", "\\r")) else str(v))
+                for k,v in entry.items()})
     state["status"] = ("PARTIAL_SOURCE_OR_BUDGET_REVIEW_REQUIRED" if had_error
                        else "SOURCE_BACKED_PROJECT_RESEARCH_COMPLETE_REVIEW_ONLY")
     # Public companies, names and channels never by themselves prove buyer
