@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from gta_york_hamilton_open_data import (
-    YORK,HAMILTON,pull,parse_york,parse_hamilton,run,robots_ok)
+    YORK,HAMILTON,BRANTFORD,pull,parse_york,parse_hamilton,parse_brantford,run,robots_ok)
 
 def getter(url,**kw):
     if "Hosted_Active_Development_Application" in url:
@@ -29,6 +29,13 @@ def getter(url,**kw):
             "APPL_DESC":"Industrial logistics development",
             "APPL_STATUS":"Under Review",
             "DATE_RECVD":1794441600000}}]}
+    if "Planning_Application_Open_Data_view" in url:
+        return {"features":[{"attributes":{
+            "OBJECTID":7,"ApplicationNum":"SPA-2026-0004",
+            "Address":"15 Copernicus Boulevard",
+            "Description":"New industrial factory building",
+            "Proposed_use":"Industrial","Applicant":"Example Manufacturing Ltd",
+            "Status":"Under Review","Submitted_date":1794441600000}}]}
     return {"features":[{"attributes":{
         "OBJECTID":1,"FILE_NUM":"ZAC-26-098",
         "FILE_TYPE":"Zoning","FILE_YEAR":2026,
@@ -50,24 +57,30 @@ class Recovery(unittest.TestCase):
         self.assertEqual(rows[0]["application_id"],"ZAC-26-098")
         self.assertEqual(rows[0]["date"],"")
         self.assertEqual(rows[0]["date_basis"],"FILE_YEAR_ONLY_NOT_PUBLICATION")
+    def test_brantford_exact_file_number(self):
+        rows=parse_brantford(pull(BRANTFORD,getter=getter,check_robots=False)[0])
+        self.assertEqual(rows[0]["application_id"],"SPA-2026-0004")
+        self.assertEqual(rows[0]["address"],"15 Copernicus Boulevard")
+        self.assertEqual(rows[0]["buyer_verified"],"False")
+
     def test_all_four_recover_independently(self):
         with tempfile.TemporaryDirectory() as tmp:
             result=run(tmp,getter=getter)
-            self.assertEqual(result["total_valid_application_files"],4)
+            self.assertEqual(result["total_valid_application_files"],5)
             self.assertEqual(result["records_by_city"],{
-                "Vaughan":1,"Markham":1,"Richmond Hill":1,"Hamilton":1})
+                "Vaughan":1,"Markham":1,"Richmond Hill":1,"Hamilton":1,"Brantford":1})
             self.assertFalse(result["complete_citywide_application_inventory_verified"])
             self.assertEqual(result["verified_buyers"],0)
             with (Path(tmp)/"GTA_RADAR_ADDITIONAL_OFFICIAL_OPEN_DATA.csv").open(
                     encoding="utf-8-sig") as fp:
-                self.assertEqual(len(list(csv.DictReader(fp))),4)
+                self.assertEqual(len(list(csv.DictReader(fp))),5)
     def test_failed_york_keeps_hamilton(self):
         def partial(url,**kw):
             if "Hosted_" in url:raise PermissionError("Denied")
             return getter(url,**kw)
         with tempfile.TemporaryDirectory() as tmp:
             result=run(tmp,getter=partial)
-            self.assertEqual(result["total_valid_application_files"],1)
+            self.assertEqual(result["total_valid_application_files"],2)
             self.assertEqual(result["records_by_city"]["Hamilton"],1)
             self.assertEqual(result["source_status"]["York Region"]["status"],"BLOCKED_OR_FAILED")
     def test_robots_invalid_origin(self):
