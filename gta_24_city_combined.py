@@ -438,8 +438,26 @@ def run(results, *, today=None):
         if score is not None:
             r["commercial_research_priority"] = "RESEARCH_ONLY_NOT_SALE_READY"
             rankings.append((score, r))
+    # A known RECENT application event outranks an undated or historical
+    # file regardless of how many generic company/planner fields it has.
+    # This is not proof of first publication. Preserve old files in MASTER
+    # and RESEARCH for background work, never silently rewrite their dates.
+    def event_band(row):
+        try:
+            age = (day - dt.date.fromisoformat(row["source_date"])).days
+        except (ValueError, TypeError):
+            return 3  # missing actual source event, NOT a fresh disclosure
+        if 0 <= age <= 30:
+            return 0
+        if 31 <= age <= 90:
+            return 1
+        if 91 <= age <= 365:
+            return 2
+        return 3
+
     rankings.sort(key=lambda pair: (
-        -pair[0], pair[1]["city"], pair[1]["application_id"]))
+        event_band(pair[1]), -pair[0],
+        pair[1]["city"], pair[1]["application_id"]))
     research = [row for _,row in rankings]
     # One research list over BOTH cohorts. Limit any single city to four
     # placements in the first ten to avoid ten Toronto or ten Barrie files.
