@@ -54,6 +54,10 @@ def stages(workspace, results, *, industrial_limit=10, skip_collection=False):
         ("industrial_investment_and_contacts",
          ["gta_investment_contact_daily_bridge.py", "--results", out] +
          (["--paid"] if not skip_collection else []), False),
+        # Consolidate official ERO equipment notices with independently
+        # cited industrial investment announcements: offline, zero extra spend.
+        ("equipment_commercial_index",
+         ["gta_equipment_commercial_daily.py", "--results", out], False),
         # The project harness remains capped and idempotent; its paid requests
         # run AFTER the industrial/contact lane, never in historical review.
         ("ai_harness_adaptive" if not skip_collection else "ai_harness_free",
