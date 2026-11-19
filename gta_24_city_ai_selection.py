@@ -36,6 +36,7 @@ OUTPUT_FIELDS = (
     "scope","current_status","applicant_or_agent_source_claim",
     "published_contact_name","published_contact_email","contact_role",
     "source_date","source_date_basis",
+    "source_event_age_band_not_publication",
     "webpage_posted_date_not_first_disclosure","source_observation",
     "official_evidence_urls","source_lanes","original_publication_verified",
     "purchasing_contact_verified","open_supplier_contract_verified",
