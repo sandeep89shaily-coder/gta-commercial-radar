@@ -15,7 +15,8 @@ FIELDS = (
     "source_type", "company", "physical_project_address_unverified",
     "municipality", "equipment_or_scope", "investment_amount_unverified",
     "source_date", "source_date_basis", "source_url", "contact_name_verified",
-    "contact_email_verified", "purchasing_authority_verified",
+    "contact_professional_title", "contact_email_verified", "contact_source_url",
+    "public_company_channel", "purchasing_authority_verified",
     "open_supplier_package_verified", "qualification_status",
 )
 
@@ -60,6 +61,11 @@ def run(results):
             "source_date": "",
             "source_date_basis": "PUBLICATION_DATE_NOT_INDEPENDENTLY_VERIFIED",
             "source_url": r.get("source_urls", ""),
+            "contact_name_verified": r.get("public_professional_name", ""),
+            "contact_professional_title": r.get("public_professional_title", ""),
+            "contact_email_verified": r.get("public_professional_email", ""),
+            "contact_source_url": r.get("public_professional_source_url", ""),
+            "public_company_channel": r.get("public_company_channel", ""),
             "qualification_status": "RESEARCH_ONLY_NOT_PROVEN_EQUIPMENT_PURCHASE",
         })
     unique = {}
