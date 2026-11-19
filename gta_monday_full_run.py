@@ -568,6 +568,25 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
         report["added_four_live_source_collection"] = {
             "status":"NOT_RUN_HISTORICAL_OR_INJECTED_RUN", "live_cities":0}
 
+    # Prefer independently published legal alternative data rather than
+    # repeatedly hitting restricted municipal GIS endpoints. Failures are
+    # visible per city and cannot replace the original 24-city archive.
+    if not skip_collection and runner is None and report.get("fresh_collection_verified"):
+        try:
+            from gta_approved_alternative_feeds import run as alternative_feeds
+            alt=alternative_feeds(results)
+            report["official_alternative_source_recovery"]={
+                "status":alt["status"],"cities":alt["cities"],
+                "records":alt["records_current_run"],
+                "verified_buyers":0}
+        except (OSError,ValueError,TypeError,ImportError) as exc:
+            report["official_alternative_source_recovery"]={
+                "status":"ALTERNATIVE_SOURCE_RECOVERY_FAILED",
+                "error_type":type(exc).__name__}
+    else:
+        report["official_alternative_source_recovery"]={
+            "status":"NOT_RUN_HISTORICAL_REVIEW"}
+
     # Canonical deliverable: ONE combined 16-core + 8-regional city research
     # universe. The individual collectors already ran above (and in daily_radar)
     # but were previously NOT joined, so the final Top 10 excluded regions.

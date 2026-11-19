@@ -107,8 +107,56 @@ def run(results,*,today=None):
             "commercial_research_priority":"BASELINE_OR_UNVERIFIED",
             "verification_required":"Check original notice, seller, actual buying role and procurement",
         })
+    # Newly recovered official alternative sources join the same 28-city
+    # research universe, WITHOUT replacing established source records.
+    # Caledon publisher-reuse permission is not certified: retain as research
+    # evidence only; do not elevate those rows into commercial Top 10.
+    fallback=[]
+    alt_status_path=root/"GTA_RADAR_ALTERNATIVE_OFFICIAL_STATUS.json"
+    alt_path=root/"GTA_RADAR_ALTERNATIVE_OFFICIAL_APPLICATIONS.csv"
+    try:
+        alt_status=json.loads(alt_status_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError, UnicodeError):
+        alt_status={}
+    if alt_status.get("status")=="OFFICIAL_ALTERNATIVE_FEEDS_AUDITED":
+        for row in _read(alt_path):
+            city=row.get("city","")
+            city_state=alt_status.get("cities",{}).get(city,{})
+            if (city not in ("Kitchener","Caledon") or
+                    city_state.get("status")!="LIVE_EXACT_IDS_PARTIAL" or
+                    not all(row.get(k) for k in ("application_id","address","scope","source_url"))):
+                continue
+            ident=row["application_id"]
+            safeid="".join(c for c in ident.upper() if c.isalnum())
+            if not safeid:continue
+            released=(city=="Kitchener" and
+                row.get("source_permission")=="PUBLISHED_OPEN_DATA_LICENCE_REUSE")
+            scope=row["scope"]
+            fallback.append({
+                "canonical_id":city.upper()+":FILE:"+safeid,
+                "city":city,"cohort":"CORE_16","record_kind":"APPLICATION",
+                "application_id":ident,"address":row["address"],
+                "project_title":"","scope":scope,"current_status":row.get("stage",""),
+                "applicant_or_agent_source_claim":row.get("applicant",""),
+                "published_contact_name":"","published_contact_email":"",
+                "contact_role":"","source_date":row.get("date",""),
+                "source_date_basis":row.get("date_basis",""),
+                "webpage_posted_date_not_first_disclosure":"",
+                "source_observation":"ALTERNATIVE_SOURCE_BASELINE_NOT_PUBLICATION",
+                "first_seen_local":"","official_evidence_urls":row["source_url"],
+                "source_lanes":row.get("source_lane","OFFICIAL_ALTERNATIVE"),
+                "commercial_text_match":str(released and any(word in scope.casefold()
+                  for word in ("industrial","commercial","manufactur",
+                  "warehouse","logistics","office","distribution","retail","factory"))),
+                "source_event_age_band_not_publication":"",
+                "original_publication_verified":"False",
+                "purchasing_contact_verified":"False",
+                "open_supplier_contract_verified":"False",
+                "commercial_research_priority":"BASELINE_OR_UNVERIFIED",
+                "verification_required":"Publisher notice, actual buying role and procurement unverified",
+            })
     records={}
-    for row in base+extra:
+    for row in base+extra+fallback:
         if row.get("canonical_id"):
             records.setdefault(row["canonical_id"],row)
     allrows=list(records.values())
@@ -162,6 +210,8 @@ def run(results,*,today=None):
         "added_cities_source_health":{x:xinfo["status"]
             for x,xinfo in health.items()},
         "all_four_added_city_source_rows":len(extra),
+        "official_alternative_source_rows_joined":len(fallback),
+        "alternative_source_cities":dict(Counter(x["city"] for x in fallback)),
         "combined_master_rows":len(allrows),
         "combined_research_candidates":len(research),
         "top10_cities":dict(Counter(x["city"] for x in top)),
