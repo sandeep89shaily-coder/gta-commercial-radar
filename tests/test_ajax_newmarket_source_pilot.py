@@ -68,7 +68,8 @@ class AjaxNewmarketAdapters(unittest.TestCase):
         def fetch(url):
             return {"features":[feature(OBJECTID=i+1 if "resultOffset=0" in url
                else 1, REF_ID=f"SPA-{i}", ADDRESS="10 Industry Rd",
-               DESCRIPTION="Industrial plant", TYPE="Industrial") for i in range(100)]}
+               DESCRIPTION="Industrial plant", TYPE="Industrial") for i in range(
+                   100 if "resultOffset=0" in url else 50)]}
         with self.assertRaisesRegex(ValueError,"DUPLICATE_OBJECTID"):
             query("Ajax",fetcher=fetch,max_rows=150,robots_check=False)
 
