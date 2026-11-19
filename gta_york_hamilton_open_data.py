@@ -20,8 +20,9 @@ from urllib.robotparser import RobotFileParser
 
 YORK="https://services1.arcgis.com/GzvOwaQBbX7KLiuG/ArcGIS/rest/services/Hosted_Active_Development_Application/FeatureServer/0"
 HAMILTON="https://services.arcgis.com/rYz782eMbySr2srL/arcgis/rest/services/Development_Applications/FeatureServer/2"
+BRANTFORD="https://services.arcgis.com/aji2lCmjXt0KpGzI/ArcGIS/rest/services/Planning_Application_Open_Data_view/FeatureServer/0"
 YORK_CITIES=("Vaughan","Markham","Richmond Hill")
-ALL_CITIES=(*YORK_CITIES,"Hamilton")
+ALL_CITIES=(*YORK_CITIES,"Hamilton","Brantford")
 MAX_BYTES=2500000
 MAX_PAGES=5
 PAGE=200
@@ -75,7 +76,7 @@ def fetch_json(url,*,check_robots=True,opener=urlopen):
     return data
 
 def pull(layer,*,getter=fetch_json,check_robots=True,max_pages=MAX_PAGES):
-    if layer not in (YORK,HAMILTON) or not 1<=max_pages<=MAX_PAGES:
+    if layer not in (YORK,HAMILTON,BRANTFORD) or not 1<=max_pages<=MAX_PAGES:
         raise ValueError("UNSUPPORTED_LAYER_OR_CAP")
     seen=set()
     features=[]
@@ -153,15 +154,42 @@ def parse_hamilton(attributes):
           "open_supplier_package_verified":"False"})
     return rows
 
+def parse_brantford(attributes):
+    rows=[]
+    for a in attributes:
+        # This is Brantford's *published Open Data view*, not the old
+        # CollectorData GIS/editor service. ApplicationNum is the file number;
+        # GlobalID and OBJECTID are technical keys, never a substitute.
+        ident=clean(a.get("ApplicationNum") or a.get("ApplicationID"),120)
+        address=clean(a.get("Address"),230)
+        scope=clean(a.get("Description") or a.get("Proposed_use"),1200)
+        if not all((ident,address,scope)):continue
+        rows.append({"city":"Brantford","application_id":ident,
+            "address":address,"scope":scope,
+            "applicant":clean(a.get("Applicant"),220),
+            "stage":clean(a.get("Status"),120),
+            "category":clean(a.get("Category") or a.get("Proposed_use"),120),
+            "date":date(a.get("Submitted_date")),
+            "date_basis":"APPLICATION_SUBMITTED_NOT_FIRST_NOTICE",
+            "source_url":BRANTFORD,
+            "source_lane":"BRANTFORD_OFFICIAL_OPEN_DATA_VIEW",
+            "source_permission":"BRANTFORD_OPEN_DATA_COMMERCIAL_LICENCE",
+            "publication_verified":"False","buyer_verified":"False",
+            "open_supplier_package_verified":"False"})
+    return rows
+
 def run(results,*,getter=fetch_json):
     root=Path(results)
     root.mkdir(parents=True,exist_ok=True)
     states={}
     rows=[]
-    for name,layer in (("York Region",YORK),("Hamilton",HAMILTON)):
+    for name,layer in (("York Region",YORK),("Hamilton",HAMILTON),
+                       ("Brantford",BRANTFORD)):
         try:
             attrs,diag=pull(layer,getter=getter)
-            data=parse_york(attrs) if layer==YORK else parse_hamilton(attrs)
+            data=(parse_york(attrs) if layer==YORK else
+                  parse_hamilton(attrs) if layer==HAMILTON else
+                  parse_brantford(attrs))
             rows.extend(data)
             states[name]={"status":("LIVE_APPLICATION_FILES_RETRIEVED" if data
                       else "FETCHED_WITHOUT_VALID_APPLICATION_FILES"),
