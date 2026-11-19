@@ -19,6 +19,8 @@ import re
 from collections import Counter, defaultdict
 from pathlib import Path
 
+from gta_authorized_application_exports import load as load_authorized_exports
+
 CORE_CITIES = (
     "Toronto", "Brampton", "Mississauga", "Hamilton", "Burlington",
     "Oakville", "Vaughan", "Kitchener", "Markham", "Oshawa", "Milton",
@@ -392,6 +394,18 @@ def run(results, *, today=None):
             stable=r.get("record_id")))
         sources["NEXT_FOUR_NOTICE"] += 1
 
+    # Publisher-permitted manually supplied City CSV exports. This is a
+    # separate LOCAL source: no GIS bypass, live collection claim, or inferred
+    # first-publication date. Never count rows without exact official IDs.
+    authorized_rows, authorized_status = load_authorized_exports(root)
+    for item in authorized_rows:
+        records.append(_record(item["city"], "AUTHORIZED_CITY_CSV_OFFLINE",
+            item["application_id"], address=item["address"],
+            scope=item["scope"], stage=item["status"],
+            applicant=item["applicant"], date=item["date"],
+            date_basis=item["source_date_basis"], url=item["url"], core=True))
+        sources["AUTHORIZED_CITY_CSV_OFFLINE"] += 1
+
     rows = _merge(records)
     for row in rows:
         try:
@@ -544,6 +558,7 @@ def run(results, *, today=None):
         "top10_cities": dict(Counter(r["city"] for r in winners)),
         "core_16_source_rows": sources["CORE_16"],
         "source_rows_by_lane": dict(sources),
+        "authorized_local_exports_not_live": authorized_status["rows"],
         "all_citywide_coverage_verified": False,
         "verified_new_publications": 0, "verified_buyers": 0,
         "verified_open_supplier_contracts": 0,
