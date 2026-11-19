@@ -102,6 +102,47 @@ class FourCityLiveAndReconcile(unittest.TestCase):
             self.assertTrue((root/"GTA_RADAR_COMBINED_28_CITY_TOP10.csv").exists())
             self.assertTrue((root/"GTA_RADAR_COMBINED_24_CITY_PROJECT_MASTER.csv").exists())
 
+    def test_partial_alternative_source_updates_city_coverage_not_legacy_failure(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp)
+            source_rows=[]
+            for city in legacy.CITIES:
+                base={k:"" for k in legacy.COLS}
+                base.update({"canonical_id":city.upper().replace(" ","_")+":FILE:BASE",
+                    "city":city,"cohort":"CORE_16" if city in legacy.CORE_CITIES else "EXPANSION_8",
+                    "record_kind":"APPLICATION","application_id":"BASE",
+                    "address":"10 Main Street","scope":"Commercial office development",
+                    "official_evidence_urls":"https://example.org/official",
+                    "commercial_text_match":"True"})
+                source_rows.append(base)
+            write(root/"GTA_RADAR_COMBINED_24_CITY_PROJECT_MASTER.csv",legacy.COLS,source_rows)
+            coverage=[{"city":city,"source_health":"ROBOTS_DENIED",
+                       "failed_or_blocked_source_count":"1","application_files":"0",
+                       "source_rows":"0"} for city in legacy.CITIES]
+            write(root/"GTA_RADAR_COMBINED_24_CITY_COVERAGE.csv",legacy.COVERAGE_COLS,coverage)
+            live.run(root,collector=lambda city,**kw:source(city),today=DAY)
+            alt_fields=("city","application_id","address","scope","applicant","stage",
+                "category","date","date_basis","source_url","source_lane",
+                "source_permission","publication_verified","buyer_verified",
+                "open_supplier_package_verified")
+            data=[{"city":"Vaughan","application_id":"D07-2026-008",
+                "address":"20 Warehouse Street","scope":"Industrial warehouse development",
+                "source_url":"https://services1.arcgis.com/example",
+                "source_permission":"YORK_REGION_OPEN_DATA_LICENCE",
+                "source_lane":"YORK_REGION_ACTIVE_APPLICATIONS_OPEN_DATA"}]
+            write(root/"GTA_RADAR_ADDITIONAL_OFFICIAL_OPEN_DATA.csv",alt_fields,data)
+            (root/"GTA_RADAR_ADDITIONAL_OFFICIAL_OPEN_DATA_STATUS.json").write_text(
+                json.dumps({"status":"PUBLISHED_OPEN_DATA_RECOVERY_PARTIAL_UNTIL_LIVE_VERIFIED",
+                "source_status":{"York Region":{"status":"LIVE_APPLICATION_FILES_RETRIEVED"}}}))
+            together.run(root,today=DAY)
+            with (root/together.COVERAGE).open(encoding="utf-8-sig") as f:
+                entries={row["city"]:row for row in csv.DictReader(f)}
+            self.assertEqual(entries["Vaughan"]["application_files"],"1")
+            self.assertEqual(entries["Vaughan"]["failed_or_blocked_source_count"],"1")
+            self.assertIn("ALTERNATE_EXACT_FILE_IDS_PARTIAL",
+                          entries["Vaughan"]["source_health"])
+            self.assertEqual(entries["Vaughan"]["coverage_verified_citywide"],"False")
+
     def test_robots_fails_closed_and_no_network_in_mock(self):
         self.assertFalse(live.robots_allowed("http://example.com/"))
         self.assertFalse(live.robots_allowed("https://user:pass@example.org/a"))
