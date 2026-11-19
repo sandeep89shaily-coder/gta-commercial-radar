@@ -76,6 +76,12 @@ def run(results, *, paid=False, city="Brampton", today=None,
     if not paid:
         save()
         return state
+    # A fresh paid discovery attempt must not silently reuse yesterday's
+    # equipment CSV as today's results when source research is blocked.
+    # Historical snapshots remain preserved by the existing ZIP archive.
+    with (output.parent / OPPORTUNITIES).open(
+            "w", encoding="utf-8-sig", newline="") as stream:
+        csv.DictWriter(stream, fieldnames=COLUMNS).writeheader()
     search = discoverer or discover
     assess = qualifier or qualify
     contacts = investigator or investigate
