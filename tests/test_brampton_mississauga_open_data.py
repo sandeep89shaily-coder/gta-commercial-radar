@@ -15,7 +15,7 @@ def fake(lane):
 def response(url):
     lane=next((k for k,v in peel.SOURCES.items() if url.startswith(v)),None)
     if lane is None:raise AssertionError(url)
-    if "?f=json" in url:
+    if "/query?" not in url and "?f=json" in url:
         return {"objectIdField":"OBJECTID","fields":[{"name":"OBJECTID"}]}
     if "/query?" not in url:raise AssertionError(url)
     if lane.startswith("Brampton"):
