@@ -168,7 +168,7 @@ class Anchors(HTMLParser):
             self.active=None
 
 KEYWORDS=re.compile(r"\b(?:planning|development|notice|application|council|agenda|minutes|"
-                    r"zoning|industrial|business|meeting|public hearing)\b",re.I)
+                    r"zoning|industrial|business|meetings?|public hearing)\b",re.I)
 
 def oakville_links(body,*,landing):
     if landing not in (OAK_NEWS,OAK_MEETINGS) or not isinstance(body,str):
