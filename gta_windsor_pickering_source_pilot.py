@@ -31,7 +31,7 @@ MAX_BYTES = 3_000_000
 MAX_ROWS = 300
 # Require actual municipal file references, not the mere year/ward/address.
 WINDSOR_FILES = re.compile(
-    r"(?<![A-Z0-9])(?:Z|ZNG|ZBA|SDN|OPA)[ -]?\d{1,3}"
+    r"(?<![A-Z0-9])(?:ZNG|ZBA|SDN|OPA|Z)[ -]?\d{1,5}"
     r"(?:[/-]\d{2,4})?(?![A-Z0-9])", re.I)
 PICKERING_FILES = re.compile(
     r"(?<![A-Z0-9])(?:OPA\s*\d{2}[-/]\d{1,4}P?|"
@@ -222,7 +222,7 @@ def parse_pickering_detail(html, *, page_url):
     posted=""
     # 'By City of Pickering - Sep 29, 2026' is an ARTICLE stamp,
     # which can postdate the original index entry.
-    d=re.search(r"\bBy\s+City of Pickering\s*[-–]\s*("+POSTED.pattern[2:-2]+r")",body,re.I)
+    d=re.search(r"By\s+City of Pickering\s*[-–]\s*(" + POSTED.pattern + r")",body,re.I)
     if d:
         posted=d.group(1)
     return [base_row(
