@@ -169,13 +169,14 @@ def run(results,*,today=None):
         "Markham":"YORK_REGION_OPEN_DATA_LICENCE",
         "Richmond Hill":"YORK_REGION_OPEN_DATA_LICENCE",
         "Hamilton":"HAMILTON_OPEN_DATA_COMMERCIAL_LICENCE",
+        "Brantford":"BRANTFORD_OPEN_DATA_COMMERCIAL_LICENCE",
     }
     if regional_status.get("status")==\
             "PUBLISHED_OPEN_DATA_RECOVERY_PARTIAL_UNTIL_LIVE_VERIFIED":
         health=regional_status.get("source_status",{})
         for item in _read(root/"GTA_RADAR_ADDITIONAL_OFFICIAL_OPEN_DATA.csv"):
             city=item.get("city","")
-            source_health=health.get("Hamilton" if city=="Hamilton" else "York Region",{})
+            source_health=health.get(city if city in ("Hamilton","Brantford") else "York Region",{})
             if (city not in allowed_sources or
                     source_health.get("status")!="LIVE_APPLICATION_FILES_RETRIEVED" or
                     item.get("source_permission")!=allowed_sources[city] or
