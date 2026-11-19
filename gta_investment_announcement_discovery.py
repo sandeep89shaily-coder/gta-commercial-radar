@@ -46,8 +46,8 @@ def search_queries(city, year):
     if city not in ("Brampton", "Mississauga", "Toronto"):
         raise ValueError("CITY_NOT_IN_CONTROLLED_PILOT")
     return [
-        f"{city} Ontario industrial development acquisition partnership "
-        f"announcement construction {year}",
+        f"{city} Ontario manufacturing capital investment new equipment "
+        f"production line automation modernization government announcement {year}",
         f"{city} Ontario new industrial condominium warehouse project "
         f"developer planned construction {year}",
     ]
