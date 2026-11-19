@@ -411,7 +411,7 @@ def run(results, *, paid=False, deep_research=False, deep_project_limit=4,
                 evidence_fingerprint = hashlib.sha256(json.dumps(
                     [live_checks[(r["city"].casefold(),r["record_id"])]
                      for r in batch], sort_keys=True).encode("utf-8")).hexdigest()
-                claim = ("ai24_company_v5_" if combined_24 else
+                claim = ("ai28_company_v5_" if combined_28 else "ai24_company_v5_" if combined_24 else
                          "ai_top10_company_v5_") + hashlib.sha256(
                     (digest + ":" + fingerprint + ":" + evidence_fingerprint
                      + ":" + day.isoformat()).encode()).hexdigest()[:26]
