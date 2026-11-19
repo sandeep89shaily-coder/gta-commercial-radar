@@ -151,7 +151,11 @@ def query_exact(application_id,*,fetcher=fetch):
         raise ValueError("EXACT_FILE_NUMBER_REQUIRED")
     # String literal is quoted as ArcGIS SQL text; only official layer and
     # whitelisted columns are queried. No arbitrary WHERE/host can be supplied.
-    where="APPLICATION_NUMBER = '"+ident.replace("'","''")+"'"
+    # AIC strips spaces from application numbers; CKAN may preserve them.
+    # Query ONLY these two exact official spellings, never fuzzy LIKE.
+    variants=list(dict.fromkeys((ident,normalized_id(ident))))
+    where="APPLICATION_NUMBER IN (" + ",".join(
+        "'"+v.replace("'","''")+"'" for v in variants) + ")"
     url=LAYER+"/query?"+urlencode({
         "where":where,"outFields":",".join(OUTFIELDS),
         "returnGeometry":"false","f":"json","resultRecordCount":3,
