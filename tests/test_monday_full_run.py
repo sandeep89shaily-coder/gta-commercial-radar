@@ -157,7 +157,7 @@ class MondayIntegrationTests(unittest.TestCase):
             self.assertFalse(report["collection_performed"])
             self.assertFalse(report["fresh_collection_verified"])
             self.assertEqual(report["ai_harness_mode"], "FREE_PREFLIGHT")
-            self.assertEqual(len(report["stages"]), 7)
+            self.assertEqual(len(report["stages"]), 8)
 
     def test_fresh_collector_failure_skips_paid_investment_research(self):
         with tempfile.TemporaryDirectory() as td:
@@ -197,7 +197,7 @@ class MondayIntegrationTests(unittest.TestCase):
             state=json.loads((ws/"GTA_RADAR_RESULTS"/"MONDAY_FULL_RADAR"/
                               monday.REPORT).read_text())
             self.assertEqual(state["archive_status"],"FAILED_NOT_PACKAGED")
-            self.assertEqual(state["stage_successes"],8)
+            self.assertEqual(state["stage_successes"],9)
             self.assertEqual(state["status"],"ALL_STAGES_RAN_REVIEW_ONLY")
             self.assertIn("archive drive full",state["archive_error"])
 
