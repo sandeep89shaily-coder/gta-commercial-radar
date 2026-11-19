@@ -235,7 +235,28 @@ def run(results,*,today=None):
         city_slots[row["city"]]+=1
         top.append(row)
         if len(top)>=10:break
-    new_coverage=list(original_coverage)
+    new_coverage=[dict(x) for x in original_coverage]
+    # The original 24-city coverage report may mark a blocked municipal GIS
+    # collector even when a separate licensed regional/open-data source now
+    # successfully retrieves exact planning file IDs. Preserve the old
+    # failure count and explicitly identify the recovered *partial* source.
+    # Do not overwrite legacy application counts or claim citywide coverage.
+    alternative_by_city=Counter(x["city"] for x in fallback+regional)
+    for entry in new_coverage:
+        city=entry.get("city","")
+        recovered=alternative_by_city.get(city,0)
+        if not recovered:
+            continue
+        entry["application_files"]=str(max(0,int(entry.get("application_files") or 0))+recovered)
+        entry["source_rows"]=str(max(0,int(entry.get("source_rows") or 0))+recovered)
+        legacy_status=entry.get("source_health","")
+        entry["source_health"]=(legacy_status+" | "+
+            "LICENSED_OR_RESEARCH_ONLY_ALTERNATE_EXACT_FILE_IDS_PARTIAL").strip(" |")
+        entry["source_limitations"]=(entry.get("source_limitations","")+" | "+
+            "Official alternative provided "+str(recovered)+
+            " application IDs; prior failed/blocked source remains unresolved; "+
+            "regional sources are not citywide complete.")[:850]
+        entry["coverage_verified_citywide"]="False"
     for city in ADDED:
         info=health[city]
         count=sum(x["city"]==city for x in extra)
@@ -270,6 +291,8 @@ def run(results,*,today=None):
         "official_alternative_source_rows_joined":len(fallback),
         "regional_open_data_rows_joined":len(regional),
         "regional_open_data_by_city":dict(Counter(x["city"] for x in regional)),
+        "recovered_existing_city_application_rows":dict(alternative_by_city),
+        "legacy_source_failures_retained":True,
         "alternative_source_cities":dict(Counter(x["city"] for x in fallback)),
         "combined_master_rows":len(allrows),
         "combined_research_candidates":len(research),
