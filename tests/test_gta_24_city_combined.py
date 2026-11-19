@@ -317,6 +317,18 @@ class Combined24CityTests(unittest.TestCase):
         self.assertIsNotNone(m._rank(original,dt.date(2026,11,18)))
         self.assertIsNotNone(_model_row(original))
 
+    def test_recent_dated_events_outweigh_undated_municipal_backlog(self):
+        m.run(self.root, today=dt.date(2026, 11, 18))
+        top = read_csv(self.root / m.TOP10)
+        self.assertEqual(top[0]["city"], "Toronto")
+        self.assertEqual(top[0]["source_event_age_band_not_publication"],
+                         "SOURCE_EVENT_0_TO_7_DAYS")
+        miss = next(r for r in read_csv(self.root / m.MASTER)
+                    if r["city"] == "Mississauga")
+        self.assertEqual(miss["source_event_age_band_not_publication"],
+                         "SOURCE_EVENT_DATE_UNKNOWN_NOT_FRESH")
+        self.assertEqual(miss["original_publication_verified"], "False")
+
     def test_core16_required_cannot_replace_with_eight_pilots(self):
         (self.root/"GTA_RADAR_COLLECTION_HEALTH.csv").unlink()
         with self.assertRaisesRegex(ValueError,"CORE_16_COLLECTION_MISSING"):
