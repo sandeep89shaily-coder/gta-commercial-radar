@@ -212,8 +212,61 @@ def run(results,*,today=None):
                 "verification_required":
                    "Regional review only; confirm local file, project stage, buyer and open work",
             })
+    # Peel official planning datasets enrich the established 28-city source
+    # universe without replacing earlier HTML or collector records.
+    # Mississauga's custom licence has not been cleared for resale/reuse;
+    # its records remain evidence inventory, not AI/customer-ranked leads.
+    peel=[]
+    peel_status_path=root/"GTA_RADAR_BR_MISS_OPEN_PLANNING_STATUS.json"
+    try:
+        peel_status=json.loads(peel_status_path.read_text(encoding="utf-8"))
+    except (OSError,ValueError,UnicodeError):
+        peel_status={}
+    peel_source_status=peel_status.get("source_status",{})
+    if peel_status.get("status")=="BRAMPTON_MISSISSAUGA_OFFICIAL_DATA_ATTEMPT_AUDITED":
+        for item in _read(root/"GTA_RADAR_BR_MISS_OPEN_PLANNING_APPLICATIONS.csv"):
+            city=item.get("city","")
+            lane=item.get("source_lane","")
+            status=peel_source_status.get(lane,{})
+            if (city not in ("Brampton","Mississauga") or
+                    status.get("status")!="LIVE_VALID_APPLICATION_FILES_PARTIAL" or
+                    not all(item.get(k) for k in ("application_id","address","scope","source_url"))):
+                continue
+            ident=item["application_id"]
+            fileid="".join(char for char in ident.upper() if char.isalnum())
+            if not fileid:continue
+            # Some Brampton layers have CC BY 4.0, but other source-level
+            # licences and the Mississauga custom licence are unverified.
+            licence=item.get("licence_status","")
+            eligible=licence=="CC_BY_4_0_PUBLISHED_DATASET"
+            scope=item["scope"]
+            peel.append({
+                "canonical_id":city.upper()+":FILE:"+fileid,
+                "city":city,"cohort":"CORE_16","record_kind":"APPLICATION",
+                "application_id":ident,"address":item["address"],
+                "project_title":item.get("project_title",""),"scope":scope,
+                "current_status":item.get("stage",""),
+                "applicant_or_agent_source_claim":item.get("applicant",""),
+                "published_contact_name":"","published_contact_email":"",
+                "contact_role":"","source_date":item.get("source_date",""),
+                "source_date_basis":item.get("source_date_basis",""),
+                "webpage_posted_date_not_first_disclosure":"",
+                "source_observation":"OFFICIAL_PLANNING_SNAPSHOT_NOT_PUBLICATION",
+                "first_seen_local":"","official_evidence_urls":item["source_url"],
+                "source_lanes":lane,
+                "commercial_text_match":str(eligible and any(w in
+                    (scope+" "+item.get("category","")).casefold()
+                    for w in ("industrial","commercial","manufactur","warehouse",
+                              "logistics","retail","office","distribution","factory"))),
+                "source_event_age_band_not_publication":"",
+                "original_publication_verified":"False",
+                "purchasing_contact_verified":"False",
+                "open_supplier_contract_verified":"False",
+                "commercial_research_priority":"BASELINE_OR_UNVERIFIED",
+                "verification_required":"Confirm original notice, applicant, buyer, reuse rights and open supplier work",
+            })
     records={}
-    for row in base+extra+fallback+regional:
+    for row in base+extra+fallback+regional+peel:
         if row.get("canonical_id"):
             records.setdefault(row["canonical_id"],row)
     allrows=list(records.values())
@@ -241,7 +294,7 @@ def run(results,*,today=None):
     # successfully retrieves exact planning file IDs. Preserve the old
     # failure count and explicitly identify the recovered *partial* source.
     # Do not overwrite legacy application counts or claim citywide coverage.
-    alternative_by_city=Counter(x["city"] for x in fallback+regional)
+    alternative_by_city=Counter(x["city"] for x in fallback+regional+peel)
     for entry in new_coverage:
         city=entry.get("city","")
         recovered=alternative_by_city.get(city,0)
@@ -290,6 +343,9 @@ def run(results,*,today=None):
         "all_four_added_city_source_rows":len(extra),
         "official_alternative_source_rows_joined":len(fallback),
         "regional_open_data_rows_joined":len(regional),
+        "peel_open_data_rows_joined":len(peel),
+        "peel_by_city":dict(Counter(x["city"] for x in peel)),
+        "mississauga_custom_licence_ai_eligible":False,
         "regional_open_data_by_city":dict(Counter(x["city"] for x in regional)),
         "recovered_existing_city_application_rows":dict(alternative_by_city),
         "legacy_source_failures_retained":True,
