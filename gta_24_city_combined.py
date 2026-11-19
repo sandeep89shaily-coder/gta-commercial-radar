@@ -43,7 +43,8 @@ COLS = (
     "published_contact_email", "contact_role", "source_date",
     "source_date_basis", "webpage_posted_date_not_first_disclosure",
     "source_observation", "first_seen_local", "official_evidence_urls",
-    "source_lanes", "commercial_text_match", "original_publication_verified",
+    "source_lanes", "commercial_text_match", "source_event_age_band_not_publication",
+    "original_publication_verified",
     "purchasing_contact_verified", "open_supplier_contract_verified",
     "commercial_research_priority", "verification_required",
 )
@@ -392,6 +393,19 @@ def run(results, *, today=None):
         sources["NEXT_FOUR_NOTICE"] += 1
 
     rows = _merge(records)
+    for row in rows:
+        try:
+            source_age = (day - dt.date.fromisoformat(row["source_date"])).days
+        except (ValueError, TypeError):
+            source_age = None
+        row["source_event_age_band_not_publication"] = (
+            "FUTURE_OR_INVALID_DATE_REVIEW" if source_age is not None and source_age < 0 else
+            "SOURCE_EVENT_0_TO_7_DAYS" if source_age is not None and source_age <= 7 else
+            "SOURCE_EVENT_8_TO_30_DAYS" if source_age is not None and source_age <= 30 else
+            "SOURCE_EVENT_31_TO_90_DAYS" if source_age is not None and source_age <= 90 else
+            "SOURCE_EVENT_91_TO_365_DAYS" if source_age is not None and source_age <= 365 else
+            "HISTORICAL_SOURCE_EVENT_OVER_365_DAYS" if source_age is not None else
+            "SOURCE_EVENT_DATE_UNKNOWN_NOT_FRESH")
     by_city = defaultdict(list)
     for row in rows:
         by_city[row["city"]].append(row)
