@@ -154,7 +154,7 @@ def base_row(city,ident,files,address,scope,applicant,record_type,url,
         "scope":description[:1300],"applicant_source_claim":clean(applicant,200),
         "record_type":clean(record_type,120),"source_date":iso_date(posted),
         "source_date_basis":("PUBLISHER_INDEX_POSTED_NOT_FIRST_PROJECT_NOTICE"
-                             if posted and city=="Pickering" else
+                             if posted and source_level=="INDEX_ONLY" else
                              "PUBLISHER_ARTICLE_DATE_NOT_PROVEN_FIRST_NOTICE"
                              if posted else "UNVERIFIED"),
         "source_url":url,"source_level":source_level,
