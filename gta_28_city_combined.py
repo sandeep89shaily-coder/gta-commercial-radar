@@ -155,8 +155,65 @@ def run(results,*,today=None):
                 "commercial_research_priority":"BASELINE_OR_UNVERIFIED",
                 "verification_required":"Publisher notice, actual buying role and procurement unverified",
             })
+    # Additional publicly licensed open-data sources are included alongside
+    # 24-city history, but a regional application must not be called complete
+    # municipality coverage. Repeated exact file IDs are deduplicated.
+    regional=[]
+    regional_status_path=root/"GTA_RADAR_ADDITIONAL_OFFICIAL_OPEN_DATA_STATUS.json"
+    try:
+        regional_status=json.loads(regional_status_path.read_text(encoding="utf-8"))
+    except (OSError,ValueError,UnicodeError):
+        regional_status={}
+    allowed_sources={
+        "Vaughan":"YORK_REGION_OPEN_DATA_LICENCE",
+        "Markham":"YORK_REGION_OPEN_DATA_LICENCE",
+        "Richmond Hill":"YORK_REGION_OPEN_DATA_LICENCE",
+        "Hamilton":"HAMILTON_OPEN_DATA_COMMERCIAL_LICENCE",
+        "Brantford":"BRANTFORD_OPEN_DATA_COMMERCIAL_LICENCE",
+    }
+    if regional_status.get("status")==\
+            "PUBLISHED_OPEN_DATA_RECOVERY_PARTIAL_UNTIL_LIVE_VERIFIED":
+        health=regional_status.get("source_status",{})
+        for item in _read(root/"GTA_RADAR_ADDITIONAL_OFFICIAL_OPEN_DATA.csv"):
+            city=item.get("city","")
+            source_health=health.get(city if city in ("Hamilton","Brantford") else "York Region",{})
+            if (city not in allowed_sources or
+                    source_health.get("status")!="LIVE_APPLICATION_FILES_RETRIEVED" or
+                    item.get("source_permission")!=allowed_sources[city] or
+                    not all(item.get(k) for k in ("application_id","address","scope","source_url"))):
+                continue
+            ident=item["application_id"]
+            safeid="".join(char for char in ident.upper() if char.isalnum())
+            if not safeid:continue
+            scope=item["scope"]
+            regional.append({
+                "canonical_id":city.upper().replace(" ","_")+":FILE:"+safeid,
+                "city":city,"cohort":"CORE_16","record_kind":"APPLICATION",
+                "application_id":ident,"address":item["address"],
+                "project_title":"","scope":scope,
+                "current_status":item.get("stage",""),
+                "applicant_or_agent_source_claim":item.get("applicant",""),
+                "published_contact_name":"","published_contact_email":"",
+                "contact_role":"","source_date":item.get("date",""),
+                "source_date_basis":item.get("date_basis",""),
+                "webpage_posted_date_not_first_disclosure":"",
+                "source_observation":"OFFICIAL_OPEN_DATA_BASELINE_NOT_FIRST_PUBLICATION",
+                "first_seen_local":"","official_evidence_urls":item["source_url"],
+                "source_lanes":item.get("source_lane","REGIONAL_OPEN_DATA"),
+                "commercial_text_match":str(any(word in (scope+" "+item.get("category","")).casefold()
+                    for word in ("industrial","commercial","manufactur",
+                        "warehouse","logistics","distribution","retail",
+                        "office","hotel","factory","business park"))),
+                "source_event_age_band_not_publication":"",
+                "original_publication_verified":"False",
+                "purchasing_contact_verified":"False",
+                "open_supplier_contract_verified":"False",
+                "commercial_research_priority":"BASELINE_OR_UNVERIFIED",
+                "verification_required":
+                   "Regional review only; confirm local file, project stage, buyer and open work",
+            })
     records={}
-    for row in base+extra+fallback:
+    for row in base+extra+fallback+regional:
         if row.get("canonical_id"):
             records.setdefault(row["canonical_id"],row)
     allrows=list(records.values())
@@ -211,6 +268,8 @@ def run(results,*,today=None):
             for x,xinfo in health.items()},
         "all_four_added_city_source_rows":len(extra),
         "official_alternative_source_rows_joined":len(fallback),
+        "regional_open_data_rows_joined":len(regional),
+        "regional_open_data_by_city":dict(Counter(x["city"] for x in regional)),
         "alternative_source_cities":dict(Counter(x["city"] for x in fallback)),
         "combined_master_rows":len(allrows),
         "combined_research_candidates":len(research),
