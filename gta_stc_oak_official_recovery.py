@@ -167,7 +167,7 @@ class Anchors(HTMLParser):
                                self.active["href"]))
             self.active=None
 
-KEYWORDS=re.compile(r"\b(?:planning|development|notice|application|council|agenda|minutes|"
+KEYWORDS=re.compile(r"\b(?:planning|development|notices?|applications?|council|agendas?|minutes|"
                     r"zoning|industrial|business|meetings?|public hearing)\b",re.I)
 
 def oakville_links(body,*,landing):
