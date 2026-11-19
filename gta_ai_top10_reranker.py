@@ -245,17 +245,19 @@ def _validate(answer, count, batch=None, live_checks=None):
 
 
 def run(results, *, paid=False, deep_research=False, deep_project_limit=4,
-        key=None, transport=None, today=None, combined_24=False):
+        key=None, transport=None, today=None, combined_24=False, combined_28=False):
     root = Path(results)
     if not root.is_dir():
         raise ValueError("EXISTING_RADAR_RESULTS_REQUIRED")
     day = today or dt.date.today()
-    if combined_24:
+    if combined_24 or combined_28:
         from gta_24_city_ai_selection import candidates as combined_candidates
-        pool = combined_candidates(root, today=day, limit=MAX_CANDIDATES)
-        out = root / "GTA_RADAR_COMBINED_24_CITY_AI_TOP10_REVIEW.json"
-        batch_folder = "AI_COMBINED_24_REVIEW_BATCHES"
-        attempt_file = "GTA_RADAR_COMBINED_24_CITY_AI_TOP10_ATTEMPT_STATUS.json"
+        universe = 28 if combined_28 else 24
+        pool = combined_candidates(root, today=day, limit=MAX_CANDIDATES,
+                                   universe=universe)
+        out = root / f"GTA_RADAR_COMBINED_{universe}_CITY_AI_TOP10_REVIEW.json"
+        batch_folder = f"AI_COMBINED_{universe}_REVIEW_BATCHES"
+        attempt_file = f"GTA_RADAR_COMBINED_{universe}_CITY_AI_TOP10_ATTEMPT_STATUS.json"
     else:
         base = base_build(root, today=day, apply_ai=False)
         pool = ai_candidate_pool(base["all_candidates"], MAX_CANDIDATES)
@@ -265,11 +267,12 @@ def run(results, *, paid=False, deep_research=False, deep_project_limit=4,
     digest = ai_fingerprint(pool)
     state = {
         "status": "FREE_PREFLIGHT_NOT_SUBMITTED" if not paid else "PENDING",
-        "selection_scope": "COMBINED_16_PLUS_8" if combined_24 else "LEGACY_CORE_ONLY",
+        "selection_scope": ("COMBINED_28" if combined_28 else
+                           "COMBINED_16_PLUS_8" if combined_24 else "LEGACY_CORE_ONLY"),
         "candidate_cities": list(dict.fromkeys(row["city"] for row in pool)),
         "candidate_cohorts": dict((cohort, sum(1 for row in pool if
             row.get("cohort")==cohort)) for cohort in ("CORE_16","EXPANSION_8"))
-            if combined_24 else {},
+            if combined_24 or combined_28 else {},
         "input_fingerprint": digest, "candidate_count": len(pool),
         "reviewed_count": 0, "accepted_batches": 0,
         "paid_model_calls": 0, "paid_search_fetch_calls": 0,
@@ -294,19 +297,21 @@ def run(results, *, paid=False, deep_research=False, deep_project_limit=4,
         tmp_attempt.replace(target)
 
     def finalize_combined():
-        if not combined_24:
+        if not (combined_24 or combined_28):
             return
         from gta_24_city_ai_selection import finalize
-        selection = finalize(root, state=state, pool=pool, today=day)
+        universe=28 if combined_28 else 24
+        selection = finalize(root, state=state, pool=pool, today=day,
+                             universe=universe)
         state["combined_final_status"] = selection["status"]
-        state["combined_final_top10"] = str(root / "GTA_RADAR_COMBINED_24_CITY_TOP10.csv")
+        state["combined_final_top10"] = str(root / f"GTA_RADAR_COMBINED_{universe}_CITY_TOP10.csv")
         state["combined_model_applied"] = selection["model_decisions_applied"]
         save_attempt()
 
     if not paid or not pool:
         state["status"] = "NO_CANDIDATES" if not pool else "FREE_PREFLIGHT_NOT_SUBMITTED"
         save_attempt()
-        if combined_24:
+        if combined_24 or combined_28:
             finalize_combined()
         return state
 
@@ -406,7 +411,7 @@ def run(results, *, paid=False, deep_research=False, deep_project_limit=4,
                 evidence_fingerprint = hashlib.sha256(json.dumps(
                     [live_checks[(r["city"].casefold(),r["record_id"])]
                      for r in batch], sort_keys=True).encode("utf-8")).hexdigest()
-                claim = ("ai24_company_v5_" if combined_24 else
+                claim = ("ai28_company_v5_" if combined_28 else "ai24_company_v5_" if combined_24 else
                          "ai_top10_company_v5_") + hashlib.sha256(
                     (digest + ":" + fingerprint + ":" + evidence_fingerprint
                      + ":" + day.isoformat()).encode()).hexdigest()[:26]
@@ -536,7 +541,7 @@ def run(results, *, paid=False, deep_research=False, deep_project_limit=4,
     tmp.write_text(json.dumps(state, ensure_ascii=False, indent=2),
                    encoding="utf-8")
     tmp.replace(out)
-    if combined_24:
+    if combined_24 or combined_28:
         finalize_combined()
         return state
     exported = regenerate_shortlist(root, today=day)
