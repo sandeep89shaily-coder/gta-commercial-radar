@@ -126,7 +126,7 @@ def _source_event_band(row, day):
     return 3
 
 
-def candidates(results, *, limit=MAX_REVIEW, today=None):
+def candidates(results, *, limit=MAX_REVIEW, today=None, universe=24):
     """Source-backed review pool; protects both original and expansion cohorts.
 
     Include up to 8 eligible expansion-city projects, up to 8 core projects,
@@ -134,9 +134,10 @@ def candidates(results, *, limit=MAX_REVIEW, today=None):
     has no genuinely eligible source files. Use at most 6 per city.
     """
     root = Path(results)
-    if not (root/QUEUE).is_file():
-        raise ValueError("COMBINED_24_RESEARCH_QUEUE_MISSING")
-    rows = _read(root, QUEUE)
+    queue = QUEUE if universe == 24 else "GTA_RADAR_COMBINED_28_CITY_RESEARCH_QUEUE.csv"
+    if not (root/queue).is_file():
+        raise ValueError("COMBINED_RESEARCH_QUEUE_MISSING")
+    rows = _read(root, queue)
     if not rows:
         # A quiet day must yield an honest zero-row Top 10 rather than
         # fallback to stale legacy candidates or try a paid API call.
@@ -168,7 +169,8 @@ def candidates(results, *, limit=MAX_REVIEW, today=None):
         x["city"], x["record_id"]))
     selected, used, city_counts = [], set(), Counter()
     cap = min(max(0, int(limit)), MAX_REVIEW)
-    for cohort in ("EXPANSION_8","CORE_16"):
+    for cohort in (("ADDED_4", "EXPANSION_8", "CORE_16") if universe == 28
+                   else ("EXPANSION_8", "CORE_16")):
         count = 0
         for row in models:
             if count >= min(8, cap) or len(selected) >= cap:
@@ -188,15 +190,19 @@ def candidates(results, *, limit=MAX_REVIEW, today=None):
     return selected
 
 
-def finalize(results, *, state=None, pool=None, today=None):
+def finalize(results, *, state=None, pool=None, today=None, universe=24):
     root = Path(results)
     day = today or dt.date.today()
-    inputs = _read(root, QUEUE)
-    deterministic = _read(root, BASE_TOP10)
-    if not (root/QUEUE).is_file() or not (root/BASE_TOP10).is_file():
+    queue = QUEUE if universe == 24 else "GTA_RADAR_COMBINED_28_CITY_RESEARCH_QUEUE.csv"
+    base_top = BASE_TOP10 if universe == 24 else "GTA_RADAR_COMBINED_28_CITY_RESEARCH_TOP10.csv"
+    final_top = FINAL_TOP10 if universe == 24 else "GTA_RADAR_COMBINED_28_CITY_TOP10.csv"
+    final_status = FINAL_STATUS if universe == 24 else "GTA_RADAR_COMBINED_28_CITY_AI_TOP10_STATUS.json"
+    inputs = _read(root, queue)
+    deterministic = _read(root, base_top)
+    if not (root/queue).is_file() or not (root/base_top).is_file():
         raise ValueError("COMBINED_RESEARCH_INPUT_FILES_NOT_FOUND")
     state = state or {}
-    pool = pool if pool is not None else candidates(root, today=day)
+    pool = pool if pool is not None else candidates(root, today=day, universe=universe)
     review = state.get("reviews") or []
     matched = (
         state.get("status") == "AI_TOP10_REVIEW_ONLY" and
@@ -273,7 +279,7 @@ def finalize(results, *, state=None, pool=None, today=None):
             "open_supplier_contract_verified":"False",
         })
         output.append(item)
-    with (root/FINAL_TOP10).open("w",encoding="utf-8-sig",newline="") as fp:
+    with (root/final_top).open("w",encoding="utf-8-sig",newline="") as fp:
         writer=csv.DictWriter(fp,fieldnames=OUTPUT_FIELDS)
         writer.writeheader()
         for item in output:
@@ -287,7 +293,7 @@ def finalize(results, *, state=None, pool=None, today=None):
         "model_reviewed_count": state.get("reviewed_count",0),
         "model_attempt_status":state.get("status","NO_AI_RESPONSE"),
         "model_decisions_applied": matched,
-        "model_research_scope":"COMBINED_16_PLUS_8",
+        "model_research_scope":("COMBINED_28" if universe == 28 else "COMBINED_16_PLUS_8"),
         "top10_count":len(output),
         "top10_cities":dict(Counter(x["city"] for x in output)),
         "top10_cohorts":dict(Counter(x["cohort"] for x in output)),
@@ -300,19 +306,20 @@ def finalize(results, *, state=None, pool=None, today=None):
             "response, contact route or municipal filed date never proves an "
             "unawarded supplier contract, buyer identity or first publication.",
     }
-    (root/FINAL_STATUS).write_text(json.dumps(summary,indent=2),
+    (root/final_status).write_text(json.dumps(summary,indent=2),
                                    encoding="utf-8")
-    combined_status_path = root / "GTA_RADAR_COMBINED_24_CITY_STATUS.json"
+    combined_status_path = root / ("GTA_RADAR_COMBINED_28_CITY_STATUS.json"
+        if universe == 28 else "GTA_RADAR_COMBINED_24_CITY_STATUS.json")
     try:
         combined = json.loads(combined_status_path.read_text(encoding="utf-8"))
-        if isinstance(combined, dict) and combined.get("configured_city_count")==24:
+        if isinstance(combined, dict) and combined.get("configured_city_count")==universe:
             combined.update({
-                "paid_ai_review_scope":"COMBINED_16_PLUS_8",
+                "paid_ai_review_scope":("COMBINED_28" if universe == 28 else "COMBINED_16_PLUS_8"),
                 "standard_paid_ai_top10_already_runs_in_upstream_daily_stage":False,
                 "standard_paid_ai_top10_includes_expansion":matched,
                 "combined_model_decisions_applied":matched,
                 "combined_ai_top10_status":origin,
-                "combined_final_top10_csv":FINAL_TOP10,
+                "combined_final_top10_csv":final_top,
                 "combined_research_top10_is_offline_not_deepseek_approved":not matched,
                 "verified_buyers":0, "verified_new_publications":0,
                 "verified_open_supplier_contracts":0,
