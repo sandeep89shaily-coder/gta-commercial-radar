@@ -146,7 +146,9 @@ def read_source(city,folder):
         "AUTHORIZED_IMPORTED_EXACT_APPLICATION_IDS_RESEARCH_ONLY" if output
         else "AUTHORIZED_EXPORT_ZERO_VALID_EXACT_APPLICATION_IDS"),
         "authorized_application_ids":len(output),"live_automatic_source":False,
-        "commercial_rights_verified":True,
+        "commercial_rights_verified":False,
+        "operator_attested_rights_manifest_present":True,
+        "independent_publisher_licence_review_still_required":True,
         "source_file_sha256":digest,
         "official_source_url":source,
         "rights_scope":rights,
