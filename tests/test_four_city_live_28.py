@@ -105,8 +105,8 @@ class FourCityLiveAndReconcile(unittest.TestCase):
     def test_robots_fails_closed_and_no_network_in_mock(self):
         self.assertFalse(live.robots_allowed("http://example.com/"))
         self.assertFalse(live.robots_allowed("https://user:pass@example.org/a"))
-        with self.assertRaises(live.SourceBlocked):
-            live.fetch_html("https://other.org/file",
-                            check_robots=True)
+        with patch.object(live,"robots_allowed",return_value=False):
+            with self.assertRaises(live.SourceBlocked):
+                live.fetch_html("https://other.org/file",check_robots=True)
 if __name__=="__main__":
     unittest.main()
