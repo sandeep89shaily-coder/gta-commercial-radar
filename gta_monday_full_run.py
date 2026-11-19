@@ -610,6 +610,28 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
         report["york_hamilton_official_open_data"]={
             "status":"NOT_RUN_HISTORICAL_OR_INJECTED_RUN"}
 
+    # Brampton's official published open-data planning layers 9/10/11 and
+    # Mississauga's separate 2026 site-plan dataset are independent recovery
+    # lanes. Licence/publisher robots failures remain explicit, not bypassed.
+    if not skip_collection and runner is None and report.get("fresh_collection_verified"):
+        try:
+            from gta_brampton_mississauga_open_data import run as recover_peel
+            peel=recover_peel(results)
+            report["peel_official_open_data_recovery"]={
+                "status":peel["status"],
+                "source_status":peel["source_status"],
+                "by_city":peel["by_city"],
+                "unique_application_files":peel["unique_application_files"],
+                "citywide_coverage_verified":False,
+                "mississauga_custom_licence_reuse_authorized":False}
+        except (OSError,ValueError,TypeError,ImportError) as exc:
+            report["peel_official_open_data_recovery"]={
+                "status":"PEEL_ALTERNATIVE_RECOVERY_FAILED",
+                "error_type":type(exc).__name__}
+    else:
+        report["peel_official_open_data_recovery"]={
+            "status":"NOT_RUN_HISTORICAL_OR_INJECTED_RUN"}
+
     # Canonical deliverable: ONE combined 16-core + 8-regional city research
     # universe. The individual collectors already ran above (and in daily_radar)
     # but were previously NOT joined, so the final Top 10 excluded regions.
