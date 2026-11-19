@@ -546,6 +546,28 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
         report["northern_commercial_research_quality"] = {
             "status": "NOT_RUN_HISTORICAL_OR_TEST_INJECTED"}
 
+    # Four NEW municipalities run automatically, independently, after the
+    # established 24-city collection and before the combined paid model.
+    # Robots/HTTP/terms blocks are counted, not bypassed or treated as live.
+    if not skip_collection and runner is None and report.get("fresh_collection_verified"):
+        try:
+            from gta_four_city_live_daily import run as run_four_live
+            four = run_four_live(results)
+            report["added_four_live_source_collection"] = {
+                "status":four["status"],
+                "live_cities":four["cities_with_live_application_ids"],
+                "application_id_rows":four["four_city_live_application_rows"],
+                "by_city":four["city_status"],
+                "verified_citywide_complete":False,
+            }
+        except (OSError,ValueError,TypeError,RuntimeError,ImportError) as exc:
+            report["added_four_live_source_collection"] = {
+                "status":"FOUR_CITY_COLLECTOR_FAILED",
+                "error_type":type(exc).__name__, "live_cities":0}
+    else:
+        report["added_four_live_source_collection"] = {
+            "status":"NOT_RUN_HISTORICAL_OR_INJECTED_RUN", "live_cities":0}
+
     # Canonical deliverable: ONE combined 16-core + 8-regional city research
     # universe. The individual collectors already ran above (and in daily_radar)
     # but were previously NOT joined, so the final Top 10 excluded regions.
@@ -601,6 +623,31 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
             "status": "NOT_RUN_HISTORICAL_OR_INJECTED_RUN",
         }
 
+    # Always materialize 28-city research outputs with the source readiness
+    # for all four new cities, even where their permitted feeds are blocked.
+    # The original 24-city master and all previous work stay untouched.
+    if (not skip_collection and runner is None and
+            report.get("combined_24_city_collection",{}).get("status")==
+                "COMBINED_16_PLUS_8_RESEARCH_ONLY_NOT_CUSTOMER_RELEASE"):
+        try:
+            from gta_28_city_combined import run as build_28_city
+            combined28=build_28_city(results)
+            report["combined_28_city_collection"]={
+                "status":combined28["status"],
+                "configured_city_count":combined28["configured_city_count"],
+                "added_cities_live":combined28["added_cities_with_live_application_ids"],
+                "added_application_rows":combined28["all_four_added_city_source_rows"],
+                "added_city_source_health":combined28["added_cities_source_health"],
+                "verified_citywide_complete":False,
+            }
+        except (OSError,ValueError,TypeError,KeyError,ImportError) as exc:
+            report["combined_28_city_collection"]={
+                "status":"COMBINED_28_CITY_INTEGRATION_FAILED",
+                "error_type":type(exc).__name__}
+    else:
+        report["combined_28_city_collection"]={
+            "status":"NOT_RUN_24_CITY_SOURCE_UNAVAILABLE_OR_HISTORICAL"}
+
     # Real per-source evidence is different from a configured city count.
     # Audit all 24 cities even when a source is blocked or produces only
     # an index page. The combined master can preserve historical files
@@ -649,10 +696,13 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
                 "COMBINED_16_PLUS_8_RESEARCH_ONLY_NOT_CUSTOMER_RELEASE"):
         try:
             from gta_ai_top10_reranker import run as review_deepseek_24
-            combined_ai = review_deepseek_24(results, paid=True, combined_24=True)
+            use28=(report.get("combined_28_city_collection",{}).get("status")==
+                   "COMBINED_28_CITY_RESEARCH_ONLY_LIVE_SOURCE_GATED")
+            combined_ai = review_deepseek_24(results, paid=True,
+                                combined_24=not use28, combined_28=use28)
             report["ai_top10_preselection"] = {
                 "status": combined_ai["status"],
-                "selection_scope": "COMBINED_16_PLUS_8",
+                "selection_scope": ("COMBINED_28" if use28 else "COMBINED_16_PLUS_8"),
                 "candidate_count": combined_ai["candidate_count"],
                 "candidate_cities": combined_ai.get("candidate_cities", []),
                 "candidate_cohorts": combined_ai.get("candidate_cohorts", {}),
@@ -672,7 +722,7 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
                 not bool(combined_ai.get("combined_model_applied"))
             report["combined_24_city_collection"]["final_top10"] = \
                 combined_ai.get("combined_final_top10", "")
-            print("24-CITY DEEPSEEK REVIEW: "
+            print(("28" if use28 else "24")+"-CITY DEEPSEEK REVIEW: "
                   + combined_ai["status"]
                   + " | reviewed " + str(combined_ai["reviewed_count"])
                   + "/" + str(combined_ai["candidate_count"])
