@@ -9,6 +9,7 @@ The previous baseline had many blocked *municipal* collectors. Rather than repea
 | Markham | Same York Region layer | REG_FILE_NUM | Not all local municipal applications |
 | Richmond Hill | Same York Region layer | REG_FILE_NUM | Not all local municipal applications |
 | Hamilton | Hamilton Open Data, Development Applications layer 2 | FILE_NUM | Submitted in past five years; does not prove active projects |
+| Brantford | City of Brantford Planning_Application_Open_Data_view FeatureServer/0 | ApplicationNum | Application status and submitted date; buyer/open work not verified |
 | Kitchener | Existing merged PR #260 city open-data layer 0 | APPLICATION_NO | Requires actual live run acceptance |
 | Caledon | Existing merged PR #260 current application index | RZ / SPA / POPA reference | Research-only until publisher-reuse check |
 
@@ -20,6 +21,7 @@ The previous baseline had many blocked *municipal* collectors. Rather than repea
 - Hamilton official open dataset: https://data-SpatialSolutions.opendata.arcgis.com/datasets/SpatialSolutions::development-applications-1
 - Hamilton REST feature layer 2: https://services.arcgis.com/rYz782eMbySr2srL/arcgis/rest/services/Development_Applications/FeatureServer/2
 - Hamilton Open Data Licence explicitly permits commercial data reuse, subject to its conditions: https://www.hamilton.ca/city-council/data-maps/open-data/open-data-licence-terms-and-conditions
+- Brantford explicitly permits commercial reuse of datasets published in its Open Data Portal: https://www.brantford.ca/your-government/open-data/ . Official open-data planning view: https://services.arcgis.com/aji2lCmjXt0KpGzI/ArcGIS/rest/services/Planning_Application_Open_Data_view/FeatureServer/0
 
 ## Live-stage behaviour
 The normal `RUN_GTA_RADAR_TODAY.bat` invokes the collector from `gta_monday_full_run.py`. If a host's robots policy disallows querying, or the official source returns HTTP/TLS/schema errors, the lane is marked **BLOCKED_OR_FAILED** and no prior rows are relabelled as collected today. Paged ArcGIS requests have a 5-page (1,000 row) cap and require stable ObjectIDs. The original 24 cities remain present. New validated rows are independently reconciled into the 28-city research master, queue and DeepSeek input.
@@ -34,4 +36,4 @@ The output ZIP contains:
 - An application date, regional receipt date or a Hamilton FILE_YEAR does **not** establish original public notice, current availability or supplier opportunity.
 - No named buyer, open contract or paid customer ready lead is asserted by this collector.
 - Complete operational acceptance requires actual machine live output and comparison against official publisher records.
-- Brampton, Mississauga, Toronto, Brantford and other municipalities still need source-specific interventions and tested permissions; do not count these as repaired.
+- Brampton, Mississauga, Toronto and other municipalities still need source-specific interventions and tested permissions; do not count these as repaired.
