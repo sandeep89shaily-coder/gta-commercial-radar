@@ -31,7 +31,7 @@ MAX_BYTES = 3_000_000
 MAX_ROWS = 300
 # Require actual municipal file references, not the mere year/ward/address.
 WINDSOR_FILES = re.compile(
-    r"(?<![A-Z0-9])(?:ZNG|ZBA|SDN|OPA|Z)[ -]?\d{1,5}"
+    r"(?<![A-Z0-9])(?:ZNG|ZBA|SDN|OPA|Z)[ /-]?\d{1,5}"
     r"(?:[/-]\d{2,4})?(?![A-Z0-9])", re.I)
 PICKERING_FILES = re.compile(
     r"(?<![A-Z0-9])(?:OPA\s*\d{2}[-/]\d{1,4}P?|"
@@ -193,9 +193,15 @@ def section_text(doc, heading, stop=None):
     if not matches:
         return ""
     pos=matches[0][1]
-    next_head=min([i for _n,i in doc.sections if i>pos],
-                  default=len(doc.text))
-    return clean(" ".join(doc.text[pos:next_head]),1500)
+    following=sorted(((i,name) for name,i in doc.sections if i>pos))
+    next_head, next_name=(following[0] if following else (len(doc.text),""))
+    value=clean(" ".join(doc.text[pos:next_head]),1500)
+    # The heading callback records its position AFTER heading text has
+    # already entered the text stream. Never include the next heading in
+    # the preceding field (e.g. Applicant: "Company Site Address").
+    if next_name and value.endswith(next_name):
+        value=clean(value[:-len(next_name)])
+    return value
 
 def parse_pickering_detail(html, *, page_url):
     """Project detail only: require file numbers AND civic site address."""
