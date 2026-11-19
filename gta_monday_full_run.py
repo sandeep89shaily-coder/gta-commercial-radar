@@ -655,6 +655,28 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
         report["stc_oak_official_source_recovery"]={
             "status":"NOT_RUN_HISTORICAL_OR_INJECTED_RUN"}
 
+    # Official published planning notices, more timely than St Catharines
+    # historical permits and independent of blocked Oakville eSCRIBE.
+    # Source evidence remains research-only until publisher reuse verified.
+    if not skip_collection and runner is None and report.get("fresh_collection_verified"):
+        try:
+            from gta_stc_oak_planning_notices import run as run_official_notices
+            notices=run_official_notices(results)
+            report["stc_oak_official_planning_notices"]={
+                "status":notices["status"],
+                "source_status":notices["source_status"],
+                "validated_official_file_records":
+                    notices["validated_official_file_records"],
+                "commercially_cleared":0,
+                "true_council_agendas_retrieved":0}
+        except (OSError,ValueError,TypeError,ImportError) as exc:
+            report["stc_oak_official_planning_notices"]={
+                "status":"PLANNING_NOTICE_RECOVERY_FAILED",
+                "error_type":type(exc).__name__}
+    else:
+        report["stc_oak_official_planning_notices"]={
+            "status":"NOT_RUN_HISTORICAL_OR_INJECTED_RUN"}
+
     # Canonical deliverable: ONE combined 16-core + 8-regional city research
     # universe. The individual collectors already ran above (and in daily_radar)
     # but were previously NOT joined, so the final Top 10 excluded regions.
