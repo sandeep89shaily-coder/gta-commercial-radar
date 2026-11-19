@@ -31,22 +31,22 @@ MAX_BYTES = 3_000_000
 MAX_ROWS = 300
 # Require actual municipal file references, not the mere year/ward/address.
 WINDSOR_FILES = re.compile(
-    r"(?<![A-Z0-9])(?:Z|ZNG|ZBA|SDN|OPA)[ -]?\\d{1,3}"
-    r"(?:[/-]\\d{2,4})?(?![A-Z0-9])", re.I)
+    r"(?<![A-Z0-9])(?:Z|ZNG|ZBA|SDN|OPA)[ -]?\d{1,3}"
+    r"(?:[/-]\d{2,4})?(?![A-Z0-9])", re.I)
 PICKERING_FILES = re.compile(
-    r"(?<![A-Z0-9])(?:OPA\\s*\\d{2}[-/]\\d{1,4}P?|"
-    r"SP[- ]?\\d{4}[-/]\\d{1,3}|CP[- ]?\\d{4}[-/]\\d{1,3}|"
-    r"A\\s*\\d{1,3}/\\d{2})(?![A-Z0-9])", re.I)
+    r"(?<![A-Z0-9])(?:OPA\s*\d{2}[-/]\d{1,4}P?|"
+    r"SP[- ]?\d{4}[-/]\d{1,3}|CP[- ]?\d{4}[-/]\d{1,3}|"
+    r"A\s*\d{1,3}/\d{2})(?![A-Z0-9])", re.I)
 COMMERCIAL = re.compile(
-    r"\\b(?:commercial|industrial|manufactur\\w*|warehouse|logistic\\w*|"
+    r"\b(?:commercial|industrial|manufactur\w*|warehouse|logistic\w*|"
     r"retail|office|hotel|restaurant|mixed.use|data.cent(?:re|er)|"
-    r"factory|distribution|storage|medical|institutional)\\b", re.I)
+    r"factory|distribution|storage|medical|institutional)\b", re.I)
 POSTED = re.compile(
-    r"\\b(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|"
+    r"\b(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|"
     r"Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|"
-    r"Dec(?:ember)?)\\s+\\d{1,2},?\\s+20\\d{2}\\b", re.I)
-CLOSED = re.compile(r"\\b(?:withdrawn|cancelled|canceled|refused|appealed|"
-                    r"completed|inactive|expired)\\b", re.I)
+    r"Dec(?:ember)?)\s+\d{1,2},?\s+20\d{2}\b", re.I)
+CLOSED = re.compile(r"\b(?:withdrawn|cancelled|canceled|refused|appealed|"
+                    r"completed|inactive|expired)\b", re.I)
 
 def clean(value, cap=1500):
     return " ".join(str(value or "").split())[:cap]
@@ -222,7 +222,7 @@ def parse_pickering_detail(html, *, page_url):
     posted=""
     # 'By City of Pickering - Sep 29, 2026' is an ARTICLE stamp,
     # which can postdate the original index entry.
-    d=re.search(r"\\bBy\\s+City of Pickering\\s*[-–]\\s*("+POSTED.pattern[2:-2]+r")",body,re.I)
+    d=re.search(r"\bBy\s+City of Pickering\s*[-–]\s*("+POSTED.pattern[2:-2]+r")",body,re.I)
     if d:
         posted=d.group(1)
     return [base_row(
@@ -303,7 +303,7 @@ def run(results, *, snapshot_dir=None):
         writer.writeheader()
         for row in distinct.values():
             writer.writerow({k:("'"+str(row.get(k,"")) if str(row.get(k,"")).lstrip().startswith(
-                ("=","+","-","@","\\t","\\r")) else str(row.get(k,"")))
+                ("=","+","-","@","\t","\r")) else str(row.get(k,"")))
                              for k in FIELDS})
     summary={
         "status":"ISOLATED_OFFLINE_HTML_SOURCE_RESEARCH_ONLY",
