@@ -690,6 +690,34 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
         report["combined_28_city_collection"]={
             "status":"NOT_RUN_24_CITY_SOURCE_UNAVAILABLE_OR_HISTORICAL"}
 
+    # Metadata + explicitly linked public documents for already-collected
+    # Toronto planning applications. The official AIC feature layer has
+    # NO attachments; policy-blocked AIC HTML cannot be bypassed.
+    if (not skip_collection and runner is None and
+            report.get("combined_24_city_collection",{}).get("status")==
+                "COMBINED_16_PLUS_8_RESEARCH_ONLY_NOT_CUSTOMER_RELEASE"):
+        try:
+            from gta_toronto_aic_enrichment import run as enrich_toronto_aic
+            toronto_aic=enrich_toronto_aic(results)
+            report["toronto_aic_project_enrichment"]={
+                "status":toronto_aic["status"],
+                "source_projects":toronto_aic["candidate_application_ids"],
+                "exact_aic_matches":toronto_aic["exact_aic_matches"],
+                "official_document_links_indexed_not_downloaded":
+                    toronto_aic["official_document_links_indexed_not_downloaded"],
+                "metadata_source_blocks_or_misses":
+                    toronto_aic["unmatched_or_failed_source_count"],
+                "aic_page_blocks":toronto_aic["records_with_aic_page_blocked"],
+                "buyers_verified":0,"paid_ai_calls":0,
+            }
+        except (OSError,ValueError,TypeError,ImportError,KeyError) as exc:
+            report["toronto_aic_project_enrichment"]={
+                "status":"AIC_ENRICHMENT_FAILED",
+                "error_type":type(exc).__name__}
+    else:
+        report["toronto_aic_project_enrichment"]={
+            "status":"NOT_RUN_HISTORICAL_OR_MISSING_CURRENT_CKAN"}
+
     # Real per-source evidence is different from a configured city count.
     # Audit all 24 cities even when a source is blocked or produces only
     # an index page. The combined master can preserve historical files
