@@ -36,6 +36,7 @@ OUTPUT_FIELDS = (
     "scope","current_status","applicant_or_agent_source_claim",
     "published_contact_name","published_contact_email","contact_role",
     "source_date","source_date_basis",
+    "source_event_age_band_not_publication",
     "webpage_posted_date_not_first_disclosure","source_observation",
     "official_evidence_urls","source_lanes","original_publication_verified",
     "purchasing_contact_verified","open_supplier_contract_verified",
@@ -110,6 +111,21 @@ def _model_row(row):
     return _score(result)
 
 
+def _source_event_band(row, day):
+    """Ranking tier for dated source events, NOT first-publication proof."""
+    try:
+        age = (day - dt.date.fromisoformat(row.get("source_date") or "")).days
+    except (ValueError, TypeError):
+        return 3
+    if 0 <= age <= 30:
+        return 0
+    if 31 <= age <= 90:
+        return 1
+    if 91 <= age <= 365:
+        return 2
+    return 3
+
+
 def candidates(results, *, limit=MAX_REVIEW, today=None):
     """Source-backed review pool; protects both original and expansion cohorts.
 
@@ -147,6 +163,7 @@ def candidates(results, *, limit=MAX_REVIEW, today=None):
         _score(model)
         models.append(model)
     models.sort(key=lambda x: (
+        _source_event_band(x, day),
         -x["internal_research_priority_score_not_sale_probability"],
         x["city"], x["record_id"]))
     selected, used, city_counts = [], set(), Counter()
@@ -218,7 +235,9 @@ def finalize(results, *, state=None, pool=None, today=None):
                 "internal_research_priority_score_not_sale_probability"]+delta,
                 item, decision))
     if matched:
-        ranking.sort(key=lambda x: (-x[0],x[1]["city"],x[1]["canonical_id"]))
+        ranking.sort(key=lambda x: (
+            _source_event_band(x[1], day), -x[0],
+            x[1]["city"], x[1]["canonical_id"]))
         selected, per_city = [], Counter()
         for _, row, decision in ranking:
             if per_city[row["city"]] >= 4:

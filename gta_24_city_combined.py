@@ -19,6 +19,8 @@ import re
 from collections import Counter, defaultdict
 from pathlib import Path
 
+from gta_authorized_application_exports import load as load_authorized_exports
+
 CORE_CITIES = (
     "Toronto", "Brampton", "Mississauga", "Hamilton", "Burlington",
     "Oakville", "Vaughan", "Kitchener", "Markham", "Oshawa", "Milton",
@@ -43,7 +45,8 @@ COLS = (
     "published_contact_email", "contact_role", "source_date",
     "source_date_basis", "webpage_posted_date_not_first_disclosure",
     "source_observation", "first_seen_local", "official_evidence_urls",
-    "source_lanes", "commercial_text_match", "original_publication_verified",
+    "source_lanes", "commercial_text_match", "source_event_age_band_not_publication",
+    "original_publication_verified",
     "purchasing_contact_verified", "open_supplier_contract_verified",
     "commercial_research_priority", "verification_required",
 )
@@ -391,7 +394,32 @@ def run(results, *, today=None):
             stable=r.get("record_id")))
         sources["NEXT_FOUR_NOTICE"] += 1
 
+    # Publisher-permitted manually supplied City CSV exports. This is a
+    # separate LOCAL source: no GIS bypass, live collection claim, or inferred
+    # first-publication date. Never count rows without exact official IDs.
+    authorized_rows, authorized_status = load_authorized_exports(root)
+    for item in authorized_rows:
+        records.append(_record(item["city"], "AUTHORIZED_CITY_CSV_OFFLINE",
+            item["application_id"], address=item["address"],
+            scope=item["scope"], stage=item["status"],
+            applicant=item["applicant"], date=item["date"],
+            date_basis=item["source_date_basis"], url=item["url"], core=True))
+        sources["AUTHORIZED_CITY_CSV_OFFLINE"] += 1
+
     rows = _merge(records)
+    for row in rows:
+        try:
+            source_age = (day - dt.date.fromisoformat(row["source_date"])).days
+        except (ValueError, TypeError):
+            source_age = None
+        row["source_event_age_band_not_publication"] = (
+            "FUTURE_OR_INVALID_DATE_REVIEW" if source_age is not None and source_age < 0 else
+            "SOURCE_EVENT_0_TO_7_DAYS" if source_age is not None and source_age <= 7 else
+            "SOURCE_EVENT_8_TO_30_DAYS" if source_age is not None and source_age <= 30 else
+            "SOURCE_EVENT_31_TO_90_DAYS" if source_age is not None and source_age <= 90 else
+            "SOURCE_EVENT_91_TO_365_DAYS" if source_age is not None and source_age <= 365 else
+            "HISTORICAL_SOURCE_EVENT_OVER_365_DAYS" if source_age is not None else
+            "SOURCE_EVENT_DATE_UNKNOWN_NOT_FRESH")
     by_city = defaultdict(list)
     for row in rows:
         by_city[row["city"]].append(row)
@@ -438,8 +466,26 @@ def run(results, *, today=None):
         if score is not None:
             r["commercial_research_priority"] = "RESEARCH_ONLY_NOT_SALE_READY"
             rankings.append((score, r))
+    # A known RECENT application event outranks an undated or historical
+    # file regardless of how many generic company/planner fields it has.
+    # This is not proof of first publication. Preserve old files in MASTER
+    # and RESEARCH for background work, never silently rewrite their dates.
+    def event_band(row):
+        try:
+            age = (day - dt.date.fromisoformat(row["source_date"])).days
+        except (ValueError, TypeError):
+            return 3  # missing actual source event, NOT a fresh disclosure
+        if 0 <= age <= 30:
+            return 0
+        if 31 <= age <= 90:
+            return 1
+        if 91 <= age <= 365:
+            return 2
+        return 3
+
     rankings.sort(key=lambda pair: (
-        -pair[0], pair[1]["city"], pair[1]["application_id"]))
+        event_band(pair[1]), -pair[0],
+        pair[1]["city"], pair[1]["application_id"]))
     research = [row for _,row in rankings]
     # One research list over BOTH cohorts. Limit any single city to four
     # placements in the first ten to avoid ten Toronto or ten Barrie files.
@@ -512,6 +558,7 @@ def run(results, *, today=None):
         "top10_cities": dict(Counter(r["city"] for r in winners)),
         "core_16_source_rows": sources["CORE_16"],
         "source_rows_by_lane": dict(sources),
+        "authorized_local_exports_not_live": authorized_status["rows"],
         "all_citywide_coverage_verified": False,
         "verified_new_publications": 0, "verified_buyers": 0,
         "verified_open_supplier_contracts": 0,

@@ -108,5 +108,35 @@ class IntegratedInvestmentContactTests(unittest.TestCase):
         self.assertFalse(r["outreach_authorized"])
 
 
+    def test_three_cited_projects_export_without_inventing_buyers(self):
+        projects = [{**PROJECT, "project_name": f"Factory {i}",
+                     "location_text": f"{i} Test Road",
+                     "claims": [{"kind": "scope", "quote": "new production line installed"}]}
+                    for i in range(1, 5)]
+        calls = []
+        def qualify(_root, **kwargs):
+            calls.append(("qualification", kwargs["project_name"]))
+            return {"status": "HOLD", "assessment": {"classification": "HOLD"}}
+        def investigate(_root, **kwargs):
+            calls.append(("contacts", kwargs["project_name"]))
+            return {"status": "PUBLIC_CHANNELS_ONLY", "public_channels": []}
+        r = run(self.root, paid=True, today=DAY,
+                discoverer=lambda *_a, **_k: {**DISCOVERY,
+                    "discovered_projects": projects},
+                qualifier=qualify, investigator=investigate)
+        self.assertEqual(r["discovery"]["exported_source_backed_opportunities"], 4)
+        self.assertEqual(r["research_completed_count"], 3)
+        self.assertEqual(len(calls), 6)
+        self.assertTrue(Path(r["equipment_opportunities_csv"]).exists())
+        import csv
+        with Path(r["equipment_opportunities_csv"]).open(encoding="utf-8-sig") as fp:
+            rows = list(csv.DictReader(fp))
+        self.assertEqual(len(rows), 4)
+        self.assertTrue(all(x["buyer_verified"] == "False" and
+                            x["published_date_verified"] == "False" and
+                            not x["purchasing_email"] for x in rows))
+
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -17,7 +17,8 @@ class MondayIntegrationTests(unittest.TestCase):
                 "daily_radar", "industrial_equipment", "commercial_activation",
                 "facility_evidence", "toronto_20_source_research",
                 "council_agenda_intelligence",
-                "industrial_investment_and_contacts", "ai_harness_adaptive"])
+                "industrial_investment_and_contacts", "equipment_commercial_index",
+                "ai_harness_adaptive"])
             self.assertEqual(sum("gta_total_intelligence_run.py" in s[1]
                                  for s in stages), 1)
             self.assertEqual(sum("gta_agent_harness.py" in s[1]
@@ -54,7 +55,7 @@ class MondayIntegrationTests(unittest.TestCase):
             self.assertNotIn("--live-ckan", stages[3][1])
             self.assertNotIn("--fetch", stages[4][1])
 
-    def test_complete_run_writes_eight_stage_manifest_and_html(self):
+    def test_complete_run_writes_nine_stage_manifest_and_html(self):
         with tempfile.TemporaryDirectory() as td:
             ws = Path(td)
             calls = []
@@ -64,12 +65,12 @@ class MondayIntegrationTests(unittest.TestCase):
             with patch.object(monday, "find_workspace", return_value=ws):
                 result = monday.execute(ws, runner=fake_run)
             self.assertEqual(result, 0)
-            self.assertEqual(len(calls), 8)
+            self.assertEqual(len(calls), 9)
             report = json.loads((ws / "GTA_RADAR_RESULTS" /
                 "MONDAY_FULL_RADAR" / monday.REPORT).read_text(encoding="utf-8"))
             self.assertEqual(report["status"], "ALL_STAGES_RAN_REVIEW_ONLY")
             self.assertTrue(report["fresh_collection_verified"])
-            self.assertEqual(report["stage_successes"], 8)
+            self.assertEqual(report["stage_successes"], 9)
             self.assertEqual(report["ai_harness_mode"], "ADAPTIVE_RESEARCH_SHARED_BUDGET")
             self.assertFalse(report["deepseek_guard_diagnostic"]["provider_billing_verified"])
             self.assertEqual(report["archive_status"], "CREATED_REVIEW_ONLY")
@@ -93,7 +94,7 @@ class MondayIntegrationTests(unittest.TestCase):
             with patch.object(monday, "find_workspace", return_value=ws):
                 code = monday.execute(ws, runner=fail_first)
             self.assertEqual(code, 2)
-            self.assertEqual(len(calls), 7)
+            self.assertEqual(len(calls), 8)
             record = json.loads((ws / "GTA_RADAR_RESULTS" /
                 "MONDAY_FULL_RADAR" / monday.REPORT).read_text(encoding="utf-8"))
             self.assertFalse(record["fresh_collection_verified"])
@@ -128,7 +129,7 @@ class MondayIntegrationTests(unittest.TestCase):
             with patch.object(monday,"find_workspace",return_value=ws):
                 self.assertEqual(monday.execute(ws,runner=successful_with_optional_errors),0)
             manifest=json.loads((results/"MONDAY_FULL_RADAR"/monday.REPORT).read_text())
-            self.assertEqual(manifest["stage_successes"],8)
+            self.assertEqual(manifest["stage_successes"],9)
             self.assertEqual(manifest["failed_stages"],[])
             self.assertEqual(manifest["status"],
                              "ALL_STAGES_RAN_WITH_SOURCE_WARNINGS_REVIEW_ONLY")
@@ -156,7 +157,7 @@ class MondayIntegrationTests(unittest.TestCase):
             self.assertFalse(report["collection_performed"])
             self.assertFalse(report["fresh_collection_verified"])
             self.assertEqual(report["ai_harness_mode"], "FREE_PREFLIGHT")
-            self.assertEqual(len(report["stages"]), 7)
+            self.assertEqual(len(report["stages"]), 8)
 
     def test_fresh_collector_failure_skips_paid_investment_research(self):
         with tempfile.TemporaryDirectory() as td:
@@ -196,7 +197,7 @@ class MondayIntegrationTests(unittest.TestCase):
             state=json.loads((ws/"GTA_RADAR_RESULTS"/"MONDAY_FULL_RADAR"/
                               monday.REPORT).read_text())
             self.assertEqual(state["archive_status"],"FAILED_NOT_PACKAGED")
-            self.assertEqual(state["stage_successes"],8)
+            self.assertEqual(state["stage_successes"],9)
             self.assertEqual(state["status"],"ALL_STAGES_RAN_REVIEW_ONLY")
             self.assertIn("archive drive full",state["archive_error"])
 

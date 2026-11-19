@@ -104,6 +104,15 @@ def _sources(root, *, not_before):
         item = _check(city, source, status, count, note)
         if item is not None:
             out[city].append(item)
+    # Offline publisher-permitted CSV imports do not establish current live
+    # municipal source health; record these separately as historical evidence.
+    authorized = current("GTA_RADAR_AUTHORIZED_EXPORT_IMPORT_STATUS.json")
+    for x in authorized.get("sources", []):
+        if isinstance(x, dict) and x.get("city") in CITIES:
+            add(x["city"], "AUTHORIZED_OFFLINE_EXPORT",
+                x.get("status", "UNKNOWN"), 0,
+                str(x.get("application_id_rows", 0)) +
+                " local application rows; NOT current live collection")
     # Old 16-city collectors. One HTML index can coexist with separate
     # functioning municipal/GIS/permit feeds: do not erase either.
     early = current("GTA_RADAR_EARLY_APPLICATION_SOURCE_STATUS.json")
