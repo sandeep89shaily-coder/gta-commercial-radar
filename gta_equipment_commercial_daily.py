@@ -108,6 +108,8 @@ def run(results):
     # audit status when absent.
     from gta_federal_industrial_funding import run as federal_grants_run
     summary["federal_industrial_funding"] = federal_grants_run(root)
+    from gta_federal_capex_qualification import run as qualify_federal_capex
+    summary["federal_capex_qualification"] = qualify_federal_capex(root)
     (root / STATUS).write_text(json.dumps(summary, indent=2), encoding="utf-8")
     return summary
 
