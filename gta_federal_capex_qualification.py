@@ -51,8 +51,8 @@ CAPEX = re.compile(
     r"plant expansion|facility expansion|capacity expansion|"
     r"expand production|equipment upgrades?|equipment expansion|"
     r"manufacturing upgrade|capital equipment|production equipment)\b",re.I)
-RND = re.compile(r"\\b(?:developing|design(?:ing)?|prototype|pilot project|assess and design|technology development|r&d)\\b", re.I)
-PURCHASE = re.compile(r"\\b(?:acquir(?:e|ing|ed|isition)|purchas(?:e|ing|ed)|install(?:ation|ing|ed)?|adding|adopt(?:ion|ing)?|procure(?:ment)?|new equipment|new machinery)\\b", re.I)
+RND = re.compile(r"\b(?:developing|design(?:ing)?|prototype|pilot project|assess and design|technology development|r&d)\b", re.I)
+PURCHASE = re.compile(r"\b(?:acquir(?:e|ing|ed|isition)|purchas(?:e|ing|ed)|install(?:ation|ing|ed)?|adding|adopt(?:ion|ing)?|procure(?:ment)?|new equipment|new machinery)\b", re.I)
 SPECIFIC = re.compile(
     r"\b(?:cnc|robotic welding|welding equipment|steel printing|"
     r"pressing (?:cell|equipment)|extrusion line|injection mould|"
