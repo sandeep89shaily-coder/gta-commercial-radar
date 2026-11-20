@@ -10,7 +10,7 @@ from gta_freshness_first_daily_selection import (
 
 def write(path,rows):
     with path.open("w",encoding="utf-8",newline="") as f:
-        writer=csv.DictWriter(f,fieldnames=list(rows[0]))
+        writer=csv.DictWriter(f,fieldnames=list(dict.fromkeys(k for row in rows for k in row)))
         writer.writeheader()
         writer.writerows(rows)
 
