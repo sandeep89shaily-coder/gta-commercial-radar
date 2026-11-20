@@ -179,11 +179,8 @@ def run(results, *, input_csv=None, as_of=None, earliest_year=2025):
                     "next_verification_action":"Find exact plant site and original project announcement; verify equipment package, buyer and vendor-selection stage.",
                     "research_only_status":"RESEARCH_QUEUE_NOT_SALES_LEAD",
                 }
-    rows=sorted(qualified.values(),key=lambda x:(
-        -int(x["research_score"]),x["agreement_date_not_publication"]*-1 if False else "",
-        x["recipient"].casefold(),x["funding_record_id"]))
     # For equal scores, prefer recent funding dates; this date is not public posting.
-    rows.sort(key=lambda x:(-int(x["research_score"]),
+    rows=sorted(qualified.values(),key=lambda x:(-int(x["research_score"]),
                             -(funding_date(x["agreement_date_not_publication"]).toordinal()),
                             x["recipient"].casefold(),x["funding_record_id"]))
     for index,row in enumerate(rows,1):
