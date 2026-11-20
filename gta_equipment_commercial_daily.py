@@ -99,6 +99,10 @@ def run(results):
         "no_network_or_paid_calls": True,
         "output_csv": str(path),
     }
+    # Prioritize verified source excerpts and prospective equipment research.
+    # This stage is offline, free and does not alter the existing index.
+    from gta_industrial_capex_priority import run as industrial_capex_run
+    summary["industrial_capex_priority"] = industrial_capex_run(root)
     (root / STATUS).write_text(json.dumps(summary, indent=2), encoding="utf-8")
     return summary
 
