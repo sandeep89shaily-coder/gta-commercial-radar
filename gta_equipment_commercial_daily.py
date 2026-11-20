@@ -103,6 +103,11 @@ def run(results):
     # This stage is offline, free and does not alter the existing index.
     from gta_industrial_capex_priority import run as industrial_capex_run
     summary["industrial_capex_priority"] = industrial_capex_run(root)
+    # No full 2.3 GB federal download in daily collection. Stream only
+    # a previously operator-supplied official snapshot, retaining full
+    # audit status when absent.
+    from gta_federal_industrial_funding import run as federal_grants_run
+    summary["federal_industrial_funding"] = federal_grants_run(root)
     (root / STATUS).write_text(json.dumps(summary, indent=2), encoding="utf-8")
     return summary
 
