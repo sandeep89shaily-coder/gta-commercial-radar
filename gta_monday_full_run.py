@@ -1234,6 +1234,20 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
             "outreach_authorized": False,
         }
 
+    # Connect the saved federal machinery research to existing company and
+    # municipal identities AFTER the combined master has been built. No paid
+    # research is automatically initiated from grant keyword matches.
+    try:
+        from gta_industrial_buyer_investigation_queue import run as industrial_handoff
+        report["industrial_buyer_investigation_handoff"] = industrial_handoff(results)
+    except (OSError,ValueError,TypeError,ImportError) as exc:
+        report["industrial_buyer_investigation_handoff"] = {
+            "status":"INDUSTRIAL_RESEARCH_HANDOFF_HELD",
+            "error_type":type(exc).__name__,
+            "verified_project_buyers":0,
+            "verified_open_equipment_orders":0,
+        }
+
     passed = sum(x["status"] == "PASSED" for x in report["stages"])
     failed = [x["name"] for x in report["stages"]
               if x["status"] == "FAILED"]
