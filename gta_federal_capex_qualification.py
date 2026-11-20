@@ -34,7 +34,9 @@ EXCLUDE = re.compile(
     r"herd management|classroom equipment|camera equipment|"
     r"it equipment|laptop computers?|engineering graduate|"
     r"project management resource|hiring|internship|work placement|"
-    r"community asset|commercialization support|food bank)\b", re.I)
+    r"community asset|commercialization support|food bank|"
+    r"greenhouse|raised garden beds?|fruit garden|urban farming|"
+    r"growing towers|grow towers|community centre)\b", re.I)
 # Require an industrial production context AND a substantive acquisition,
 # installation, modernization, manufacturing equipment or capacity signal.
 INDUSTRY = re.compile(
