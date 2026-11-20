@@ -51,7 +51,22 @@ def propose(source_items,results,out,*,paid=False,key=None,transport=None):
    if result.get("finish_reason")=="length":
     raise native.ModelResponseError("TRUNCATED","Truncated buyer role extraction",
                                     (result.get("message") or {}).get("content"),actual)
-   raw=native.parse_model_json((result.get("message") or {}).get("content"))
+   try:
+    raw=native.parse_model_json((result.get("message") or {}).get("content"))
+   except (ValueError,TypeError) as exc:
+    # Bad JSON is not an empty buyer finding, and must never be retried
+    # automatically (the provider may already have charged the call).
+    native.ledger_finish(db,today,rid,"DONE" if actual is not None else "UNKNOWN",actual)
+    failure={"status":"MODEL_INVALID_JSON_REVIEW_ONLY",
+             "error_type":type(exc).__name__,
+             "raw_model_excerpt":str((result.get("message") or {}).get("content") or "")[:3000],
+             "observations":[],"rejected":[],
+             "verified_buyers":0,"verified_unawarded_contracts":0,
+             "paid_model_calls":1,"automatic_retry":False}
+    out.write_text(json.dumps(failure,indent=2),encoding="utf-8")
+    return {"status":failure["status"],"candidate_relationships":0,
+            "invalid_evidence":0,"verified_buyers":0,
+            "error_type":type(exc).__name__,"automatic_retry":False}
    native.ledger_finish(db,today,rid,"DONE" if actual is not None else "UNKNOWN",actual)
   except Exception:
    native.ledger_finish(db,today,rid,"UNKNOWN");raise
