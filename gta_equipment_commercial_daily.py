@@ -106,8 +106,25 @@ def run(results):
     # No full 2.3 GB federal download in daily collection. Stream only
     # a previously operator-supplied official snapshot, retaining full
     # audit status when absent.
-    from gta_federal_industrial_funding import run as federal_grants_run
-    summary["federal_industrial_funding"] = federal_grants_run(root)
+    from gta_federal_industrial_funding import (
+        run as federal_grants_run, OUTPUT as federal_output,
+    )
+    # The original grants.csv is several GB and refreshed infrequently.
+    # Never repeat the full import in every municipal daily run. The operator
+    # can refresh it explicitly by running gta_federal_industrial_funding.py.
+    # Most importantly, an absent snapshot must not erase previously imported
+    # official funding candidates or their historical research.
+    saved_federal = root / federal_output
+    if saved_federal.is_file() and saved_federal.stat().st_size > 100:
+        summary["federal_industrial_funding"] = {
+            "status": "REUSED_SAVED_OFFICIAL_FUNDING_CANDIDATES",
+            "input_path": str(saved_federal),
+            "refresh_mode": "MANUAL_OFFICIAL_SNAPSHOT_IMPORT_ONLY",
+            "new_candidates_collected_today": 0,
+            "paid_ai_calls": 0,
+        }
+    else:
+        summary["federal_industrial_funding"] = federal_grants_run(root)
     from gta_federal_capex_qualification import run as qualify_federal_capex
     summary["federal_capex_qualification"] = qualify_federal_capex(root)
     (root / STATUS).write_text(json.dumps(summary, indent=2), encoding="utf-8")
