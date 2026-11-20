@@ -55,12 +55,12 @@ CAPEX = re.compile(
     r"manufacturing upgrade|capital equipment|production equipment)\b",re.I)
 RND = re.compile(r"\b(?:developing|design(?:ing)?|prototype|pilot project|assess and design|technology development|r&d)\b", re.I)
 PUBLIC_COMMUNITY_RECIPIENT = re.compile(
-    r"\\b(?:corporation of the (?:town|city|municipality)|town of |"
+    r"\b(?:corporation of the (?:town|city|municipality)|town of |"
     r"city of |municipality of |public library|community foundation|"
-    r"food rescue|food bank)\\b",re.I)
+    r"food rescue|food bank)\b",re.I)
 DIGITAL_ONLY = re.compile(
-    r"\\b(?:paperless|digitiz(?:ation|ing)|software|digital workflow|"
-    r"enterprise resource planning|erp system)\\b",re.I)
+    r"\b(?:paperless|digitiz(?:ation|ing)|software|digital workflow|"
+    r"enterprise resource planning|erp system)\b",re.I)
 PURCHASE = re.compile(r"\b(?:acquir(?:e|ing|ed|isition)|purchas(?:e|ing|ed)|install(?:ation|ing|ed)?|adding|adopt(?:ion|ing)?|procure(?:ment)?|new equipment|new machinery)\b", re.I)
 SPECIFIC = re.compile(
     r"\b(?:cnc|robotic welding|welding equipment|steel printing|"
