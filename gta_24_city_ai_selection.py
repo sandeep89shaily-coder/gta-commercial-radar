@@ -230,13 +230,15 @@ def finalize(results, *, state=None, pool=None, today=None, universe=24):
                 break
             label = decision.get("decision", "NEUTRAL")
             cited = bool(decision.get("cited_live_source"))
-            # The model may only move rankings within a narrow interval.
+            # An explicit negative model decision must be enforced as an
+            # eligibility gate, not a small score penalty. Exclude conflicting
+            # exact-project identities from Top10 until source resolution.
+            # Fewer than ten defensible projects is preferable to padding.
+            if label in ("DEPRIORITIZE", "CHECK_CONFLICT"):
+                continue
             # PREFER without an independently fetched literal quote gains
-            # NO bonus. No AI output can override buyer/evidence release.
-            delta = (
-                5 if label == "PREFER" and cited else
-                -8 if label == "DEPRIORITIZE" else
-                -6 if label == "CHECK_CONFLICT" else 0)
+            # no bonus. AI never verifies buyers or an open supplier package.
+            delta = 5 if label == "PREFER" and cited else 0
             ranking.append((model[
                 "internal_research_priority_score_not_sale_probability"]+delta,
                 item, decision))
@@ -295,6 +297,11 @@ def finalize(results, *, state=None, pool=None, today=None, universe=24):
         "model_decisions_applied": matched,
         "model_research_scope":("COMBINED_28" if universe == 28 else "COMBINED_16_PLUS_8"),
         "top10_count":len(output),
+        "ai_rejected_or_held_count": (
+            sum(x.get("decision") in ("DEPRIORITIZE", "CHECK_CONFLICT")
+                for x in review) if matched else 0),
+        "top10_unfilled_slots_due_to_evidence_gates": (
+            10-len(output) if matched else 0),
         "top10_cities":dict(Counter(x["city"] for x in output)),
         "top10_cohorts":dict(Counter(x["cohort"] for x in output)),
         "buyer_contacts_verified":0,
