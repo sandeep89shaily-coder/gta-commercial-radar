@@ -54,6 +54,13 @@ CAPEX = re.compile(
     r"expand production|equipment upgrades?|equipment expansion|"
     r"manufacturing upgrade|capital equipment|production equipment)\b",re.I)
 RND = re.compile(r"\b(?:developing|design(?:ing)?|prototype|pilot project|assess and design|technology development|r&d)\b", re.I)
+PUBLIC_COMMUNITY_RECIPIENT = re.compile(
+    r"\\b(?:corporation of the (?:town|city|municipality)|town of |"
+    r"city of |municipality of |public library|community foundation|"
+    r"food rescue|food bank)\\b",re.I)
+DIGITAL_ONLY = re.compile(
+    r"\\b(?:paperless|digitiz(?:ation|ing)|software|digital workflow|"
+    r"enterprise resource planning|erp system)\\b",re.I)
 PURCHASE = re.compile(r"\b(?:acquir(?:e|ing|ed|isition)|purchas(?:e|ing|ed)|install(?:ation|ing|ed)?|adding|adopt(?:ion|ing)?|procure(?:ment)?|new equipment|new machinery)\b", re.I)
 SPECIFIC = re.compile(
     r"\b(?:cnc|robotic welding|welding equipment|steel printing|"
@@ -141,8 +148,8 @@ def run(results, *, input_csv=None, as_of=None, earliest_year=2025):
                 if not name or not description or len(description)<25:
                     counters["insufficient_description"]+=1
                     continue
-                if EXCLUDE.search(scope):
-                    counters["unrelated_programme"]+=1
+                if EXCLUDE.search(scope) or PUBLIC_COMMUNITY_RECIPIENT.search(name):
+                    counters["unrelated_programme_or_public_community_recipient"]+=1
                     continue
                 if not INDUSTRY.search(scope) or not CAPEX.search(scope):
                     counters["missing_industrial_capex_evidence"]+=1
@@ -168,6 +175,8 @@ def run(results, *, input_csv=None, as_of=None, earliest_year=2025):
                 score+=(5 if "automation" in scope.lower() or "robotic" in scope.lower() else 0)
                 if RND.search(description) and not PURCHASE.search(description):
                     score-=30
+                if DIGITAL_ONLY.search(description) and not PURCHASE.search(description):
+                    score-=25
                 name_match="COMPANY_NAME_ONLY_REVIEW" if key[0] in names else (
                     "NO_MATCH_FOUND_IN_AVAILABLE_LOCAL_EXPORTS" if available else
                     "NOT_CHECKED_NO_LOCAL_RADAR_EXPORTS")
