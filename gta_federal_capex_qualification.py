@@ -32,7 +32,9 @@ EXCLUDE = re.compile(
     r"youth employment|training placement|trade show|"
     r"arts festival|language training|milking|livestock|"
     r"herd management|classroom equipment|camera equipment|"
-    r"it equipment|laptop computers?)\b", re.I)
+    r"it equipment|laptop computers?|engineering graduate|"
+    r"project management resource|hiring|internship|work placement|"
+    r"community asset|commercialization support|food bank)\b", re.I)
 # Require an industrial production context AND a substantive acquisition,
 # installation, modernization, manufacturing equipment or capacity signal.
 INDUSTRY = re.compile(
@@ -49,6 +51,8 @@ CAPEX = re.compile(
     r"plant expansion|facility expansion|capacity expansion|"
     r"expand production|equipment upgrades?|equipment expansion|"
     r"manufacturing upgrade|capital equipment|production equipment)\b",re.I)
+RND = re.compile(r"\\b(?:developing|design(?:ing)?|prototype|pilot project|assess and design|technology development|r&d)\\b", re.I)
+PURCHASE = re.compile(r"\\b(?:acquir(?:e|ing|ed|isition)|purchas(?:e|ing|ed)|install(?:ation|ing|ed)?|adding|adopt(?:ion|ing)?|procure(?:ment)?|new equipment|new machinery)\\b", re.I)
 SPECIFIC = re.compile(
     r"\b(?:cnc|robotic welding|welding equipment|steel printing|"
     r"pressing (?:cell|equipment)|extrusion line|injection mould|"
@@ -158,7 +162,10 @@ def run(results, *, input_csv=None, as_of=None, earliest_year=2025):
                     continue
                 cats=[cat for cat,rx in CATS if rx.search(scope)]
                 score=50+(25 if specific else 0)+(10 if date.year==today.year else 0)
+                score+=(15 if PURCHASE.search(description) else 0)
                 score+=(5 if "automation" in scope.lower() or "robotic" in scope.lower() else 0)
+                if RND.search(description) and not PURCHASE.search(description):
+                    score-=30
                 name_match="COMPANY_NAME_ONLY_REVIEW" if key[0] in names else (
                     "NO_MATCH_FOUND_IN_AVAILABLE_LOCAL_EXPORTS" if available else
                     "NOT_CHECKED_NO_LOCAL_RADAR_EXPORTS")
