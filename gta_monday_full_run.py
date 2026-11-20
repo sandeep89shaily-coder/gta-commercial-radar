@@ -789,6 +789,29 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
         report["western_31_city_corridor"]={
             "status":"NOT_RUN_WITHOUT_CURRENT_VALID_28_CITY_BASELINE"}
 
+    # Offline quarterly gap comparison of permission-cleared reference exports.
+    # No HTTP fetch, AI promotion, or paid calls. Required same-run 31-city master.
+    if (not skip_collection and runner is None and
+            report.get("western_31_city_corridor", {}).get("status") ==
+                "COMBINED_31_CITY_SOURCE_RIGHTS_GATED_RESEARCH"):
+        try:
+            from gta_quarterly_application_reconciliation import reconcile
+            quarter = reconcile(results)
+            report["quarterly_31_city_gap_audit"] = {
+                "status": quarter["status"],
+                "cities_with_reference": quarter["cities_with_reference"],
+                "reference_only_review_candidates":
+                    quarter["reference_only_review_candidates"],
+                "input_exports_rejected": quarter["input_exports_rejected"],
+                "commercial_leads_created": 0, "paid_ai_calls": 0}
+        except (OSError,ValueError,TypeError,ImportError,KeyError) as exc:
+            report["quarterly_31_city_gap_audit"] = {
+                "status": "QUARTERLY_31_CITY_RECONCILIATION_FAILED",
+                "error_type": type(exc).__name__}
+    else:
+        report["quarterly_31_city_gap_audit"] = {
+            "status": "NOT_RUN_WITHOUT_FRESH_31_CITY_MASTER"}
+
     # Metadata + explicitly linked public documents for already-collected
     # Toronto planning applications. The official AIC feature layer has
     # NO attachments; policy-blocked AIC HTML cannot be bypassed.
