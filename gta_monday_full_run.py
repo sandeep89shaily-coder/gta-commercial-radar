@@ -1248,6 +1248,21 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
             "verified_open_equipment_orders":0,
         }
 
+    # Freshness-first output is separate from the historical combined AI
+    # Top 10. Pull the current daily new/changed feed into both commercial
+    # research lanes, while retaining older prospects in a watchlist.
+    try:
+        from gta_freshness_first_daily_selection import run as fresh_select
+        report["freshness_first_daily_selection"] = fresh_select(results)
+    except (OSError, ValueError, TypeError, KeyError, ImportError) as exc:
+        report["freshness_first_daily_selection"] = {
+            "status": "FRESH_DAILY_SELECTION_HELD",
+            "error_type": type(exc).__name__,
+            "verified_first_publications": 0,
+            "verified_buyers": 0,
+            "verified_open_supplier_contracts": 0,
+        }
+
     passed = sum(x["status"] == "PASSED" for x in report["stages"])
     failed = [x["name"] for x in report["stages"]
               if x["status"] == "FAILED"]
