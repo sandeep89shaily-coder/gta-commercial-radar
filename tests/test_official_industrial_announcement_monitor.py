@@ -81,6 +81,30 @@ class AnnouncementMonitorTests(unittest.TestCase):
             self.assertEqual((root/LEDGER).read_bytes(),before)
             self.assertEqual(csvrows(root/FRESH),[])
 
+    def test_empty_feed_is_not_successful_coverage(self):
+        with tempfile.TemporaryDirectory() as d:
+            result=run(Path(d),today="2026-11-21",
+                       fetcher=lambda _:b"<rss><channel></channel></rss>",
+                       feeds={"FEDDEV_ONTARIO":"https://api.io.canada.ca/feed"})
+            self.assertEqual(result["sources_collected"],0)
+            self.assertEqual(result["source_health"]["FEDDEV_ONTARIO"]["status"],
+                             "EMPTY_OR_UNRECOGNIZED_FEED")
+            self.assertEqual(result["status"],"NO_OFFICIAL_FEEDS_WITH_ITEMS")
+
+    def test_completed_factory_not_promoted_as_upcoming_equipment(self):
+        xml=b"""<rss><channel><item>
+          <title>Industrial manufacturing plant expansion completed</title>
+          <link>https://news.ontario.ca/en/release/1/plant</link>
+          <pubDate>Fri, 20 Nov 2026 09:00:00 -0500</pubDate>
+          <description>Manufacturing retooling of the plant now complete; production line equipment running.</description>
+          </item></channel></rss>"""
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d)
+            run(root,today="2026-11-21",fetcher=lambda _:xml,
+                feeds={"Ontario":"https://news.ontario.ca/rss"})
+            self.assertEqual(csvrows(root/FRESH)[0]["project_stage"],
+                             "COMPLETED_OR_OPERATIONAL_RECHECK_PROCUREMENT")
+
     def test_undated_atom_updated_is_not_publication(self):
         xml=b"""<feed xmlns="http://www.w3.org/2005/Atom">
             <entry><title>Ontario factory expansion</title>
