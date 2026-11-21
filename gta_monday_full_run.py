@@ -59,6 +59,10 @@ def stages(workspace, results, *, industrial_limit=10, skip_collection=False):
         ("official_industrial_announcements",
          ["gta_official_industrial_announcement_monitor.py",
           "--results", out], False),
+        # Official agency-wide FedDev fallback, Invest Ontario and company
+        # newsrooms: bounded full-article evidence, no paid provider.
+        ("industrial_fulltext_news",
+         ["gta_industrial_fulltext_discovery.py","--results",out],False),
         # Consolidate official ERO equipment notices with independently
         # cited industrial investment announcements: offline, zero extra spend.
         ("equipment_commercial_index",
@@ -73,7 +77,8 @@ def stages(workspace, results, *, industrial_limit=10, skip_collection=False):
     if skip_collection:
         # Historical-only review must never fetch live announcement feeds.
         base = [stage for stage in base[1:]
-                if stage[0] != "official_industrial_announcements"]
+                if stage[0] not in ("official_industrial_announcements",
+                                    "industrial_fulltext_news")]
     return base
 
 
@@ -204,7 +209,8 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
         # Running paid company research after a failed primary collector
         # could re-label historical research as today's discovery. Do not.
         # Historical-only review is allowed but MUST have no --paid flag.
-        if (name == "official_industrial_announcements" and
+        if (name in ("official_industrial_announcements",
+                     "industrial_fulltext_news") and
                 not skip_collection and not report["fresh_collection_verified"]):
             log.write_text("SKIPPED_NO_FRESH_COLLECTION; NO_NETWORK\n",
                            encoding="utf-8")
