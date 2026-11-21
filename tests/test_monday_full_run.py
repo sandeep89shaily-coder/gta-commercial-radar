@@ -95,7 +95,7 @@ class MondayIntegrationTests(unittest.TestCase):
             with patch.object(monday, "find_workspace", return_value=ws):
                 code = monday.execute(ws, runner=fail_first)
             self.assertEqual(code, 2)
-            self.assertEqual(len(calls), 9)
+            self.assertEqual(len(calls), 8)
             record = json.loads((ws / "GTA_RADAR_RESULTS" /
                 "MONDAY_FULL_RADAR" / monday.REPORT).read_text(encoding="utf-8"))
             self.assertFalse(record["fresh_collection_verified"])
