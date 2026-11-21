@@ -22,6 +22,7 @@ DAILY = "GTA_RADAR_DAILY_NEW_DEVELOPMENTS.csv"
 UNIFIED_DAILY = "GTA_RADAR_UNIFIED_MUNICIPAL_DAILY_CHANGES.csv"
 EQUIPMENT = "GTA_RADAR_EQUIPMENT_COMMERCIAL_INDEX.csv"
 ANNOUNCEMENTS = "GTA_RADAR_FRESH_INDUSTRIAL_ANNOUNCEMENTS.csv"
+FULLTEXT = "GTA_RADAR_FULLTEXT_EQUIPMENT_FRESH_RESEARCH.csv"
 FEDERAL = "GTA_RADAR_FEDERAL_CAPEX_TOP20_RESEARCH.csv"
 GENERAL_TOP = "GTA_RADAR_FRESH_GENERAL_RESEARCH_TOP10.csv"
 EQUIPMENT_TOP = "GTA_RADAR_FRESH_EQUIPMENT_RESEARCH_TOP10.csv"
@@ -189,6 +190,38 @@ def run(results, *, today=None):
             decision="SOURCE_RESEARCH_ONLY_NOT_EQUIPMENT_ORDER",
             next_verification_action="Check original dated release, manufacturer identity, exact equipment scope, vendor selection and purchasing contact.")
         recent_equipment.append(row)
+    # Full-text dated announcements from the FedDev fallback, InvestOntario
+    # and manufacturer newsrooms are research evidence, not open orders.
+    existing_urls={x.get("source_url","") for x in recent_equipment}
+    for r in _read(root/FULLTEXT):
+        counts["fulltext_announcement_input"]+=1
+        date=_date(r.get("publisher_reported_date"))
+        url=_url(r.get("source_url"))
+        if (not date or not 0<=(day-date).days<=RECENT_MAX_DAYS
+                or r.get("opportunity_class")!="RECENT_DATED_RESEARCH"
+                or not url or url in existing_urls):
+            counts["fulltext_not_recent_or_duplicate"]+=1
+            continue
+        stage=r.get("procurement_stage") or "TIMING_UNKNOWN_REQUIRES_VERIFICATION"
+        row=_base(lane="EQUIPMENT_INTELLIGENCE",
+            city=r.get("city_mentioned") or "Ontario (site to verify)",
+            address_or_company_site_unverified="",
+            project_or_company=r.get("title",""),
+            source_project_id="FULLTEXT:"+str(r.get("source","")),
+            scope=r.get("industrial_scope_quote","")[:850],
+            source_event_date=date.isoformat(),
+            source_event_date_basis=r.get("publisher_date_basis",""),
+            radar_first_observed=r.get("first_seen_by_radar",""),
+            observation=r.get("observation",""),
+            source_url=url,
+            freshness_class="RECENT_PUBLISHER_DATED_ARTICLE_NOT_VERIFIED_FIRST_PUBLICATION",
+            decision=("RESEARCH_ONLY_COMPLETED_STAGE" if
+                      "COMPLETED" in stage or "ALREADY_AWARDED" in stage
+                      else "RESEARCH_ONLY_PROCUREMENT_UNVERIFIED"),
+            next_verification_action="Verify full original article, Ontario project location, equipment need and purchasing stage.")
+        row["stage"]=stage
+        recent_equipment.append(row)
+        existing_urls.add(url)
     # Environment/funding data is separate; no reuse of an old funding
     # agreement as a 'new' equipment disclosure.
     for r in _read(root/EQUIPMENT):
