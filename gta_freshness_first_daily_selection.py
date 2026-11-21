@@ -19,6 +19,7 @@ from gta_freshness import _date
 from gta_client_freshness import _read_history, _site_key
 
 DAILY = "GTA_RADAR_DAILY_NEW_DEVELOPMENTS.csv"
+UNIFIED_DAILY = "GTA_RADAR_UNIFIED_MUNICIPAL_DAILY_CHANGES.csv"
 EQUIPMENT = "GTA_RADAR_EQUIPMENT_COMMERCIAL_INDEX.csv"
 FEDERAL = "GTA_RADAR_FEDERAL_CAPEX_TOP20_RESEARCH.csv"
 GENERAL_TOP = "GTA_RADAR_FRESH_GENERAL_RESEARCH_TOP10.csv"
@@ -90,7 +91,10 @@ def run(results, *, today=None):
     history=_read_history(root,day)
     recent_general=[]; recent_equipment=[]; older=[]; counts=Counter()
     seen=set()
-    for r in _read(root/DAILY):
+    # The full run materializes the cross-city union immediately before this
+    # stage. Standalone/older exports may still use the original V6 feed.
+    daily_path = root/UNIFIED_DAILY if (root/UNIFIED_DAILY).is_file() else root/DAILY
+    for r in _read(daily_path):
         counts["daily_input"]+=1
         obs=str(r.get("observation") or "").strip().upper()
         city=str(r.get("city") or "").strip()
@@ -223,6 +227,8 @@ def run(results, *, today=None):
     result={
         "status":"FRESHNESS_FIRST_DAILY_RESEARCH_ONLY",
         "run_date":day.isoformat(),
+        "daily_input_source":daily_path.name,
+        "cross_city_reconciliation_used":daily_path.name==UNIFIED_DAILY,
         "general_recent_source_event_candidates":len(recent_general),
         "general_top10_count":min(10,len(recent_general)),
         "equipment_recent_source_event_candidates":len(recent_equipment),

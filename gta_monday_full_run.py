@@ -1248,6 +1248,19 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
             "verified_open_equipment_orders":0,
         }
 
+    # Reconcile V6 permit changes with independent municipal application
+    # collector change feeds. Preserve source-specific change dates and city
+    # collection diagnostics; never relabel historical baselines as new.
+    try:
+        from gta_unified_municipal_daily import run as unified_changes
+        report["unified_municipal_daily_changes"] = unified_changes(results)
+    except (OSError, ValueError, TypeError, ImportError) as exc:
+        report["unified_municipal_daily_changes"] = {
+            "status":"UNIFIED_MUNICIPAL_CHANGE_RECONCILIATION_HELD",
+            "error_type":type(exc).__name__,
+            "verified_first_publications":0,"verified_buyers":0,
+        }
+
     # Freshness-first output is separate from the historical combined AI
     # Top 10. Pull the current daily new/changed feed into both commercial
     # research lanes, while retaining older prospects in a watchlist.
