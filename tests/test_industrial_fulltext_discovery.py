@@ -92,6 +92,42 @@ class FullTextTests(unittest.TestCase):
                              "COMPLETED_OR_OPERATIONAL_NOT_UPCOMING_ORDER")
             self.assertEqual(item["open_supplier_package_verified"],"False")
 
+    def test_archive_fallback_discovers_official_feddev_release(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d)
+            idx="https://feddev-ontario.canada.ca/en/media-room/news-releases-2026"
+            release="https://www.canada.ca/en/economic-development-southern-ontario/news/2026/11/plant-investment.html"
+            listing=('<html><body><a href="'+release+
+                '">Government supports investment in manufacturing</a></body></html>').encode()
+            pages={idx:listing,release:FEDDEV}
+            data=run(root,today="2026-11-21",
+                fetcher=lambda u:pages[u],
+                indexes={"FEDDEV_OFFICIAL_2026_ARCHIVE":idx})
+            self.assertEqual(data["federal_fallback_observed_feddev_articles"],1)
+            self.assertEqual(data["recent_dated_research"],1)
+
+    def test_manufacturer_footer_never_becomes_equipment_evidence(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d)
+            idx="https://www.martinrea.com/newsroom/"
+            release="https://www.martinrea.com/news-release/new-working-relationship/"
+            listing=('<html><body><a href="'+release+
+                '">Martinrea announces new working relationship</a></body></html>').encode()
+            article=b"""<html><head><meta property="article:published_time"
+                content="2026-11-11"/></head><body>
+                <article><h1>New working relationship</h1>
+                <p>The company has established a working relationship with
+                a business partner to share technical expertise and improve
+                operational efficiencies across its business.</p></article>
+                <footer>Machinery production expansion automation CNC equipment
+                in Toronto Ontario</footer></body></html>"""
+            data=run(root,today="2026-11-21",
+                indexes={"MARTINREA":idx},
+                fetcher=lambda u: listing if u==idx else article)
+            self.assertEqual(data["recent_dated_research"],0)
+            self.assertEqual(data["older_watchlist"],0)
+            self.assertEqual(data["sources"]["MARTINREA"]["not_equipment_evidence"],1)
+
     def test_failed_source_does_not_erase_historical_ledger(self):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d);url="https://www.linamar.com/news-listings/"
