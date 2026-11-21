@@ -55,10 +55,10 @@ ACTION = re.compile(r"\b(?:invest\w*|expand\w*|expansion|new|build\w*|"
     r"construct\w*|moderniz\w*|upgrade|retool\w*|install\w*|"
     r"launch\w*|production line|acquir\w*|purchase\w*|"
     r"automat\w*|capacity)\b",re.I)
-COMPLETED = re.compile(r"\\b(?:retooling (?:is |was |has been )?complete|"
+COMPLETED = re.compile(r"\b(?:retooling (?:is |was |has been )?complete|"
     r"retooling of the plant now complete|already operational|"
     r"now operational|has begun production|began production|"
-    r"production (?:has )?started|opened (?:last |in )?20\\d\\d)\\b",re.I)
+    r"production (?:has )?started|opened (?:last |in )?20\d\d)\b",re.I)
 MACHINES = re.compile(r"\b(?:CNC|machine(?:ry)?|equipment|robot\w*|"
     r"production line|automation|press(?:es)?|packaging line|"
     r"furnace|kiln|boiler|extruder|stamping|milling|"
