@@ -198,6 +198,12 @@ def run(results, *, today=None, fetcher=None, feeds=None):
             # Never allow a new feed ingestion to overwrite stored first-seen
             # or an original reporter-published date without a change note.
             original_date=(old or {}).get("first_reported_date") or entry["publisher_date"]
+            # If a publisher revises an existing item and changes pubDate,
+            # preserve its earliest observed publisher date for freshness.
+            # A revision is not automatically a new equipment announcement.
+            original_day=_date(original_date)
+            if original_day and original_day<date:
+                date=original_day
             if not old or old.get("digest")!=digest:
                 records[key]={"source":source,"url":url,"title":title,
                     "excerpt":body[:1500],"digest":digest,
@@ -215,7 +221,7 @@ def run(results, *, today=None, fetcher=None, feeds=None):
             classification=("RECENT_PUBLISHER_REPORTED_ANNOUNCEMENT_RESEARCH_ONLY"
                 if fresh else "HISTORICAL_ANNOUNCEMENT_WATCHLIST")
             outputs.append({"source":source,"source_url":url,
-                "title":title,"publisher_reported_date":entry["publisher_date"],
+                "title":title,"publisher_reported_date":date.isoformat(),
                 "publisher_date_basis":"RSS_ATOM_PUBLISHER_DATE_NOT_INDEPENDENTLY_VERIFIED",
                 "first_seen_by_radar":first,"last_seen_by_radar":day.isoformat(),
                 "observation":obs,"company_source_claim_unverified":"",
