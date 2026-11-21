@@ -28,6 +28,7 @@ GOVERNMENT_ATOM=("https://api.io.canada.ca/io-server/gc/news/en/v2?"
                  "atomtitle=news%20releases")
 INDEXES={
     "FEDDEV_GOVERNMENT_WIDE_ATOM":GOVERNMENT_ATOM,
+    "FEDDEV_OFFICIAL_2026_ARCHIVE":"https://feddev-ontario.canada.ca/en/media-room/news-releases-2026",
     "INVEST_ONTARIO":"https://investontario.ca/press-room",
     "LINAMAR":"https://www.linamar.com/news-listings/",
     "MARTINREA":"https://www.martinrea.com/newsroom/",
@@ -93,8 +94,12 @@ class Page(HTMLParser):
         super().__init__(convert_charrefs=True)
         self.links=[];self.parts=[];self.meta={};self.anchor=None
         self.hidden=0;self.heading="";self.in_h1=False
+        self.article_parts=[];self.main_parts=[]
+        self.article_depth=0;self.main_depth=0
     def handle_starttag(self,tag,attrs):
         d=dict(attrs)
+        if tag=="article":self.article_depth+=1
+        if tag=="main":self.main_depth+=1
         if tag in ("script","style","nav","footer"):
             self.hidden+=1
         if tag=="a":self.anchor={"url":d.get("href",""),"parts":[]}
@@ -106,6 +111,8 @@ class Page(HTMLParser):
         if tag=="time" and d.get("datetime"):
             self.meta.setdefault("time_datetime",d["datetime"])
     def handle_endtag(self,tag):
+        if tag=="article":self.article_depth=max(0,self.article_depth-1)
+        if tag=="main":self.main_depth=max(0,self.main_depth-1)
         if tag=="a" and self.anchor:
             self.links.append((self.anchor["url"],_clean(" ".join(self.anchor["parts"]))))
             self.anchor=None
@@ -119,9 +126,20 @@ class Page(HTMLParser):
         if self.anchor is not None:self.anchor["parts"].append(cleaned)
         if self.in_h1:self.heading+=" "+cleaned
         self.parts.append(cleaned)
+        if self.article_depth:self.article_parts.append(cleaned)
+        if self.main_depth:self.main_parts.append(cleaned)
     @property
     def text(self):
         return " ".join(self.parts)[:35000]
+    @property
+    def article_text(self):
+        # Prefer the authored article region; never use footer/forms to
+        # establish manufacturing scope if an article region exists.
+        if sum(map(len,self.article_parts))>=100:
+            return " ".join(self.article_parts)[:30000]
+        if sum(map(len,self.main_parts))>=100:
+            return " ".join(self.main_parts)[:30000]
+        return self.text
 
 def _page(data):
     page=Page()
@@ -168,6 +186,10 @@ def _candidate_links(source,index,content):
         url=urljoin(index,relative)
         if not _allowed(url):continue
         path=urlsplit(url).path.lower()
+        if source=="FEDDEV_OFFICIAL_2026_ARCHIVE":
+            if not (path.startswith("/en/economic-development-southern-ontario/news/")
+                    or path.startswith("/en/media-room/news-releases/")):
+                continue
         if source=="LINAMAR" and not re.match(r"^/news/[^/]+/?$",path):
             continue
         if source=="MARTINREA" and not re.match(
@@ -259,9 +281,16 @@ def run(results,*,today=None,fetcher=None,indexes=None,max_articles=MAX_ARTICLES
                 diag["articles_failed"]+=1
                 continue
             diag["articles_ok"]+=1;diag["publisher_dated"]+=1
-            body=page.text
+            body=page.article_text
             combined=title+" "+body
-            if not SECTOR.search(combined) or not ACTION.search(combined):
+            # The original implementation classified manufacturer articles
+            # from site-wide newsletter/footer boilerplate. Qualify against
+            # substantive article text, not a stray site navigation keyword.
+            if (len(body)<100 or not SECTOR.search(body)
+                    or not ACTION.search(body)):
+                diag.setdefault("not_equipment_evidence",0)
+                diag["not_equipment_evidence"]+=1
+                continue
                 continue
             if source=="FEDDEV_GOVERNMENT_WIDE_ATOM" and not _feddev_item({"url":url}):
                 continue
@@ -318,11 +347,13 @@ def run(results,*,today=None,fetcher=None,indexes=None,max_articles=MAX_ARTICLES
     _write_csv(root/FILES["fresh"],recent)
     _write_csv(root/FILES["watch"],history)
     feddev=health.get("FEDDEV_GOVERNMENT_WIDE_ATOM",{})
+    feddev_archive=health.get("FEDDEV_OFFICIAL_2026_ARCHIVE",{})
     report={"status":"FULLTEXT_SOURCE_RESEARCH_WITH_GAPS"
                if any(v.get("status")!="INDEX_READ" or not v.get("publisher_dated")
                       for v in health.values()) else "FULLTEXT_SOURCES_RETRIEVED",
         "date":day.isoformat(),"sources":health,
-        "federal_fallback_observed_feddev_articles":feddev.get("publisher_dated",0),
+        "federal_fallback_observed_feddev_articles":(
+            feddev.get("publisher_dated",0)+feddev_archive.get("publisher_dated",0)),
         "articles_requested":min(len(pending),max_articles),
         "recent_dated_research":len(recent),"older_watchlist":len(history),
         "ledger_total_urls":len(ledger),
