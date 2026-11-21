@@ -21,6 +21,7 @@ from gta_client_freshness import _read_history, _site_key
 DAILY = "GTA_RADAR_DAILY_NEW_DEVELOPMENTS.csv"
 UNIFIED_DAILY = "GTA_RADAR_UNIFIED_MUNICIPAL_DAILY_CHANGES.csv"
 EQUIPMENT = "GTA_RADAR_EQUIPMENT_COMMERCIAL_INDEX.csv"
+ANNOUNCEMENTS = "GTA_RADAR_FRESH_INDUSTRIAL_ANNOUNCEMENTS.csv"
 FEDERAL = "GTA_RADAR_FEDERAL_CAPEX_TOP20_RESEARCH.csv"
 GENERAL_TOP = "GTA_RADAR_FRESH_GENERAL_RESEARCH_TOP10.csv"
 EQUIPMENT_TOP = "GTA_RADAR_FRESH_EQUIPMENT_RESEARCH_TOP10.csv"
@@ -162,6 +163,32 @@ def run(results, *, today=None):
             recent_general.append(row)
         else:
             older.append(row)
+    # Recently publisher-dated industrial announcements are a separate
+    # independently sourced intake. A reported RSS date is NOT authenticated
+    # first publication, nor evidence of equipment procurement.
+    for r in _read(root/ANNOUNCEMENTS):
+        counts["official_announcement_input"]+=1
+        date=_date(r.get("publisher_reported_date"))
+        if (not date or not 0<=(day-date).days<=RECENT_MAX_DAYS
+                or not str(r.get("classification") or "").startswith("RECENT_")
+                or not _url(r.get("source_url"))):
+            counts["announcement_not_recent_for_daily"]+=1
+            continue
+        row=_base(lane="EQUIPMENT_INTELLIGENCE",
+            city=r.get("city_mentioned") or "Ontario (city to verify)",
+            address_or_company_site_unverified="",
+            project_or_company=r.get("title",""),
+            source_project_id="OFFICIAL_ANNOUNCEMENT:"+r.get("source",""),
+            scope=r.get("industrial_scope_quote","")[:850],
+            source_event_date=date.isoformat(),
+            source_event_date_basis=r.get("publisher_date_basis",""),
+            radar_first_observed=r.get("first_seen_by_radar",""),
+            observation=r.get("observation",""),
+            source_url=_url(r.get("source_url")),
+            freshness_class="RECENT_PUBLISHER_REPORTED_DATE_UNVERIFIED",
+            decision="SOURCE_RESEARCH_ONLY_NOT_EQUIPMENT_ORDER",
+            next_verification_action="Check original dated release, manufacturer identity, exact equipment scope, vendor selection and purchasing contact.")
+        recent_equipment.append(row)
     # Environment/funding data is separate; no reuse of an old funding
     # agreement as a 'new' equipment disclosure.
     for r in _read(root/EQUIPMENT):
