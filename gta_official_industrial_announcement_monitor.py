@@ -41,7 +41,7 @@ CSV_FIELDS = (
     "publisher_date_basis","first_seen_by_radar","last_seen_by_radar",
     "observation","company_source_claim_unverified","city_mentioned",
     "industrial_scope_quote","equipment_explicit_in_excerpt",
-    "equipment_inference_only","classification","buyer_verified",
+    "equipment_inference_only","classification","project_stage","buyer_verified",
     "open_supplier_package_verified","publication_independently_verified",
     "next_check",
 )
@@ -55,6 +55,10 @@ ACTION = re.compile(r"\b(?:invest\w*|expand\w*|expansion|new|build\w*|"
     r"construct\w*|moderniz\w*|upgrade|retool\w*|install\w*|"
     r"launch\w*|production line|acquir\w*|purchase\w*|"
     r"automat\w*|capacity)\b",re.I)
+COMPLETED = re.compile(r"\\b(?:retooling (?:is |was |has been )?complete|"
+    r"retooling of the plant now complete|already operational|"
+    r"now operational|has begun production|began production|"
+    r"production (?:has )?started|opened (?:last |in )?20\\d\\d)\\b",re.I)
 MACHINES = re.compile(r"\b(?:CNC|machine(?:ry)?|equipment|robot\w*|"
     r"production line|automation|press(?:es)?|packaging line|"
     r"furnace|kiln|boiler|extruder|stamping|milling|"
@@ -166,6 +170,12 @@ def run(results, *, today=None, fetcher=None, feeds=None):
         try:
             data=(fetcher or _http)(url)
             entries=_entries(data)
+            if not entries:
+                # HTTP 200 with an empty/mismatched feed is not coverage.
+                feed_health[source]={"status":"EMPTY_OR_UNRECOGNIZED_FEED",
+                                     "items":0,
+                                     "warning":"No dated RSS/Atom entries parsed; source coverage not verified."}
+                continue
             success+=1
             feed_health[source]={"status":"FETCHED_AND_PARSED","items":len(entries)}
         except (OSError,ValueError,ET.ParseError,TypeError) as exc:
@@ -220,6 +230,11 @@ def run(results, *, today=None, fetcher=None, feeds=None):
             # Initial discovery of an old announcement goes into history.
             classification=("RECENT_PUBLISHER_REPORTED_ANNOUNCEMENT_RESEARCH_ONLY"
                 if fresh else "HISTORICAL_ANNOUNCEMENT_WATCHLIST")
+            # Excerpt-only evidence may not describe procurement timing.
+            # Explicitly completed work cannot be marketed as upcoming.
+            project_stage=("COMPLETED_OR_OPERATIONAL_RECHECK_PROCUREMENT"
+                           if COMPLETED.search(combined)
+                           else "STAGE_NOT_VERIFIED_FROM_FEED_EXCERPT")
             outputs.append({"source":source,"source_url":url,
                 "title":title,"publisher_reported_date":date.isoformat(),
                 "publisher_date_basis":"RSS_ATOM_PUBLISHER_DATE_NOT_INDEPENDENTLY_VERIFIED",
@@ -230,6 +245,7 @@ def run(results, *, today=None, fetcher=None, feeds=None):
                 "equipment_explicit_in_excerpt":str(explicit),
                 "equipment_inference_only":str(not explicit),
                 "classification":classification,
+                "project_stage":project_stage,
                 "buyer_verified":"False","open_supplier_package_verified":"False",
                 "publication_independently_verified":"False",
                 "next_check":"Confirm named manufacturer, exact plant, original publication, equipment procurement and potential vendors."})
@@ -243,7 +259,8 @@ def run(results, *, today=None, fetcher=None, feeds=None):
     historical.sort(key=lambda r:r["publisher_reported_date"],reverse=True)
     _write(root/FRESH,fresh)
     _write(root/HISTORY,historical)
-    report={"status":("PARTIAL_OFFICIAL_FEED_COLLECTION" if success<len(sources)
+    report={"status":("NO_OFFICIAL_FEEDS_WITH_ITEMS" if success==0
+                      else "PARTIAL_OFFICIAL_FEED_COLLECTION" if success<len(sources)
                       else "OFFICIAL_FEEDS_COLLECTED"),
             "run_date":day.isoformat(),"source_health":feed_health,
             "source_count":len(sources),"sources_collected":success,
