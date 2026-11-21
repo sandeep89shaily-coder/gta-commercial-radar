@@ -54,6 +54,11 @@ def stages(workspace, results, *, industrial_limit=10, skip_collection=False):
         ("industrial_investment_and_contacts",
          ["gta_investment_contact_daily_bridge.py", "--results", out] +
          (["--paid"] if not skip_collection else []), False),
+        # Dedicated low-cost publisher-dated investment announcements.
+        # Separate original release dates from Radar first-seen timestamps.
+        ("official_industrial_announcements",
+         ["gta_official_industrial_announcement_monitor.py",
+          "--results", out], False),
         # Consolidate official ERO equipment notices with independently
         # cited industrial investment announcements: offline, zero extra spend.
         ("equipment_commercial_index",
