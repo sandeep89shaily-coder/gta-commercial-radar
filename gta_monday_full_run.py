@@ -63,6 +63,10 @@ def stages(workspace, results, *, industrial_limit=10, skip_collection=False):
         # newsrooms: bounded full-article evidence, no paid provider.
         ("industrial_fulltext_news",
          ["gta_industrial_fulltext_discovery.py","--results",out],False),
+        # Exhaustively audit up to 40 FedDev agency Atom entries in a
+        # separate bounded lane; no shared 18-article discovery starvation.
+        ("feddev_all40_evidence",
+         ["gta_feddev_all40_audit.py","--results",out,"--limit","40"],False),
         # Consolidate official ERO equipment notices with independently
         # cited industrial investment announcements: offline, zero extra spend.
         ("equipment_commercial_index",
@@ -78,7 +82,8 @@ def stages(workspace, results, *, industrial_limit=10, skip_collection=False):
         # Historical-only review must never fetch live announcement feeds.
         base = [stage for stage in base[1:]
                 if stage[0] not in ("official_industrial_announcements",
-                                    "industrial_fulltext_news")]
+                                    "industrial_fulltext_news",
+                                    "feddev_all40_evidence")]
     return base
 
 
@@ -210,7 +215,8 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
         # could re-label historical research as today's discovery. Do not.
         # Historical-only review is allowed but MUST have no --paid flag.
         if (name in ("official_industrial_announcements",
-                     "industrial_fulltext_news") and
+                     "industrial_fulltext_news",
+                     "feddev_all40_evidence") and
                 not skip_collection and not report["fresh_collection_verified"]):
             log.write_text("SKIPPED_NO_FRESH_COLLECTION; NO_NETWORK\n",
                            encoding="utf-8")

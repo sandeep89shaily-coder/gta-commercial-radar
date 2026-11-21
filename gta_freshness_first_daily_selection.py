@@ -23,6 +23,7 @@ UNIFIED_DAILY = "GTA_RADAR_UNIFIED_MUNICIPAL_DAILY_CHANGES.csv"
 EQUIPMENT = "GTA_RADAR_EQUIPMENT_COMMERCIAL_INDEX.csv"
 ANNOUNCEMENTS = "GTA_RADAR_FRESH_INDUSTRIAL_ANNOUNCEMENTS.csv"
 FULLTEXT = "GTA_RADAR_FULLTEXT_EQUIPMENT_FRESH_RESEARCH.csv"
+FEDDEV_ALL40 = "GTA_RADAR_FEDDEV_ALL40_EVIDENCE.csv"
 FEDERAL = "GTA_RADAR_FEDERAL_CAPEX_TOP20_RESEARCH.csv"
 GENERAL_TOP = "GTA_RADAR_FRESH_GENERAL_RESEARCH_TOP10.csv"
 EQUIPMENT_TOP = "GTA_RADAR_FRESH_EQUIPMENT_RESEARCH_TOP10.csv"
@@ -219,6 +220,41 @@ def run(results, *, today=None):
                       "COMPLETED" in stage or "ALREADY_AWARDED" in stage
                       else "RESEARCH_ONLY_PROCUREMENT_UNVERIFIED"),
             next_verification_action="Verify full original article, Ontario project location, equipment need and purchasing stage.")
+        row["stage"]=stage
+        recent_equipment.append(row)
+        existing_urls.add(url)
+    # The exhaustive FedDev archive retains all 40 input records, but only
+    # independently article-dated, recent industrial articles can enter
+    # research; completed projects stay research-only and no buyer is proven.
+    existing_urls={x.get("source_url","") for x in recent_equipment}
+    for r in _read(root/FEDDEV_ALL40):
+        counts["feddev_all40_rows"]+=1
+        date=_date(r.get("article_reported_date"))
+        url=_url(r.get("source_url"))
+        if (not url or url in existing_urls or not date or
+                not 0<=(day-date).days<=RECENT_MAX_DAYS or
+                r.get("article_retrieval_status")!="FETCHED" or
+                r.get("manufacturing_expansion_explicit")!="True"):
+            counts["feddev_all40_not_fresh_or_duplicate"]+=1
+            continue
+        stage=r.get("procurement_stage") or "TIMING_UNKNOWN_REQUIRES_VERIFICATION"
+        row=_base(lane="EQUIPMENT_INTELLIGENCE",
+            city=r.get("city_mentioned_unverified") or "Ontario (site unverified)",
+            address_or_company_site_unverified="",
+            project_or_company=r.get("company_identified") or r.get("headline",""),
+            source_project_id="FEDDEV_ALL40:"+str(r.get("feed_position","")),
+            scope=r.get("equipment_evidence_quote") or r.get("evidence_excerpt",""),
+            source_event_date=date.isoformat(),
+            source_event_date_basis=r.get("date_basis",""),
+            radar_first_observed=r.get("first_seen_by_radar",""),
+            observation="SOURCE_ANNOUNCEMENT_RESEARCH",
+            company_source_claim=r.get("company_identified",""),
+            source_url=url,
+            freshness_class="RECENT_PUBLISHER_DATED_FEDDEV_RESEARCH_NOT_PURCHASE",
+            decision=("COMPLETED_OR_AWARDED_RESEARCH_ONLY"
+                      if "COMPLETED" in stage or "ALREADY_AWARDED" in stage
+                      else "FUTURE_EQUIPMENT_RESEARCH_PROCUREMENT_UNVERIFIED"),
+            next_verification_action="Verify company legal name, plant location, specific unawarded machinery and official purchasing contact.")
         row["stage"]=stage
         recent_equipment.append(row)
         existing_urls.add(url)

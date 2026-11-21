@@ -18,7 +18,7 @@ class MondayIntegrationTests(unittest.TestCase):
                 "facility_evidence", "toronto_20_source_research",
                 "council_agenda_intelligence",
                 "industrial_investment_and_contacts", "official_industrial_announcements",
-                "industrial_fulltext_news", "equipment_commercial_index",
+                "industrial_fulltext_news", "feddev_all40_evidence", "equipment_commercial_index",
                 "ai_harness_adaptive"])
             self.assertEqual(sum("gta_total_intelligence_run.py" in s[1]
                                  for s in stages), 1)
@@ -66,12 +66,12 @@ class MondayIntegrationTests(unittest.TestCase):
             with patch.object(monday, "find_workspace", return_value=ws):
                 result = monday.execute(ws, runner=fake_run)
             self.assertEqual(result, 0)
-            self.assertEqual(len(calls), 11)
+            self.assertEqual(len(calls), 12)
             report = json.loads((ws / "GTA_RADAR_RESULTS" /
                 "MONDAY_FULL_RADAR" / monday.REPORT).read_text(encoding="utf-8"))
             self.assertEqual(report["status"], "ALL_STAGES_RAN_REVIEW_ONLY")
             self.assertTrue(report["fresh_collection_verified"])
-            self.assertEqual(report["stage_successes"], 11)
+            self.assertEqual(report["stage_successes"], 12)
             self.assertEqual(report["ai_harness_mode"], "ADAPTIVE_RESEARCH_SHARED_BUDGET")
             self.assertFalse(report["deepseek_guard_diagnostic"]["provider_billing_verified"])
             self.assertEqual(report["archive_status"], "CREATED_REVIEW_ONLY")
@@ -130,7 +130,7 @@ class MondayIntegrationTests(unittest.TestCase):
             with patch.object(monday,"find_workspace",return_value=ws):
                 self.assertEqual(monday.execute(ws,runner=successful_with_optional_errors),0)
             manifest=json.loads((results/"MONDAY_FULL_RADAR"/monday.REPORT).read_text())
-            self.assertEqual(manifest["stage_successes"],11)
+            self.assertEqual(manifest["stage_successes"],12)
             self.assertEqual(manifest["failed_stages"],[])
             self.assertEqual(manifest["status"],
                              "ALL_STAGES_RAN_WITH_SOURCE_WARNINGS_REVIEW_ONLY")
@@ -198,7 +198,7 @@ class MondayIntegrationTests(unittest.TestCase):
             state=json.loads((ws/"GTA_RADAR_RESULTS"/"MONDAY_FULL_RADAR"/
                               monday.REPORT).read_text())
             self.assertEqual(state["archive_status"],"FAILED_NOT_PACKAGED")
-            self.assertEqual(state["stage_successes"],11)
+            self.assertEqual(state["stage_successes"],12)
             self.assertEqual(state["status"],"ALL_STAGES_RAN_REVIEW_ONLY")
             self.assertIn("archive drive full",state["archive_error"])
 
