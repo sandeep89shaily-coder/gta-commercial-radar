@@ -30,10 +30,12 @@ INDEXES={
     "FEDDEV_GOVERNMENT_WIDE_ATOM":GOVERNMENT_ATOM,
     "INVEST_ONTARIO":"https://investontario.ca/press-room",
     "LINAMAR":"https://www.linamar.com/news-listings/",
+    "MARTINREA":"https://www.martinrea.com/newsroom/",
 }
 HOSTS={"api.io.canada.ca","www.canada.ca","canada.ca",
        "feddev-ontario.canada.ca","investontario.ca","www.investontario.ca",
-       "www.linamar.com","linamar.com"}
+       "www.linamar.com","linamar.com",
+       "www.martinrea.com","martinrea.com"}
 FILES={
     "ledger":"GTA_RADAR_FULLTEXT_INDUSTRIAL_LEDGER.json",
     "fresh":"GTA_RADAR_FULLTEXT_EQUIPMENT_FRESH_RESEARCH.csv",
@@ -168,11 +170,17 @@ def _candidate_links(source,index,content):
         path=urlsplit(url).path.lower()
         if source=="LINAMAR" and not re.match(r"^/news/[^/]+/?$",path):
             continue
+        if source=="MARTINREA" and not re.match(
+                r"^/(?:news-release|news)/[^/]+/?$",path):
+            continue
         if source=="INVEST_ONTARIO":
             if path.rstrip("/") in ("/press-room","/news","/"):continue
             if not re.search(r"(?:news|press|investment|media|announcement)",path):
                 continue
-        if url in seen or len(text)<15 or len(text)>250:continue
+        if (url in seen or len(text)>250 or
+                (len(text)<15 and not
+                 (source=="MARTINREA" and text.casefold()=="read more"))):
+            continue
         seen.add(url)
         out.append((url,text,""))
     return out
@@ -286,7 +294,9 @@ def run(results,*,today=None,fetcher=None,indexes=None,max_articles=MAX_ARTICLES
                 "publisher_date_basis":basis,
                 "first_seen_by_radar":first,"last_seen_by_radar":day.isoformat(),
                 "observation":obs,"city_mentioned":location,
-                "company_source_claim_unverified":"Linamar" if source=="LINAMAR" else "",
+                "company_source_claim_unverified":(
+                    "Linamar" if source=="LINAMAR" else
+                    "Martinrea International" if source=="MARTINREA" else ""),
                 "industrial_scope_quote":_excerpt(body),
                 "specific_machinery_explicit":str(bool(MACHINES.search(_excerpt(body)))),
                 "procurement_stage":stage,"opportunity_class":classification,
