@@ -54,6 +54,11 @@ def stages(workspace, results, *, industrial_limit=10, skip_collection=False):
         ("industrial_investment_and_contacts",
          ["gta_investment_contact_daily_bridge.py", "--results", out] +
          (["--paid"] if not skip_collection else []), False),
+        # Dedicated low-cost publisher-dated investment announcements.
+        # Separate original release dates from Radar first-seen timestamps.
+        ("official_industrial_announcements",
+         ["gta_official_industrial_announcement_monitor.py",
+          "--results", out], False),
         # Consolidate official ERO equipment notices with independently
         # cited industrial investment announcements: offline, zero extra spend.
         ("equipment_commercial_index",
@@ -66,7 +71,9 @@ def stages(workspace, results, *, industrial_limit=10, skip_collection=False):
          False),
     ]
     if skip_collection:
-        base = base[1:]
+        # Historical-only review must never fetch live announcement feeds.
+        base = [stage for stage in base[1:]
+                if stage[0] != "official_industrial_announcements"]
     return base
 
 
@@ -197,6 +204,16 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
         # Running paid company research after a failed primary collector
         # could re-label historical research as today's discovery. Do not.
         # Historical-only review is allowed but MUST have no --paid flag.
+        if (name == "official_industrial_announcements" and
+                not skip_collection and not report["fresh_collection_verified"]):
+            log.write_text("SKIPPED_NO_FRESH_COLLECTION; NO_NETWORK\n",
+                           encoding="utf-8")
+            report["stages"].append({
+                "name": name, "status": "SKIPPED_NO_FRESH_COLLECTION",
+                "exit_code": None, "critical": False,
+                "log": str(log)})
+            save()
+            continue
         if (name == "industrial_investment_and_contacts" and
                 not skip_collection and not report["fresh_collection_verified"]):
             log.write_text("SKIPPED_NO_FRESH_COLLECTION; NO_SPEND\n",
