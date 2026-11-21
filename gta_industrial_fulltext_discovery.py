@@ -28,7 +28,14 @@ GOVERNMENT_ATOM=("https://api.io.canada.ca/io-server/gc/news/en/v2?"
                  "atomtitle=news%20releases")
 INDEXES={
     "FEDDEV_GOVERNMENT_WIDE_ATOM":GOVERNMENT_ATOM,
-    "FEDDEV_OFFICIAL_2026_ARCHIVE":"https://feddev-ontario.canada.ca/en/media-room/news-releases-2026",
+    # The HTML archive is JS-rendered. Its official linked API is the actual
+    # source of news items; parsing the HTML shell returns zero links.
+    "FEDDEV_OFFICIAL_2026_ARCHIVE":(
+        "https://api.io.canada.ca/io-server/gc/news/en/v2?"
+        "atomtitle=Federal+Economic+Development+Agency+for+Southern+Ontario"
+        "&dept=economicdevelopmentsouthernontario&format=atom&orderBy=desc"
+        "&pick=50&publishedDate%3E=2026-01-01&sort=publishedDate"
+        "&type=newsreleases"),
     "INVEST_ONTARIO":"https://investontario.ca/press-room",
     "LINAMAR":"https://www.linamar.com/news-listings/",
     "MARTINREA":"https://www.martinrea.com/newsroom/",
@@ -173,13 +180,21 @@ def _canonical(url):
 def _feddev_item(item):
     # Agency identity is determined from the canonical federal path, never
     # merely from a text mention of FedDev in a different department's release.
-    return ("/en/economic-development-southern-ontario/news/" in
-            urlsplit(item["url"]).path.lower())
+    p=urlsplit(item["url"])
+    path=p.path.lower()
+    return ((p.hostname in ("www.canada.ca","canada.ca") and
+             "/en/economic-development-southern-ontario/news/" in path)
+            or (p.hostname=="feddev-ontario.canada.ca" and
+                "/en/media-room/" in path))
 
 def _candidate_links(source,index,content):
-    if source=="FEDDEV_GOVERNMENT_WIDE_ATOM":
+    if source in ("FEDDEV_GOVERNMENT_WIDE_ATOM",
+                  "FEDDEV_OFFICIAL_2026_ARCHIVE"):
+        # Both feeds provide Atom entries. The agency-specific archive
+        # endpoint itself is authoritative for FedDev affiliation, but
+        # a linked article must still be hosted on official FedDev/Canada.ca.
         return [(x["url"],x["title"],x["publisher_date"])
-                for x in _entries(content) if _feddev_item(x)]
+                for x in _entries(content) if _feddev_item(x)] 
     page=_page(content)
     seen=set();out=[]
     for relative,text in page.links:

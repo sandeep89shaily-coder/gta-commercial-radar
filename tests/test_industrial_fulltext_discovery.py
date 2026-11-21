@@ -95,16 +95,35 @@ class FullTextTests(unittest.TestCase):
     def test_archive_fallback_discovers_official_feddev_release(self):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d)
-            idx="https://feddev-ontario.canada.ca/en/media-room/news-releases-2026"
+            idx="https://api.io.canada.ca/io-server/gc/news/en/v2?dept=economicdevelopmentsouthernontario&format=atom"
             release="https://www.canada.ca/en/economic-development-southern-ontario/news/2026/11/plant-investment.html"
-            listing=('<html><body><a href="'+release+
-                '">Government supports investment in manufacturing</a></body></html>').encode()
+            listing=('''<feed xmlns="http://www.w3.org/2005/Atom">
+              <entry><title>Government supports manufacturing expansion</title>
+              <link href="'''+release+'''"/>
+              <published>2026-11-20T12:00:00-05:00</published>
+              <summary>Manufacturing investment in Ontario.</summary></entry>
+              </feed>''').encode()
             pages={idx:listing,release:FEDDEV}
             data=run(root,today="2026-11-21",
                 fetcher=lambda u:pages[u],
                 indexes={"FEDDEV_OFFICIAL_2026_ARCHIVE":idx})
             self.assertEqual(data["federal_fallback_observed_feddev_articles"],1)
             self.assertEqual(data["recent_dated_research"],1)
+
+    def test_archive_atom_accepts_official_feddev_hosted_article(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d)
+            idx="https://api.io.canada.ca/io-server/gc/news/en/v2?dept=economicdevelopmentsouthernontario&format=atom"
+            release="https://feddev-ontario.canada.ca/en/media-room/news-releases/manufacturing-investment"
+            listing=('''<feed xmlns="http://www.w3.org/2005/Atom">
+              <entry><title>FedDev manufacturing equipment expansion</title>
+              <link href="'''+release+'''"/>
+              <published>2026-11-20T12:00:00-05:00</published>
+              </entry></feed>''').encode()
+            result=run(root,today="2026-11-21",fetcher=lambda u:
+                listing if u==idx else FEDDEV,
+                indexes={"FEDDEV_OFFICIAL_2026_ARCHIVE":idx})
+            self.assertEqual(result["federal_fallback_observed_feddev_articles"],1)
 
     def test_manufacturer_footer_never_becomes_equipment_evidence(self):
         with tempfile.TemporaryDirectory() as d:
