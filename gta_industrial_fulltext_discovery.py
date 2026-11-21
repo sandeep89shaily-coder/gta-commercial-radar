@@ -13,6 +13,7 @@ import html
 from html.parser import HTMLParser
 import json
 import re
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from urllib.parse import urljoin,urlsplit,urlunsplit
 from urllib.request import Request,urlopen
@@ -187,14 +188,51 @@ def _feddev_item(item):
             or (p.hostname=="feddev-ontario.canada.ca" and
                 "/en/media-room/" in path))
 
+def _federal_atom_entries(content):
+    """Read real Atom links even when <published> is omitted.
+
+    <updated> means the feed entry changed; it MUST NOT be relabeled as
+    first publication. The linked original article has to establish a date
+    before the research record can be admitted.
+    """
+    root=ET.fromstring(content)
+    entries=[]
+    for node in root.iter():
+        if node.tag.rsplit("}",1)[-1]!="entry":
+            continue
+        title="";published="";url=""
+        for child in node:
+            name=child.tag.rsplit("}",1)[-1]
+            if name=="title":
+                title=_clean(" ".join(child.itertext()))
+            elif name=="published" and child.text:
+                published=child.text.strip()
+            elif name=="link" and child.attrib.get("rel","alternate")=="alternate":
+                url=child.attrib.get("href") or (child.text or "").strip()
+        if not url:
+            # Some government Atom entries use an <id> URL as their
+            # canonical reference rather than an alternate link.
+            for child in node:
+                if child.tag.rsplit("}",1)[-1]=="id" and child.text:
+                    value=child.text.strip()
+                    if _allowed(value):
+                        url=value
+                        break
+        if not title or not _allowed(url):
+            continue
+        published_date=_date(published) if published else None
+        entries.append((url,title,published_date.isoformat() if published_date else ""))
+    return entries
+
 def _candidate_links(source,index,content):
     if source in ("FEDDEV_GOVERNMENT_WIDE_ATOM",
                   "FEDDEV_OFFICIAL_2026_ARCHIVE"):
         # Both feeds provide Atom entries. The agency-specific archive
         # endpoint itself is authoritative for FedDev affiliation, but
         # a linked article must still be hosted on official FedDev/Canada.ca.
-        return [(x["url"],x["title"],x["publisher_date"])
-                for x in _entries(content) if _feddev_item(x)] 
+        return [(url,title,feed_date) for url,title,feed_date
+                in _federal_atom_entries(content)
+                if _feddev_item({"url":url})]
     page=_page(content)
     seen=set();out=[]
     for relative,text in page.links:
@@ -269,10 +307,30 @@ def run(results,*,today=None,fetcher=None,indexes=None,max_articles=MAX_ARTICLES
     for source,index_url in feeds.items():
         try:
             if not _allowed(index_url):raise ValueError("UNAUTHORIZED_SOURCE_INDEX")
-            candidates=_candidate_links(source,index_url,fetch(index_url))
+            payload=fetch(index_url)
+            candidates=_candidate_links(source,index_url,payload)
             health[source]={"status":"INDEX_READ","candidate_links":len(candidates),
                             "articles_ok":0,"articles_failed":0,
                             "publisher_dated":0,"industrial":0}
+            if source in ("FEDDEV_GOVERNMENT_WIDE_ATOM",
+                          "FEDDEV_OFFICIAL_2026_ARCHIVE"):
+                raw_items=_federal_atom_entries(payload)
+                # Audit entry parsing before agency-path filtering. These
+                # counts show whether the XML, URLs, or article stage is
+                # responsible for a zero result; no content is discarded.
+                root_xml=ET.fromstring(payload)
+                health[source].update({
+                    "atom_raw_entry_nodes":sum(
+                        x.tag.rsplit("}",1)[-1]=="entry"
+                        for x in root_xml.iter()),
+                    "atom_valid_https_links":len(raw_items),
+                    "atom_links_without_published":sum(
+                        not item[2] for item in raw_items),
+                    "atom_agency_url_matches":len(candidates),
+                    "atom_example_hosts":sorted(set(
+                        urlsplit(item[0]).hostname or "" for item in raw_items
+                    ))[:8],
+                })
             if not candidates:
                 health[source]["status"]="NO_CANDIDATES_CHECK_INDEX_PARSER"
             for url,title,feed_date in candidates[:35]:

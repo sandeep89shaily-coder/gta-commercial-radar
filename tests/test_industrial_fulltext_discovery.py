@@ -125,6 +125,47 @@ class FullTextTests(unittest.TestCase):
                 indexes={"FEDDEV_OFFICIAL_2026_ARCHIVE":idx})
             self.assertEqual(result["federal_fallback_observed_feddev_articles"],1)
 
+    def test_undated_atom_can_fetch_article_but_not_infer_pubdate(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d)
+            idx="https://api.io.canada.ca/io-server/gc/news/en/v2?dept=economicdevelopmentsouthernontario&format=atom"
+            release="https://www.canada.ca/en/economic-development-southern-ontario/news/2026/11/plant-expansion.html"
+            # Real-world response may have only <updated>, not <published>.
+            # The first published date must come from the original article.
+            feed=('''<feed xmlns="http://www.w3.org/2005/Atom">
+              <updated>2026-11-21T09:00:00-05:00</updated>
+              <link href="http://localhost:8181/self" rel="self"/>
+              <entry><title>London factory manufacturing expansion</title>
+              <updated>2026-11-21T08:00:00-05:00</updated>
+              <link href="'''+release+'''" rel="alternate"/>
+              </entry></feed>''').encode()
+            result=run(root,today="2026-11-21",
+                fetcher=lambda u:feed if u==idx else FEDDEV,
+                indexes={"FEDDEV_OFFICIAL_2026_ARCHIVE":idx})
+            self.assertEqual(result["sources"]["FEDDEV_OFFICIAL_2026_ARCHIVE"]["candidate_links"],1)
+            self.assertEqual(result["federal_fallback_observed_feddev_articles"],1)
+            row=rows(root/FILES["fresh"])[0]
+            self.assertTrue(row["publisher_date_basis"].startswith("ARTICLE_"))
+            self.assertEqual(row["publisher_reported_date"],"2026-11-20")
+
+    def test_undated_atom_with_undated_article_is_not_fresh(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d)
+            idx="https://api.io.canada.ca/io-server/gc/news/en/v2?dept=economicdevelopmentsouthernontario&format=atom"
+            release="https://www.canada.ca/en/economic-development-southern-ontario/news/2026/11/undated.html"
+            feed=('''<feed xmlns="http://www.w3.org/2005/Atom"><entry>
+              <title>New manufacturing equipment expansion</title>
+              <updated>2026-11-21T09:00:00Z</updated>
+              <link href="'''+release+'''" />
+              </entry></feed>''').encode()
+            article=b"<html><body><article>Manufacturing company will expand its production with new CNC machinery in London, Ontario. Project is not yet installed and future factory production capacity is planned.</article></body></html>"
+            result=run(root,today="2026-11-21",
+                fetcher=lambda u:feed if u==idx else article,
+                indexes={"FEDDEV_OFFICIAL_2026_ARCHIVE":idx})
+            self.assertEqual(result["sources"]["FEDDEV_OFFICIAL_2026_ARCHIVE"]["candidate_links"],1)
+            self.assertEqual(result["recent_dated_research"],0)
+            self.assertEqual(result["ledger_total_urls"],0)
+
     def test_manufacturer_footer_never_becomes_equipment_evidence(self):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d)
