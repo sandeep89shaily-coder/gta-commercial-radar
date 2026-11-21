@@ -13,6 +13,7 @@ import datetime as dt
 import hashlib
 import json
 import re
+import zipfile
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -71,13 +72,28 @@ def _quote(text,pattern,limit=650):
     a=max(0,match.start()-150)
     return " ".join(text[a:min(len(text),match.end()+limit)].split())[:900]
 
-def _contact(text):
-    # A government news release may name a media contact, but it is not
-    # evidence of the recipient manufacturer's purchasing department.
-    matches=EMAIL.findall(text)
-    if not matches:return "","NO_PUBLIC_COMPANY_CONTACT_EVIDENCE"
-    # Do not publish private individual addresses or assert company ownership.
-    return "PUBLISHER_ARTICLE_CONTACT_PRESENT_UNVERIFIED","MEDIA_OR_GENERAL_CONTACT_NOT_PURCHASER"
+def _contact(text,page,company):
+    """Link explicitly named company to outbound site only as review candidate.
+
+    Other outbound publisher/news/agency links are not proof of a recipient
+    business contact. A government media email is never the equipment buyer.
+    """
+    if company:
+        words=[x.lower() for x in re.findall(r"[a-zA-Z]{4,}",company)
+               if x.lower() not in ("incorporated","limited","company","industries",
+                                    "canada","ontario","manufacturing")]
+        for link,label in page.links:
+            host=urlsplit(link).hostname or ""
+            if (urlsplit(link).scheme=="https" and host and
+                    not host.endswith(("canada.ca","gc.ca","ontario.ca")) and
+                    not any(x in host for x in ("facebook.","linkedin.","youtube.",
+                                               "twitter.","instagram.","x.com",
+                                               "google.","bit.ly")) and
+                    any(word in host.lower().replace("-","") for word in words)):
+                return link[:700],"POSSIBLE_COMPANY_DOMAIN_FROM_SOURCE_LINK_NOT_BUYER"
+    if EMAIL.search(text):
+        return "","GOVERNMENT_MEDIA_OR_GENERAL_EMAIL_PRESENT_NOT_BUYER"
+    return "","NO_PUBLIC_BUSINESS_CONTACT_ESTABLISHED"
 
 def _read_ledger(path):
     if not path.is_file():return {}
@@ -158,7 +174,7 @@ def run(results,*,today=None,fetcher=None,feed_url=None,limit=MAX_ITEMS):
                 bool(SECTOR.search(body) and ACTION.search(body)))
             row["procurement_stage"]=_stage(body)
             row["evidence_excerpt"]=_excerpt(body)[:1100]
-            contact,contact_role=_contact(body)
+            contact,contact_role=_contact(body,page,company)
             row["public_business_contact_route"]=contact
             row["business_contact_role"]=contact_role
             if not date:
@@ -227,6 +243,19 @@ def main():
     ap.add_argument("--results",required=True)
     ap.add_argument("--as-of",default=None)
     ap.add_argument("--limit",type=int,default=MAX_ITEMS)
+    ap.add_argument("--zip",dest="zip_path",default=None,
+                    help="Optional output ZIP for one-step Desktop upload")
     args=ap.parse_args()
-    print(json.dumps(run(args.results,today=args.as_of,limit=args.limit),indent=2))
+    result=run(args.results,today=args.as_of,limit=args.limit)
+    if args.zip_path:
+        destination=Path(args.zip_path).expanduser()
+        if not destination.parent.is_dir():
+            raise FileNotFoundError("ZIP_DESTINATION_PARENT_NOT_FOUND")
+        if destination.suffix.lower()!=".zip":
+            raise ValueError("ZIP_DESTINATION_MUST_END_IN_ZIP")
+        with zipfile.ZipFile(destination,"w",compression=zipfile.ZIP_DEFLATED) as archive:
+            for name in (REPORT,EVIDENCE,STATUS,LEDGER):
+                archive.write(Path(args.results)/name,arcname=name)
+        result["upload_zip"]=str(destination)
+    print(json.dumps(result,indent=2))
 if __name__=="__main__":main()
