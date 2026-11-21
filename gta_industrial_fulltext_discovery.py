@@ -13,6 +13,7 @@ import html
 from html.parser import HTMLParser
 import json
 import re
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from urllib.parse import urljoin,urlsplit,urlunsplit
 from urllib.request import Request,urlopen
@@ -187,14 +188,51 @@ def _feddev_item(item):
             or (p.hostname=="feddev-ontario.canada.ca" and
                 "/en/media-room/" in path))
 
+def _federal_atom_entries(content):
+    """Read real Atom links even when <published> is omitted.
+
+    <updated> means the feed entry changed; it MUST NOT be relabeled as
+    first publication. The linked original article has to establish a date
+    before the research record can be admitted.
+    """
+    root=ET.fromstring(content)
+    entries=[]
+    for node in root.iter():
+        if node.tag.rsplit("}",1)[-1]!="entry":
+            continue
+        title="";published="";url=""
+        for child in node:
+            name=child.tag.rsplit("}",1)[-1]
+            if name=="title":
+                title=_clean(" ".join(child.itertext()))
+            elif name=="published" and child.text:
+                published=child.text.strip()
+            elif name=="link" and child.attrib.get("rel","alternate")=="alternate":
+                url=child.attrib.get("href") or (child.text or "").strip()
+        if not url:
+            # Some government Atom entries use an <id> URL as their
+            # canonical reference rather than an alternate link.
+            for child in node:
+                if child.tag.rsplit("}",1)[-1]=="id" and child.text:
+                    value=child.text.strip()
+                    if _allowed(value):
+                        url=value
+                        break
+        if not title or not _allowed(url):
+            continue
+        published_date=_date(published) if published else None
+        entries.append((url,title,published_date.isoformat() if published_date else ""))
+    return entries
+
 def _candidate_links(source,index,content):
     if source in ("FEDDEV_GOVERNMENT_WIDE_ATOM",
                   "FEDDEV_OFFICIAL_2026_ARCHIVE"):
         # Both feeds provide Atom entries. The agency-specific archive
         # endpoint itself is authoritative for FedDev affiliation, but
         # a linked article must still be hosted on official FedDev/Canada.ca.
-        return [(x["url"],x["title"],x["publisher_date"])
-                for x in _entries(content) if _feddev_item(x)] 
+        return [(url,title,feed_date) for url,title,feed_date
+                in _federal_atom_entries(content)
+                if _feddev_item({"url":url})]
     page=_page(content)
     seen=set();out=[]
     for relative,text in page.links:
