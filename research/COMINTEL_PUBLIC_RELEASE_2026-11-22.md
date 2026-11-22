@@ -3,7 +3,7 @@
 **Editorial date:** 2026-11-22 (America/Toronto)  
 **Rolling inclusion dates:** November 18–22, inclusive (five calendar days).  
 **Public feed:** `website/data/opportunities.json`  
-**Approved for publication:** 7 research leads; **0 verified open supplier packages**.
+**Approved for publication:** **17** source-linked research signals (**15 commercial, 2 industrial**), across **Toronto (16)** and **Guelph (1)**. **0 verified open equipment or construction supplier packages**. The SickKids planning/design/conformance RFP is a distinct professional-services procurement, not an equipment RFQ.
 
 ## Input provenance and selection limitations
 
@@ -13,12 +13,13 @@ Toronto public notices and contemporary public permit-index corroboration.
 
 That ZIP predates merging the new five-day all-candidates queue. Its
 `GTA_RADAR_UNIFIED_MUNICIPAL_DAILY_CHANGES.csv` has **119 rows, all Toronto**.
-The raw rows were individually screened for *source event dates* between
+Of the 119 Toronto rows, **49** carried source-record dates inside the
+five-day window. The raw rows were individually screened for *source event dates* between
 November 18 and 22 (even though the ZIP's saved previous shortlist used a
 three-day policy). This does NOT constitute exhaustive municipal coverage or
 a complete November 18–22 live rerun across all configured municipalities.
 
-All 5 permit leads below appear with exact source IDs and scope in the November
+All **13 permit leads** below appear with exact source IDs and scope in the November
 22 captured City Toronto active-permits extract. They are linked to an
 ID-filtered **official Toronto Open Data CKAN source**, but the live API query
 could not be independently fetched in this environment. Public permit-index
@@ -29,7 +30,12 @@ the November 22 snapshot status and a date-basis disclaimer.
 
 The two November 20 new *planning notices* were independently opened on
 City of Toronto's official public-notice system and link to the precise
-individual notice, not a homepage.
+individual notice, not a homepage. One additional Ontario Newsroom release,
+**SickKids Project Horizon's Nov 19 design-RFP milestone**, was checked against
+provincial reporting and Infrastructure Ontario's procurement market update.
+The other added source is a Nov 19 original local-news report of **Label Design's
+Guelph manufacturing-site move**. These are reported project signals, not
+endorsements or claims of an open equipment-purchasing round.
 
 ## Released cases
 
@@ -42,6 +48,16 @@ individual notice, not a homepage.
 | 5207 Dundas St W — daycare fit-out | Nov 18 municipal permit record | 26 271554 BLD · corroboration [street permits](https://thepermitmap.com/street/dundas-st-w/) | Permit stage snapshot only |
 | 55 University Ave — fire alarm panels | Nov 19 municipal permit record | 26 272511 FSU · corroboration [fire alarm permits](https://thepermitmap.com/work/fire-alarm/) | Procurement may already be assigned |
 | 90 Wynford Dr — sprinkler revisions | Nov 20 municipal permit record | 26 272935 FSU · corroboration [sprinkler permits](https://thepermitmap.com/work/sprinklers/) | Contract availability not established |
+| 40 King St W — Smart & Biggar tenant fit-out | Nov 20 permit record | 26 273015 BLD / HVA / PLB; captured Toronto CKAN row | New-tenant scope; packages not verified |
+| 985 Woodbine Ave — commercial demolition | Nov 20 permit record | 26 272995 DEM; captured Toronto CKAN row | Redevelopment and procurement unknown |
+| 2086–2090 Danforth Ave — commercial demolition | Nov 20 permit record | 26 273035 DEM; captured Toronto CKAN row | Demolition permit is not an open contract |
+| 771 Warden Ave — office trailer and parking | Nov 18 permit record | 26 271774 BLD; captured Toronto CKAN row | Site contractor and future work unknown |
+| 25 York St — ground-floor galleria canopy | Nov 18 permit record | 26 271855 BLD; captured Toronto CKAN row | Subcontract opportunities not verified |
+| 40 King St W — Kalos LLP interior/access-controls | Nov 18 permit record | 26 271861 FSU; captured Toronto CKAN row | Separate project ID from Smart & Biggar; buyer unknown |
+| 1133 Avenue Rd — daycare interior alterations | Nov 18 permit record | 26 271522 BLD / HVA / PLB; captured Toronto CKAN row | Parent-folder review pending |
+| 1759 Avenue Rd — retail garage repairs | Nov 19 permit record | 26 272390 BLD; captured Toronto CKAN row | Small scope; stage snapshot only |
+| SickKids Ambulatory Care Tower — PDC design RFP | Nov 19 **Ontario Newsroom release** | [Official announcement](https://news.ontario.ca/en/release/1008299/ontario-building-new-ambulatory-care-tower-at-sickkids-hospital) | Professional-services design RFP, not an open equipment or construction order |
+| Label Design — former Mitsubishi facility, Guelph | Nov 19 **local news report date** | [GuelphToday original report](https://www.guelphtoday.com/local-news/label-company-buys-former-mitsubishi-chemical-facility-in-guelph-13038427) | Purchase was the previous month, renovation already underway; future machinery and vendor packages unknown |
 
 The notices identify Build Canada Homes as the 1350 Sheppard *proponent*
 and National Bank of Canada as an office *tenant* at 130 King. **Neither is
@@ -60,11 +76,16 @@ research have been published.
 
 ### Held records / exclusions
 
-**114** of the 119 older unified municipal daily rows remain unpublished.
+**106** of the **119** Toronto unified municipal daily rows remain unpublished;
+**13** current-window permit records are included, with 2 additional Toronto
+planning notices, 1 provincial procurement announcement and 1 Guelph company
+facility-move report.
 Reasons include older source dates, already-issued permits, held/cancelled or
 less actionable stages, duplicate / unspecific work, or lack of independent
-corroboration. This is a **hold for more review**, not a conclusion that
-114 companies have no prospective work.
+corroboration. Some selected signals (e.g. a canopy or garage repair) are
+minor works and are clearly published as lower-confidence research, not
+high-value qualified buyer-ready opportunities. This is a **hold for more review**, not a conclusion that
+106 companies have no prospective work.
 
 Also deliberately excluded:
 
@@ -91,3 +112,14 @@ and scope and generate/commit the next approved JSON. The public website
 also independently hides records older than four calendar days by source date.
 
 No emails were sent. No private customer contacts or AI API secrets are included.
+
+## Publication target and anti-padding policy
+
+The owner requested a public five-day board with **15–20 useful research
+signals** when genuinely supportable. This edition contains **17**, with
+**49 source-dated Toronto municipal rows** considered and non-
+qualifying items held rather than inflating the result. Future releases
+should aim for 15–20 distinct, relevant source-linked project **signals**,
+not guarantee that many verified tender opportunities. When fewer than 15
+pass review, publish fewer and record the shortfall. Never treat an old
+project with a recent changed-status observation as a new announcement.
