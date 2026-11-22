@@ -27,6 +27,8 @@ FEDDEV_ALL40 = "GTA_RADAR_FEDDEV_ALL40_EVIDENCE.csv"
 FEDERAL = "GTA_RADAR_FEDERAL_CAPEX_TOP20_RESEARCH.csv"
 GENERAL_TOP = "GTA_RADAR_FRESH_GENERAL_RESEARCH_TOP10.csv"
 EQUIPMENT_TOP = "GTA_RADAR_FRESH_EQUIPMENT_RESEARCH_TOP10.csv"
+GENERAL_ALL = "GTA_RADAR_FRESH_GENERAL_RESEARCH_ALL.csv"
+EQUIPMENT_ALL = "GTA_RADAR_FRESH_EQUIPMENT_RESEARCH_ALL.csv"
 WATCHLIST = "GTA_RADAR_OLDER_ACTIVE_OPPORTUNITY_WATCHLIST.csv"
 STATUS = "GTA_RADAR_FRESHNESS_FIRST_SELECTION_STATUS.json"
 FIELDS = (
@@ -52,7 +54,7 @@ SCOPED = re.compile(r"\b(?:interior alterations?|renovat|conver|fit.out|"
     r"expan|construction|build|install|demolish|addition|modif|"
     r"alteration|tenant improvement|relocat|new)\b",re.I)
 OBSERVATIONS = {"FIRST_OBSERVED","RECORD_CHANGED"}
-RECENT_MAX_DAYS = 2  # Fri November 20 includes Wed Nov 18 through Fri Nov 20.
+RECENT_MAX_DAYS = 4  # Inclusive five-calendar-day window: today plus four prior days.
 
 def _read(path):
     if not path.is_file(): return []
@@ -97,7 +99,27 @@ def run(results, *, today=None):
     # The full run materializes the cross-city union immediately before this
     # stage. Standalone/older exports may still use the original V6 feed.
     daily_path = root/UNIFIED_DAILY if (root/UNIFIED_DAILY).is_file() else root/DAILY
-    for r in _read(daily_path):
+    daily_rows = _read(daily_path)
+    daily_keys = {(str(r.get("city") or "").casefold(),
+                   str(r.get("project_id") or "").casefold()) for r in daily_rows}
+    # Carry recent first-observed records forward from today's live snapshot even
+    # when no municipal record change occurred today (e.g. weekends).
+    # They are research-only repeats, NEVER fresh disclosures or confirmed bids.
+    for carry in _read(root/"GTA_RADAR_DAILY_PUBLIC_RECORDS.csv"):
+        if str(carry.get("observation") or "").upper() != "UNCHANGED":
+            continue
+        first = _date(carry.get("first_seen_local"))
+        if (not first or not 0 <= (day-first).days <= RECENT_MAX_DAYS
+                or _date(carry.get("last_seen_local")) != day):
+            continue
+        key = (str(carry.get("city") or "").casefold(),
+               str(carry.get("project_id") or "").casefold())
+        if key in daily_keys:
+            continue
+        daily_keys.add(key)
+        daily_rows.append(carry)
+        counts["rolling_unchanged_records_considered"] += 1
+    for r in daily_rows:
         counts["daily_input"]+=1
         obs=str(r.get("observation") or "").strip().upper()
         city=str(r.get("city") or "").strip()
@@ -109,7 +131,7 @@ def run(results, *, today=None):
         if not city or not addr or not ident or len(scope)<35 or not COMMERCIAL.search(scope):
             counts["daily_insufficient_commercial_evidence"]+=1
             continue
-        if obs not in OBSERVATIONS:
+        if obs not in OBSERVATIONS and obs != "UNCHANGED":
             counts["daily_no_new_observation"]+=1
             continue
         if _date(r.get("last_seen_local"))!=day:
@@ -150,6 +172,8 @@ def run(results, *, today=None):
         if obs=="FIRST_OBSERVED" and seen_day!=day:
             counts["not_first_observed_today"]+=1
             freshness="PREVIOUSLY_OBSERVED_WATCHLIST"
+        if obs=="UNCHANGED" and freshness=="RECENT_SOURCE_EVENT_NOT_PUBLICATION_PROOF":
+            freshness="RECENT_UNCHANGED_RESEARCH_NOT_NEW_DISCLOSURE"
         row=_base(lane="GENERAL_COMMERCIAL",
             city=city,address_or_company_site_unverified=addr,
             project_or_company=addr,source_project_id=ident,
@@ -159,9 +183,12 @@ def run(results, *, today=None):
             radar_first_observed=r.get("first_seen_local",""),
             observation=obs,stage=status_text or stage,
             company_source_claim="",source_url=_url(r.get("record_source_url")),
-            freshness_class=freshness,decision="RESEARCH_ONLY",
+            freshness_class=freshness,
+            decision=("RESEARCH_ONLY_PREVIOUSLY_OBSERVED" if obs=="UNCHANGED"
+                      else "RESEARCH_ONLY"),
             next_verification_action="Get exact permit source and first public posting; identify owner/tenant, GC and any unawarded work.")
-        if freshness=="RECENT_SOURCE_EVENT_NOT_PUBLICATION_PROOF":
+        if freshness in ("RECENT_SOURCE_EVENT_NOT_PUBLICATION_PROOF",
+                         "RECENT_UNCHANGED_RESEARCH_NOT_NEW_DISCLOSURE"):
             recent_general.append(row)
         else:
             older.append(row)
@@ -331,7 +358,11 @@ def run(results, *, today=None):
         uniq.setdefault(key,r)
     recent_equipment=sorted(uniq.values(),key=lambda r:(
         r["source_event_date"],r["city"],r["project_or_company"]),reverse=True)
-    for filename,items in ((GENERAL_TOP,recent_general[:10]),
+    # Full research exports are never capped at 10. Preserve the historic
+    # Top 10 summaries for compatibility with existing dashboards.
+    for filename,items in ((GENERAL_ALL,recent_general),
+                           (EQUIPMENT_ALL,recent_equipment),
+                           (GENERAL_TOP,recent_general[:10]),
                            (EQUIPMENT_TOP,recent_equipment[:10]),
                            (WATCHLIST,older)):
         for i,item in enumerate(items,1):
@@ -344,19 +375,21 @@ def run(results, *, today=None):
         "cross_city_reconciliation_used":daily_path.name==UNIFIED_DAILY,
         "general_recent_source_event_candidates":len(recent_general),
         "general_top10_count":min(10,len(recent_general)),
+        "general_all_research_count":len(recent_general),
         "equipment_recent_source_event_candidates":len(recent_equipment),
         "equipment_top10_count":min(10,len(recent_equipment)),
+        "equipment_all_research_count":len(recent_equipment),
         "older_watchlist_count":len(older),
         "verified_first_publications":0,
         "verified_buyers":0,"verified_open_supplier_contracts":0,
-        "selection_window_days_inclusive":3,
+        "selection_window_days_inclusive":5,
         "source_event_not_first_publication":True,
         "previously_reported_history_coverage":"ONLY_REGISTERED_LOCAL_HISTORY_AND_SEED; EXTERNAL_REPORTS_NOT_AUTOMATICALLY_SYNCED",
         "ai_research_applied_to_this_shortlist":False,
         "no_paid_calls":True,
         "no_unverified_older_project_padding":True,
         "counts":dict(counts),
-        "outputs":[GENERAL_TOP,EQUIPMENT_TOP,WATCHLIST],
+        "outputs":[GENERAL_ALL,EQUIPMENT_ALL,GENERAL_TOP,EQUIPMENT_TOP,WATCHLIST],
     }
     (root/STATUS).write_text(json.dumps(result,indent=2),encoding="utf-8")
     return result
