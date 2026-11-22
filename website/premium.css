@@ -130,3 +130,8 @@ h2 span{color:#488698}
  .preview-body .detail{grid-template-columns:41% 59%;gap:6px}
  .what-strip .strip-grid>div{font-size:9px}
 }
+
+/* ComIntel public identity; the underlying GTA Radar research engine is unchanged. */
+.brand-text strong{font-weight:850;letter-spacing:.035em}
+.brand-dot{color:#86efd1;margin-left:1px}
+.footer-brand{letter-spacing:-.045em}
