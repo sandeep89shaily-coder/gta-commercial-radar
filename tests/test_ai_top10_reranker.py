@@ -200,6 +200,65 @@ class AITopTenSelectionTests(unittest.TestCase):
                          ["choices"][0]["message"]["content"], '{"reviews":[]}')
         self.assertFalse((self.root / AI_REVIEW).exists())
 
+    def test_malformed_json_one_budgeted_repair_preserves_whole_batch(self):
+        self.write([self.row("A"), self.row("B")])
+        calls=[]
+        def transport(path, payload):
+            if path == "/v1/tools/search": return {"results":[]}
+            if path == "/v1/tools/fetch": return {"content":""}
+            self.assertEqual(path,"/chat/completions")
+            calls.append(path)
+            project=json.loads(payload["messages"][1]["content"])["projects"][0]
+            if project["project_id"]=="A" and len(calls)==1:
+                content='{"reviews": [THIS IS NOT VALID JSON'
+            else:
+                content=json.dumps({"reviews":[{
+                    "i":0, "decision":"NEUTRAL",
+                    "reason":"Investigate official exact-file notice",
+                    "investigate":"Check if plant equipment remains unawarded",
+                }]})
+            return {"choices":[{"message":{"content":content},
+                     "finish_reason":"stop"}],
+                "usage":{"prompt_tokens":500,"completion_tokens":110}}
+        result=ai_run(self.root,paid=True,key="test",today=DAY,transport=transport)
+        self.assertEqual(result["status"],"AI_TOP10_REVIEW_ONLY")
+        self.assertEqual(result["reviewed_count"],2)
+        self.assertEqual(result["paid_model_calls"],3)
+        self.assertEqual(result["recovered_json_batches"],1)
+        self.assertEqual(len(calls),3)
+        self.assertFalse(result["verified_buyers"])
+        self.assertFalse(result["verified_open_supplier_packages"])
+
+    def test_irrecoverable_json_does_not_discard_later_checkpoints(self):
+        self.write([self.row("A"),self.row("B")])
+        calls=[]
+        def send(path,payload):
+            if path=="/v1/tools/search":return {"results":[]}
+            if path=="/v1/tools/fetch":return {"content":""}
+            project=json.loads(payload["messages"][1]["content"])["projects"][0]
+            calls.append(project["project_id"])
+            content=(
+                "not JSON at all" if project["project_id"]=="A" else
+                json.dumps({"reviews":[{"i":0,"decision":"NEUTRAL",
+                    "reason":"Check actual municipal project scope",
+                    "investigate":"Confirm source and procurement stage"}]}))
+            return {"choices":[{"message":{"content":content},
+                        "finish_reason":"stop"}],
+                    "usage":{"prompt_tokens":500,"completion_tokens":110}}
+        first=ai_run(self.root,paid=True,key="test",today=DAY,transport=send)
+        self.assertEqual(first["reviewed_count"],1)
+        self.assertEqual(first["paid_model_calls"],3)
+        self.assertEqual(len(first["failed_reviews"]),1)
+        self.assertEqual(first["failed_reviews"][0]["record_id"],"A")
+        self.assertEqual(calls,["A","A","B"])
+        self.assertIn("INCOMPLETE",first["status"])
+        self.assertFalse((self.root/AI_REVIEW).exists())
+        again=ai_run(self.root,paid=True,key="test",today=DAY,
+                     transport=lambda *_:self.fail("No repeat paid calls permitted"))
+        self.assertEqual(again["paid_model_calls"],0)
+        self.assertEqual(again["reviewed_count"],1)
+        self.assertGreaterEqual(again["reused_paid_response_count"],1)
+
     def test_evidence_quote_can_reference_supplied_role_excerpt(self):
         from gta_ai_top10_reranker import _validate
         row = {"city": "Toronto", "record_id": "A"}
