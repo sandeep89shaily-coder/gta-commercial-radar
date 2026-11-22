@@ -66,7 +66,7 @@
     byId("window-label").textContent = pretty(begin, true) + " — " + pretty(today, false);
   }
   function makeCard(rec) {
-    var card = textEl("article", "op-card", "");
+    var card = textEl("article", "op-card " + rec.lane, "");
     var top = textEl("div", "op-card-top", "");
     var laneName = rec.lane === "industrial_equipment" ? "Industrial & equipment" : "Commercial development";
     top.appendChild(textEl("span", "op-card-lane " + rec.lane, laneName));
