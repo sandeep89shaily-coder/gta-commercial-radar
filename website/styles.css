@@ -152,3 +152,18 @@ h2 span{color:#789b84}
  .sample-form{padding:23px}
 }
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*:before,*:after{transition:none!important;animation:none!important}}
+
+/* Homepage invitation to the curated five-day opportunity board */
+.feed-teaser{background:#e7f2e9;padding:76px 0;border-top:1px solid #d5e6d8;border-bottom:1px solid #d5e6d8}
+.feed-teaser-grid{display:grid;grid-template-columns:1fr .76fr;gap:94px;align-items:center}
+.feed-teaser h2{font-size:clamp(39px,4vw,58px);margin:3px 0 25px}
+.feed-teaser h2 span{color:#719d7b}
+.feed-teaser p{font-size:14px;line-height:1.86;color:#587463;max-width:570px;margin:0}
+.feed-teaser-right{border:1px solid #c2dcca;border-radius:12px;background:#fff;padding:31px;box-shadow:0 12px 25px #214d2b09}
+.feed-teaser-index{font-size:10px;font-weight:850;letter-spacing:.13em;color:#4e805b}
+.feed-teaser-dates{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin:27px 0}
+.feed-teaser-dates span{height:61px;display:grid;place-items:center;background:#e7f3e7;border:1px solid #d4e9d7;border-radius:4px;color:#528265;font-size:14px;font-weight:800}
+.feed-teaser-dates span:last-child{background:#1d5237;color:#e8f9ea;border-color:#1d5237}
+.feed-teaser-right p{font-size:12px;margin-bottom:26px}
+.feed-teaser-right .btn{width:100%;justify-content:space-between}
+@media(max-width:760px){.feed-teaser{padding:60px 0}.feed-teaser-grid{grid-template-columns:1fr;gap:30px}.feed-teaser-right{padding:24px}.feed-teaser-dates span{height:48px}}

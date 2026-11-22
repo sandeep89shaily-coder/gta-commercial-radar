@@ -22,12 +22,21 @@ jobs:
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
-      - name: Validate static website assets
-        run: python3 -m unittest discover -s tests -p test_marketing_website.py
+      - name: Validate static website assets and approved five-day public feed
+        run: |
+          python3 -m unittest discover -s tests -p test_marketing_website.py
+          python3 -m unittest discover -s tests -p test_public_opportunities_website.py
+          python3 website/validate_public_feed.py
+      - name: Assemble public assets without the local editorial publisher
+        run: |
+          mkdir -p _site/data
+          cp website/index.html website/styles.css website/app.js _site/
+          cp website/opportunities.html website/opportunities.css website/opportunities.js _site/
+          cp website/data/opportunities.json _site/data/
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: website
+          path: _site
       - name: Deploy to GitHub Pages
         id: deploy
         uses: actions/deploy-pages@v4
