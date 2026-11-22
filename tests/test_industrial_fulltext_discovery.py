@@ -188,6 +188,30 @@ class FullTextTests(unittest.TestCase):
             self.assertEqual(data["older_watchlist"],0)
             self.assertEqual(data["sources"]["MARTINREA"]["not_equipment_evidence"],1)
 
+    def test_manufacturer_not_starved_by_feddev_archive(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d)
+            index={"FEDDEV_GOVERNMENT_WIDE_ATOM":GOVERNMENT_ATOM,
+                   "LINAMAR":"https://www.linamar.com/news-listings/"}
+            result=run(root,today="2026-11-21",max_articles=1,
+                indexes=index,fetcher=lambda u:(
+                    ATOM if u==GOVERNMENT_ATOM else
+                    LINAMAR_INDEX if u==index["LINAMAR"] else
+                    LINAMAR if u=="https://www.linamar.com/news/guelph-industrial-robotic-expansion/" else
+                    FEDDEV))
+            self.assertEqual(result["articles_requested"],1)
+            self.assertTrue(result["publisher_round_robin_retrieval"])
+            self.assertEqual(result["sources"]["LINAMAR"]["articles_ok"],1)
+            self.assertEqual(result["sources"]["FEDDEV_GOVERNMENT_WIDE_ATOM"]["articles_ok"],0)
+            self.assertEqual(result["recent_dated_research"],1)
+
+    def test_official_news_archive_targets(self):
+        from gta_industrial_fulltext_discovery import INDEXES
+        self.assertEqual(INDEXES["INVEST_ONTARIO"],
+                         "https://www.investontario.ca/press-room")
+        self.assertEqual(INDEXES["MARTINREA"],
+                         "https://www.martinrea.com/category/news-release/")
+
     def test_failed_source_does_not_erase_historical_ledger(self):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d);url="https://www.linamar.com/news-listings/"
