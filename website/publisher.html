@@ -58,10 +58,10 @@
   <main id="publisher" class="wrap publisher">
     <span class="section-number">PRIVATE EDITORIAL WORKFLOW</span>
     <h1>Curate today's<br><em>opportunities.</em></h1>
-    <p class="pub-intro">Review Radar's two five-day CSV exports, choose which records are suitable for public publication, and generate a single JSON feed. Everything on this page runs in your browser. No file uploads to a server, no automatic publication, and no emails.</p>
+    <p class="pub-intro">Review ComIntel's two five-day CSV exports, choose which records are suitable for public publication, and generate a single JSON feed. Everything on this page runs in your browser. No file uploads to a server, no automatic publication, and no emails.</p>
     <p class="pub-status" id="pub-status" role="status" aria-live="polite">Choose your CSV exports to begin. No records are pre-approved.</p>
     <div class="pub-steps">
-      <section class="pub-card"><b>01 / Commercial projects</b><label for="pub-general">Five-day general research CSV<input id="pub-general" type="file" accept=".csv,text/csv"></label><p>Choose <code>GTA_RADAR_FRESH_GENERAL_RESEARCH_ALL.csv</code> from today's Radar ZIP.</p></section>
+      <section class="pub-card"><b>01 / Commercial projects</b><label for="pub-general">Five-day general research CSV<input id="pub-general" type="file" accept=".csv,text/csv"></label><p>Choose <code>GTA_RADAR_FRESH_GENERAL_RESEARCH_ALL.csv</code> from today's ComIntel research archive.</p></section>
       <section class="pub-card"><b>02 / Industrial equipment</b><label for="pub-equipment">Five-day equipment research CSV<input id="pub-equipment" type="file" accept=".csv,text/csv"></label><p>Choose <code>GTA_RADAR_FRESH_EQUIPMENT_RESEARCH_ALL.csv</code>. You can use either file or both.</p></section>
       <section class="pub-card"><b>03 / Editorial date</b><label for="pub-date">Issue date (Ontario)<input id="pub-date" type="date"></label><p>Only records whose source-event date falls within this date and the four preceding calendar days are eligible.</p></section>
     </div>
@@ -72,7 +72,7 @@
       <label class="pub-confirm"><input type="checkbox" id="pub-confirm"><span>I have manually checked the original source, dates, accuracy and relevant publication/reuse rights for every selected record. I understand these are research candidates, not verified open tenders, buyers or supplier contracts.</span></label>
     </section>
     <div class="pub-actions"><button type="button" id="pub-export" class="pub-btn" disabled>Download approved opportunities.json</button></div>
-    <p class="pub-note"><strong>How publishing works:</strong> This tool creates a file on your computer; it cannot change the live website. After downloading, replace <code>website/data/opportunities.json</code> in the GitHub repository with the reviewed file, commit the change, and manually run the existing <strong>Deploy ComIntel marketing website</strong> workflow. Never publish an unreviewed Radar export directly. Publishing a record does not establish its original announcement date or open purchasing status.</p>
+    <p class="pub-note"><strong>How publishing works:</strong> This tool creates a file on your computer; it cannot change the live website. After downloading, replace <code>website/data/opportunities.json</code> in the GitHub repository with the reviewed file, commit the change, and manually run the existing <strong>Deploy ComIntel marketing website</strong> workflow. Never publish an unreviewed research export directly. Publishing a record does not establish its original announcement date or open purchasing status.</p>
   </main>
 </body>
 </html>
