@@ -134,7 +134,7 @@ def candidates(results, *, limit=MAX_REVIEW, today=None, universe=24):
     has no genuinely eligible source files. Use at most 6 per city.
     """
     root = Path(results)
-    queue = QUEUE if universe == 24 else "GTA_RADAR_COMBINED_28_CITY_RESEARCH_QUEUE.csv"
+    queue = f"GTA_RADAR_COMBINED_{universe}_CITY_RESEARCH_QUEUE.csv"
     if not (root/queue).is_file():
         raise ValueError("COMBINED_RESEARCH_QUEUE_MISSING")
     rows = _read(root, queue)
@@ -169,7 +169,8 @@ def candidates(results, *, limit=MAX_REVIEW, today=None, universe=24):
         x["city"], x["record_id"]))
     selected, used, city_counts = [], set(), Counter()
     cap = min(max(0, int(limit)), MAX_REVIEW)
-    for cohort in (("ADDED_4", "EXPANSION_8", "CORE_16") if universe == 28
+    for cohort in (("WEST_3", "ADDED_4", "EXPANSION_8", "CORE_16") if universe == 31
+                   else ("ADDED_4", "EXPANSION_8", "CORE_16") if universe == 28
                    else ("EXPANSION_8", "CORE_16")):
         count = 0
         for row in models:
@@ -193,10 +194,10 @@ def candidates(results, *, limit=MAX_REVIEW, today=None, universe=24):
 def finalize(results, *, state=None, pool=None, today=None, universe=24):
     root = Path(results)
     day = today or dt.date.today()
-    queue = QUEUE if universe == 24 else "GTA_RADAR_COMBINED_28_CITY_RESEARCH_QUEUE.csv"
-    base_top = BASE_TOP10 if universe == 24 else "GTA_RADAR_COMBINED_28_CITY_RESEARCH_TOP10.csv"
-    final_top = FINAL_TOP10 if universe == 24 else "GTA_RADAR_COMBINED_28_CITY_TOP10.csv"
-    final_status = FINAL_STATUS if universe == 24 else "GTA_RADAR_COMBINED_28_CITY_AI_TOP10_STATUS.json"
+    queue = f"GTA_RADAR_COMBINED_{universe}_CITY_RESEARCH_QUEUE.csv"
+    base_top = f"GTA_RADAR_COMBINED_{universe}_CITY_RESEARCH_TOP10.csv"
+    final_top = f"GTA_RADAR_COMBINED_{universe}_CITY_TOP10.csv"
+    final_status = f"GTA_RADAR_COMBINED_{universe}_CITY_AI_TOP10_STATUS.json"
     inputs = _read(root, queue)
     deterministic = _read(root, base_top)
     if not (root/queue).is_file() or not (root/base_top).is_file():
@@ -295,7 +296,7 @@ def finalize(results, *, state=None, pool=None, today=None, universe=24):
         "model_reviewed_count": state.get("reviewed_count",0),
         "model_attempt_status":state.get("status","NO_AI_RESPONSE"),
         "model_decisions_applied": matched,
-        "model_research_scope":("COMBINED_28" if universe == 28 else "COMBINED_16_PLUS_8"),
+        "model_research_scope":("COMBINED_31" if universe == 31 else "COMBINED_28" if universe == 28 else "COMBINED_16_PLUS_8"),
         "top10_count":len(output),
         "ai_rejected_or_held_count": (
             sum(x.get("decision") in ("DEPRIORITIZE", "CHECK_CONFLICT")
@@ -315,13 +316,12 @@ def finalize(results, *, state=None, pool=None, today=None, universe=24):
     }
     (root/final_status).write_text(json.dumps(summary,indent=2),
                                    encoding="utf-8")
-    combined_status_path = root / ("GTA_RADAR_COMBINED_28_CITY_STATUS.json"
-        if universe == 28 else "GTA_RADAR_COMBINED_24_CITY_STATUS.json")
+    combined_status_path = root / f"GTA_RADAR_COMBINED_{universe}_CITY_STATUS.json"
     try:
         combined = json.loads(combined_status_path.read_text(encoding="utf-8"))
         if isinstance(combined, dict) and combined.get("configured_city_count")==universe:
             combined.update({
-                "paid_ai_review_scope":("COMBINED_28" if universe == 28 else "COMBINED_16_PLUS_8"),
+                "paid_ai_review_scope":("COMBINED_31" if universe == 31 else "COMBINED_28" if universe == 28 else "COMBINED_16_PLUS_8"),
                 "standard_paid_ai_top10_already_runs_in_upstream_daily_stage":False,
                 "standard_paid_ai_top10_includes_expansion":matched,
                 "combined_model_decisions_applied":matched,

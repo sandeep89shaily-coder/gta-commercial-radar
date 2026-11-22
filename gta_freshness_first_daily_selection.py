@@ -302,6 +302,23 @@ def run(results, *, today=None):
             freshness_class="FUNDING_AGREEMENT_WATCHLIST_NOT_NEW_EQUIPMENT_DISCLOSURE",
             decision="RESEARCH_ONLY",
             next_verification_action="Find independent current equipment procurement or official announcement; agreement date is not publication."))
+    # Audited recipient research belongs ONLY in the historical equipment watchlist.
+    # Recipients are not fresh because the importer ran today; do not invent
+    # supplier awards, verified buyer roles or independent procurement checks.
+    for r in _read(root/"GTA_RADAR_FEDDEV_RECIPIENT_EQUIPMENT_WATCHLIST.csv"):
+        counts["feddev_historical_recipients"] += 1
+        older.append(_base(lane="EQUIPMENT_INTELLIGENCE",
+            city=r.get("city", ""),
+            project_or_company=r.get("company", ""),
+            scope=r.get("scope", ""),
+            source_event_date=r.get("source_date", ""),
+            source_event_date_basis="FEDDEV_BACKGROUND_PUBLICATION_NOT_NEW_PURCHASE",
+            company_source_claim=r.get("company", ""),
+            source_url=_url(r.get("official_backgrounder_url", "")),
+            freshness_class="HISTORICAL_FEDDEV_RECIPIENT_WATCHLIST",
+            decision="PROCUREMENT_NOT_VERIFIED_RESEARCH_ONLY",
+            next_verification_action=r.get("next_action", "") or
+                "Find independently dated equipment purchase/award and purchasing authority."))
     # Prefer first observations to material changes. Never pad with old projects.
     recent_general.sort(key=lambda r:(
         0 if r["observation"]=="FIRST_OBSERVED" else 1,
