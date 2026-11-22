@@ -284,6 +284,9 @@ def run(results, *, paid=False, deep_research=False, deep_project_limit=4,
         "verified_buyers": 0, "verified_open_supplier_packages": 0,
         "budget_cap_usd": DEEPSEEK_DAILY_LIMIT_USD,
         "reviews": [],
+        "failed_reviews": [],
+        "recovered_json_batches": 0,
+        "reused_paid_response_count": 0,
         "model_directed_research": [],
         "partial_source_checks": [],
         "source_evidence_incomplete": False,
@@ -434,47 +437,139 @@ def run(results, *, paid=False, deep_research=False, deep_project_limit=4,
                     status = "INVALID_EXISTING_REVIEW_NO_AUTOMATIC_RETRY"
                     break
                 payload = _payload(batch, live_checks)
-                if not native.ledger_claim(db, day.isoformat(), claim,
-                                           MODEL_RESERVE, legacy,
-                                           daily_limit=DEEPSEEK_DAILY_LIMIT_USD):
-                    status = "LOCAL_BUDGET_OR_EXISTING_RESERVATION_BLOCKED"
-                    break
-                try:
-                    response = native.request("/chat/completions", payload, token, transport)
-                except native.DeepSeekAccountBalanceError:
-                    native.ledger_finish(db, day.isoformat(), claim, "NONBILLABLE")
-                    status = "PROVIDER_HTTP_402_ACCOUNT_BALANCE"
-                    break
-                except Exception as exc:
-                    native.ledger_finish(db, day.isoformat(), claim, "UNKNOWN")
-                    status = "MODEL_REQUEST_UNKNOWN_CHARGE_" + type(exc).__name__
-                    break
-                # A request may have incurred tokens even if output cannot be
-                # parsed. Record provider-reported usage estimate, never fake $0.
-                cost = native.model_usage_cost(
-                    response.get("usage") or {} if isinstance(response, dict) else {})
-                if cost is None:
-                    native.ledger_finish(db, day.isoformat(), claim, "UNKNOWN")
-                    status = "MODEL_USAGE_MISSING_FULL_RESERVATION_HELD"
-                    break
-                native.ledger_finish(db, day.isoformat(), claim, "DONE", cost)
-                state["paid_model_calls"] += 1
-                # Preserve the exact paid response for local offline diagnosis.
-                # Do not automatically retry a request that may already be billed.
+                # Charged replies are immutable checkpoints. On restart,
+                # reuse a saved raw reply instead of repeating a paid call.
                 raw_path = review_root / (claim + ".raw_response.json")
-                raw_tmp = raw_path.with_suffix(".json.tmp")
-                raw_tmp.write_text(
-                    json.dumps(response, ensure_ascii=False, indent=2),
-                    encoding="utf-8")
-                raw_tmp.replace(raw_path)
+                response = None
+                if raw_path.is_file():
+                    try:
+                        if raw_path.stat().st_size > 200_000:
+                            raise ValueError("RAW_REPLY_OVERSIZED")
+                        response = json.loads(raw_path.read_text(encoding="utf-8"))
+                        state["reused_paid_response_count"] += 1
+                    except (OSError, ValueError, TypeError):
+                        status = "INVALID_SAVED_RAW_REPLY_HELD"
+                        state["failed_reviews"].append({
+                            "record_id": batch[0]["record_id"],
+                            "reason": status})
+                        continue
+                else:
+                    if not native.ledger_claim(db, day.isoformat(), claim,
+                                               MODEL_RESERVE, legacy,
+                                               daily_limit=DEEPSEEK_DAILY_LIMIT_USD):
+                        status = "LOCAL_BUDGET_OR_EXISTING_RESERVATION_BLOCKED"
+                        break
+                    try:
+                        response = native.request("/chat/completions", payload, token, transport)
+                    except native.DeepSeekAccountBalanceError:
+                        native.ledger_finish(db, day.isoformat(), claim, "NONBILLABLE")
+                        status = "PROVIDER_HTTP_402_ACCOUNT_BALANCE"
+                        break
+                    except Exception as exc:
+                        native.ledger_finish(db, day.isoformat(), claim, "UNKNOWN")
+                        status = "MODEL_REQUEST_UNKNOWN_CHARGE_" + type(exc).__name__
+                        break
+                    # A syntactically invalid model reply can still be billed.
+                    # Record its usage and raw bytes before attempting repair.
+                    cost = native.model_usage_cost(
+                        response.get("usage") or {} if isinstance(response, dict) else {})
+                    if cost is None:
+                        native.ledger_finish(db, day.isoformat(), claim, "UNKNOWN")
+                        status = "MODEL_USAGE_MISSING_FULL_RESERVATION_HELD"
+                        break
+                    native.ledger_finish(db, day.isoformat(), claim, "DONE", cost)
+                    state["paid_model_calls"] += 1
+                    raw_tmp = raw_path.with_suffix(".json.tmp")
+                    raw_tmp.write_text(json.dumps(response, ensure_ascii=False, indent=2),
+                                       encoding="utf-8")
+                    raw_tmp.replace(raw_path)
                 try:
                     parsed = _validate(response, len(batch), batch, live_checks)
-                except (ValueError, TypeError, AttributeError) as exc:
-                    status = "AI_REVIEW_INVALID_" + type(exc).__name__
-                    state["failed_project_id"] = batch[0]["record_id"]
-                    state["validation_error"] = _safe_text(exc, 180)
-                    state["failed_response_file"] = str(raw_path)
-                    break
+                except (ValueError, TypeError, AttributeError) as initial_exc:
+                    # One separately budgeted, separately checkpointed repair
+                    # attempt. Never resend an already billed request after
+                    # a crash. Corrected replies face the SAME citation checks.
+                    repair_claim = claim + "_json_repair_v1"
+                    repair_path = review_root / (repair_claim + ".raw_response.json")
+                    repair_response = None
+                    repair_reason = "NO_REPAIR_REPLY"
+                    if repair_path.is_file():
+                        try:
+                            if repair_path.stat().st_size > 200_000:
+                                raise ValueError("REPAIR_REPLY_OVERSIZED")
+                            repair_response = json.loads(
+                                repair_path.read_text(encoding="utf-8"))
+                            state["reused_paid_response_count"] += 1
+                        except (OSError, ValueError, TypeError):
+                            repair_reason = "INVALID_SAVED_REPAIR_REPLY"
+                    elif native.ledger_claim(
+                            db, day.isoformat(), repair_claim,
+                            MODEL_RESERVE, legacy,
+                            daily_limit=DEEPSEEK_DAILY_LIMIT_USD):
+                        repair_payload = json.loads(json.dumps(payload))
+                        repair_payload["messages"][0]["content"] += (
+                            " IMPORTANT JSON-REPAIR PASS: your prior response "
+                            "failed strict parsing or schema validation. "
+                            "Return exactly one valid JSON object with a "
+                            "reviews array and each required field. "
+                            "No markdown, commentary or fabricated evidence.")
+                        try:
+                            repair_response = native.request(
+                                "/chat/completions", repair_payload, token, transport)
+                        except native.DeepSeekAccountBalanceError:
+                            native.ledger_finish(db, day.isoformat(),
+                                                 repair_claim, "NONBILLABLE")
+                            status = "PROVIDER_HTTP_402_ACCOUNT_BALANCE"
+                            break
+                        except Exception as exc:
+                            native.ledger_finish(db, day.isoformat(),
+                                                 repair_claim, "UNKNOWN")
+                            repair_reason = "REPAIR_REQUEST_UNKNOWN_CHARGE_" + type(exc).__name__
+                        else:
+                            repair_cost = native.model_usage_cost(
+                                repair_response.get("usage") or {}
+                                if isinstance(repair_response, dict) else {})
+                            if repair_cost is None:
+                                native.ledger_finish(db, day.isoformat(),
+                                                     repair_claim, "UNKNOWN")
+                                repair_reason = "REPAIR_USAGE_MISSING"
+                                repair_response = None
+                            else:
+                                native.ledger_finish(db, day.isoformat(),
+                                                     repair_claim, "DONE", repair_cost)
+                                state["paid_model_calls"] += 1
+                                repair_tmp = repair_path.with_suffix(".json.tmp")
+                                repair_tmp.write_text(
+                                    json.dumps(repair_response, ensure_ascii=False, indent=2),
+                                    encoding="utf-8")
+                                repair_tmp.replace(repair_path)
+                    else:
+                        repair_reason = "REPAIR_BUDGET_OR_LEDGER_HELD"
+                    if repair_response is not None:
+                        try:
+                            parsed = _validate(repair_response, len(batch),
+                                               batch, live_checks)
+                            state["recovered_json_batches"] += 1
+                        except (ValueError, TypeError, AttributeError) as repair_exc:
+                            repair_reason = type(repair_exc).__name__ + ":" + str(repair_exc)[:130]
+                            parsed = None
+                    else:
+                        parsed = None
+                    if parsed is None:
+                        status = "AI_REVIEW_INVALID_" + type(initial_exc).__name__
+                        state["failed_project_id"] = batch[0]["record_id"]
+                        state["validation_error"] = _safe_text(initial_exc, 180)
+                        state["failed_response_file"] = str(raw_path)
+                        state["failed_reviews"].append({
+                            "record_id": batch[0]["record_id"],
+                            "error": state["validation_error"],
+                            "repair_status": repair_reason,
+                            "raw_response_file": str(raw_path)})
+                        # Do not discard the successful projects after one
+                        # malformed response. The final AI ranking stays held
+                        # until every project has a valid review.
+                        save_attempt()
+                        continue
                 accepted = []
                 for i, row in enumerate(batch):
                     rec = parsed[i]
