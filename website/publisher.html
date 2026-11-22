@@ -27,7 +27,7 @@
     .pub-review{background:white;border:1px solid #d9e5dc;border-radius:10px;overflow:hidden}
     .pub-review-head{display:flex;align-items:center;justify-content:space-between;gap:15px;padding:20px 22px;border-bottom:1px solid #e0e8e0}
     .pub-review-head h2{font-size:21px;margin:0}
-    .pub-review-head p{color:#647f6d;font-size:12px;margin:0}
+    .pub-review-head p{color:#647f6d;font-size:12px;margin:0}.pub-target-hint{font-size:11px!important;color:#3b7665!important;max-width:300px;line-height:1.5}
     .pub-rows{max-height:510px;overflow:auto}
     .pub-row{display:grid;grid-template-columns:40px 1fr 145px;gap:14px;align-items:start;padding:18px 21px;border-bottom:1px solid #e8eee8}
     .pub-row:last-child{border:0}
@@ -67,7 +67,7 @@
     </div>
     <div class="pub-actions"><button type="button" id="pub-load" class="pub-btn">Review selected CSVs</button><button type="button" id="pub-select-none" class="pub-btn secondary">Clear selections</button></div>
     <section class="pub-review" aria-labelledby="review-title">
-      <div class="pub-review-head"><h2 id="review-title">Approval worklist</h2><p id="pub-counts">No files loaded</p></div>
+      <div class="pub-review-head"><h2 id="review-title">Approval worklist</h2><p id="pub-counts">No files loaded</p><p id="pub-target-hint" class="pub-target-hint" aria-live="polite">Target: 15–20 distinct, reviewed research signals when adequate evidence is available.</p></div>
       <div id="pub-rows" class="pub-rows"><div class="pub-row"><div></div><div><strong>Nothing loaded yet.</strong><span class="detail">Select your five-day CSV files above.</span></div></div></div>
       <label class="pub-confirm"><input type="checkbox" id="pub-confirm"><span>I have manually checked the original source, dates, accuracy and relevant publication/reuse rights for every selected record. I understand these are research candidates, not verified open tenders, buyers or supplier contracts.</span></label>
     </section>
