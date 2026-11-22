@@ -42,7 +42,8 @@ FEEDS=(
  ("GTA_RADAR_VAUGHAN_OFFICIAL_NOTICES_NEW_OR_CHANGED.csv","VAUGHAN_NOTICES"),
  ("GTA_RADAR_MARKHAM_CIRCULATION_CHANGES.csv","MARKHAM_CIRCULATION"),
  ("GTA_RADAR_NORTHERN_MAJOR_CITY_SOURCE_CHANGES.csv","NORTHERN_MAJOR"),
- ("GTA_RADAR_TORONTO_OPEN_DATA_CHANGES.csv","TORONTO_OPEN_DATA"),
+ # Toronto remains served by the canonical daily permit feed; do not import
+ # legacy Toronto CKAN changes dated weeks ago as current-day observations.
 )
 FIELDS=("observation","first_seen_local","last_seen_local","project_id","address",
         "city","source_id","source_keys","lane","description","event_date",
