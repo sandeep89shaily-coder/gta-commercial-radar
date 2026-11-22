@@ -228,6 +228,18 @@ class AITopTenSelectionTests(unittest.TestCase):
         self.assertEqual(len(calls),3)
         self.assertFalse(result["verified_buyers"])
         self.assertFalse(result["verified_open_supplier_packages"])
+        # Simulate power loss after the paid replies were checkpointed but
+        # before their validated project summaries were saved.
+        snapshots=[p for p in (self.root/"AI_TOP10_REVIEW_BATCHES").glob("*.json")
+                   if not p.name.endswith(".raw_response.json")]
+        self.assertEqual(len(snapshots),2)
+        for path in snapshots:path.unlink()
+        again=ai_run(self.root,paid=True,key="test",today=DAY,
+                     transport=lambda *_:self.fail("Paid reply must be reused"))
+        self.assertEqual(again["reviewed_count"],2)
+        self.assertEqual(again["paid_model_calls"],0)
+        self.assertGreaterEqual(again["reused_paid_response_count"],3)
+        self.assertEqual(again["recovered_json_batches"],1)
 
     def test_irrecoverable_json_does_not_discard_later_checkpoints(self):
         self.write([self.row("A"),self.row("B")])
