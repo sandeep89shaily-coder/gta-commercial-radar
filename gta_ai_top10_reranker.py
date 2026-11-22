@@ -483,6 +483,11 @@ def run(results, *, paid=False, deep_research=False, deep_project_limit=4,
                     raw_tmp.write_text(json.dumps(response, ensure_ascii=False, indent=2),
                                        encoding="utf-8")
                     raw_tmp.replace(raw_path)
+                # Snapshot estimated total billed usage, including replies
+                # loaded after a crash; no undefined cost on restart.
+                estimated_review_cost = native.model_usage_cost(
+                    response.get("usage") or {} if isinstance(response,dict) else {}
+                ) or 0.0
                 try:
                     parsed = _validate(response, len(batch), batch, live_checks)
                 except (ValueError, TypeError, AttributeError) as initial_exc:
@@ -549,6 +554,10 @@ def run(results, *, paid=False, deep_research=False, deep_project_limit=4,
                         try:
                             parsed = _validate(repair_response, len(batch),
                                                batch, live_checks)
+                            estimated_review_cost += (
+                                native.model_usage_cost(repair_response.get("usage") or {})
+                                if isinstance(repair_response,dict) else 0.0
+                            ) or 0.0
                             state["recovered_json_batches"] += 1
                         except (ValueError, TypeError, AttributeError) as repair_exc:
                             repair_reason = type(repair_exc).__name__ + ":" + str(repair_exc)[:130]
@@ -609,7 +618,7 @@ def run(results, *, paid=False, deep_research=False, deep_project_limit=4,
                     "evidence_fingerprint": evidence_fingerprint,
                     "recheck_date": day.isoformat(),
                     "source_snapshot_only": False, "reviews": accepted,
-                    "cost_estimate_not_provider_invoice_usd": round(cost, 8),
+                    "cost_estimate_not_provider_invoice_usd": round(estimated_review_cost, 8),
                 }
                 immutable.write_text(
                     json.dumps(snapshot, ensure_ascii=False, indent=2),
