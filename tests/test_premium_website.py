@@ -53,7 +53,8 @@ class PremiumSiteTests(unittest.TestCase):
         self.assertIn("ILLUSTRATIVE", text)
         self.assertTrue(all((SITE / x).is_file() for x in parsed.assets))
         feed = json.loads((SITE / "data" / "opportunities.json").read_text())
-        self.assertEqual(feed["records"], [])
+        self.assertGreater(len(feed["records"]), 0)
+        self.assertTrue(all(rec["approved_for_publication"] for rec in feed["records"]))
 
     def test_premium_css_responsive_and_no_external_assets(self):
         for name in ("premium.css", "premium-opportunities.css"):
