@@ -91,6 +91,31 @@ class FedDevForty(unittest.TestCase):
             self.assertEqual(row["article_retrieval_status"],"FAILED_OSError")
             self.assertEqual(row["published_in_last_7_days"],"UNKNOWN")
 
+    def test_generic_grant_and_press_secretary_not_machinery(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d)
+            feed_url=INDEXES["FEDDEV_OFFICIAL_2026_ARCHIVE"]
+            release=("https://www.canada.ca/en/economic-development-southern-ontario/"
+                     "news/2026/11/entrepreneurship-program.html")
+            atom=('<feed xmlns="http://www.w3.org/2005/Atom"><entry>'
+                  '<title>Government supports Black entrepreneurship</title>'
+                  '<link href="'+release+'" /></entry></feed>').encode()
+            article=(b'<html><head><meta property="article:published_time" '
+                     b'content="2026-11-20"/></head><body><h1>Funding programme</h1>'
+                     b'<article>Government of Canada invests in expanded '
+                     b'business entrepreneurship support and helps eligible '
+                     b'businesses apply for regional grants, training and '
+                     b'programming; this is not a plant equipment investment.'
+                     b'</article><footer>Contacts: Press Secretary, Office '
+                     b'of the Minister</footer></body></html>')
+            result=run(root,today="2026-11-22",fetcher=lambda url:
+                       atom if url==feed_url else article)
+            record=csvrows(root/REPORT)[0]
+            self.assertEqual(record["equipment_explicit"],"False")
+            self.assertEqual(record["manufacturing_expansion_explicit"],"False")
+            selected=select(root,today="2026-11-22")
+            self.assertEqual(selected["equipment_top10_count"],0)
+
     def test_enforces_bound(self):
         with tempfile.TemporaryDirectory() as d:
             with self.assertRaises(ValueError):
