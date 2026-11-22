@@ -125,9 +125,12 @@ def prepare(results, *, today=None):
                 reason="INSUFFICIENT_INDUSTRIAL_COMMERCIAL_SCOPE"
             elif lane=="GENERAL_COMMERCIAL" and not address:
                 reason="MISSING_PROJECT_ADDRESS"
-            elif HOLD_STAGE.search(stage) or str(r.get("decision") or "").upper() in (
+            elif (HOLD_STAGE.search(stage) or any(flag in stage.upper() for flag in
+                    ("COMPLETED_", "ALREADY_AWARDED", "SUPPLIER_SELECTED",
+                     "OPERATIONAL_", "CANCELLED_", "WITHDRAWN_", "CLOSED_"))
+                    or str(r.get("decision") or "").upper() in (
                     "RESEARCH_ONLY_COMPLETED_STAGE",
-                    "COMPLETED_OR_AWARDED_RESEARCH_ONLY"):
+                    "COMPLETED_OR_AWARDED_RESEARCH_ONLY")):
                 reason="COMPLETED_OR_AWARDED_NOT_CURRENT_PROCUREMENT"
             elif project_id in seen:
                 reason="DUPLICATE_PROJECT_SOURCE"
