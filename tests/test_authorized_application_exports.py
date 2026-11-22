@@ -56,8 +56,8 @@ class AuthorizedExportTests(unittest.TestCase):
                 ("Brampton","https://geohub.brampton.ca/datasets/brampton::pre-consultation-2/about"),
                 ("Mississauga","https://data.mississauga.ca/datasets/85536f145719436ebde8d31f36d11d83_0/about"),
             ):
-                contents=("FILE,ADDRESS,SCOPE\\n"
-                          "SP-26-77,10 Test Road,Industrial development application\\n")
+                contents=("FILE,ADDRESS,SCOPE\n"
+                          "SP-26-77,10 Test Road,Industrial development application\n")
                 local=folder/(city.lower()+".csv")
                 local.write_text(contents,encoding="utf-8")
                 exports.append({
