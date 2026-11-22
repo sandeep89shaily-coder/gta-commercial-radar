@@ -67,6 +67,9 @@ def stages(workspace, results, *, industrial_limit=10, skip_collection=False):
         # separate bounded lane; no shared 18-article discovery starvation.
         ("feddev_all40_evidence",
          ["gta_feddev_all40_audit.py","--results",out,"--limit","40"],False),
+        # Preserve the audited 78 recipient projects as an evidence-only watchlist.
+        ("feddev_recipient_evidence_import",
+         ["gta_feddev_recipient_import.py", "--results", out], False),
         # Consolidate official ERO equipment notices with independently
         # cited industrial investment announcements: offline, zero extra spend.
         ("equipment_commercial_index",
