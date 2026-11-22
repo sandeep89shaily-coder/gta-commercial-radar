@@ -11,7 +11,7 @@ import json
 from pathlib import Path
 from urllib.parse import urlsplit
 
-CITIES = ("Burlington", "Vaughan", "Kitchener")
+CITIES = ("Burlington", "Vaughan", "Kitchener", "Brampton", "Mississauga")
 MAX_SIZE = 30_000_000
 OUTPUT = "GTA_RADAR_AUTHORIZED_EXPORT_IMPORT_STATUS.json"
 
@@ -23,6 +23,8 @@ def _official(city, url):
             "Kitchener": ("kitchener.ca", "open-kitchenergis.opendata.arcgis.com"),
             "Vaughan": ("vaughan.ca",),
             "Burlington": ("burlington.ca",),
+            "Brampton": ("brampton.ca",),
+            "Mississauga": ("mississauga.ca",),
         }[city]
         return (p.scheme == "https" and not p.username and not p.password and
                 any(host == domain or host.endswith("." + domain)
@@ -42,7 +44,7 @@ def load(root):
                 raise ValueError("OVERSIZE_MANIFEST")
             config = json.loads(manifest_path.read_text(encoding="utf-8"))
             sources = config.get("exports", []) if isinstance(config, dict) else []
-            if not isinstance(sources, list) or len(sources) > 3:
+            if not isinstance(sources, list) or len(sources) > 5:
                 raise ValueError("INVALID_EXPORT_MANIFEST")
         except (ValueError, OSError, UnicodeError):
             sources = []
@@ -61,6 +63,17 @@ def load(root):
                     not path.is_file() or path.is_symlink() or
                     not 0 < path.stat().st_size <= MAX_SIZE):
                 continue
+            # Both City datasets may be publicly viewable while their terms
+            # differ. Do not use an operator-supplied file for commercial
+            # intelligence until the dataset-specific reuse authorization is
+            # affirmatively documented; a checked checkbox alone is not proof.
+            if city in ("Brampton", "Mississauga"):
+                licence=str(entry.get("dataset_licence") or "").strip()
+                proof=str(entry.get("licence_or_permission_url") or "").strip()
+                if (not entry.get("commercial_reuse_permission_confirmed")
+                        or not licence or not _official(city,proof)):
+                    item["status"]="HELD_DATASET_SPECIFIC_REUSE_NOT_DOCUMENTED"
+                    continue
             content = path.read_bytes()
             if hashlib.sha256(content).hexdigest() != entry.get("sha256"):
                 item["status"] = "HELD_FILE_HASH_MISMATCH"
