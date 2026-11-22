@@ -24,7 +24,7 @@ def test_actual_full_run_pdf_audit_is_examined(tmp_path):
         w.writeheader()
         w.writerow({"url":url,"status":"CAPTURED",
             "sha256":hashlib.sha256(pdf.read_bytes()).hexdigest(),
-            "saved_path":r"C:\\Radar\\GTA_RADAR_RESULTS\\TOTAL_INTELLIGENCE_REVIEW\\MEETING_DOCUMENTS\\Toronto\\pdfs\\example.pdf"})
+            "saved_path":"GTA_RADAR_RESULTS/TOTAL_INTELLIGENCE_REVIEW/MEETING_DOCUMENTS/Toronto/pdfs/example.pdf"})
     result=review(tmp_path)
     assert result["captured_official_pdfs_inspected"]==1
     assert result["documents"][0]["city"]=="Toronto"
