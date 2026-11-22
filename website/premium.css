@@ -36,7 +36,7 @@ body{background:#f5f8fc;color:#162c3e}
 .hero-proof-row span{font-size:8px;line-height:1.55;color:#9fc5d4;letter-spacing:.09em;font-weight:750}
 .hero .source-row{border-top:0;padding-top:0;color:#a5c8d6;gap:16px;font-size:10px}
 .hero .source-row i{background:#173f49;color:#8cf3cf}
-.preview-wrap{height:635px;position:relative;padding:0;isolation:isolate}
+.preview-wrap{height:745px;position:relative;padding:0;isolation:isolate}
 .radar-console{position:absolute;inset:0 0 auto 0;height:382px;border:1px solid #3a6785;border-radius:16px;background:linear-gradient(150deg,#0f2a47,#092039 72%,#153a4d);box-shadow:0 30px 75px #031018ab, inset 0 1px 0 #e0ffff18;overflow:hidden}
 .radar-console:after{content:"";position:absolute;inset:42px 0 42px;background:repeating-linear-gradient(90deg,transparent 0,transparent 48px,#8dc5ed0b 49px),repeating-linear-gradient(0deg,transparent 0,transparent 48px,#8dc5ed0b 49px);pointer-events:none}
 .radar-console-bar{display:flex;justify-content:space-between;gap:15px;align-items:center;color:#b8deef;font-size:9px;font-weight:780;letter-spacing:.08em;border-bottom:1px solid #345672;background:#081a2e78;padding:17px 19px;position:relative;z-index:2}
