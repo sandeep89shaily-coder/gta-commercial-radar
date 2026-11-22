@@ -127,6 +127,19 @@ class PublicOpportunityWebsite(unittest.TestCase):
         self.assertNotIn("localStorage", script)
         self.assertNotIn("innerHTML", script)
 
+    def test_both_browser_scripts_parse_in_node_when_available(self):
+        import shutil
+        import subprocess
+        node = shutil.which("node")
+        if not node:
+            self.skipTest("node is not installed on this machine")
+        for name in ("opportunities.js", "publisher.js"):
+            with self.subTest(script=name):
+                result = subprocess.run(
+                    [node, "--check", str(ROOT / name)],
+                    capture_output=True, text=True, check=False)
+                self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_homepage_links_directly_to_opportunity_board(self):
         html = (ROOT / "index.html").read_text(encoding="utf-8")
         self.assertIn('href="./opportunities.html"', html)
