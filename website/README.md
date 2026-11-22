@@ -108,3 +108,26 @@ For deployment validation, run:
 
 This is a public, professionally styled discovery site plus a controlled
 editorial daily publishing workflow, not yet a paid SaaS product.
+
+## November 22 premium visual redesign — screenshot-reference direction
+
+The actual public frontend now uses `premium.css` and
+`premium-opportunities.css`, retaining its existing page structure,
+static hosting, five-day expiry rules, source links and editorial publishing
+controls. The dark navy/blue-and-teal homepage now features a bespoke
+**illustrative signal network**, a visually layered **sample project dossier**
+and a clearer discovery-to-investigation flow.
+
+The opportunities page now has an editorial intelligence-dashboard layout:
+a source-window signal graphic, summary metrics based on **published records**
+rather than invented coverage, a proper left filter sidebar, and large
+project-dossier cards with distinct commercial/equipment visuals.
+
+The separate illustrative sample on the public feed empty-state is clearly
+labeled **not a live lead**, with no false company or procurement claims.
+The publisher JSON remains intentionally empty until manually approved items
+are uploaded. The image-reference-inspired design does not change
+collection permissions, source verification or automate publishing.
+
+Use the existing `Deploy GTA Radar marketing website` workflow to publish.
+Its artifact includes the two new CSS files and excludes the editor.
