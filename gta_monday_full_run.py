@@ -922,11 +922,21 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
             from gta_ai_top10_reranker import run as review_deepseek_24
             use28=(report.get("combined_28_city_collection",{}).get("status")==
                    "COMBINED_28_CITY_RESEARCH_ONLY_LIVE_SOURCE_GATED")
+            western=report.get("western_31_city_corridor",{})
+            # The western collector does not authorize paid AI merely by
+            # configuring 31 cities. Only independently admitted WEST_3
+            # candidates can activate the 31-city selection path.
+            qualified_western=int(western.get("candidate_rows_new_cities_promoted_to_ai") or 0)
+            use31=(use28 and
+                   western.get("status")=="COMBINED_31_CITY_SOURCE_RIGHTS_GATED_RESEARCH"
+                   and qualified_western>0)
             combined_ai = review_deepseek_24(results, paid=True,
-                                combined_24=not use28, combined_28=use28)
+                                combined_24=not use28,
+                                combined_28=use28 and not use31,
+                                combined_31=use31)
             report["ai_top10_preselection"] = {
                 "status": combined_ai["status"],
-                "selection_scope": ("COMBINED_28" if use28 else "COMBINED_16_PLUS_8"),
+                "selection_scope": ("COMBINED_31" if use31 else "COMBINED_28" if use28 else "COMBINED_16_PLUS_8"),
                 "candidate_count": combined_ai["candidate_count"],
                 "candidate_cities": combined_ai.get("candidate_cities", []),
                 "candidate_cohorts": combined_ai.get("candidate_cohorts", {}),
@@ -946,7 +956,7 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
                 not bool(combined_ai.get("combined_model_applied"))
             report["combined_24_city_collection"]["final_top10"] = \
                 combined_ai.get("combined_final_top10", "")
-            print(("28" if use28 else "24")+"-CITY DEEPSEEK REVIEW: "
+            print(("31" if use31 else "28" if use28 else "24")+"-CITY DEEPSEEK REVIEW: "
                   + combined_ai["status"]
                   + " | reviewed " + str(combined_ai["reviewed_count"])
                   + "/" + str(combined_ai["candidate_count"])
