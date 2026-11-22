@@ -114,8 +114,13 @@
   function update() {
     var reviewed = rows.filter(function (r) { return !r.hold; }).length;
     var held = rows.length - reviewed;
-    byId("pub-counts").textContent = countSelected() + " selected · " + reviewed + " eligible · " + held + " held";
-    byId("pub-export").disabled = !countSelected() || !byId("pub-confirm").checked;
+    var selected = countSelected();
+    byId("pub-counts").textContent = selected + " selected · " + reviewed + " eligible · " + held + " held";
+    byId("pub-target-hint").textContent = selected >= 15 && selected <= 20 ?
+      "Target met: 15–20 reviewed source-backed research signals." :
+      selected > 20 ? "More than 20 selected. Consider choosing the strongest 15–20 distinct projects." :
+      "Target 15–20 when evidence supports them. Never approve weak or stale items just to reach a number.";
+    byId("pub-export").disabled = !selected || !byId("pub-confirm").checked;
   }
   function drawRows() {
     var destination = byId("pub-rows");
