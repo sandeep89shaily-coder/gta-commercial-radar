@@ -57,7 +57,7 @@ class AllRecentAIQueueTests(unittest.TestCase):
             write(root/EQUIPMENT_ALL,equipment)
             report=prepare(root,today="2026-11-22")
             selected=read(root/AI_INPUT)
-            self.assertEqual(report["all_five_day_rows"],report.get("all_five_day_rows",0)) if False else None
+            self.assertEqual(report["counts"]["all_five_day_rows"],17)
             self.assertEqual(report["eligible_for_source_backed_ai"],15)
             self.assertEqual(len(selected),15)
             self.assertEqual({r["city"] for r in selected},{"Brampton","Oakville"})
