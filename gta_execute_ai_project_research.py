@@ -122,7 +122,10 @@ def execute(candidate_file,shared_results,out,*,paid=False,max_projects=3,
     state["budget_remaining_usd"]=None
     state["status"]="INTERRUPTED_BY_ERROR"   # replaced below if the loop finishes
     try:
-        limit=max(0,min(int(max_projects),10))
+        # An arbitrary ten-project ceiling is not the research backlog limit.
+        # The shared ledger's configured daily USD budget remains the hard
+        # spending guard; snapshots/checkpoints avoid replay charges.
+        limit=max(0,min(int(max_projects),500))
         for row,pick in eligible:
             if state["attempted"]>=limit:break
             rid=row["project_id"]
