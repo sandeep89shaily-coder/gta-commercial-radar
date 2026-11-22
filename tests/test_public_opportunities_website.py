@@ -62,7 +62,12 @@ class PublicOpportunityWebsite(unittest.TestCase):
         body = json.loads((ROOT / "data" / "opportunities.json").read_text())
         self.assertEqual(metadata["records"], len(body["records"]))
         self.assertEqual(body["window_days"], 5)
-        self.assertTrue(body["records"])
+        self.assertTrue(15 <= len(body["records"]) <= 20,
+                        "Five-day editorial target is 15–20 source-backed signals")
+        self.assertEqual(len({r["id"] for r in body["records"]}), len(body["records"]))
+        self.assertGreaterEqual(len({r["city"] for r in body["records"]}), 2)
+        self.assertTrue(all("2026-11-18" <= r["source_date"] <= "2026-11-22"
+                            for r in body["records"]))
         self.assertTrue(all(r["approved_for_publication"] and
                             r["rights_checked"] and r["source_checked"]
                             for r in body["records"]))
