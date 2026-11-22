@@ -60,40 +60,40 @@ MAX_SAVED_TEXT=30000
 # keyword includes "press", which incorrectly matched "Press Secretary" in
 # government article footers; generic policy announcements are not purchases.
 _SPECIFIC_MACHINE = re.compile(
-    r"\\b(?:cnc|machin(?:e|ery)|equipment|robot(?:s|ics|ic)?|automation|"
+    r"\b(?:cnc|machin(?:e|ery)|equipment|robot(?:s|ics|ic)?|automation|"
     r"production lines?|packaging lines?|industrial presses|stamping presses|"
     r"furnaces?|kilns?|boilers?|extruders?|stamping|milling|laser cutters?|"
-    r"dust collectors?|scrubbers?|cooling towers?)\\b", re.I)
+    r"dust collectors?|scrubbers?|cooling towers?)\b", re.I)
 _CONCRETE_ACTION = re.compile(
-    r"\\b(?:invest(?:ing|ment)?|moderniz\\w*|upgrad\\w*|retool\\w*|"
-    r"purchas\\w*|acquir\\w*|install\\w*|add(?:ing)?|integrat\\w*|"
-    r"expan\\w*|adopt\\w*|replac\\w*|new production)\\b", re.I)
+    r"\b(?:invest(?:ing|ment)?|moderniz\w*|upgrad\w*|retool\w*|"
+    r"purchas\w*|acquir\w*|install\w*|add(?:ing)?|integrat\w*|"
+    r"expan\w*|adopt\w*|replac\w*|new production)\b", re.I)
 _SITE_CONTEXT = re.compile(
-    r"\\b(?:manufactur\\w*|factory|plant|production|facilit\\w*|"
-    r"processing|fabricat\\w*|industrial|steel|operations)\\b", re.I)
+    r"\b(?:manufactur\w*|factory|plant|production|facilit\w*|"
+    r"processing|fabricat\w*|industrial|steel|operations)\b", re.I)
 _GENERIC_POLICY = re.compile(
-    r"\\b(?:businesses of all sizes|eligible businesses|"
+    r"\b(?:businesses of all sizes|eligible businesses|"
     r"productivity mega deduction|funding applications|"
     r"businesses and organizations can apply|"
     r"government is helping canadian businesses|"
     r"sectors where canada has strong expertise|"
     r"industries support thousands of jobs|"
     r"defence ecosystem is dynamic|"
-    r"government of canada is aiming to transform)\\b", re.I)
+    r"government of canada is aiming to transform)\b", re.I)
 
 def _specific_equipment_quote(text):
     """Extract an equipment/action/source passage; never infer a supplier bid."""
     # The footer on many Canada.ca releases contains "Press Secretary",
     # "Associated links", and named automation companies unrelated to a sale.
-    main=re.split(r"\\b(?:Associated links|Contacts|Media contacts)\\b",
+    main=re.split(r"\b(?:Associated links|Contacts|Media contacts)\b",
                   str(text or ""),maxsplit=1,flags=re.I)[0]
     for found in _SPECIFIC_MACHINE.finditer(main):
         excerpt=main[max(0,found.start()-230):found.end()+230]
         # A roster of recipient company names such as "Cravo Equipment" or
         # "Ascension Automation" does not itself describe an equipment order.
         if (excerpt.count(",") >= 4 and not re.search(
-                r"\\b(?:is receiving|will install|will purchase|is undertaking|"
-                r"plans to install|plans to purchase)\\b", excerpt, re.I)):
+                r"\b(?:is receiving|will install|will purchase|is undertaking|"
+                r"plans to install|plans to purchase)\b", excerpt, re.I)):
             continue
         if (_GENERIC_POLICY.search(excerpt)
                 or not _CONCRETE_ACTION.search(excerpt)
