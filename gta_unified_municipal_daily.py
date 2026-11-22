@@ -28,6 +28,21 @@ FEEDS=(
  ("GTA_RADAR_MUNICIPAL_PROJECT_CHANGES.csv","MUNICIPAL_HTML"),
  ("GTA_RADAR_GGH_OFFICIAL_GIS_NEW_OR_CHANGED.csv","GGH_GIS"),
  ("GTA_RADAR_REGIONAL_PROJECT_DETAILS_NEW_OR_CHANGED.csv","REGIONAL_DETAIL"),
+ # Independent file-ID collectors already run in the full municipal pipeline.
+ # Only explicit FIRST_OBSERVED/RECORD_CHANGED rows are considered. The
+ # historical project master and baseline outputs are never daily changes.
+ ("GTA_RADAR_ADDITIONAL_CITY_GIS_NEW_OR_CHANGED.csv","ADDITIONAL_GIS"),
+ ("GTA_RADAR_FIVE_CITY_OFFICIAL_NEW_OR_CHANGED.csv","FIVE_CITY_OFFICIAL"),
+ ("GTA_RADAR_GGH_EXPANSION_NEW_OR_CHANGED.csv","GGH_EXPANSION"),
+ ("GTA_RADAR_EARLY_APPLICATION_NEW_OR_CHANGED.csv","EARLY_APPLICATION"),
+ ("GTA_RADAR_STRUCTURED_APPLICATION_CHANGES.csv","STRUCTURED_APPLICATION"),
+ ("GTA_RADAR_OFFICIAL_CSV_IMPORT_NEW_OR_CHANGED.csv","AUTHORIZED_CSV"),
+ ("GTA_RADAR_BURLINGTON_GIS_NEW_OR_CHANGED.csv","BURLINGTON_GIS"),
+ ("GTA_RADAR_BURLINGTON_OFFICIAL_PAGES_NEW_OR_CHANGED.csv","BURLINGTON_PAGES"),
+ ("GTA_RADAR_VAUGHAN_OFFICIAL_NOTICES_NEW_OR_CHANGED.csv","VAUGHAN_NOTICES"),
+ ("GTA_RADAR_MARKHAM_CIRCULATION_CHANGES.csv","MARKHAM_CIRCULATION"),
+ ("GTA_RADAR_NORTHERN_MAJOR_CITY_SOURCE_CHANGES.csv","NORTHERN_MAJOR"),
+ ("GTA_RADAR_TORONTO_OPEN_DATA_CHANGES.csv","TORONTO_OPEN_DATA"),
 )
 FIELDS=("observation","first_seen_local","last_seen_local","project_id","address",
         "city","source_id","source_keys","lane","description","event_date",
@@ -98,7 +113,8 @@ def run(results,*,today=None):
             city=str(r.get("city") or "").strip()
             appid=str(r.get("application_id") or r.get("file_number") or "").strip()
             projectid=str(r.get("project_id") or "").strip()
-            scope=str(r.get("description") or r.get("scope") or "").strip()
+            scope=str(r.get("description") or r.get("scope") or
+                      r.get("proposed_use") or r.get("project_description") or "").strip()
             first=_date(r.get("first_seen_local"))
             if obs not in OBS or not city or not (appid or projectid) or len(scope)<25:
                 secondary_sources[lane]["rejected"]+=1
@@ -113,7 +129,8 @@ def run(results,*,today=None):
                 secondary_sources[lane]["rejected"]+=1
                 continue
             secondary_seen.add(key)
-            date=str(r.get("source_record_date") or r.get("date") or "")
+            date=str(r.get("source_record_date") or r.get("source_date") or
+                     r.get("date") or r.get("circulation_date") or "")
             # An old filing's new recorded digest is a review event, not
             # today's first-publication or fresh commercial opportunity.
             entry={k:"" for k in FIELDS}
@@ -121,14 +138,17 @@ def run(results,*,today=None):
                 "observation":obs,"first_seen_local":r.get("first_seen_local",""),
                 "last_seen_local":day.isoformat(),
                 "project_id":f"{lane}:{city}:{appid or projectid}",
-                "address":r.get("address") or r.get("project_title") or "",
+                "address":r.get("address") or "",
                 "city":city,"source_id":lane,
                 "source_keys":appid or projectid,
                 "lane":"MUNICIPAL_APPLICATION_CHANGE_REVIEW",
                 "description":scope,"date_basis":"MUNICIPAL_SOURCE_CHANGE_NOT_FIRST_PUBLICATION",
-                "source_record_date":date,"changed_fields":"UNKNOWN",
-                "current_source_status":r.get("current_status",""),
-                "record_source_url":r.get("source_url") or r.get("official_record_url") or "",
+                "source_record_date":date,
+                "changed_fields":r.get("changed_fields") or "UNKNOWN",
+                "current_source_status":r.get("current_status") or r.get("stage") or r.get("status") or "",
+                "record_source_url":(r.get("record_source_url") or r.get("original_record_url")
+                                     or r.get("official_record_url") or r.get("source_url")
+                                     or r.get("pdf_url") or ""),
                 "record_source_url_basis":"SOURCE_RECORD_URL_NOT_INDEPENDENTLY_RECHECKED",
                 "source_group":"MUNICIPAL_APPLICATION_SOURCE_CHANGE",
                 "paid_freshness_eligible":"False",
@@ -136,7 +156,7 @@ def run(results,*,today=None):
                 "warning":"Source collector change is NOT a new public announcement; no verified buyer or open RFQ.",
             })
             age=(day-_date(date)).days if _date(date) else None
-            if age is not None and 0<=age<=2:
+            if age is not None and 0<=age<=4:
                 entry["freshness_band"]="RECENT_APPLICATION_EVENT_REVIEW_NOT_PUBLICATION"
             else:
                 entry["freshness_band"]="OLDER_OR_UNKNOWN_APPLICATION_EVENT_REVIEW"
@@ -187,6 +207,8 @@ def run(results,*,today=None):
         "cities_with_unchanged_public_records":[x["city"] for x in city_rows if x["public_feed_unchanged"]],
         "citywide_collection_completeness_verified":False,
         "verified_first_publications":0,"verified_buyers":0,"verified_open_contracts":0,
+        "secondary_feed_count":len(FEEDS),
+        "secondary_feeds_with_data":sum(v["input_rows"]>0 for v in secondary_sources.values()),
         "no_network_or_paid_calls":True,
         "warning":"Baseline/historical records are never new opportunities. Zero changes can mean unchanged records, unavailable feeds or true quiet activity; citywide completeness is not established.",
         "outputs":[OUTPUT,CITY,STATUS]}
