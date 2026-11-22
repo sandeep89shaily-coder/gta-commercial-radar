@@ -7,7 +7,9 @@
   <meta name="description" content="Explore source-linked commercial and industrial development research across Southern Ontario. A five-day rolling project intelligence board with clear evidence and procurement limitations.">
   <title>Opportunities | GTA Radar</title>
   <link rel="stylesheet" href="./styles.css">
+  <link rel="stylesheet" href="./premium.css">
   <link rel="stylesheet" href="./opportunities.css">
+  <link rel="stylesheet" href="./premium-opportunities.css">
   <script src="./opportunities.js" defer></script>
 </head>
 <body class="op-page">
@@ -30,10 +32,11 @@
 
   <main id="main">
     <section class="op-hero">
+      <div class="op-hero-glow" aria-hidden="true"></div>
       <div class="wrap op-hero-grid">
         <div>
           <div class="op-overline"><span class="op-live-dot" aria-hidden="true"></span> SOUTHERN ONTARIO / FIELD INTELLIGENCE</div>
-          <h1>Find the work<br><em>before it moves on.</em></h1>
+          <h1>Discover the signals.<br><em>Explore the possibilities.</em></h1>
           <p class="op-lead">A clearer view of emerging industrial investment, commercial development and projects worth investigating. Every record links back to its source; uncertainty stays visible.</p>
           <div class="op-hero-actions">
             <a class="op-primary" href="#board">Explore opportunities <span aria-hidden="true">↗</span></a>
@@ -44,6 +47,16 @@
           <span class="aside-index">THE RESEARCH WINDOW <span>01 — 05</span></span>
           <div class="as-of-date" id="window-label">Five calendar days</div>
           <div class="date-trail" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+          <div class="op-live-graph" aria-label="Decorative five-day research signal illustration">
+            <svg viewBox="0 0 390 132" aria-hidden="true">
+              <defs><linearGradient id="signalLine" x1="0" x2="1"><stop stop-color="#67a9ff"/><stop offset="1" stop-color="#79f3d5"/></linearGradient><linearGradient id="underLine" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#70e9d7" stop-opacity=".34"/><stop offset="1" stop-color="#70e9d7" stop-opacity="0"/></linearGradient></defs>
+              <path d="M0 28H390M0 68H390M0 110H390" stroke="#8DC6E8" stroke-opacity=".12" stroke-dasharray="4 8"/>
+              <path d="M8 114L61 91L123 102L180 52L244 74L304 27L383 16V132H8Z" fill="url(#underLine)"/>
+              <path d="M8 114L61 91L123 102L180 52L244 74L304 27L383 16" stroke="url(#signalLine)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+              <g fill="#b9ffe7" stroke="#1d4e68" stroke-width="4"><circle cx="61" cy="91" r="5"/><circle cx="180" cy="52" r="5"/><circle cx="304" cy="27" r="6"/><circle cx="383" cy="16" r="6"/></g>
+            </svg>
+            <div><span>PROJECT SIGNALS</span><span>ILLUSTRATIVE · NOT LIVE DATA</span></div>
+          </div>
           <p>Five calendar days, including today. Dates come from source records—not the day Radar first saw a page.</p>
           <div class="aside-foot"><span>Source-backed research</span><span>Ontario / CA</span></div>
         </aside>
@@ -68,6 +81,9 @@
           <div class="op-stat"><span class="op-stat-label">Markets represented</span><strong id="metric-cities">—</strong><small>Not a claim of full city coverage</small></div>
         </div>
 
+        <div class="op-explore-layout">
+          <aside class="op-filter-sidebar" aria-label="Opportunity filters">
+            <div class="op-filter-heading"><span>01 / RESEARCH FILTERS</span><strong>Refine your view</strong><p>Explore by category, location and original-source details.</p></div>
         <div class="op-toolbar" aria-label="Filter opportunities">
           <div class="op-tabs" role="group" aria-label="Opportunity category">
             <button class="op-tab active" data-lane="all" type="button" aria-pressed="true">All research <span id="tab-all-count"></span></button>
@@ -83,14 +99,23 @@
           <div class="op-result-meta"><span id="op-result-count">Loading research…</span><span>Research candidates · Not confirmed open bids</span></div>
         </div>
 
+          </aside>
+          <div class="op-feed-main">
+            <div class="op-feed-heading"><div><span>02 / SOURCE-LINKED INTELLIGENCE</span><h3>Project research feed</h3></div><span class="feed-review-stamp">PUBLIC / EDITORIALLY REVIEWED</span></div>
         <div id="op-results" class="op-results" aria-live="polite" aria-busy="true"></div>
         <div id="op-empty" class="op-empty" hidden>
           <span class="op-empty-symbol" aria-hidden="true">⌁</span>
           <h3 id="op-empty-title">No public opportunities in this window yet</h3>
           <p id="op-empty-description">Only explicitly reviewed, source-linked records are shown here. New findings will appear when the next five-day briefing is published.</p>
           <a href="./index.html#sample">Request a research sample <span aria-hidden="true">↗</span></a>
+          <div class="op-demo-dossier" aria-label="Illustrative dossier format, not a current opportunity">
+            <div class="op-demo-thumb"><span>DEMO FORMAT<br>ONLY</span><i aria-hidden="true"></i></div>
+            <div><span class="op-demo-overline">ILLUSTRATIVE PROJECT RESEARCH · NOT A LIVE LEAD</span><h4>Proposed industrial facility expansion</h4><p>Illustrative Ontario location · Manufacturing / industrial<br>Possible new production space and building-service requirements.</p><div class="op-demo-details"><span>PLANNING-STAGE EXAMPLE</span><span>PURCHASING UNCONFIRMED</span></div></div>
+          </div>
         </div>
 
+          </div>
+        </div>
         <div class="op-disclaimer">
           <span class="op-disclaimer-icon" aria-hidden="true">i</span>
           <div><strong>What these records mean.</strong> Source-event dates may reflect filings, permits or announcements rather than first public disclosure. Original-publication verification, company roles, purchasing authority and supplier availability are separate checks. Records are research leads, not guaranteed tenders, and data availability differs by municipality.</div>
