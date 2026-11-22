@@ -55,6 +55,40 @@ class CrossMunicipalDaily(unittest.TestCase):
             self.assertTrue(selected["cross_city_reconciliation_used"])
             self.assertEqual(selected["general_top10_count"],1)
 
+    def test_additional_city_change_feeds_reach_five_day_export(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d)
+            write(root/"GTA_RADAR_FIVE_CITY_OFFICIAL_NEW_OR_CHANGED.csv",[{
+                "observation":"FIRST_OBSERVED","city":"Burlington",
+                "project_id":"BURLINGTON:SP-26-77",
+                "application_id":"SP-26-77",
+                "address":"100 Commerce Road",
+                "description":"New industrial warehouse construction and commercial expansion project",
+                "first_seen_local":"2026-11-22",
+                "source_record_date":"2026-11-20",
+                "current_status":"Under Review",
+                "source_url":"https://www.burlington.ca/en/building-and-renovating/current-development-projects.aspx"
+            }])
+            write(root/"GTA_RADAR_MARKHAM_CIRCULATION_CHANGES.csv",[{
+                "observation":"INITIAL_BASELINE","city":"Markham",
+                "application_id":"M-26-25","address":"100 Example Rd",
+                "proposed_use":"New industrial warehouse construction",
+                "first_seen_local":"2026-11-22",
+                "circulation_date":"2026-11-21",
+                "pdf_url":"https://markham.ca/notice.pdf"
+            }])
+            stats=run(root,today="2026-11-22")
+            self.assertEqual(stats["secondary_new"],1)
+            self.assertGreaterEqual(stats["secondary_feed_count"],12)
+            record=read(root/OUTPUT)[0]
+            self.assertEqual(record["city"],"Burlington")
+            self.assertEqual(record["source_record_date"],"2026-11-20")
+            self.assertEqual(record["source_keys"],"SP-26-77")
+            self.assertIn("NOT_FIRST_PUBLICATION",record["date_basis"])
+            report=fresh(root,today="2026-11-22")
+            self.assertEqual(report["general_all_research_count"],1)
+            self.assertEqual(report["verified_first_publications"],0)
+
     def test_baseline_never_becomes_new_lead(self):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d)
