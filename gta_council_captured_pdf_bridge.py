@@ -24,6 +24,10 @@ OUT = "COUNCIL_CAPTURED_PDF_BRIDGE"
 AUDITS = (
     "DAILY_INTEGRATED_REVIEW/TORONTO_DOCUMENTS/COMBINED_PDF_FETCH_AUDIT.csv",
     "DAILY_INTEGRATED_REVIEW/OTHER_CITY_DOCUMENTS/MULTICITY_PDF_FETCH_AUDIT.csv",
+    # The full November 22 export stores verified PDF audits here, not in
+    # DAILY_INTEGRATED_REVIEW. Both locations are searched; SHA deduplicates.
+    "TOTAL_INTELLIGENCE_REVIEW/MEETING_DOCUMENTS/Toronto/COMBINED_PDF_FETCH_AUDIT.csv",
+    "TOTAL_INTELLIGENCE_REVIEW/MEETING_DOCUMENTS/Toronto/AUTOMATIC_PDF_FETCH_AUDIT.csv",
 )
 HOSTS = {
     "Toronto": ("www.toronto.ca", "toronto.ca"),
@@ -87,8 +91,9 @@ def review(results, *, now=None):
                 url = str(row.get("url") or "")
                 parsed = urlsplit(url)
                 city = row.get("city") or (
-                    "Toronto" if "/TORONTO_DOCUMENTS/" in
-                    ("/" + audit).upper() else "")
+                    "Toronto" if any(part in ("/" + audit).upper()
+                    for part in ("/TORONTO_DOCUMENTS/", "/MEETING_DOCUMENTS/TORONTO/"))
+                    else "")
                 if city not in HOSTS or parsed.scheme != "https" or (
                         parsed.hostname or "").lower() not in HOSTS[city]:
                     continue

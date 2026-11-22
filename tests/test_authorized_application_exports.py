@@ -46,6 +46,42 @@ class AuthorizedExportTests(unittest.TestCase):
             manifest.write_text(json.dumps({"exports": [item]}))
             self.assertEqual(load(root)[0], [])
 
+    def test_brampton_mississauga_local_handoffs_require_documented_rights(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            folder=root/"GTA_RADAR_AUTHORIZED_EXPORTS"
+            folder.mkdir()
+            exports=[]
+            for city,source in (
+                ("Brampton","https://geohub.brampton.ca/datasets/brampton::pre-consultation-2/about"),
+                ("Mississauga","https://data.mississauga.ca/datasets/85536f145719436ebde8d31f36d11d83_0/about"),
+            ):
+                contents=("FILE,ADDRESS,SCOPE\n"
+                          "SP-26-77,10 Test Road,Industrial development application\n")
+                local=folder/(city.lower()+".csv")
+                local.write_text(contents,encoding="utf-8")
+                exports.append({
+                    "city":city,"official_source_url":source,
+                    "sha256":hashlib.sha256(local.read_bytes()).hexdigest(),
+                    "permitted_public_export":True,
+                    "dataset_licence":"CC BY 4.0" if city=="Brampton" else "CUSTOM",
+                    "licence_or_permission_url":source,
+                    "commercial_reuse_permission_confirmed":False,
+                    "columns":{"application_id":"FILE","address":"ADDRESS","scope":"SCOPE"},
+                })
+            manifest=folder/"manifest.json"
+            manifest.write_text(json.dumps({"exports":exports}))
+            records,report=load(root)
+            self.assertEqual(records,[])
+            self.assertTrue(all(x["status"]==
+                "HELD_DATASET_SPECIFIC_REUSE_NOT_DOCUMENTED" for x in report["sources"]))
+            exports[0]["commercial_reuse_permission_confirmed"]=True
+            manifest.write_text(json.dumps({"exports":exports}))
+            records,report=load(root)
+            self.assertEqual([r["city"] for r in records],["Brampton"])
+            self.assertTrue(report["no_network_requests"])
+            self.assertTrue(report["no_verified_original_publication"])
+
     def test_missing_manifest_never_invents_city_files(self):
         with tempfile.TemporaryDirectory() as tmp:
             rows,report = load(tmp)
