@@ -297,7 +297,7 @@ def run(results, *, paid=False, deep_research=False, deep_project_limit=4,
         tmp_attempt.replace(target)
 
     def finalize_combined():
-        if not (combined_24 or combined_28):
+        if not (combined_24 or combined_28 or combined_31):
             return
         from gta_24_city_ai_selection import finalize
         universe=31 if combined_31 else 28 if combined_28 else 24
