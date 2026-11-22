@@ -18,7 +18,7 @@ class ComIntelBrandTests(unittest.TestCase):
     def test_title_and_domain_present(self):
         home=(SITE/"index.html").read_text(encoding="utf-8")
         opportunities=(SITE/"opportunities.html").read_text(encoding="utf-8")
-        self.assertIn("ComIntel | Commercial &amp; Industrial",home.replace("& Industrial","&amp; Industrial"))
+        self.assertIn("ComIntel | Commercial &amp; Industrial",home)
         self.assertIn("ComIntel.ca",opportunities)
         self.assertIn("./opportunities.html",home)
         self.assertIn("No guaranteed open tenders",home)
