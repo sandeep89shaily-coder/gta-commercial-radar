@@ -1,3 +1,24 @@
+# ComIntel.ca — public website identity (November 22, 2026)
+
+**Public name:** ComIntel. **Planned domain:** comintel.ca.
+**Product:** commercial and industrial opportunity intelligence across
+Southern Ontario. This is the public branding of the GTA Radar research
+project; the existing research engine, result-file schema and repository
+remain unchanged.
+
+The public homepage, opportunities dashboard and local editor now display
+ComIntel branding. Live data stays subject to the same rolling five-day
+window, explicit public-source approval and owner-controlled publication.
+The prior email inbox is deliberately retained until a real domain mailbox
+is configured.
+
+**Not launched:** domain ownership, DNS, GitHub Pages domain/HTTPS and
+trademark clearance are not verified or completed. See
+[COMINTEL_DOMAIN_SETUP.md](COMINTEL_DOMAIN_SETUP.md) before redirecting
+traffic or changing DNS records.
+
+---
+
 # GTA Radar public website — V2 clarity redesign
 
 This is the **marketing website**, not the municipal collection dashboard. The site lives in `website/` and is deliberately small, responsive, dependency-free and easy to rebrand when a new domain/name is selected.
