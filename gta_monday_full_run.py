@@ -929,7 +929,7 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
             report["unified_municipal_daily_changes"]=daily_changes
             report["all_five_day_ai_research"]={
                 "status":all_ai["status"],
-                "input_rows":all_ai["counts"]["all_five_day_rows"],
+                "input_rows":all_ai["counts"].get("all_five_day_rows",0),
                 "eligible_rows":all_ai["eligible_for_source_backed_ai"],
                 "held_rows":all_ai["held_with_specific_reason"],
                 "source_cities":all_ai["cities_with_eligible_records"],
