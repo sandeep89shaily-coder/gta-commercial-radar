@@ -45,3 +45,66 @@ The sample request form currently opens the visitor's own email program to prepa
 The site never claims 16 cities with complete data coverage or verified sale-ready buyers. Its sample brief is labelled `DEMO` / `NOT A REAL PROJECT`, and open-bid status remains unconfirmed. Live reports need a separate original-source audit; marketing copy cannot turn a research candidate into verified procurement.
 
 No changes were made to daily Radar collectors, SQLite, scheduled work, AI costs or outreach permissions. `python -m unittest discover -s tests -p test_marketing_website.py` validates structure and claims; full GitHub CI tests the repository matrix.
+
+
+## New: public five-calendar-day opportunity board (November 22, 2026)
+
+The actual deploy source is **website/**, not the separate historical docs/
+sample. The public opportunities.html page is responsive and lets visitors
+filter editorially approved research by sector, city, and search text,
+opening the original source for each record. The initial public JSON data file
+is empty rather than presenting historical examples as recent findings.
+
+### Daily publishing steps (owner)
+
+1. Run RUN_GTA_RADAR_TODAY.bat, then unzip the dated results archive.
+   Locate GTA_RADAR_FRESH_GENERAL_RESEARCH_ALL.csv and
+   GTA_RADAR_FRESH_EQUIPMENT_RESEARCH_ALL.csv.
+2. Open website/publisher.html locally in Chrome or another modern browser,
+   load one or both CSVs and select the Ontario issue date.
+3. Check the actual source, identity, dates, project stage, relevance and
+   publication/commercial reuse rights for each proposed public record.
+   Select only items suitable for external display. No row is pre-approved.
+4. Confirm the editorial review statement; download opportunities.json.
+   Everything happens locally. No email or network upload occurs.
+5. Replace website/data/opportunities.json in your working repository with
+   the downloaded JSON. Either commit it with git or paste the JSON into
+   the matching file using GitHub's web editor.
+6. Run the existing **Deploy GTA Radar marketing website** GitHub Actions
+   workflow manually. Its validation must pass before deployment.
+
+To preview the site locally, run from the repository directory:
+
+    py -3 -m http.server 8080 --directory website
+
+Then open http://localhost:8080/opportunities.html and
+http://localhost:8080/publisher.html.
+
+### Editorial and deployment safeguards
+
+- Public feed schema: schema_version 1, window_days 5, published_on ISO date
+  and the records array. Source-event dates must be from the five calendar
+  days ending on published_on. The website separately enforces a five-day
+  window relative to the viewer's current Ontario day, so stale feeds expire.
+- Each record requires a specific HTTPS source URL and the three affirmative
+  flags approved_for_publication, source_checked and rights_checked.
+- The publisher sets first_publication_verified, buyer_verified and
+  open_supplier_package_verified to false. The validator rejects a public
+  record claiming those certifications, pending a separate evidence workflow.
+- The publisher never exports business-contact emails, AI private working
+  papers, API keys or internal ledgers. An AI investigation is not a sale.
+- The public site renders user-controlled text safely through textContent.
+- Deployment excludes publisher.html and publisher.js from the GitHub Pages
+  artifact. This is a local-only export tool without a passwordless backend.
+- Pages deployment remains manual. GitHub Pages must already be configured
+  under repository Settings → Pages for GitHub Actions deployments.
+- No visitor tracking, hidden personal-data capture, customer subscriptions,
+  verified open-bid database or unattended publication are implied.
+
+For deployment validation, run:
+
+    py -3 website/validate_public_feed.py
+    py -3 -m unittest discover -s tests -p test_public_opportunities_website.py
+
+This is a public, professionally styled discovery site plus a controlled
+editorial daily publishing workflow, not yet a paid SaaS product.
