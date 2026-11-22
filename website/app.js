@@ -25,9 +25,9 @@
     // The static website has no server, so there is no hidden or misleading
     // 'success' message. The visitor must explicitly send the email from
     // their own mail client to make a request.
-    var subject = "GTA Radar sample research report request";
+    var subject = "ComIntel.ca sample research report request";
     var body = [
-      "Hello GTA Radar,",
+      "Hello ComIntel team,",
       "",
       "I would like to request a sample of your source-linked commercial intelligence report.",
       "",
