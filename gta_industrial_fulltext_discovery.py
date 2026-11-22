@@ -37,9 +37,9 @@ INDEXES={
         "&dept=economicdevelopmentsouthernontario&format=atom&orderBy=desc"
         "&pick=50&publishedDate%3E=2026-01-01&sort=publishedDate"
         "&type=newsreleases"),
-    "INVEST_ONTARIO":"https://investontario.ca/press-room",
+    "INVEST_ONTARIO":"https://www.investontario.ca/press-room",
     "LINAMAR":"https://www.linamar.com/news-listings/",
-    "MARTINREA":"https://www.martinrea.com/newsroom/",
+    "MARTINREA":"https://www.martinrea.com/category/news-release/",
 }
 HOSTS={"api.io.canada.ca","www.canada.ca","canada.ca",
        "feddev-ontario.canada.ca","investontario.ca","www.investontario.ca",
@@ -341,8 +341,24 @@ def run(results,*,today=None,fetcher=None,indexes=None,max_articles=MAX_ARTICLES
             health[source]={"status":"INDEX_FAILED","error_type":type(exc).__name__,
                             "candidate_links":0,"articles_ok":0,"articles_failed":0,
                             "publisher_dated":0,"industrial":0}
-    # Prioritize publisher-dated/agency records; bound total article retrieval.
-    for source,url,index_title,feed_date in pending[:max_articles]:
+    # Give each accessible publisher a chance before the large FedDev archives
+    # consume the bounded article budget. The dedicated FedDev all-40 collector
+    # already handles that archive. Keep one article per source in the first
+    # pass, then fill remaining slots in original within-source order.
+    priority=("INVEST_ONTARIO","LINAMAR","MARTINREA",
+              "FEDDEV_OFFICIAL_2026_ARCHIVE","FEDDEV_GOVERNMENT_WIDE_ATOM")
+    by_source={name:[] for name in priority}
+    for item in pending:
+        by_source.setdefault(item[0],[]).append(item)
+    selected=[]
+    order=[name for name in priority if by_source.get(name)]
+    order += [name for name in by_source if name not in order and by_source[name]]
+    while len(selected)<max_articles and any(by_source.get(name) for name in order):
+        for name in order:
+            if by_source.get(name) and len(selected)<max_articles:
+                selected.append(by_source[name].pop(0))
+    # Bound total requests; no extra URLs or source-policy bypasses.
+    for source,url,index_title,feed_date in selected:
         diag=health[source]
         try:
             page=_page(fetch(url))
@@ -427,7 +443,8 @@ def run(results,*,today=None,fetcher=None,indexes=None,max_articles=MAX_ARTICLES
         "date":day.isoformat(),"sources":health,
         "federal_fallback_observed_feddev_articles":(
             feddev.get("publisher_dated",0)+feddev_archive.get("publisher_dated",0)),
-        "articles_requested":min(len(pending),max_articles),
+        "articles_requested":len(selected),
+        "publisher_round_robin_retrieval":True,
         "recent_dated_research":len(recent),"older_watchlist":len(history),
         "ledger_total_urls":len(ledger),
         "verified_open_orders":0,"verified_buyers":0,
