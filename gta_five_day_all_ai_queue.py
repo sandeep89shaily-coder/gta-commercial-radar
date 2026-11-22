@@ -31,13 +31,13 @@ FIELDS = ("project_id", "city", "address", "description", "source_id",
           "lane", "freshness_class", "observation", "ai_research_priority")
 AUDIT_FIELDS = FIELDS + ("qualification", "reason", "score", "score_tier")
 HOLD_STAGE = re.compile(
-    r"\\b(?:completed|operational|already awarded|supplier selected|"
-    r"installation completed|cancelled|canceled|withdrawn|closed)\\b", re.I)
+    r"\b(?:completed|operational|already awarded|supplier selected|"
+    r"installation completed|cancelled|canceled|withdrawn|closed)\b", re.I)
 CONCRETE_SCOPE = re.compile(
-    r"\\b(?:manufactur\\w*|industrial|warehouse|commercial|office|"
-    r"restaurant|retail|construction|renovat\\w*|fit.out|expan\\w*|"
-    r"machin\\w*|automation|equipment|factory|plant|robot\\w*|"
-    r"processing|stamping|production|install\\w*|distribution)\\b", re.I)
+    r"\b(?:manufactur\w*|industrial|warehouse|commercial|office|"
+    r"restaurant|retail|construction|renovat\w*|fit.out|expan\w*|"
+    r"machin\w*|automation|equipment|factory|plant|robot\w*|"
+    r"processing|stamping|production|install\w*|distribution)\b", re.I)
 
 def _read(path):
     if not path.is_file():
