@@ -56,6 +56,43 @@ PROVEN_BAD={"Ontario","Canada","Southern Ontario","The Government",
 EMAIL=re.compile(r"(?<![\w.])[\w.+-]+@(?:[\w-]+\.)+[A-Za-z]{2,}(?![\w.])")
 MAX_SAVED_TEXT=30000
 
+# Require a concrete equipment + industrial action passage. The broad MACHINES
+# keyword includes "press", which incorrectly matched "Press Secretary" in
+# government article footers; generic policy announcements are not purchases.
+_SPECIFIC_MACHINE = re.compile(
+    r"\\b(?:cnc|machin(?:e|ery)|equipment|robot(?:s|ics|ic)?|automation|"
+    r"production lines?|packaging lines?|industrial presses|stamping presses|"
+    r"furnaces?|kilns?|boilers?|extruders?|stamping|milling|laser cutters?|"
+    r"dust collectors?|scrubbers?|cooling towers?)\\b", re.I)
+_CONCRETE_ACTION = re.compile(
+    r"\\b(?:invest(?:ing|ment)?|moderniz\\w*|upgrad\\w*|retool\\w*|"
+    r"purchas\\w*|acquir\\w*|install\\w*|add(?:ing)?|integrat\\w*|"
+    r"expan\\w*|adopt\\w*|replac\\w*|new production)\\b", re.I)
+_SITE_CONTEXT = re.compile(
+    r"\\b(?:manufactur\\w*|factory|plant|production|facilit\\w*|"
+    r"processing|fabricat\\w*|industrial|steel|operations)\\b", re.I)
+_GENERIC_POLICY = re.compile(
+    r"\\b(?:businesses of all sizes|eligible businesses|"
+    r"productivity mega deduction|funding applications|"
+    r"businesses and organizations can apply|"
+    r"government is helping canadian businesses)\\b", re.I)
+
+def _specific_equipment_quote(text):
+    """Extract an equipment/action/source passage; never infer a supplier bid."""
+    # The footer on many Canada.ca releases contains "Press Secretary",
+    # "Associated links", and named automation companies unrelated to a sale.
+    main=re.split(r"\\b(?:Associated links|Contacts|Media contacts)\\b",
+                  str(text or ""),maxsplit=1,flags=re.I)[0]
+    for found in _SPECIFIC_MACHINE.finditer(main):
+        excerpt=main[max(0,found.start()-230):found.end()+230]
+        if (_GENERIC_POLICY.search(excerpt)
+                or not _CONCRETE_ACTION.search(excerpt)
+                or not _SITE_CONTEXT.search(excerpt)):
+            continue
+        return " ".join(excerpt.split())[:650]
+    return ""
+
+
 def _company(text):
     """Conservative source-text *candidate*, never verified legal buyer."""
     for pattern in COMPANY_PATTERNS:
@@ -168,10 +205,14 @@ def run(results,*,today=None,fetcher=None,feed_url=None,limit=MAX_ITEMS):
             company,status=_company(page.heading+" "+body)
             row["company_identified"]=company
             row["company_identification_status"]=status
-            row["equipment_explicit"]=str(bool(MACHINES.search(body)))
-            row["equipment_evidence_quote"]=_quote(body,MACHINES)
+            equipment_quote=_specific_equipment_quote(body)
+            row["equipment_explicit"]=str(bool(equipment_quote))
+            row["equipment_evidence_quote"]=equipment_quote
+            # The downstream equipment research shortlist must not elevate
+            # generic workforce/funding programmes with boilerplate keywords.
             row["manufacturing_expansion_explicit"]=str(
-                bool(SECTOR.search(body) and ACTION.search(body)))
+                bool(equipment_quote and SECTOR.search(body)
+                     and ACTION.search(body)))
             row["procurement_stage"]=_stage(body)
             row["evidence_excerpt"]=_excerpt(body)[:1100]
             contact,contact_role=_contact(body,page,company)
@@ -185,8 +226,8 @@ def run(results,*,today=None,fetcher=None,feed_url=None,limit=MAX_ITEMS):
                 "COMPLETED_OR_OPERATIONAL_NOT_UPCOMING_ORDER",
                 "SUPPLIER_OR_EQUIPMENT_ALREADY_AWARDED_RECHECK"):
                 row["review_reason"]="Equipment stage completed or supplier already selected"
-            elif not MACHINES.search(body):
-                row["review_reason"]="Investment mention; equipment purchase unspecified"
+            elif not equipment_quote:
+                row["review_reason"]="No concrete industrial equipment action in article body"
             else:
                 row["review_reason"]="Research future equipment requirement and purchaser"
             snapshots.append({
