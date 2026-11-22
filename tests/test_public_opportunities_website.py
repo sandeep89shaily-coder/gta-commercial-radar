@@ -57,12 +57,18 @@ class Page(HTMLParser):
                 self.links.append(asset)
 
 class PublicOpportunityWebsite(unittest.TestCase):
-    def test_initial_public_feed_is_empty_not_fabricated(self):
+    def test_public_feed_contains_only_approved_source_linked_records(self):
         metadata = validate()
-        self.assertEqual(metadata["records"], 0)
         body = json.loads((ROOT / "data" / "opportunities.json").read_text())
-        self.assertEqual(body["records"], [])
+        self.assertEqual(metadata["records"], len(body["records"]))
         self.assertEqual(body["window_days"], 5)
+        self.assertTrue(body["records"])
+        self.assertTrue(all(r["approved_for_publication"] and
+                            r["rights_checked"] and r["source_checked"]
+                            for r in body["records"]))
+        self.assertTrue(all(not r["buyer_verified"] and
+                            not r["open_supplier_package_verified"]
+                            for r in body["records"]))
 
     def test_valid_published_record_and_exact_five_day_boundary(self):
         payload = {"schema_version": 1, "window_days": 5,
