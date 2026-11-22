@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en-CA">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="description" content="Local editorial preparation tool for GTA Radar five-day public research exports.">
+  <title>Editorial publisher · GTA Radar</title>
+  <link rel="stylesheet" href="./styles.css">
+  <style>
+    body{background:#f5f8f4;color:#183829}
+    .publisher{padding:65px 0 90px;max-width:1100px}
+    .publisher h1{font-size:clamp(36px,5vw,55px);margin:13px 0 17px}
+    .publisher h1 em{color:#3d8059;font-style:normal}
+    .pub-intro{max-width:770px;font-size:15px;color:#5e7767;line-height:1.8;margin-bottom:25px}
+    .pub-status{background:#e7f3ea;border:1px solid #bad5c3;border-radius:9px;padding:14px 18px;color:#2d6844;font-size:12px;line-height:1.6}
+    .pub-steps{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:25px 0}
+    .pub-card{background:white;border:1px solid #d9e6dd;border-radius:11px;padding:22px}
+    .pub-card b{display:block;font-size:15px;margin-bottom:13px}
+    .pub-card label{display:block;color:#546f5d;font-size:12px;margin:12px 0}
+    .pub-card input[type=file],.pub-card input[type=date]{max-width:100%;display:block;width:100%;border:1px solid #d4e5d9;border-radius:6px;padding:10px;background:#fff;margin-top:8px}
+    .pub-card p{font-size:12px;color:#6c8273;line-height:1.7}
+    .pub-actions{display:flex;flex-wrap:wrap;gap:12px;margin:15px 0 25px}
+    .pub-btn{background:#173c2a;color:white;border:0;border-radius:7px;padding:14px 18px;font-weight:750;font-size:13px;cursor:pointer}
+    .pub-btn:disabled{opacity:.4;cursor:not-allowed}
+    .pub-btn.secondary{background:white;color:#246b42;border:1px solid #cadbce}
+    .pub-review{background:white;border:1px solid #d9e5dc;border-radius:10px;overflow:hidden}
+    .pub-review-head{display:flex;align-items:center;justify-content:space-between;gap:15px;padding:20px 22px;border-bottom:1px solid #e0e8e0}
+    .pub-review-head h2{font-size:21px;margin:0}
+    .pub-review-head p{color:#647f6d;font-size:12px;margin:0}
+    .pub-rows{max-height:510px;overflow:auto}
+    .pub-row{display:grid;grid-template-columns:40px 1fr 145px;gap:14px;align-items:start;padding:18px 21px;border-bottom:1px solid #e8eee8}
+    .pub-row:last-child{border:0}
+    .pub-row input[type=checkbox]{width:18px;height:18px;margin-top:7px;accent-color:#2a8252}
+    .pub-row strong{display:block;font-size:15px;letter-spacing:-.02em;overflow-wrap:anywhere}
+    .pub-row .detail{font-size:12px;line-height:1.6;color:#587363;display:block;margin-top:7px;grid-template-columns:none}
+    .pub-row .pub-source{display:block;font-size:11px;color:#31734d;margin-top:7px;overflow-wrap:anywhere}
+    .pub-meta{color:#768d7d;font-size:11px;text-align:right}
+    .pub-meta b{color:#2b6d46;display:block;margin-bottom:4px}
+    .pub-row.held{opacity:.65;background:#fafbf9}
+    .pub-confirm{display:flex;align-items:start;gap:12px;padding:19px 21px;background:#eff6ee;color:#365f45;font-size:12px;line-height:1.7}
+    .pub-confirm input{margin-top:4px;accent-color:#33865b}
+    .pub-note{font-size:12px;color:#617767;line-height:1.8;margin-top:25px;max-width:820px}
+    a{overflow-wrap:anywhere}
+    @media(max-width:760px){.pub-steps{grid-template-columns:1fr}.pub-row{grid-template-columns:30px 1fr}.pub-meta{grid-column:2;text-align:left}.pub-review-head{display:block}.pub-review-head p{margin-top:8px}}
+  </style>
+  <script src="./publisher.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#publisher">Skip to publisher</a>
+  <div class="eyebrow-bar">GTA RADAR <span aria-hidden="true">•</span> EDITORIAL WORKSPACE · LOCAL PROCESSING</div>
+  <header class="header">
+    <div class="wrap header-inner">
+      <a class="brand" href="./index.html"><span class="brand-icon" aria-hidden="true">✳</span><span class="brand-text"><strong>GTA RADAR</strong><small>EDITORIAL PUBLISHER</small></span></a>
+      <nav class="nav" aria-label="Navigation"><a href="./index.html">Website</a><a href="./opportunities.html">Opportunity board</a></nav>
+    </div>
+  </header>
+  <main id="publisher" class="wrap publisher">
+    <span class="section-number">PRIVATE EDITORIAL WORKFLOW</span>
+    <h1>Curate today's<br><em>opportunities.</em></h1>
+    <p class="pub-intro">Review Radar's two five-day CSV exports, choose which records are suitable for public publication, and generate a single JSON feed. Everything on this page runs in your browser. No file uploads to a server, no automatic publication, and no emails.</p>
+    <p class="pub-status" id="pub-status" role="status" aria-live="polite">Choose your CSV exports to begin. No records are pre-approved.</p>
+    <div class="pub-steps">
+      <section class="pub-card"><b>01 / Commercial projects</b><label for="pub-general">Five-day general research CSV<input id="pub-general" type="file" accept=".csv,text/csv"></label><p>Choose <code>GTA_RADAR_FRESH_GENERAL_RESEARCH_ALL.csv</code> from today's Radar ZIP.</p></section>
+      <section class="pub-card"><b>02 / Industrial equipment</b><label for="pub-equipment">Five-day equipment research CSV<input id="pub-equipment" type="file" accept=".csv,text/csv"></label><p>Choose <code>GTA_RADAR_FRESH_EQUIPMENT_RESEARCH_ALL.csv</code>. You can use either file or both.</p></section>
+      <section class="pub-card"><b>03 / Editorial date</b><label for="pub-date">Issue date (Ontario)<input id="pub-date" type="date"></label><p>Only records whose source-event date falls within this date and the four preceding calendar days are eligible.</p></section>
+    </div>
+    <div class="pub-actions"><button type="button" id="pub-load" class="pub-btn">Review selected CSVs</button><button type="button" id="pub-select-none" class="pub-btn secondary">Clear selections</button></div>
+    <section class="pub-review" aria-labelledby="review-title">
+      <div class="pub-review-head"><h2 id="review-title">Approval worklist</h2><p id="pub-counts">No files loaded</p></div>
+      <div id="pub-rows" class="pub-rows"><div class="pub-row"><div></div><div><strong>Nothing loaded yet.</strong><span class="detail">Select your five-day CSV files above.</span></div></div></div>
+      <label class="pub-confirm"><input type="checkbox" id="pub-confirm"><span>I have manually checked the original source, dates, accuracy and relevant publication/reuse rights for every selected record. I understand these are research candidates, not verified open tenders, buyers or supplier contracts.</span></label>
+    </section>
+    <div class="pub-actions"><button type="button" id="pub-export" class="pub-btn" disabled>Download approved opportunities.json</button></div>
+    <p class="pub-note"><strong>How publishing works:</strong> This tool creates a file on your computer; it cannot change the live website. After downloading, replace <code>website/data/opportunities.json</code> in the GitHub repository with the reviewed file, commit the change, and manually run the existing <strong>Deploy GTA Radar marketing website</strong> workflow. Never publish an unreviewed Radar export directly. Publishing a record does not establish its original announcement date or open purchasing status.</p>
+  </main>
+</body>
+</html>
