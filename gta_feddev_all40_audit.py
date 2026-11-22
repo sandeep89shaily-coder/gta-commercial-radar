@@ -75,7 +75,11 @@ _GENERIC_POLICY = re.compile(
     r"\\b(?:businesses of all sizes|eligible businesses|"
     r"productivity mega deduction|funding applications|"
     r"businesses and organizations can apply|"
-    r"government is helping canadian businesses)\\b", re.I)
+    r"government is helping canadian businesses|"
+    r"sectors where canada has strong expertise|"
+    r"industries support thousands of jobs|"
+    r"defence ecosystem is dynamic|"
+    r"government of canada is aiming to transform)\\b", re.I)
 
 def _specific_equipment_quote(text):
     """Extract an equipment/action/source passage; never infer a supplier bid."""
@@ -85,6 +89,12 @@ def _specific_equipment_quote(text):
                   str(text or ""),maxsplit=1,flags=re.I)[0]
     for found in _SPECIFIC_MACHINE.finditer(main):
         excerpt=main[max(0,found.start()-230):found.end()+230]
+        # A roster of recipient company names such as "Cravo Equipment" or
+        # "Ascension Automation" does not itself describe an equipment order.
+        if (excerpt.count(",") >= 4 and not re.search(
+                r"\\b(?:is receiving|will install|will purchase|is undertaking|"
+                r"plans to install|plans to purchase)\\b", excerpt, re.I)):
+            continue
         if (_GENERIC_POLICY.search(excerpt)
                 or not _CONCRETE_ACTION.search(excerpt)
                 or not _SITE_CONTEXT.search(excerpt)):
