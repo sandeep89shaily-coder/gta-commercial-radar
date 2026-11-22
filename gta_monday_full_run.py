@@ -911,6 +911,61 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
         report["combined_24_city_source_readiness"] = {
             "status":"NOT_RUN_COMBINED_COLLECTION_UNAVAILABLE_OR_HISTORICAL"}
 
+    # Give current five-day, source-backed leads a chance at deeper AI
+    # investigation BEFORE older combined-universe ranking spends the shared
+    # budget. No arbitrary Top 10 truncation: every eligible row is queued,
+    # with monetary ledger and immutable evidence checkpoints controlling
+    # requests. Historical mode and stub-run tests do not make paid calls.
+    if not skip_collection and runner is None:
+        try:
+            from gta_unified_municipal_daily import run as run_municipal_changes
+            from gta_freshness_first_daily_selection import run as run_fresh
+            from gta_five_day_all_ai_queue import prepare as prepare_all_ai
+            from gta_execute_ai_project_research import execute as investigate_all
+            daily_changes=run_municipal_changes(results)
+            fresh_status=run_fresh(results)
+            all_ai=prepare_all_ai(results)
+            report["freshness_first_daily_selection"]=fresh_status
+            report["unified_municipal_daily_changes"]=daily_changes
+            report["all_five_day_ai_research"]={
+                "status":all_ai["status"],
+                "input_rows":all_ai["counts"]["all_five_day_rows"],
+                "eligible_rows":all_ai["eligible_for_source_backed_ai"],
+                "held_rows":all_ai["held_with_specific_reason"],
+                "source_cities":all_ai["cities_with_eligible_records"],
+                "ai_queue_file":str(results/"GTA_RADAR_FIVE_DAY_ALL_AI_CANDIDATES.csv"),
+                "outreach_authorized":False,
+            }
+            if all_ai["eligible_for_source_backed_ai"]>0:
+                ai_result=investigate_all(
+                    results/"GTA_RADAR_FIVE_DAY_ALL_AI_CANDIDATES.csv",
+                    results,results/"FRESH_AI_INVESTIGATIONS",
+                    paid=True,max_projects=all_ai["eligible_for_source_backed_ai"])
+                report["all_five_day_ai_research"].update({
+                    "investigation_status":ai_result["status"],
+                    "ai_attempted":ai_result["attempted"],
+                    "ai_completed_review_only":ai_result["completed"],
+                    "shared_budget_remaining_usd":ai_result.get("budget_remaining_usd"),
+                    "verified_buyers":0,"verified_open_supplier_packages":0,
+                })
+            else:
+                report["all_five_day_ai_research"].update({
+                    "investigation_status":"NO_SOURCE_QUALIFIED_FRESH_PROJECTS",
+                    "ai_attempted":0,"ai_completed_review_only":0})
+        except (OSError,ValueError,TypeError,KeyError,ImportError,RuntimeError) as exc:
+            report["all_five_day_ai_research"]={
+                "status":"ALL_FIVE_DAY_AI_RESEARCH_HELD",
+                "error_type":type(exc).__name__,
+                "ai_completed_review_only":0,
+                "verified_buyers":0,"verified_open_supplier_packages":0,
+                "outreach_authorized":False}
+    else:
+        report["all_five_day_ai_research"]={
+            "status":"HISTORICAL_OR_STUB_RUN_NO_PAID_FRESH_RESEARCH",
+            "ai_completed_review_only":0,"outreach_authorized":False}
+
+    # The legacy combined-universe Top 10 AI pass remains a separately
+    # budget-governed research summary; five-day AI has priority above.
     # This is now the ONLY paid Top 10 model assessment on real full runs.
     # It begins after the combined 24-city input is built; legacy stage above
     # is intentionally deferred so the owner does not pay for two 24-project
