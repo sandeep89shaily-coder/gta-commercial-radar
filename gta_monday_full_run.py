@@ -178,19 +178,34 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
             "<style>body{font:15px Arial;margin:2rem;max-width:1100px}"
             "table{border-collapse:collapse;width:100%}"
             "th,td{padding:9px;border:1px solid #bbb;text-align:left}</style>"
-            "</head><body><h1>GTA Radar — Combined 16 + 8 Municipalities</h1>"
+            "</head><body><h1>GTA Radar — Southern Ontario daily intelligence</h1>"
             "<p>Status: <b>" + html.escape(report["status"]) + "</b></p>"
             "<p>Collector: " + ("fresh output required" if not skip_collection else
                                  "SKIPPED; saved evidence may be older") + "</p>"
             "<p>Source events are not verified buyers, openings or available contracts.</p>"
-            "<h2>Combined 24-city deliverables</h2>"
+            "<h2>Existing 24-city baseline deliverables</h2>"
             "<p><b>Primary cross-region Top 10:</b> "
             "GTA_RADAR_COMBINED_24_CITY_TOP10.csv (DeepSeek only if all "
             "reviewed candidates pass independent model/source checks).</p>"
             "<p><b>Measured source coverage:</b> "
             "GTA_RADAR_COMBINED_24_CITY_LIVE_SOURCE_READINESS.csv. "
-            "The 24 city entries are configured; citywide completeness "
+            "The baseline 24 city entries are configured; citywide completeness "
             "remains unverified when an official source is blocked.</p>"
+            "<h2>Expanded 31-city research coverage (rights-gated)</h2>"
+            "<p><b>Combined research master:</b> "
+            "GTA_RADAR_COMBINED_31_CITY_PROJECT_MASTER.csv. "
+            "The 31 municipalities are configured, NOT verified as 31 live "
+            "application sources. London, Sarnia and Chatham-Kent remain "
+            "permission- and evidence-gated; Windsor is retained once.</p>"
+            "<p><b>Coverage and restrictions:</b> "
+            "GTA_RADAR_COMBINED_31_CITY_COVERAGE.csv and "
+            "GTA_RADAR_WESTERN_CORRIDOR_SOURCE_STATUS.json. "
+            "Check each city's actual live ID counts before reporting coverage. "
+            "No added western research record is automatically a paid AI "
+            "candidate, verified buyer or available procurement.</p>"
+            "<p><b>31-city stage result:</b> " + html.escape(str(
+                report.get("western_31_city_corridor", {}).get("status",
+                           "NOT_RUN"))) + "</p>"
             "<p><b>DeepSeek outcome:</b> " + html.escape(str(
                 report.get("ai_top10_preselection", {}).get("status", "NOT_RUN")))
             + " (candidate count " + html.escape(str(
