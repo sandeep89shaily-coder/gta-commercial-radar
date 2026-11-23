@@ -101,6 +101,16 @@ class FourCityLiveAndReconcile(unittest.TestCase):
             self.assertEqual(result["model_research_scope"],"COMBINED_28")
             self.assertTrue((root/"GTA_RADAR_COMBINED_28_CITY_TOP10.csv").exists())
             self.assertTrue((root/"GTA_RADAR_COMBINED_24_CITY_PROJECT_MASTER.csv").exists())
+            base_file = root / "GTA_RADAR_COMBINED_24_CITY_PROJECT_MASTER.csv"
+            write(base_file, legacy.COLS, [])
+            result = together.run(root, today=DAY)
+            self.assertEqual(result["all_four_added_city_source_rows"], 4)
+            with (root / together.MASTER).open(encoding="utf-8-sig") as fp:
+                self.assertEqual(len(list(csv.DictReader(fp))), 4)
+            base_file.unlink()
+            with self.assertRaisesRegex(ValueError, "CURRENT_24_CITY_MASTER_REQUIRED"):
+                together.run(root, today=DAY)
+
 
     def test_partial_alternative_source_updates_city_coverage_not_legacy_failure(self):
         with tempfile.TemporaryDirectory() as temp:

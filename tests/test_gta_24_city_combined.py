@@ -140,6 +140,21 @@ class Combined24CityTests(unittest.TestCase):
                 {"city":"North Bay","lane":"PUBLIC_PLANNING_NOTICES",
                  "status":"NO_EXACT_PLANNING_NOTICES_DISCOVERED"}]}))
 
+    def test_empty_core_with_valid_schema_preserves_independent_sources(self):
+        core = self.root / "GTA_RADAR_COLLECTION_MASTER.csv"
+        core.write_text("canonical_id,city,record_kind,application_id\n", encoding="utf-8")
+        result = m.run(self.root, today=dt.date(2026, 11, 23))
+        self.assertEqual(result["core_collection_input_rows"], 0)
+        self.assertGreater(result["unique_application_files_in_combined_master"], 0)
+        self.assertEqual(len(read_csv(self.root / m.COVERAGE)), 24)
+        for invalid in ("", "city,scope\n"):
+            core.write_text(invalid, encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "CORE_16_COLLECTION_MISSING_OR_CONFIG_CHANGED"):
+                m.run(self.root)
+        core.unlink()
+        with self.assertRaisesRegex(ValueError, "CORE_16_COLLECTION_MISSING_OR_CONFIG_CHANGED"):
+            m.run(self.root)
+
     def test_all_24_cities_combined_without_inventing_coverage(self):
         status=m.run(self.root,today=dt.date(2026,11,18))
         self.assertEqual(status["configured_city_count"],24)
