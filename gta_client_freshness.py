@@ -296,6 +296,11 @@ def run(results, *, today=None):
                  "<a href='"+CLIENT_EXCLUDED+"'>Previously reported exclusions</a> · "
                  "<a href='"+CLIENT_STATUS+"'>Audit and score definitions</a></p></body></html>")
     (root/CLIENT_HTML).write_text("".join(pages),encoding="utf-8")
+    # Separate, fail-closed buyer/procurement evidence recheck. No automatic
+    # promotion to sale-ready and no existing SQLite / history changes.
+    from gta_buyer_verification import run as buyer_review
+    result["buyer_verification_review"] = buyer_review(root)
+    (root/CLIENT_STATUS).write_text(json.dumps(result,indent=2),encoding="utf-8")
     return result
 
 
