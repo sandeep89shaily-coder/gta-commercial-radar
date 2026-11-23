@@ -41,7 +41,7 @@ def read_candidates(path):
         valid.append(row)
     return valid
 
-def locate_candidates(results,explicit=None):
+def locate_candidates(results,explicit=None,*,allow_missing=False):
     """Find V8 queue across normal and legacy result layouts; verify content."""
     root=Path(results)
     locations=[root,root/"results",root/"RESULTS",root.parent,root.parent/"GTA_RADAR_RESULTS"]
@@ -58,6 +58,8 @@ def locate_candidates(results,explicit=None):
             continue
         if rows:return path,rows
         checked.append({"path":str(path),"reason":"NO_ELIGIBLE_SOURCED_PROJECTS"})
+    if allow_missing and not explicit and not checked:
+        return None, []
     raise ValueError("No eligible V8 sourced project queue found; checked: "+json.dumps(checked)[:900])
 
 def select_projects(projects, *, today=None):
