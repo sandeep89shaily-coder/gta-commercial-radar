@@ -134,6 +134,21 @@ def _event(path, entry):
         stream.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
 
+def _daily_report_confirms_empty_queue(results):
+    path = results / "GTA_RADAR_V6_RUN.json"
+    try:
+        report = json.loads(path.read_text(encoding="utf-8"))
+        ai = report["selective_ai"]
+        return (report["investigation_date"] == dt.date.today().isoformat()
+                and report["status"] == "SUCCESS"
+                and bool(report["finished_local"])
+                and ai["status"] == "NO_ELIGIBLE_NEW_PROJECTS"
+                and ai["eligible_for_ai"] == 0
+                and ai["pending_before"] == 0)
+    except (OSError, ValueError, TypeError, KeyError):
+        return False
+
+
 def run(results, out=None, *, candidates=None, paid=False, max_projects=3,
         executor=None, acquire_lock=None):
     """Run one bounded cycle. All paid work goes through the legacy ledger.
@@ -170,7 +185,15 @@ def run(results, out=None, *, candidates=None, paid=False, max_projects=3,
     _event(events_path, {"at": state["started_utc"], "event": "RUN_STARTED",
                          "mode": state["mode"]})
     try:
-        source, projects = locate_candidates(results, candidates)
+        source, projects = locate_candidates(
+            results, candidates,
+            allow_missing=not candidates and _daily_report_confirms_empty_queue(results),
+        )
+        if source is None:
+            state["status"] = "NO_ELIGIBLE_NEW_PROJECTS"
+            state["steps"].append({"name": "candidate_preflight", "status": state["status"],
+                                   "candidates": 0, "eligible": 0})
+            return state
         eligible, selection = select_projects(projects)
         selected = [row for row, _ in eligible[:10]]
         state["candidate_source"] = str(source)
