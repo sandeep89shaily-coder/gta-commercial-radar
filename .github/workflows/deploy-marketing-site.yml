@@ -38,6 +38,7 @@ jobs:
           mkdir -p _site/data
           cp website/index.html website/styles.css website/premium.css website/app.js _site/
           cp website/opportunities.html website/opportunities.css website/premium-opportunities.css website/opportunities.js _site/
+          cp website/robots.txt website/sitemap.xml _site/
           cp website/data/opportunities.json _site/data/
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
