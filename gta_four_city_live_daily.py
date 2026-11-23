@@ -161,10 +161,12 @@ def run(results, *, collector=None, today=None, check_robots=True):
         except (OSError, ValueError, UnicodeError):
             old={}
     next_ledger=dict(old)
+    cities_with_history={key.split("|",1)[0] for key in old}
     accepted=[]; health=[]
     for city in CITIES:
         info={"city":city,"status":"SOURCE_NOT_ATTEMPTED",
               "retrieved_application_id_records":0,
+              "initial_baseline":city.upper() not in cities_with_history,
               "verified_citywide_coverage":False,
               "buyer_verified":0,"original_publication_verified":0,
               "new_project_publications_verified":0}
