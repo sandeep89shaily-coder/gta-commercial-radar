@@ -1,5 +1,6 @@
 """Offline harness tests: default no-spend, evidence safety, resume and failure."""
 import csv
+import datetime as dt
 import hashlib
 import json
 import tempfile
@@ -72,6 +73,28 @@ class HarnessTests(unittest.TestCase):
         self.assertTrue(result["projects"][0]["planned_tasks"])
         self.assertEqual(result["metrics"]["saved_current_input_reviews"], 0)
         self.assertTrue((self.out / "AI_HARNESS_EVENTS.jsonl").is_file())
+
+    def test_current_successful_empty_daily_queue_is_a_no_spend_outcome(self):
+        self.queue.unlink()
+        summary = self.root / "GTA_RADAR_V6_RUN.json"
+        state = {
+            "status": "SUCCESS",
+            "investigation_date": dt.date.today().isoformat(),
+            "finished_local": dt.datetime.now().astimezone().isoformat(),
+            "selective_ai": {"status": "NO_ELIGIBLE_NEW_PROJECTS",
+                             "eligible_for_ai": 0, "pending_before": 0},
+        }
+        summary.write_text(json.dumps(state), encoding="utf-8")
+        with patch.object(harness, "execute_project_research") as paid:
+            result = harness.run(self.root, self.out, paid=True)
+        self.assertEqual(result["status"], "NO_ELIGIBLE_NEW_PROJECTS")
+        self.assertIn("finished_utc", result)
+        paid.assert_not_called()
+        with self.assertRaises(ValueError):
+            harness.run(self.root, self.out, candidates=self.queue)
+        self.queue.write_text("invalid,csv\nvalue,row\n", encoding="utf-8")
+        with self.assertRaises(ValueError):
+            harness.run(self.root, self.out)
 
     def test_paid_opt_in_calls_existing_executor_under_shared_lock(self):
         sequence = []
