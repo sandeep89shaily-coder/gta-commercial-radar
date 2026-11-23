@@ -145,10 +145,14 @@ def run(results,*,today=None,not_before=None):
             raw_obs=str(r.get("observation") or r.get("source_observation") or "").strip().upper()
             obs=OBS_ALIASES.get(lane,{}).get(raw_obs,raw_obs)
             city=str(r.get("city") or "").strip()
-            if lane=="FOUR_CITY_LIVE" and four_health.get(city,{}).get("status") != "LIVE_APPLICATION_IDS_RETRIEVED_PARTIAL_COVERAGE":
-                audit["rejected"]+=1
-                rejected_reasons["NO_CURRENT_SUCCESSFUL_CITY_SOURCE"]+=1
-                continue
+            if lane=="FOUR_CITY_LIVE":
+                city_source=four_health.get(city,{})
+                if city_source.get("status") != "LIVE_APPLICATION_IDS_RETRIEVED_PARTIAL_COVERAGE":
+                    audit["rejected"]+=1
+                    rejected_reasons["NO_CURRENT_SUCCESSFUL_CITY_SOURCE"]+=1
+                    continue
+                if city_source.get("initial_baseline") and obs=="FIRST_OBSERVED":
+                    obs="INITIAL_BASELINE"
             if obs in NON_EVENTS or obs.startswith("INITIAL_BASELINE_"):
                 label="unchanged" if obs=="UNCHANGED" else "baseline"
                 audit[label]+=1
