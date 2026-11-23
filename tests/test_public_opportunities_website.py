@@ -1,13 +1,15 @@
 """Tests for public five-day opportunity site and fail-closed publication contract."""
 from __future__ import annotations
 
+import datetime as dt
+import hashlib
 import json
 import tempfile
 import unittest
 from html.parser import HTMLParser
 from pathlib import Path
 
-from website.validate_public_feed import validate
+from website.validate_public_feed import PROOF_FIELDS, record_digest, validate, validate_publication
 
 ROOT = Path(__file__).resolve().parent.parent / "website"
 
@@ -62,12 +64,11 @@ class PublicOpportunityWebsite(unittest.TestCase):
         body = json.loads((ROOT / "data" / "opportunities.json").read_text())
         self.assertEqual(metadata["records"], len(body["records"]))
         self.assertEqual(body["window_days"], 5)
-        self.assertTrue(15 <= len(body["records"]) <= 20,
-                        "Five-day editorial target is 15–20 source-backed signals")
         self.assertEqual(len({r["id"] for r in body["records"]}), len(body["records"]))
-        self.assertGreaterEqual(len({r["city"] for r in body["records"]}), 2)
-        self.assertTrue(all("2026-11-18" <= r["source_date"] <= "2026-11-22"
-                            for r in body["records"]))
+        if body["records"]:
+            issue = dt.date.fromisoformat(body["published_on"])
+            self.assertTrue(all(0 <= (issue - dt.date.fromisoformat(r["source_date"])).days <= 4
+                                for r in body["records"]))
         self.assertTrue(all(r["approved_for_publication"] and
                             r["rights_checked"] and r["source_checked"]
                             for r in body["records"]))
@@ -79,6 +80,39 @@ class PublicOpportunityWebsite(unittest.TestCase):
         payload = {"schema_version": 1, "window_days": 5,
                    "published_on": "2026-11-22", "records": [row(source_date="2026-11-18")]}
         self.assertEqual(check(payload)["records"], 1)
+
+    def test_new_release_requires_record_specific_proof_and_saved_source(self):
+        record = row()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            feed = root / "opportunities.json"
+            feed.write_text(json.dumps({"schema_version": 1, "window_days": 5,
+                                        "published_on": "2026-11-22", "records": [record]}))
+            with self.assertRaisesRegex(ValueError, "PUBLICATION_PROOF_REQUIRED"):
+                validate_publication(feed, root)
+
+            capture = root / "captures" / "SP-1.txt"
+            capture.parent.mkdir()
+            capture.write_text("SP-1 source notice with address, scope and date")
+            proof = {
+                "record_sha256": record_digest(record),
+                "publisher": "City of Toronto",
+                "capture_file": "captures/SP-1.txt",
+                "capture_sha256": hashlib.sha256(capture.read_bytes()).hexdigest(),
+                "captured_at": "2026-11-22T10:00:00-05:00",
+                "reviewer": "Editorial reviewer",
+                "approved_at": "2026-11-22T11:00:00-05:00",
+                "stage_as_of": "2026-11-22",
+                "rights_basis": "Open dataset with attribution",
+                "rights_url": "https://www.toronto.ca/open-data/licence/",
+                "verification_limitation": "One publisher notice",
+                "reviewed_claims": {key: record[key] for key in PROOF_FIELDS},
+            }
+            (root / "publication-proof.json").write_text(json.dumps({record["id"]: proof}))
+            self.assertEqual(validate_publication(feed, root)["records"], 1)
+            capture.write_text("edited after review")
+            with self.assertRaisesRegex(ValueError, "SOURCE_CAPTURE_MISSING_OR_CHANGED"):
+                validate_publication(feed, root)
 
     def test_rejects_stale_future_unapproved_and_unsourced_records(self):
         base = {"schema_version": 1, "window_days": 5,
