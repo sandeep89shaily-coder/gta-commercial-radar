@@ -206,6 +206,10 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
             "<p><b>31-city stage result:</b> " + html.escape(str(
                 report.get("western_31_city_corridor", {}).get("status",
                            "NOT_RUN"))) + "</p>"
+            "<p><a href='../GTA_RADAR_UNIFIED_MUNICIPAL_CITY_AUDIT.csv'>"
+            "Daily municipal activity and source access</a>. "
+            "See which cities changed, which returned unchanged records, "
+            "and which source attempts failed.</p>"
             "<p><b>DeepSeek outcome:</b> " + html.escape(str(
                 report.get("ai_top10_preselection", {}).get("status", "NOT_RUN")))
             + " (candidate count " + html.escape(str(
@@ -224,6 +228,51 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
 
     save()
     run = runner or subprocess.run
+    run_threshold = dt.datetime.fromisoformat(started).timestamp() - 3
+    deferred_harness = None
+
+    def run_stage(name, cmd, log, critical):
+        try:
+            with log.open("w", encoding="utf-8") as stream:
+                result = run(cmd, cwd=ROOT, stdout=stream, stderr=subprocess.STDOUT)
+            exit_code = result.returncode
+            failure = ""
+        except (OSError, ValueError) as exc:
+            exit_code = 125
+            failure = type(exc).__name__ + ": " + str(exc)[:200]
+            log.write_text(failure, encoding="utf-8")
+        row = {
+            "name": name, "status": "PASSED" if exit_code == 0 else "FAILED",
+            "exit_code": exit_code, "critical": critical,
+            "log": str(log),
+        }
+        if failure:
+            row["error"] = failure
+        report["stages"].append(row)
+        return row
+
+    def inspect_harness():
+        # Exit code 0 is not evidence that DeepSeek ran or was billed.
+        # The harness's own manifest explicitly reports attempts and
+        # model results; never equate ledger holds with API charges.
+        ai_manifest = results / "AGENT_HARNESS_REVIEW" / "AI_HARNESS_STATUS.json"
+        try:
+            data = json.loads(ai_manifest.read_text(encoding="utf-8"))
+            report["ai_harness_diagnostics"] = {
+                "status": data.get("status", "UNKNOWN"),
+                "mode": data.get("mode", "UNKNOWN"),
+                "research_attempts": data.get("executor", {}).get("attempted", 0),
+                "research_completed": data.get("executor", {}).get("completed", 0),
+                "model_calls_billed_verified": False,
+                "local_guard_used_or_held_usd_not_billing": data.get(
+                    "executor", {}).get("budget_used_or_held_usd"),
+            }
+        except (OSError, ValueError, TypeError) as exc:
+            report["ai_harness_diagnostics"] = {
+                "status": "HARNESS_REPORT_MISSING_OR_UNREADABLE",
+                "error_type": type(exc).__name__,
+            }
+
     for name, args, critical in stages(
             ws, results, industrial_limit=industrial_limit,
             skip_collection=skip_collection):
@@ -258,80 +307,12 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
                 "outreach_authorized": False}
             save()
             continue
-        # Source-backed fresh investigation runs before the older paid
-        # adaptive harness can consume the shared DeepSeek budget.
-        if name in ("ai_harness_adaptive","ai_harness_free"):
-            # Give current five-day, source-backed leads a chance at deeper AI
-            # investigation BEFORE older combined-universe ranking spends the shared
-            # budget. No arbitrary Top 10 truncation: every eligible row is queued,
-            # with monetary ledger and immutable evidence checkpoints controlling
-            # requests. Historical mode and stub-run tests do not make paid calls.
-            if not skip_collection and runner is None and report["fresh_collection_verified"]:
-                try:
-                    from gta_unified_municipal_daily import run as run_municipal_changes
-                    from gta_freshness_first_daily_selection import run as run_fresh
-                    from gta_five_day_all_ai_queue import prepare as prepare_all_ai
-                    from gta_execute_ai_project_research import execute as investigate_all
-                    daily_changes=run_municipal_changes(results)
-                    fresh_status=run_fresh(results)
-                    all_ai=prepare_all_ai(results)
-                    report["freshness_first_daily_selection"]=fresh_status
-                    report["unified_municipal_daily_changes"]=daily_changes
-                    report["all_five_day_ai_research"]={
-                        "status":all_ai["status"],
-                        "input_rows":all_ai["counts"].get("all_five_day_rows",0),
-                        "eligible_rows":all_ai["eligible_for_source_backed_ai"],
-                        "held_rows":all_ai["held_with_specific_reason"],
-                        "source_cities":all_ai["cities_with_eligible_records"],
-                        "ai_queue_file":str(results/"GTA_RADAR_FIVE_DAY_ALL_AI_CANDIDATES.csv"),
-                        "outreach_authorized":False,
-                    }
-                    if all_ai["eligible_for_source_backed_ai"]>0:
-                        ai_result=investigate_all(
-                            results/"GTA_RADAR_FIVE_DAY_ALL_AI_CANDIDATES.csv",
-                            results,results/"FRESH_AI_INVESTIGATIONS",
-                            paid=True,max_projects=all_ai["eligible_for_source_backed_ai"])
-                        report["all_five_day_ai_research"].update({
-                            "investigation_status":ai_result["status"],
-                            "ai_attempted":ai_result["attempted"],
-                            "ai_completed_review_only":ai_result["completed"],
-                            "shared_budget_remaining_usd":ai_result.get("budget_remaining_usd"),
-                            "verified_buyers":0,"verified_open_supplier_packages":0,
-                        })
-                    else:
-                        report["all_five_day_ai_research"].update({
-                            "investigation_status":"NO_SOURCE_QUALIFIED_FRESH_PROJECTS",
-                            "ai_attempted":0,"ai_completed_review_only":0})
-                except (OSError,ValueError,TypeError,KeyError,ImportError,RuntimeError) as exc:
-                    report["all_five_day_ai_research"]={
-                        "status":"ALL_FIVE_DAY_AI_RESEARCH_HELD",
-                        "error_type":type(exc).__name__,
-                        "ai_completed_review_only":0,
-                        "verified_buyers":0,"verified_open_supplier_packages":0,
-                        "outreach_authorized":False}
-            else:
-                report["all_five_day_ai_research"]={
-                    "status":"HISTORICAL_OR_STUB_RUN_NO_PAID_FRESH_RESEARCH",
-                    "ai_completed_review_only":0,"outreach_authorized":False}
+        if name == "ai_harness_adaptive" and runner is None:
+            deferred_harness = (name, cmd, log, critical)
+            continue
 
-
-        try:
-            with log.open("w", encoding="utf-8") as stream:
-                result = run(cmd, cwd=ROOT, stdout=stream, stderr=subprocess.STDOUT)
-            exit_code = result.returncode
-            failure = ""
-        except (OSError, ValueError) as exc:
-            exit_code = 125
-            failure = type(exc).__name__ + ": " + str(exc)[:200]
-            log.write_text(failure, encoding="utf-8")
-        row = {
-            "name": name, "status": "PASSED" if exit_code == 0 else "FAILED",
-            "exit_code": exit_code, "critical": critical,
-            "log": str(log),
-        }
-        if failure:
-            row["error"] = failure
-        report["stages"].append(row)
+        row = run_stage(name, cmd, log, critical)
+        exit_code = row["exit_code"]
         if name == "council_agenda_intelligence":
             council_file = results / "COUNCIL_INTELLIGENCE_REVIEW" / "COUNCIL_INTEGRATED_REVIEW_STATUS.json"
             try:
@@ -412,26 +393,7 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
                 report["ai_top10_preselection"] = {
                     "status": "SKIPPED_NO_FRESH_COLLECTION"}
         if name in ("ai_harness_adaptive", "ai_harness_free"):
-            # Exit code 0 is not evidence that DeepSeek ran or was billed.
-            # The harness's own manifest explicitly reports attempts and
-            # model results; never equate ledger holds with API charges.
-            ai_manifest = results / "AGENT_HARNESS_REVIEW" / "AI_HARNESS_STATUS.json"
-            try:
-                data = json.loads(ai_manifest.read_text(encoding="utf-8"))
-                report["ai_harness_diagnostics"] = {
-                    "status": data.get("status", "UNKNOWN"),
-                    "mode": data.get("mode", "UNKNOWN"),
-                    "research_attempts": data.get("executor", {}).get("attempted", 0),
-                    "research_completed": data.get("executor", {}).get("completed", 0),
-                    "model_calls_billed_verified": False,
-                    "local_guard_used_or_held_usd_not_billing": data.get(
-                        "executor", {}).get("budget_used_or_held_usd"),
-                }
-            except (OSError, ValueError, TypeError) as exc:
-                report["ai_harness_diagnostics"] = {
-                    "status": "HARNESS_REPORT_MISSING_OR_UNREADABLE",
-                    "error_type": type(exc).__name__,
-                }
+            inspect_harness()
         if name == "industrial_investment_and_contacts":
             bridge_path = (results / "GTA_RADAR_INVESTMENT_CONTACT_BRIDGE" /
                            "INVESTMENT_CONTACT_INTEGRATION_STATUS.json")
@@ -462,30 +424,6 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
         save()
         print(name + ": " + row["status"] + " | " + str(log), flush=True)
 
-    # Provide an independent, read-only breakdown of the *local software*
-    # guard. Reservations and estimates are NOT DeepSeek provider invoices.
-    # The SQLite files are opened read-only and remain unchanged.
-    if not skip_collection:
-        try:
-            from gta_ai_budget_guard_diagnostic import run as run_ai_guard_diagnostic
-            audit = run_ai_guard_diagnostic(results)
-            report["deepseek_guard_diagnostic"] = {
-                "status": audit["status"],
-                "provider_billing_verified": False,
-                "provider_actual_billed_usd": None,
-                "shared_completed_estimate_usd": audit["shared_ledger"].get(
-                    "completed_estimate_usd"),
-                "shared_unresolved_reserved_usd": audit["shared_ledger"].get(
-                    "unresolved_reserved_usd"),
-                "local_guard_usage_usd_not_provider_billing": audit[
-                    "shared_ledger"].get("local_guard_usage_usd"),
-            }
-        except (OSError, ValueError, TypeError, ImportError) as exc:
-            report["deepseek_guard_diagnostic"] = {
-                "status": "BUDGET_GUARD_AUDIT_HELD",
-                "error_type": type(exc).__name__,
-                "provider_billing_verified": False,
-            }
 
     # New source quality: municipal application details were previously lost
     # behind the Mississauga index's 30-row history and blocked ArcGIS feeds.
@@ -983,6 +921,61 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
         report["combined_24_city_source_readiness"] = {
             "status":"NOT_RUN_COMBINED_COLLECTION_UNAVAILABLE_OR_HISTORICAL"}
 
+    # Regional collectors must finish before the five-day AI queue is built.
+    if not skip_collection and runner is None and report["fresh_collection_verified"]:
+        try:
+            from gta_unified_municipal_daily import run as run_municipal_changes
+            from gta_freshness_first_daily_selection import run as run_fresh
+            from gta_five_day_all_ai_queue import prepare as prepare_all_ai
+            from gta_execute_ai_project_research import execute as investigate_all
+            daily_changes=run_municipal_changes(results, not_before=run_threshold)
+            fresh_status=run_fresh(results)
+            all_ai=prepare_all_ai(results)
+            report["freshness_first_daily_selection"]=fresh_status
+            report["unified_municipal_daily_changes"]=daily_changes
+            report["all_five_day_ai_research"]={
+                "status":all_ai["status"],
+                "input_rows":all_ai["counts"].get("all_five_day_rows",0),
+                "eligible_rows":all_ai["eligible_for_source_backed_ai"],
+                "held_rows":all_ai["held_with_specific_reason"],
+                "source_cities":all_ai["cities_with_eligible_records"],
+                "ai_queue_file":str(results/"GTA_RADAR_FIVE_DAY_ALL_AI_CANDIDATES.csv"),
+                "outreach_authorized":False,
+            }
+            if all_ai["eligible_for_source_backed_ai"]>0:
+                ai_result=investigate_all(
+                    results/"GTA_RADAR_FIVE_DAY_ALL_AI_CANDIDATES.csv",
+                    results,results/"FRESH_AI_INVESTIGATIONS",
+                    paid=True,max_projects=all_ai["eligible_for_source_backed_ai"])
+                report["all_five_day_ai_research"].update({
+                    "investigation_status":ai_result["status"],
+                    "ai_attempted":ai_result["attempted"],
+                    "ai_completed_review_only":ai_result["completed"],
+                    "shared_budget_remaining_usd":ai_result.get("budget_remaining_usd"),
+                    "verified_buyers":0,"verified_open_supplier_packages":0,
+                })
+            else:
+                report["all_five_day_ai_research"].update({
+                    "investigation_status":"NO_SOURCE_QUALIFIED_FRESH_PROJECTS",
+                    "ai_attempted":0,"ai_completed_review_only":0})
+        except (OSError,ValueError,TypeError,KeyError,ImportError,RuntimeError) as exc:
+            report["all_five_day_ai_research"]={
+                "status":"ALL_FIVE_DAY_AI_RESEARCH_HELD",
+                "error_type":type(exc).__name__,
+                "ai_completed_review_only":0,
+                "verified_buyers":0,"verified_open_supplier_packages":0,
+                "outreach_authorized":False}
+    else:
+        report["all_five_day_ai_research"]={
+            "status":"HISTORICAL_OR_STUB_RUN_NO_PAID_FRESH_RESEARCH",
+            "ai_completed_review_only":0,"outreach_authorized":False}
+
+    if deferred_harness:
+        row = run_stage(*deferred_harness)
+        inspect_harness()
+        save()
+        print(row["name"] + ": " + row["status"] + " | " + row["log"], flush=True)
+
     # The legacy combined-universe Top 10 AI pass remains a separately
     # budget-governed research summary; five-day AI has priority above.
     # This is now the ONLY paid Top 10 model assessment on real full runs.
@@ -1063,6 +1056,32 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
                 "status": "COMBINED_24_INPUT_INCOMPLETE_PAID_AI_NOT_STARTED",
                 "applies_to_top10": False,
                 "verified_buyers": 0,
+            }
+
+
+    # Provide an independent, read-only breakdown of the *local software*
+    # guard. Reservations and estimates are NOT DeepSeek provider invoices.
+    # The SQLite files are opened read-only and remain unchanged.
+    if not skip_collection:
+        try:
+            from gta_ai_budget_guard_diagnostic import run as run_ai_guard_diagnostic
+            audit = run_ai_guard_diagnostic(results)
+            report["deepseek_guard_diagnostic"] = {
+                "status": audit["status"],
+                "provider_billing_verified": False,
+                "provider_actual_billed_usd": None,
+                "shared_completed_estimate_usd": audit["shared_ledger"].get(
+                    "completed_estimate_usd"),
+                "shared_unresolved_reserved_usd": audit["shared_ledger"].get(
+                    "unresolved_reserved_usd"),
+                "local_guard_usage_usd_not_provider_billing": audit[
+                    "shared_ledger"].get("local_guard_usage_usd"),
+            }
+        except (OSError, ValueError, TypeError, ImportError) as exc:
+            report["deepseek_guard_diagnostic"] = {
+                "status": "BUDGET_GUARD_AUDIT_HELD",
+                "error_type": type(exc).__name__,
+                "provider_billing_verified": False,
             }
 
     # Read-only quality report is part of post-run evidence accounting, not a
@@ -1369,7 +1388,8 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
     # collection diagnostics; never relabel historical baselines as new.
     try:
         from gta_unified_municipal_daily import run as unified_changes
-        report["unified_municipal_daily_changes"] = unified_changes(results)
+        report["unified_municipal_daily_changes"] = unified_changes(
+            results, not_before=run_threshold if not skip_collection and runner is None else None)
     except (OSError, ValueError, TypeError, ImportError) as exc:
         report["unified_municipal_daily_changes"] = {
             "status":"UNIFIED_MUNICIPAL_CHANGE_RECONCILIATION_HELD",
