@@ -72,13 +72,18 @@ def _clean(v):
     return " ".join(str(v or "").split())
 
 
-def _csv(path):
+def _csv(path, *, required_fields=()):
     if not path.is_file():
+        if required_fields:
+            raise ValueError("CORE_16_COLLECTION_MISSING_OR_CONFIG_CHANGED")
         return []
     if path.is_symlink() or path.stat().st_size > 80_000_000:
         raise ValueError("UNSAFE_COMBINED_SOURCE_FILE:" + path.name)
     with path.open(encoding="utf-8-sig", newline="") as fp:
-        return list(csv.DictReader(fp))
+        rows = csv.DictReader(fp)
+        if not set(required_fields).issubset(rows.fieldnames or ()):
+            raise ValueError("CORE_16_COLLECTION_MISSING_OR_CONFIG_CHANGED")
+        return list(rows)
 
 
 def _json(path):
@@ -291,9 +296,12 @@ def run(results, *, today=None):
     if not root.is_dir():
         raise FileNotFoundError("EXISTING_RESULTS_DIRECTORY_REQUIRED")
     day = today or dt.date.today()
-    originals = _csv(root / "GTA_RADAR_COLLECTION_MASTER.csv")
+    originals = _csv(
+        root / "GTA_RADAR_COLLECTION_MASTER.csv",
+        required_fields=("canonical_id", "city", "record_kind", "application_id"),
+    )
     prior_health = _csv(root / "GTA_RADAR_COLLECTION_HEALTH.csv")
-    if not originals or {x.get("city") for x in prior_health} != set(CORE_CITIES):
+    if {x.get("city") for x in prior_health} != set(CORE_CITIES):
         raise ValueError("CORE_16_COLLECTION_MISSING_OR_CONFIG_CHANGED")
     records = []
     sources = Counter()
@@ -538,6 +546,7 @@ def run(results, *, today=None):
     _write(root / TOP10, COLS, winners)
     result = {
         "status": "COMBINED_16_PLUS_8_RESEARCH_ONLY_NOT_CUSTOMER_RELEASE",
+        "core_collection_input_rows": len(originals),
         "configured_core_cities": list(CORE_CITIES),
         "configured_expansion_cities": list(EXPANSION_CITIES),
         "configured_city_count": 24,
