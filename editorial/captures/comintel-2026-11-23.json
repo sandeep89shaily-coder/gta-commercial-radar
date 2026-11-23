@@ -1,0 +1,257 @@
+{
+  "as_of": "2026-11-23T20:35:09.810322+00:00",
+  "toronto_open_data_attribution": "Contains information licensed under the Open Government Licence – Toronto.",
+  "records": {
+    "toronto-active-permit:26-154673": {
+      "source_url": "https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action/datastore_search?resource_id=6d0229af-bc54-46de-9c2b-26759b01dd05&filters=%7B%22PERMIT_NUM%22%3A+%2226+154673+STR%22%7D&limit=10",
+      "record": {
+        "PERMIT_NUM": "26 154673 STR",
+        "REVISION_NUM": "00",
+        "APPLICATION_DATE": "2026-10-06",
+        "ISSUED_DATE": "2026-11-19",
+        "STATUS": "Permit Issued",
+        "STREET_NUM": "100",
+        "STREET_NAME": "CLAYSON",
+        "STREET_TYPE": "RD",
+        "STREET_DIRECTION": " ",
+        "DESCRIPTION": "Conditional Permit - Part Permit - Proposed construction of the building shell and exterior envelope for the industrial expansion (Phases 1 & 2) at Gay Lea Clayson Rd. Scope includes the primary structural frame, masonry shafts, exterior wall assemblies, roofing systems, and all exterior doors and windows.",
+        "CURRENT_USE": null,
+        "PROPOSED_USE": null
+      }
+    },
+    "toronto-active-permit:26-272920": {
+      "source_url": "https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action/datastore_search?resource_id=6d0229af-bc54-46de-9c2b-26759b01dd05&filters=%7B%22PERMIT_NUM%22%3A+%2226+272920+BLD%22%7D&limit=10",
+      "record": {
+        "PERMIT_NUM": "26 272920 BLD",
+        "REVISION_NUM": "00",
+        "APPLICATION_DATE": "2026-11-20",
+        "ISSUED_DATE": null,
+        "STATUS": "Not Started",
+        "STREET_NUM": "529",
+        "STREET_NAME": "CARLINGVIEW",
+        "STREET_TYPE": "DR",
+        "STREET_DIRECTION": " ",
+        "DESCRIPTION": "Re-installation of a previously existing industrial concrete batching plant.",
+        "CURRENT_USE": "Industrial",
+        "PROPOSED_USE": "Industrial"
+      }
+    },
+    "toronto-active-permit:26-272427": {
+      "source_url": "https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action/datastore_search?resource_id=6d0229af-bc54-46de-9c2b-26759b01dd05&filters=%7B%22PERMIT_NUM%22%3A+%2226+272427+FSU%22%7D&limit=10",
+      "record": {
+        "PERMIT_NUM": "26 272427 FSU",
+        "REVISION_NUM": "00",
+        "APPLICATION_DATE": "2026-11-19",
+        "ISSUED_DATE": null,
+        "STATUS": "Not Started",
+        "STREET_NUM": "201",
+        "STREET_NAME": "GARYRAY",
+        "STREET_TYPE": "DR",
+        "STREET_DIRECTION": " ",
+        "DESCRIPTION": "Proposal for a fire alarm system installation",
+        "CURRENT_USE": "Industrial",
+        "PROPOSED_USE": "Industrial"
+      }
+    },
+    "toronto-active-permit:26-256648": {
+      "source_url": "https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action/datastore_search?resource_id=6d0229af-bc54-46de-9c2b-26759b01dd05&filters=%7B%22PERMIT_NUM%22%3A+%2226+256648+BLD%22%7D&limit=10",
+      "record": {
+        "PERMIT_NUM": "26 256648 BLD",
+        "REVISION_NUM": "00",
+        "APPLICATION_DATE": "2026-10-19",
+        "ISSUED_DATE": "2026-11-20",
+        "STATUS": "Permit Issued",
+        "STREET_NUM": "955",
+        "STREET_NAME": "GERRARD",
+        "STREET_TYPE": "ST",
+        "STREET_DIRECTION": "E",
+        "DESCRIPTION": "Proposal for Interior Alterations",
+        "CURRENT_USE": "Office",
+        "PROPOSED_USE": "Dental Clinic"
+      }
+    },
+    "toronto-active-permit:26-268264": {
+      "source_url": "https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action/datastore_search?resource_id=6d0229af-bc54-46de-9c2b-26759b01dd05&filters=%7B%22PERMIT_NUM%22%3A+%2226+268264+HVA%22%7D&limit=10",
+      "record": {
+        "PERMIT_NUM": "26 268264 HVA",
+        "REVISION_NUM": "00",
+        "APPLICATION_DATE": "2026-11-10",
+        "ISSUED_DATE": "2026-11-19",
+        "STATUS": "Permit Issued",
+        "STREET_NUM": "200",
+        "STREET_NAME": "SPADINA",
+        "STREET_TYPE": "AVE",
+        "STREET_DIRECTION": " ",
+        "DESCRIPTION": "HVAC - Proposed interior renovation and fit-out of an existing two-storey commercial building for a pediatric clinic.",
+        "CURRENT_USE": "Medical Office",
+        "PROPOSED_USE": "Medical Office"
+      }
+    },
+    "toronto-active-permit:26-272291": {
+      "source_url": "https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action/datastore_search?resource_id=6d0229af-bc54-46de-9c2b-26759b01dd05&filters=%7B%22PERMIT_NUM%22%3A+%2226+272291+HVA%22%7D&limit=10",
+      "record": {
+        "PERMIT_NUM": "26 272291 HVA",
+        "REVISION_NUM": "00",
+        "APPLICATION_DATE": "2026-11-19",
+        "ISSUED_DATE": null,
+        "STATUS": "Application Acceptable",
+        "STREET_NUM": "130",
+        "STREET_NAME": "KING",
+        "STREET_TYPE": "ST",
+        "STREET_DIRECTION": "W",
+        "DESCRIPTION": "HVAC - Interior Alterations for the New National Bank of Canada Office Tenancy. Construction requires new openings in structural slab for floor monuments, removal and construction of non-fire rated, non-load bearing interior walls, updated finishes and furnishings as per new tenant layout floor plan.  Minimal Structural, Mechanical, and Electrical upgrades required.  Mechanical work includes replacing existing hot water tank; Structural and Electrical, relocate existing floor monuments in existing slab",
+        "CURRENT_USE": "Office",
+        "PROPOSED_USE": "Office"
+      }
+    },
+    "toronto-active-permit:26-272935": {
+      "source_url": "https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action/datastore_search?resource_id=6d0229af-bc54-46de-9c2b-26759b01dd05&filters=%7B%22PERMIT_NUM%22%3A+%2226+272935+FSU%22%7D&limit=10",
+      "record": {
+        "PERMIT_NUM": "26 272935 FSU",
+        "REVISION_NUM": "00",
+        "APPLICATION_DATE": "2026-11-20",
+        "ISSUED_DATE": null,
+        "STATUS": "Application Acceptable",
+        "STREET_NUM": "90",
+        "STREET_NAME": "WYNFORD",
+        "STREET_TYPE": "DR",
+        "STREET_DIRECTION": " ",
+        "DESCRIPTION": "Sprinkler system revisions to include additional fire protection work on Levels 3 and 4, together with minor revisions to the existing fire protection systems on the Ground Floor, First Floor, and Second Floor. Related permit 24 253435",
+        "CURRENT_USE": "Industrial",
+        "PROPOSED_USE": "Industrial"
+      }
+    },
+    "toronto-active-permit:26-272511": {
+      "source_url": "https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action/datastore_search?resource_id=6d0229af-bc54-46de-9c2b-26759b01dd05&filters=%7B%22PERMIT_NUM%22%3A+%2226+272511+FSU%22%7D&limit=10",
+      "record": {
+        "PERMIT_NUM": "26 272511 FSU",
+        "REVISION_NUM": "00",
+        "APPLICATION_DATE": "2026-11-19",
+        "ISSUED_DATE": null,
+        "STATUS": "Not Started",
+        "STREET_NUM": "55",
+        "STREET_NAME": "UNIVERSITY",
+        "STREET_TYPE": "AVE",
+        "STREET_DIRECTION": " ",
+        "DESCRIPTION": "Proposed Fire/Security upgrades for 5 Fire Alarm Control Panels/Nodes by replacing CPU's and LCD's in existing Edwards Fire Alarm Panels ETS3.",
+        "CURRENT_USE": "Office - Group D",
+        "PROPOSED_USE": "Office - Group D"
+      }
+    },
+    "toronto-active-permit:26-272532": {
+      "source_url": "https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action/datastore_search?resource_id=6d0229af-bc54-46de-9c2b-26759b01dd05&filters=%7B%22PERMIT_NUM%22%3A+%2226+272532+FSU%22%7D&limit=10",
+      "record": {
+        "PERMIT_NUM": "26 272532 FSU",
+        "REVISION_NUM": "00",
+        "APPLICATION_DATE": "2026-11-19",
+        "ISSUED_DATE": null,
+        "STATUS": "Not Started",
+        "STREET_NUM": "4301",
+        "STREET_NAME": "KINGSTON",
+        "STREET_TYPE": "RD",
+        "STREET_DIRECTION": " ",
+        "DESCRIPTION": "Proposed replacement of existing sprinkler header, valves, compressor, piping, standpipe and pipe schedule sprinkler system with new sprinkler header, valves, compressor, piping, standpipe and hydraulically designed sprinkler system. Installation of heat tracing, new double check detector assembly backflow preventer after existing water service and new wiring for two (2) new zones on new backflow preventer.",
+        "CURRENT_USE": "Apartment Building",
+        "PROPOSED_USE": "Apartment Building"
+      }
+    },
+    "toronto-active-permit:26-272521": {
+      "source_url": "https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action/datastore_search?resource_id=6d0229af-bc54-46de-9c2b-26759b01dd05&filters=%7B%22PERMIT_NUM%22%3A+%2226+272521+FSU%22%7D&limit=10",
+      "record": {
+        "PERMIT_NUM": "26 272521 FSU",
+        "REVISION_NUM": "00",
+        "APPLICATION_DATE": "2026-11-19",
+        "ISSUED_DATE": null,
+        "STATUS": "Not Started",
+        "STREET_NUM": "4100-4110",
+        "STREET_NAME": "LAWRENCE",
+        "STREET_TYPE": "AVE",
+        "STREET_DIRECTION": "E",
+        "DESCRIPTION": "Proposed replacement of existing sprinkler header, valves, compressor, piping, standpipe and pipe schedule sprinkler system with new sprinkler header, valves, compressor, piping, standpipe and hydraulically designed sprinkler system. Installation of heat tracing, new double check detector assembly backflow preventer after existing water service and new wiring for two (2) new zones on new backflow preventer.",
+        "CURRENT_USE": "Apartment Building",
+        "PROPOSED_USE": "Apartment Building"
+      }
+    },
+    "toronto-active-permit:26-272433": {
+      "source_url": "https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action/datastore_search?resource_id=6d0229af-bc54-46de-9c2b-26759b01dd05&filters=%7B%22PERMIT_NUM%22%3A+%2226+272433+FSU%22%7D&limit=10",
+      "record": {
+        "PERMIT_NUM": "26 272433 FSU",
+        "REVISION_NUM": "00",
+        "APPLICATION_DATE": "2026-11-19",
+        "ISSUED_DATE": null,
+        "STATUS": "Not Started",
+        "STREET_NUM": "104",
+        "STREET_NAME": "SCHOLARS",
+        "STREET_TYPE": "WALK",
+        "STREET_DIRECTION": " ",
+        "DESCRIPTION": "Proposal for the replacement of an existing fire alarm control panel and existing detection devices. Work to include any repairs to existing wiring if required and no new devices to be added",
+        "CURRENT_USE": "Educational Institution ",
+        "PROPOSED_USE": "Educational Institution "
+      }
+    },
+    "toronto-active-permit:26-242408": {
+      "source_url": "https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action/datastore_search?resource_id=6d0229af-bc54-46de-9c2b-26759b01dd05&filters=%7B%22PERMIT_NUM%22%3A+%2226+242408+PLB%22%7D&limit=10",
+      "record": {
+        "PERMIT_NUM": "26 242408 PLB",
+        "REVISION_NUM": "00",
+        "APPLICATION_DATE": "2026-10-28",
+        "ISSUED_DATE": "2026-11-20",
+        "STATUS": "Permit Issued",
+        "STREET_NUM": "2280",
+        "STREET_NAME": "ISLINGTON",
+        "STREET_TYPE": "AVE",
+        "STREET_DIRECTION": " ",
+        "DESCRIPTION": "Plumbing  - Proposal for interior alterations to the unit for a medical clinic and pharmacy",
+        "CURRENT_USE": "Group D",
+        "PROPOSED_USE": "Medical Clinic And Pharmacy "
+      }
+    },
+    "toronto-active-permit:26-107910": {
+      "source_url": "https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action/datastore_search?resource_id=6d0229af-bc54-46de-9c2b-26759b01dd05&filters=%7B%22PERMIT_NUM%22%3A+%2226+107910+STS%22%7D&limit=10",
+      "record": {
+        "PERMIT_NUM": "26 107910 STS",
+        "REVISION_NUM": "00",
+        "APPLICATION_DATE": "2026-11-20",
+        "ISSUED_DATE": null,
+        "STATUS": "Application On Hold",
+        "STREET_NUM": "6650",
+        "STREET_NAME": "FINCH",
+        "STREET_TYPE": "AVE",
+        "STREET_DIRECTION": "W",
+        "DESCRIPTION": "Drain - Interior storage room and sprinkler room renovation, including the building's automatic sprinkler upgrades.",
+        "CURRENT_USE": "Food Production",
+        "PROPOSED_USE": "Food Production"
+      }
+    },
+    "toronto-public-notice:8046": {
+      "source_url": "https://secure.toronto.ca/nm/api/individual/notice/8046.do",
+      "captured_page_sha256": "2006ed113d101854bc22da3ae0b2bd3c3724f443dc50d383b10de7e33d45a4cd",
+      "observed_facts": {
+        "notice_date": "2026-11-20",
+        "application_ids": "26 257236 NNY 06 OZ; 26 257298 NNY 06 SB",
+        "address": "1350 Sheppard Avenue West; Toronto, ON, Canada",
+        "scope_summary": "A zoning amendment, district plan and subdivision application propose a Downsview mixed-use development with about 3,160 homes and 10,000 m² of non-residential space. Proposed uses include retail, community space, a possible school and childcare."
+      }
+    },
+    "toronto-public-notice:8047": {
+      "source_url": "https://secure.toronto.ca/nm/api/individual/notice/8047.do",
+      "captured_page_sha256": "9a4f56791985c42f04aff394e52f39e50ac9bd8d9640b4fe77dccba3d768ecd9",
+      "observed_facts": {
+        "notice_date": "2026-11-20",
+        "application_ids": "26 253544 NNY 15 OZ",
+        "address": "60 Overlea Boulevard; Toronto, ON, Canada",
+        "scope_summary": "An official plan and zoning application proposes two 50-storey towers with 1,261 homes, street-level commercial space and a daycare."
+      }
+    },
+    "ontario-ero:026-0020": {
+      "source_url": "https://ero.ontario.ca/notice/026-0020",
+      "captured_page_sha256": "1126795d854845b55d15b5407741997d4463bd5f40eb628c1d7c3e79dcfbe3b6",
+      "observed_facts": {
+        "decision_date": "2026-11-20",
+        "reference": "026-0020",
+        "address": "2620 Royal Windsor Drive",
+        "scope_summary": "Ontario posted an amended air and noise approval decision for the existing Valvoline lubricants packaging facility. The earlier renewal proposal dates to January. No specific new equipment order was disclosed."
+      }
+    }
+  }
+}
