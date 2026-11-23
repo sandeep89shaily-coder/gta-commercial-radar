@@ -5,8 +5,8 @@ Safe by default: collect links only. Actual media/subtitle download requires
 robots restrictions, or anti-bot controls.
 """
 from __future__ import annotations
-import argparse,datetime as dt,hashlib,html,json,re,subprocess,sys
-from urllib.error import HTTPError
+import argparse,datetime as dt,hashlib,html,json,re,ssl,subprocess,sys
+from urllib.error import HTTPError, URLError
 from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import urljoin,urlparse
@@ -160,7 +160,17 @@ def fetch_html(url):
  if url not in OFFICIAL.values():raise ValueError("Non-allowlisted municipal index")
  # Use normal public web access without bypassing site policies.
  req=Request(url,headers={"User-Agent":"GTARadarResearch/1.0 (public source verification)"})
- with urlopen(req,timeout=15) as f:
+ try:
+  response=urlopen(req,timeout=15)
+ except (ssl.SSLCertVerificationError, URLError) as exc:
+  if not isinstance(getattr(exc,"reason",exc),ssl.SSLCertVerificationError):
+   raise
+  from gta_stc_oak_official_recovery import secure_ca_bundle
+  context=secure_ca_bundle()
+  if context is None:
+   raise
+  response=urlopen(req,timeout=15,context=context)
+ with response as f:
   if f.status!=200:raise ValueError("Municipal index unavailable")
   body=f.read(4_000_001)
  if len(body)>4_000_000:raise ValueError("Index too large (4 MB bounded limit)")
