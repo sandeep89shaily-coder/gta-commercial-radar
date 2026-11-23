@@ -32,7 +32,7 @@ COLS = ("city", "application_id", "address", "scope", "applicant",
         "stage", "category", "date", "date_basis", "source_url",
         "original_publication_verified", "buyer_verified",
         "procurement_verified", "first_seen_local",
-        "source_observation", "source_kind")
+        "source_observation", "source_kind", "changed_fields")
 
 class SourceBlocked(Exception):
     pass
@@ -161,10 +161,12 @@ def run(results, *, collector=None, today=None, check_robots=True):
         except (OSError, ValueError, UnicodeError):
             old={}
     next_ledger=dict(old)
+    cities_with_history={key.split("|",1)[0] for key in old}
     accepted=[]; health=[]
     for city in CITIES:
         info={"city":city,"status":"SOURCE_NOT_ATTEMPTED",
               "retrieved_application_id_records":0,
+              "initial_baseline":city.upper() not in cities_with_history,
               "verified_citywide_coverage":False,
               "buyer_verified":0,"original_publication_verified":0,
               "new_project_publications_verified":0}
@@ -183,19 +185,23 @@ def run(results, *, collector=None, today=None, check_robots=True):
                     continue
                 unique.setdefault(key,raw)
             for key,r in unique.items():
-                fingerprint=hashlib.sha256(json.dumps(
-                    {k:r.get(k,"") for k in ("address","scope","applicant","stage","date")},
-                    sort_keys=True).encode()).hexdigest()
+                fields={k:r.get(k,"") for k in ("address","scope","applicant","stage","date")}
+                fingerprint=hashlib.sha256(json.dumps(fields,sort_keys=True).encode()).hexdigest()
                 prior=next_ledger.get(key,{})
                 new=not bool(prior)
                 changed=bool(prior and prior.get("fingerprint")!=fingerprint)
+                previous_fields=prior.get("fields")
+                changed_fields=(" | ".join("description" if k=="scope" else k
+                    for k,v in fields.items() if previous_fields.get(k)!=v)
+                    if changed and isinstance(previous_fields,dict) else "")
                 next_ledger[key]={"first_seen":prior.get("first_seen") or day.isoformat(),
-                                  "fingerprint":fingerprint}
+                                  "fingerprint":fingerprint,"fields":fields}
                 accepted.append({**r,
                     "first_seen_local":next_ledger[key]["first_seen"],
                     "source_observation":("FIRST_OBSERVED_NOT_FIRST_PUBLICATION" if new
                         else "SOURCE_UPDATED_NOT_FIRST_PUBLICATION" if changed
                         else "UNCHANGED"),
+                    "changed_fields":changed_fields,
                     "original_publication_verified":"False",
                     "buyer_verified":"False","procurement_verified":"False"})
             info["retrieved_application_id_records"]=len(unique)
