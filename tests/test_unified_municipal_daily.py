@@ -112,12 +112,13 @@ class CrossMunicipalDaily(unittest.TestCase):
                 dict(base,city="Ajax",application_id="A2",source_url="https://ajax.ca/project/A2",
                      source_observation="SOURCE_UPDATED_NOT_FIRST_PUBLICATION",changed_fields="description"),
                 dict(base,city="Pickering",application_id="P1",source_observation="UNCHANGED"),
-                dict(base,city="Windsor",application_id="W1",source_observation="INITIAL_BASELINE"),
+                dict(base,city="Windsor",application_id="W1",source_observation="FIRST_OBSERVED_NOT_FIRST_PUBLICATION"),
                 dict(base,city="Newmarket",application_id="N1",source_observation="FIRST_OBSERVED_NOT_FIRST_PUBLICATION"),
             ])
             healthy="LIVE_APPLICATION_IDS_RETRIEVED_PARTIAL_COVERAGE"
             (root/"GTA_RADAR_FOUR_CITY_SOURCE_STATUS.json").write_text(json.dumps({"city_status":[
-                {"city":city,"status":healthy} for city in ("Ajax","Pickering","Windsor")
+                {"city":city,"status":healthy,"initial_baseline":city=="Windsor"}
+                for city in ("Ajax","Pickering","Windsor")
             ]+[{"city":"Newmarket","status":"BLOCKED_OR_FAILED_NO_NEW_LIVE_RECORDS"}]}))
             result=run(root,today=day)
             self.assertEqual(result["unified_change_rows"],3)
