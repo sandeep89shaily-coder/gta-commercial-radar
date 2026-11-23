@@ -11,8 +11,8 @@ import json
 from collections import Counter
 from pathlib import Path
 
-from gta_24_city_combined import (_rank, _write, COLS, COVERAGE_COLS,
-                                  CORE_CITIES, EXPANSION_CITIES)
+from gta_24_city_combined import (_csv, _rank, _write, CITIES as LEGACY_CITIES,
+                                  COLS, COVERAGE_COLS, CORE_CITIES, EXPANSION_CITIES)
 from gta_four_city_live_daily import (CITIES as ADDED, MASTER as LIVE,
                                       STATUS as LIVE_STATUS)
 
@@ -52,9 +52,13 @@ def _band(row,day):
 def run(results,*,today=None):
     root=Path(results)
     day=today or dt.date.today()
-    base=_read(root/"GTA_RADAR_COMBINED_24_CITY_PROJECT_MASTER.csv")
+    try:
+        base = _csv(root / "GTA_RADAR_COMBINED_24_CITY_PROJECT_MASTER.csv",
+                    required_fields=("canonical_id", "city", "record_kind", "application_id"))
+    except ValueError as exc:
+        raise ValueError("CURRENT_24_CITY_MASTER_REQUIRED") from exc
     original_coverage=_read(root/"GTA_RADAR_COMBINED_24_CITY_COVERAGE.csv")
-    if len(original_coverage)!=24 or not base:
+    if len(original_coverage) != len(LEGACY_CITIES) or {r.get("city") for r in original_coverage} != set(LEGACY_CITIES):
         raise ValueError("CURRENT_24_CITY_MASTER_REQUIRED")
     try:
         live=json.loads((root/LIVE_STATUS).read_text(encoding="utf-8"))
