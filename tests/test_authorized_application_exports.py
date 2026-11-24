@@ -5,7 +5,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
-from gta_authorized_application_exports import load
+from gta_authorized_application_exports import load, stage_kitchener_export
 
 class AuthorizedExportTests(unittest.TestCase):
     def test_source_identity_and_permission_guard(self):
@@ -81,6 +81,24 @@ class AuthorizedExportTests(unittest.TestCase):
             self.assertEqual([r["city"] for r in records],["Brampton"])
             self.assertTrue(report["no_network_requests"])
             self.assertTrue(report["no_verified_original_publication"])
+
+    def test_kitchener_geohub_export_stages_without_personal_fields(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "download.csv"
+            source.write_text(
+                "Application Number,Address,Application Summary,Application Type,Status,In Date,Applicant\n"
+                "ZBA26/016/K/BB,10 Test Road,,Rezoning,Received,11/2/2026 12:00:00 AM,Personal Name\n",
+                encoding="utf-8-sig",
+            )
+            stage_kitchener_export(source, root)
+            rows, status = load(root)
+        self.assertTrue(status["no_network_requests"])
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["application_id"], "ZBA26/016/K/BB")
+        self.assertEqual(rows[0]["date"], "2026-11-02")
+        self.assertEqual(rows[0]["scope"], "Rezoning")
+        self.assertEqual(rows[0]["applicant"], "")
 
     def test_missing_manifest_never_invents_city_files(self):
         with tempfile.TemporaryDirectory() as tmp:

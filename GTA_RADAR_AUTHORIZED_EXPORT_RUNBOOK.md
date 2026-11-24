@@ -6,6 +6,24 @@ Vaughan and Kitchener authorized-access requests were sent November 11, with
 follow-ups on November 18, 2026. An automatic Vaughan acknowledgement is **not
 permission**. Do not invent approval.
 
+## Kitchener GeoHub download
+
+Open [Planning Applications Active](https://open-kitchenergis.opendata.arcgis.com/datasets/KitchenerGIS::planning-applications-active),
+select Download, then CSV. Use the file downloaded from the catalogue.
+The generic Hub CSV URL and the catalogue's generated download can return
+different snapshots. The November 23, 2026 check found that the generic URL
+ended in 2024 and the catalogue download contained 2026 files.
+
+Save the download as `kitchener.csv` in Downloads. From the Radar checkout:
+
+```powershell
+python .\gta_authorized_application_exports.py --kitchener-csv "$env:USERPROFILE\Downloads\kitchener.csv" --results ".\GTA_RADAR_RESULTS"
+```
+
+The command checks the City headers, records the licence and file hash, and
+stages the CSV for the normal Radar run. Imported dates are application
+receipt dates. Download and stage a new file to refresh the saved snapshot.
+
 ## Using a City-provided public CSV
 
 1. Obtain a publisher-permitted CSV from an official City source, together
@@ -54,10 +72,11 @@ Official Kitchener references:
 
 ## Existing unresolved access
 
-- Vaughan: publisher response/permission or permitted export still required.
-- Kitchener: a compliant download/export route and application stable-ID
-  dataset mapping still need live verification. The City publishes GeoHub
-  download options and `Planning_Applications_Active` metadata.
+- Vaughan: the York Region open-data export supplies regional review records.
+  A City export would cover local files outside the regional queue. The City
+  offers a Public Notification Registry for statutory planning notices.
+- Kitchener: the GeoHub browser download supplies a saved City snapshot.
+  The original automated GIS query remains subject to its access policy.
 - Burlington: individual public planning pages and file IDs exist but
   completeness of its citywide application index remains unverified.
 

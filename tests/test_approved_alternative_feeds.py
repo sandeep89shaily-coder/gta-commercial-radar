@@ -39,22 +39,6 @@ class OfficialAlternativeTests(unittest.TestCase):
         self.assertEqual(state["features_examined"],1)
         self.assertFalse(state["possibly_truncated"])
 
-    def test_default_kitchener_uses_catalogue_bulk_csv(self):
-        record = {"APPLICATION_NO": "ZBA22/024/M/BB", "ADDRESS": "7 Morrison Rd",
-                  "DESCRIPTION": "Planning application", "FOLDERTYPE": "Rezoning",
-                  "INDATE": "10/14/2022 12:00:00 AM", "APPLICANT": "Personal Name"}
-        with tempfile.TemporaryDirectory() as root:
-            with patch.object(alternatives, "download_rows", return_value=[record, record]), \
-                    patch.object(alternatives, "fetch", side_effect=fake_fetch):
-                report = alternatives.run(root)
-            self.assertEqual(report["cities"]["Kitchener"]["transport"], "ARCGIS_HUB_CSV")
-            with (Path(root) / alternatives.OUT).open(encoding="utf-8-sig", newline="") as f:
-                row, _ = list(csv.DictReader(f))
-        self.assertEqual(row["date"], "2022-10-14")
-        self.assertEqual(row["source_url"], alternatives.KITCHENER_CATALOGUE)
-        self.assertEqual(row["applicant"], "")
-        self.assertEqual(row["publication_verified"], "False")
-
     def test_caledon_deduplicated_without_policy_document(self):
         rows=alternatives.caledon_rows(HTML)
         self.assertEqual(len(rows),1)
