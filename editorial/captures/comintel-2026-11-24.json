@@ -1,0 +1,137 @@
+{
+  "as_of": "2026-11-24T09:31:21.178136-05:00",
+  "toronto_open_data_attribution": "Contains information licensed under the Open Government Licence – Toronto.",
+  "records": {
+    "niagara-planning:am-2026-013": {
+      "source_url": "https://webpublic.niagarafalls.ca/Planning/Details/411",
+      "record": {
+        "application_id": "AM-2026-013",
+        "address": "8168 McLeod Road",
+        "hearing_date": "2026-11-24",
+        "application_types": [
+          "Official Plan Amendment",
+          "Zoning By-law Amendment"
+        ],
+        "project": "Proposed Shoppers Drug Mart store",
+        "source_html_sha256": "9eacdb017769826b0f9924e20675fe16fbfc01083dff31ec54780c12e3996f8a"
+      }
+    },
+    "ontario-ero:026-0782": {
+      "source_url": "https://ero.ontario.ca/notice/026-0782",
+      "record": {
+        "ero_number": "026-0782",
+        "address": "198 First Road West, Hamilton",
+        "decision_posted": "2026-11-23",
+        "decision": "Environmental Compliance Approval granted",
+        "scope": [
+          "wet pond",
+          "inlet and outlet structures",
+          "erosion control"
+        ],
+        "source_html_sha256": "a4eaf724d7220a7cd9542d3d375f214f33fd1dbde660c10b5dd8fc25b4650a41"
+      }
+    },
+    "toronto-aic:17278508NNY15SA": {
+      "source_url": "https://gis.toronto.ca/arcgis/rest/services/cot_geospatial11/FeatureServer/60/query?where=APPLICATION_NUMBER+%3D+%2717278508NNY15SA%27&outFields=FULL_ADDRESS%2CAPPLICATION_NUMBER%2CINDATE%2CLATEST_MILESTONE%2CLATEST_MILESTONE_DATE%2CSTATUS_DESC%2CFOLDERDESCRIPTION&returnGeometry=false&f=json",
+      "record": {
+        "FULL_ADDRESS": "110 FAIRBANK AVE",
+        "APPLICATION_NUMBER": "17278508NNY15SA",
+        "INDATE": 1513832400000,
+        "LATEST_MILESTONE": "Notice of Complete Application Issued",
+        "LATEST_MILESTONE_DATE": 1795410000000,
+        "STATUS_DESC": "Under Review",
+        "FOLDERDESCRIPTION": "Proposed three-storey building containing banquet halls on the first and second floors, office uses on the first through third floors, and an outdoor amenity area on the second floor."
+      }
+    },
+    "toronto-active-permit:26-250571": {
+      "source_url": "https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action/datastore_search?resource_id=6d0229af-bc54-46de-9c2b-26759b01dd05&filters=%7B%22PERMIT_NUM%22%3A+%2226+250571+HVA%22%2C+%22REVISION_NUM%22%3A+%2200%22%7D&limit=10",
+      "record": {
+        "PERMIT_NUM": "26 250571 HVA",
+        "REVISION_NUM": "00",
+        "APPLICATION_DATE": "2026-10-06",
+        "ISSUED_DATE": "2026-11-20",
+        "STATUS": "Permit Issued",
+        "STREET_NUM": "595",
+        "STREET_NAME": "BAY",
+        "STREET_TYPE": "ST",
+        "STREET_DIRECTION": " ",
+        "DESCRIPTION": "HVAC - Interior alterations and T-Bar ceiling. Complete plumbing, HVAC, sprinklers, fire alarm and electrical fit out. Flooring, painting, millwork and all other interior finishes - Unit 401"
+      }
+    },
+    "toronto-active-permit:26-261099": {
+      "source_url": "https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action/datastore_search?resource_id=6d0229af-bc54-46de-9c2b-26759b01dd05&filters=%7B%22PERMIT_NUM%22%3A+%2226+261099+BLD%22%2C+%22REVISION_NUM%22%3A+%2200%22%7D&limit=10",
+      "record": {
+        "PERMIT_NUM": "26 261099 BLD",
+        "REVISION_NUM": "00",
+        "APPLICATION_DATE": "2026-10-27",
+        "ISSUED_DATE": "2026-11-20",
+        "STATUS": "Permit Issued",
+        "STREET_NUM": "400",
+        "STREET_NAME": "CARLINGVIEW",
+        "STREET_TYPE": "DR",
+        "STREET_DIRECTION": " ",
+        "DESCRIPTION": "Proposal to install stand-alone steel storage pallet racks inside the warehouse."
+      }
+    },
+    "toronto-active-permit:26-110058": {
+      "source_url": "https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action/datastore_search?resource_id=6d0229af-bc54-46de-9c2b-26759b01dd05&filters=%7B%22PERMIT_NUM%22%3A+%2226+110058+FSU%22%2C+%22REVISION_NUM%22%3A+%2200%22%7D&limit=10",
+      "record": {
+        "PERMIT_NUM": "26 110058 FSU",
+        "REVISION_NUM": "00",
+        "APPLICATION_DATE": "2026-01-28",
+        "ISSUED_DATE": "2026-11-20",
+        "STATUS": "Permit Issued",
+        "STREET_NUM": "130",
+        "STREET_NAME": "BELFIELD",
+        "STREET_TYPE": "RD",
+        "STREET_DIRECTION": " ",
+        "DESCRIPTION": "Proposal for fire alarm system"
+      }
+    },
+    "toronto-active-permit:26-164005-rev01": {
+      "source_url": "https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action/datastore_search?resource_id=6d0229af-bc54-46de-9c2b-26759b01dd05&filters=%7B%22PERMIT_NUM%22%3A+%2226+164005+BLD%22%2C+%22REVISION_NUM%22%3A+%2201%22%7D&limit=10",
+      "record": {
+        "PERMIT_NUM": "26 164005 BLD",
+        "REVISION_NUM": "01",
+        "APPLICATION_DATE": "2026-11-20",
+        "ISSUED_DATE": null,
+        "STATUS": "Application Acceptable",
+        "STREET_NUM": "10-20",
+        "STREET_NAME": "BAY",
+        "STREET_TYPE": "ST",
+        "STREET_DIRECTION": " ",
+        "DESCRIPTION": "Rev 01: Addition of fire alarm speakers and strobesINTERIOR ALTERATIONS TO EXISTING OFFICE SPACE - LEVEL 4"
+      }
+    },
+    "toronto-active-permit:26-126835": {
+      "source_url": "https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action/datastore_search?resource_id=6d0229af-bc54-46de-9c2b-26759b01dd05&filters=%7B%22PERMIT_NUM%22%3A+%2226+126835+STS%22%2C+%22REVISION_NUM%22%3A+%2200%22%7D&limit=10",
+      "record": {
+        "PERMIT_NUM": "26 126835 STS",
+        "REVISION_NUM": "00",
+        "APPLICATION_DATE": "2026-03-10",
+        "ISSUED_DATE": "2026-11-20",
+        "STATUS": "Permit Issued",
+        "STREET_NUM": "318",
+        "STREET_NAME": "LAWRENCE",
+        "STREET_TYPE": "AVE",
+        "STREET_DIRECTION": "E",
+        "DESCRIPTION": "Drain - Proposal for a 3 storey & basement addition to an existing independent school."
+      }
+    },
+    "toronto-active-permit:26-205137": {
+      "source_url": "https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action/datastore_search?resource_id=6d0229af-bc54-46de-9c2b-26759b01dd05&filters=%7B%22PERMIT_NUM%22%3A+%2226+205137+BLD%22%2C+%22REVISION_NUM%22%3A+%2200%22%7D&limit=10",
+      "record": {
+        "PERMIT_NUM": "26 205137 BLD",
+        "REVISION_NUM": "00",
+        "APPLICATION_DATE": "2026-07-20",
+        "ISSUED_DATE": "2026-11-20",
+        "STATUS": "Permit Issued",
+        "STREET_NUM": "3840",
+        "STREET_NAME": "FINCH",
+        "STREET_TYPE": "AVE",
+        "STREET_DIRECTION": "E",
+        "DESCRIPTION": "Interior alteration to the second floor to convert part of the school to daycare."
+      }
+    }
+  }
+}
