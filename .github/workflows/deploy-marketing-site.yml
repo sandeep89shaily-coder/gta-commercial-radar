@@ -1,6 +1,6 @@
 name: Deploy GTA Radar marketing website
 
-# Publishing is triggered only when the editor-reviewed public feed is committed.
+# Publishing is triggered by changes to the editor-reviewed feed or the opportunities page.
 # The private daily collector/AI research NEVER publishes automatically. The
 # deployment validator rejects unapproved/unsafe publication JSON.
 on:
@@ -10,6 +10,7 @@ on:
       - main
     paths:
       - 'website/data/opportunities.json'
+      - 'website/opportunities.html'
 
 permissions:
   contents: read
