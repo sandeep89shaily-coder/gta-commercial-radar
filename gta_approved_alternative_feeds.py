@@ -1,6 +1,6 @@
 """Permitted alternative official feeds for previously blocked municipal lanes.
 
-Kitchener: public, open-licensed Planning_Applications_Active FeatureServer/0.
+Kitchener: the public, open-licensed Planning Applications Active Hub CSV.
 Caledon: current-applications public HTML index, research-only pending reuse
 licence confirmation. No proxy/403/robots bypass; no paid model, no database
 changes, no invented project announcement dates or buyer contacts.
@@ -17,6 +17,9 @@ from urllib.parse import urlencode, urlsplit, urljoin
 from urllib.request import Request, urlopen
 from urllib.robotparser import RobotFileParser
 
+from gta_arcgis_hub_exports import KITCHENER_ITEM, csv_date, download_rows
+
+KITCHENER_CATALOGUE = "https://open-kitchenergis.opendata.arcgis.com/datasets/KitchenerGIS::planning-applications-active"
 KITCHENER="https://services1.arcgis.com/qAo1OsXi67t7XgmS/arcgis/rest/services/Planning_Applications_Active/FeatureServer/0"
 CALEDON="https://www.caledon.ca/en/town-services/current-applications"
 CITIES=("Kitchener","Caledon")
@@ -151,15 +154,41 @@ def caledon_rows(html):
             "open_supplier_package_verified":"False"})
     return rows
 
-def run(results,*,fetcher=fetch):
+def kitchener_export():
+    fields = ("APPLICATION_NO", "ADDRESS", "DESCRIPTION", "FOLDERTYPE", "INDATE")
+    records = download_rows(KITCHENER_ITEM, fields)
+    rows = {}
+    for record in records:
+        ident = clean(record.get("APPLICATION_NO"), 150)
+        address = clean(record.get("ADDRESS"), 250)
+        scope = clean(record.get("DESCRIPTION") or record.get("FOLDERTYPE"), 1300)
+        if not (ident and address and scope):
+            continue
+        rows.setdefault(ident.casefold(), {
+            "city": "Kitchener", "application_id": ident, "address": address,
+            "scope": scope, "applicant": "",
+            "stage": clean(record.get("STATUS"), 150),
+            "category": clean(record.get("FOLDERTYPE"), 100),
+            "date": csv_date(record.get("INDATE")),
+            "date_basis": "APPLICATION_INDATE_NOT_PUBLICATION",
+            "source_url": KITCHENER_CATALOGUE,
+            "source_lane": "KITCHENER_OPEN_DATA_OFFICIAL",
+            "source_permission": "PUBLISHED_OPEN_DATA_LICENCE_REUSE",
+            "publication_verified": "False", "buyer_verified": "False",
+            "open_supplier_package_verified": "False",
+        })
+    return list(rows.values()), {"features_examined": len(records), "transport": "ARCGIS_HUB_CSV"}
+
+
+def run(results,*,fetcher=None):
     root=Path(results);root.mkdir(parents=True,exist_ok=True)
     cities={};allrows=[]
     for city in CITIES:
         try:
             if city=="Kitchener":
-                rows,extra=arcgis_rows(fetcher=fetcher)
+                rows,extra=arcgis_rows(fetcher=fetcher) if fetcher else kitchener_export()
             else:
-                body=fetcher(CALEDON,allowed_hosts={"www.caledon.ca","caledon.ca"})
+                body=(fetcher or fetch)(CALEDON,allowed_hosts={"www.caledon.ca","caledon.ca"})
                 rows=caledon_rows(body)
                 extra={"index_only":True,"reused_for_commercial_leads":False}
             allrows.extend(rows)
