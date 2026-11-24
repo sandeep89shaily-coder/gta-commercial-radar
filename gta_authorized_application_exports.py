@@ -6,14 +6,27 @@ Unknown/missing file IDs never become application records. Original publication
 dates and current citywide coverage are never inferred from local imports.
 """
 import csv
+import io
 import hashlib
 import json
 from pathlib import Path
 from urllib.parse import urlsplit
 
+from gta_arcgis_hub_exports import csv_date
+
 CITIES = ("Burlington", "Vaughan", "Kitchener", "Brampton", "Mississauga")
 MAX_SIZE = 30_000_000
 OUTPUT = "GTA_RADAR_AUTHORIZED_EXPORT_IMPORT_STATUS.json"
+KITCHENER_GEOHUB = "https://open-kitchenergis.opendata.arcgis.com/datasets/KitchenerGIS::planning-applications-active"
+KITCHENER_LICENCE = "https://www.kitchener.ca/council-and-city-administration/data-and-maps/open-data-licence/"
+KITCHENER_COLUMNS = {
+    "application_id": "Application Number",
+    "address": "Address",
+    "scope": "Application Summary",
+    "category": "Application Type",
+    "status": "Status",
+    "application_date": "In Date",
+}
 
 def _official(city, url):
     try:
@@ -95,17 +108,20 @@ def load(root):
                             break
                         ident = str(row.get(fields["application_id"]) or "").strip()
                         address = str(row.get(fields["address"]) or "").strip()
-                        scope = str(row.get(fields["scope"]) or "").strip()
+                        scope = str(row.get(fields["scope"]) or row.get(fields.get("category", "")) or "").strip()
                         if not ident or not address or not scope:
                             continue
                         optional = lambda key: str(
                             row.get(fields.get(key) or "") or "").strip()
+                        application_date = optional("application_date")
+                        if entry["official_source_url"] == KITCHENER_GEOHUB:
+                            application_date = csv_date(application_date)
                         accepted.append({
                             "city": city, "application_id": ident[:120],
                             "address": address[:200], "scope": scope[:1200],
                             "status": optional("status")[:120],
                             "applicant": optional("applicant")[:180],
-                            "date": optional("application_date")[:30],
+                            "date": application_date[:30],
                             "url": entry["official_source_url"],
                             "source_date_basis":
                                 "CITY_APPLICATION_DATE_NOT_FIRST_PUBLICATION",
@@ -125,3 +141,50 @@ def load(root):
     (root / OUTPUT).write_text(json.dumps(summary, indent=2),
                                 encoding="utf-8")
     return exported, summary
+
+
+def stage_kitchener_export(source, results):
+    """Register the City GeoHub's browser-downloaded CSV for the next run."""
+    source = Path(source)
+    if not 0 < source.stat().st_size <= MAX_SIZE:
+        raise ValueError("KITCHENER_EXPORT_SIZE_INVALID")
+    content = source.read_bytes()
+    with io.StringIO(content.decode("utf-8-sig"), newline="") as stream:
+        reader = csv.DictReader(stream, strict=True)
+        if not set(KITCHENER_COLUMNS.values()).issubset(reader.fieldnames or ()):
+            raise ValueError("KITCHENER_GEOHUB_CSV_HEADERS_REQUIRED")
+        if not any(
+            row["Application Number"] and row["Address"]
+            and (row["Application Summary"] or row["Application Type"])
+            for row in reader
+        ):
+            raise ValueError("KITCHENER_EXPORT_HAS_NO_APPLICATION_FILES")
+
+    folder = Path(results) / "GTA_RADAR_AUTHORIZED_EXPORTS"
+    folder.mkdir(parents=True, exist_ok=True)
+    manifest_path = folder / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8")) if manifest_path.exists() else {}
+    exports = [entry for entry in manifest.get("exports", []) if entry["city"] != "Kitchener"]
+    exports.append({
+        "city": "Kitchener",
+        "official_source_url": KITCHENER_GEOHUB,
+        "dataset_licence": "Open Government Licence - The Corporation of the City of Kitchener",
+        "licence_or_permission_url": KITCHENER_LICENCE,
+        "permitted_public_export": True,
+        "commercial_reuse_permission_confirmed": True,
+        "sha256": hashlib.sha256(content).hexdigest(),
+        "columns": KITCHENER_COLUMNS,
+    })
+    (folder / "kitchener.csv").write_bytes(content)
+    manifest_path.write_text(json.dumps({**manifest, "exports": exports}, indent=2), encoding="utf-8")
+    return manifest_path
+
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(description=stage_kitchener_export.__doc__)
+    parser.add_argument("--kitchener-csv", required=True)
+    parser.add_argument("--results", required=True)
+    args = parser.parse_args()
+    print(stage_kitchener_export(args.kitchener_csv, args.results))

@@ -5,6 +5,8 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
+import gta_york_hamilton_open_data as regional
 from gta_york_hamilton_open_data import (
     YORK,HAMILTON,BRANTFORD,pull,parse_york,parse_hamilton,parse_brantford,run,robots_ok)
 
@@ -51,6 +53,24 @@ class Recovery(unittest.TestCase):
         self.assertEqual(rows[0]["date_basis"],"REGIONAL_RECEIPT_NOT_PUBLICATION")
         self.assertEqual(rows[0]["buyer_verified"],"False")
         self.assertTrue(diag["pagination_complete"])
+    def test_default_york_uses_the_regional_catalogue_csv(self):
+        rows = [{"MUN_NAME": "Vaughan", "REG_FILE_NUM": "SP.18.V.0111",
+                 "ADDRESS": "9580 Jane Street", "APPL_TYPE": "Site Plan",
+                 "APPL_NAME": "Proposed development", "OWNERSHIP": "Personal Name",
+                 "DATE_RECVD": "2018/04/22 04:00:00+00"}]
+        with tempfile.TemporaryDirectory() as root:
+            with patch.object(regional, "download_rows", return_value=rows), \
+                    patch.object(regional, "fetch_json", side_effect=getter):
+                result = regional.run(root)
+            self.assertEqual(result["records_by_city"]["Vaughan"], 1)
+            self.assertEqual(result["source_status"]["York Region"]["transport"], "ARCGIS_HUB_CSV")
+            with (Path(root) / regional.OUTPUT).open(encoding="utf-8-sig", newline="") as f:
+                row = next(csv.DictReader(f))
+        self.assertEqual(row["date"], "2018-04-22")
+        self.assertEqual(row["source_url"], regional.YORK_CATALOGUE)
+        self.assertEqual(row["applicant"], "")
+        self.assertEqual(row["publication_verified"], "False")
+
     def test_hamilton_file_year_not_publication(self):
         rows=parse_hamilton(pull(HAMILTON,getter=getter,check_robots=False)[0])
         self.assertEqual(len(rows),1)

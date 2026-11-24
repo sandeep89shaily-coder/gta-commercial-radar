@@ -18,6 +18,9 @@ from urllib.parse import urlencode, urlsplit
 from urllib.request import Request, urlopen
 from urllib.robotparser import RobotFileParser
 
+from gta_arcgis_hub_exports import YORK_ITEM, csv_date, download_rows
+
+YORK_CATALOGUE = "https://insights-york.opendata.arcgis.com/datasets/york::active-development-application-boundaries"
 YORK="https://services1.arcgis.com/GzvOwaQBbX7KLiuG/ArcGIS/rest/services/Hosted_Active_Development_Application/FeatureServer/0"
 HAMILTON="https://services.arcgis.com/rYz782eMbySr2srL/arcgis/rest/services/Development_Applications/FeatureServer/2"
 BRANTFORD="https://services.arcgis.com/aji2lCmjXt0KpGzI/ArcGIS/rest/services/Planning_Application_Open_Data_view/FeatureServer/0"
@@ -37,6 +40,8 @@ def clean(v,cap=1200):
     return " ".join(str(v or "").split())[:cap]
 
 def date(v):
+    if isinstance(v, str):
+        return csv_date(v)
     if isinstance(v,(int,float)) and 1e12<v<1e14:
         try:
             return dt.datetime.fromtimestamp(v/1000,dt.timezone.utc).date().isoformat()
@@ -109,7 +114,7 @@ def pull(layer,*,getter=fetch_json,check_robots=True,max_pages=MAX_PAGES):
     return features,{"features_examined":total,"pagination_complete":complete,
                      "row_cap":PAGE*max_pages}
 
-def parse_york(attributes):
+def parse_york(attributes, *, source_url=YORK):
     rows=[]
     for a in attributes:
         mun=clean(a.get("MUN_NAME"),90).casefold()
@@ -121,12 +126,12 @@ def parse_york(attributes):
         scope=clean(a.get("APPL_DESC") or a.get("APPL_NAME"),1400)
         if not all((ident,addr,scope)):continue
         rows.append({"city":city,"application_id":ident,"address":addr,
-          "scope":scope,"applicant":clean(a.get("OWNERSHIP"),220),
+          "scope":scope,"applicant":("" if source_url == YORK_CATALOGUE else clean(a.get("OWNERSHIP"),220)),
           "stage":clean(a.get("APPL_STATUS") or a.get("APPL_STAGE"),120),
           "category":clean(a.get("APPL_TYPE"),120),
           "date":date(a.get("DATE_RECVD")),
           "date_basis":"REGIONAL_RECEIPT_NOT_PUBLICATION",
-          "source_url":YORK,
+          "source_url":source_url,
           "source_lane":"YORK_REGION_ACTIVE_APPLICATIONS_OPEN_DATA",
           "source_permission":"YORK_REGION_OPEN_DATA_LICENCE",
           "publication_verified":"False","buyer_verified":"False",
@@ -178,7 +183,7 @@ def parse_brantford(attributes):
             "open_supplier_package_verified":"False"})
     return rows
 
-def run(results,*,getter=fetch_json):
+def run(results,*,getter=None):
     root=Path(results)
     root.mkdir(parents=True,exist_ok=True)
     states={}
@@ -186,10 +191,18 @@ def run(results,*,getter=fetch_json):
     for name,layer in (("York Region",YORK),("Hamilton",HAMILTON),
                        ("Brantford",BRANTFORD)):
         try:
-            attrs,diag=pull(layer,getter=getter)
-            data=(parse_york(attrs) if layer==YORK else
-                  parse_hamilton(attrs) if layer==HAMILTON else
-                  parse_brantford(attrs))
+            if layer == YORK and getter is None:
+                attrs = download_rows(YORK_ITEM, (
+                    "MUN_NAME", "REG_FILE_NUM", "EXT_REF_NUM", "ADDRESS",
+                    "LOCATION", "APPL_DESC", "APPL_NAME", "DATE_RECVD",
+                ))
+                diag = {"features_examined": len(attrs), "transport": "ARCGIS_HUB_CSV"}
+                data = parse_york(attrs, source_url=YORK_CATALOGUE)
+            else:
+                attrs,diag=pull(layer,getter=getter or fetch_json)
+                data=(parse_york(attrs) if layer==YORK else
+                      parse_hamilton(attrs) if layer==HAMILTON else
+                      parse_brantford(attrs))
             rows.extend(data)
             states[name]={"status":("LIVE_APPLICATION_FILES_RETRIEVED" if data
                       else "FETCHED_WITHOUT_VALID_APPLICATION_FILES"),
