@@ -1,0 +1,342 @@
+{
+  "as_of": "2026-11-25T10:17:27.367102-05:00",
+  "toronto_open_data_attribution": "Contains information licensed under the Open Government Licence – Toronto.",
+  "records": {
+    "mississauga-planning:21t-m-15-3-w5": {
+      "source_url": "https://www.mississauga.ca/services-and-programs/planning-and-development/development-applications/active-development-applications/7140-hurontario-street-21t-m-25-2-w5-and-oz-opa-25-9-w5/",
+      "record": {
+        "application": "21T-M 15-3 W5 / OZ 15-5 W5",
+        "meeting_date": "2026-11-23",
+        "industrial_buildings": 7,
+        "source_html_sha256": "fb88c8195a63cfb5bef08f283a3ab7efddba4b8dd7c30688eb755b8aa1407f23"
+      }
+    },
+    "ontario-ero:026-0421": {
+      "source_url": "https://ero.ontario.ca/notice/026-0421",
+      "record": {
+        "notice": "026-0421",
+        "decision_posted": "2026-11-24",
+        "site": "3143 19th Avenue",
+        "design_flow_l_per_day": 48000,
+        "scope": "Tertiary sewage treatment and six subsurface dispersal beds for two proposed industrial buildings",
+        "source_html_sha256": "3cd51fd29ea479c769cc642a5cc60a2a6ee033e99db2b8cfaffbb9f4295b5782"
+      }
+    },
+    "ontario-ero:026-1165": {
+      "source_url": "https://ero.ontario.ca/notice/026-1165",
+      "record": {
+        "notice": "026-1165",
+        "proposal_posted": "2026-11-23",
+        "site": "8800 Thorold Townline Road",
+        "scrubber_installation_proposed": "2028–29",
+        "source_html_sha256": "38948ddcb3a04d54df3ef0709022c9f73941c8f094646b181f0d22c11156e3dd"
+      }
+    },
+    "vaughan-planning:op-26-005": {
+      "source_url": "https://www.vaughan.ca/about-city-vaughan/departments/office-city-clerk/public-notices",
+      "record": {
+        "application": "OP.26.005 / Z.26.018",
+        "meeting_date": "2026-11-24",
+        "homes_proposed": 1157,
+        "commercial_floor_area_m2": 2228.92,
+        "source_html_sha256": "66c1d80ce2dcc94b05464109a59e3ebd9e055175cde0eca181ee627609a078dc"
+      }
+    },
+    "ontario-ero:026-1213": {
+      "source_url": "https://ero.ontario.ca/notice/026-1213",
+      "record": {
+        "notice": "026-1213",
+        "proposal_posted": "2026-11-24",
+        "site": "70 Hannan Court",
+        "emission_sources": [
+          "dust collectors",
+          "cooling towers",
+          "storage tanks",
+          "heating equipment"
+        ],
+        "source_html_sha256": "995b28c510893267913f2124a4902998e5236288edae0aaaa195d913ede5f87f"
+      }
+    },
+    "brampton-building-permit:26-196369-000-00": {
+      "source_url": "https://maps1.brampton.ca/arcgis/rest/services/BuildingPermit/Building_Permits/FeatureServer/0/query?where=PERMITNUMBER+%3D+%2726-196369-000-00%27&outFields=%2A&returnGeometry=false&f=json",
+      "record": {
+        "ADDRESS": "330 Balmoral Dr, Brampton, ON, L6T 1V6",
+        "PERMITNUMBER": "26-196369-000-00",
+        "WORKDESC": "Alteration (Renovation)",
+        "SUBDESC": "A2: School",
+        "INDATE": 1795582800000,
+        "STATUSDESC": "Applied"
+      }
+    },
+    "toronto-active-permit:26-251832": {
+      "source_url": "https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action/datastore_search?resource_id=6d0229af-bc54-46de-9c2b-26759b01dd05&filters=%7B%22PERMIT_NUM%22%3A+%2226+251832+BLD%22%2C+%22REVISION_NUM%22%3A+%2200%22%7D&limit=3",
+      "record": {
+        "PERMIT_NUM": "26 251832 BLD",
+        "REVISION_NUM": "00",
+        "APPLICATION_DATE": "2026-10-08",
+        "ISSUED_DATE": "2026-11-23",
+        "STATUS": "Permit Issued",
+        "STREET_NUM": "700",
+        "STREET_NAME": "PROGRESS",
+        "STREET_TYPE": "AVE",
+        "STREET_DIRECTION": " ",
+        "DESCRIPTION": "Interior alterations to existing industrial unit to establish a food processing operation. "
+      }
+    },
+    "toronto-active-permit:26-223814": {
+      "source_url": "https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action/datastore_search?resource_id=6d0229af-bc54-46de-9c2b-26759b01dd05&filters=%7B%22PERMIT_NUM%22%3A+%2226+223814+BLD%22%2C+%22REVISION_NUM%22%3A+%2200%22%7D&limit=3",
+      "record": {
+        "PERMIT_NUM": "26 223814 BLD",
+        "REVISION_NUM": "00",
+        "APPLICATION_DATE": "2026-08-21",
+        "ISSUED_DATE": "2026-11-23",
+        "STATUS": "Permit Issued",
+        "STREET_NUM": "705",
+        "STREET_NAME": "MIDDLEFIELD",
+        "STREET_TYPE": "RD",
+        "STREET_DIRECTION": " ",
+        "DESCRIPTION": "Proposed installation of a cooler/freezer condenser on the existing roof"
+      }
+    },
+    "toronto-active-permit:26-273533": {
+      "source_url": "https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action/datastore_search?resource_id=6d0229af-bc54-46de-9c2b-26759b01dd05&filters=%7B%22PERMIT_NUM%22%3A+%2226+273533+HVA%22%7D&limit=10",
+      "record": {
+        "PERMIT_NUM": "26 273533 HVA",
+        "REVISION_NUM": "00",
+        "APPLICATION_DATE": "2026-11-23",
+        "ISSUED_DATE": null,
+        "STATUS": "Application Acceptable",
+        "STREET_NUM": "270",
+        "STREET_NAME": "THE KINGSWAY",
+        "STREET_TYPE": " ",
+        "STREET_DIRECTION": " ",
+        "DESCRIPTION": "HVAC - Proposed new interior fit-up within an existing building for a proposed TD branch, including all associated electrical and mechanical work."
+      }
+    },
+    "toronto-active-permit:26-273822": {
+      "source_url": "https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action/datastore_search?resource_id=6d0229af-bc54-46de-9c2b-26759b01dd05&filters=%7B%22PERMIT_NUM%22%3A+%2226+273822+BLD%22%2C+%22REVISION_NUM%22%3A+%2200%22%7D&limit=3",
+      "record": {
+        "PERMIT_NUM": "26 273822 BLD",
+        "REVISION_NUM": "00",
+        "APPLICATION_DATE": "2026-11-23",
+        "ISSUED_DATE": null,
+        "STATUS": "Application Acceptable",
+        "STREET_NUM": "1101",
+        "STREET_NAME": "FINCH",
+        "STREET_TYPE": "AVE",
+        "STREET_DIRECTION": "W",
+        "DESCRIPTION": "Proposal to install a garage door and vehicle lift, along with interior renovations for a car maintenance garage."
+      }
+    },
+    "toronto-active-permit:25-268241-rev01": {
+      "source_url": "https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action/datastore_search?resource_id=6d0229af-bc54-46de-9c2b-26759b01dd05&filters=%7B%22PERMIT_NUM%22%3A+%2225+268241+BLD%22%2C+%22REVISION_NUM%22%3A+%2201%22%7D&limit=3",
+      "record": {
+        "PERMIT_NUM": "25 268241 BLD",
+        "REVISION_NUM": "01",
+        "APPLICATION_DATE": "2026-11-23",
+        "ISSUED_DATE": null,
+        "STATUS": "Not Started",
+        "STREET_NUM": "2180",
+        "STREET_NAME": "YONGE",
+        "STREET_TYPE": "ST",
+        "STREET_DIRECTION": " ",
+        "DESCRIPTION": "Revision 01 - Building renovation including interior alterations at basement level, ground floor lobby level and 3rd floor.  Project scope also includes elevator modernization, curtain wall modernization.) All changes bubbled on plans and described in a covering memo.Building renovation including interior alterations at basement level, ground floor lobby level and 3rdfloor. Project scope also includes elevator modernization, curtain wall modernization. No new floorarea is proposed."
+      }
+    },
+    "toronto-active-permit:25-268130-rev01": {
+      "source_url": "https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action/datastore_search?resource_id=6d0229af-bc54-46de-9c2b-26759b01dd05&filters=%7B%22PERMIT_NUM%22%3A+%2225+268130+BLD%22%2C+%22REVISION_NUM%22%3A+%2201%22%7D&limit=3",
+      "record": {
+        "PERMIT_NUM": "25 268130 BLD",
+        "REVISION_NUM": "01",
+        "APPLICATION_DATE": "2026-11-23",
+        "ISSUED_DATE": null,
+        "STATUS": "Not Started",
+        "STREET_NUM": "2190",
+        "STREET_NAME": "YONGE",
+        "STREET_TYPE": "ST",
+        "STREET_DIRECTION": " ",
+        "DESCRIPTION": "Revision #1 - Building renovation including interior demolition, core and shell commercial space, replacement of the east elevation façade and roof repair.  Changes bubbled on plans and cover memo outline nature of changes.Proposed building renovation including interior demolition, core and shell commercial space, replacement of the east elevation façade and roof repair. No new floor area is proposed."
+      }
+    },
+    "toronto-active-permit:26-273907": {
+      "source_url": "https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action/datastore_search?resource_id=6d0229af-bc54-46de-9c2b-26759b01dd05&filters=%7B%22PERMIT_NUM%22%3A+%2226+273907+BLD%22%2C+%22REVISION_NUM%22%3A+%2200%22%7D&limit=3",
+      "record": {
+        "PERMIT_NUM": "26 273907 BLD",
+        "REVISION_NUM": "00",
+        "APPLICATION_DATE": "2026-11-23",
+        "ISSUED_DATE": null,
+        "STATUS": "Application Acceptable",
+        "STREET_NUM": "47",
+        "STREET_NAME": "DENSLEY",
+        "STREET_TYPE": "AVE",
+        "STREET_DIRECTION": " ",
+        "DESCRIPTION": "Proposal to replace rear windows, renovate existing offices and conference hall, construct a side addition, and build a retaining wall."
+      }
+    },
+    "toronto-active-permit:26-255996": {
+      "source_url": "https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action/datastore_search?resource_id=6d0229af-bc54-46de-9c2b-26759b01dd05&filters=%7B%22PERMIT_NUM%22%3A+%2226+255996+FSU%22%2C+%22REVISION_NUM%22%3A+%2200%22%7D&limit=3",
+      "record": {
+        "PERMIT_NUM": "26 255996 FSU",
+        "REVISION_NUM": "00",
+        "APPLICATION_DATE": "2026-10-16",
+        "ISSUED_DATE": "2026-11-23",
+        "STATUS": "Permit Issued",
+        "STREET_NUM": "101",
+        "STREET_NAME": "RIDGETOP",
+        "STREET_TYPE": "RD",
+        "STREET_DIRECTION": " ",
+        "DESCRIPTION": "Proposal to upgrade the Fire Alarm audibility with horn/strobes and provide new pull stations at exits."
+      }
+    },
+    "toronto-active-permit:26-247366": {
+      "source_url": "https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action/datastore_search?resource_id=6d0229af-bc54-46de-9c2b-26759b01dd05&filters=%7B%22PERMIT_NUM%22%3A+%2226+247366+FSU%22%2C+%22REVISION_NUM%22%3A+%2200%22%7D&limit=3",
+      "record": {
+        "PERMIT_NUM": "26 247366 FSU",
+        "REVISION_NUM": "00",
+        "APPLICATION_DATE": "2026-10-01",
+        "ISSUED_DATE": "2026-11-23",
+        "STATUS": "Permit Issued",
+        "STREET_NUM": "661",
+        "STREET_NAME": "QUEEN",
+        "STREET_TYPE": "ST",
+        "STREET_DIRECTION": "E",
+        "DESCRIPTION": "Proposal to add and relocate sprinklers and fire hose cabinets within Shoppers Drug Mart #9490."
+      }
+    },
+    "toronto-active-permit:26-259610": {
+      "source_url": "https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action/datastore_search?resource_id=6d0229af-bc54-46de-9c2b-26759b01dd05&filters=%7B%22PERMIT_NUM%22%3A+%2226+259610+BLD%22%2C+%22REVISION_NUM%22%3A+%2200%22%7D&limit=3",
+      "record": {
+        "PERMIT_NUM": "26 259610 BLD",
+        "REVISION_NUM": "00",
+        "APPLICATION_DATE": "2026-10-23",
+        "ISSUED_DATE": "2026-11-23",
+        "STATUS": "Permit Issued",
+        "STREET_NUM": "393",
+        "STREET_NAME": "UNIVERSITY",
+        "STREET_TYPE": "AVE",
+        "STREET_DIRECTION": " ",
+        "DESCRIPTION": "Proposal for interior alterations to existing office suite. To include HVAC, sprinkler alterations."
+      }
+    },
+    "toronto-active-permit:26-175550-rev01": {
+      "source_url": "https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action/datastore_search?resource_id=6d0229af-bc54-46de-9c2b-26759b01dd05&filters=%7B%22PERMIT_NUM%22%3A+%2226+175550+PLB%22%2C+%22REVISION_NUM%22%3A+%2201%22%7D&limit=3",
+      "record": {
+        "PERMIT_NUM": "26 175550 PLB",
+        "REVISION_NUM": "01",
+        "APPLICATION_DATE": "2026-11-19",
+        "ISSUED_DATE": "2026-11-23",
+        "STATUS": "Revision Issued",
+        "STREET_NUM": "1",
+        "STREET_NAME": "ADELAIDE",
+        "STREET_TYPE": "ST",
+        "STREET_DIRECTION": "E",
+        "DESCRIPTION": "Plumbing  - Interior tenant improvment for single tenant, on part of the 8th floor and full 9th and 10th floors.Scope includes stair infill, non-load beaing partition construction, re-alignment and redistribution of electrical, mechanical and life safety systems. Area is existing and egress locations are existing to remain."
+      }
+    },
+    "toronto-active-permit:26-218208": {
+      "source_url": "https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action/datastore_search?resource_id=6d0229af-bc54-46de-9c2b-26759b01dd05&filters=%7B%22PERMIT_NUM%22%3A+%2226+218208+HVA%22%2C+%22REVISION_NUM%22%3A+%2200%22%7D&limit=3",
+      "record": {
+        "PERMIT_NUM": "26 218208 HVA",
+        "REVISION_NUM": "00",
+        "APPLICATION_DATE": "2026-08-12",
+        "ISSUED_DATE": "2026-11-23",
+        "STATUS": "Permit Issued",
+        "STREET_NUM": "900",
+        "STREET_NAME": "DON MILLS",
+        "STREET_TYPE": "RD",
+        "STREET_DIRECTION": " ",
+        "DESCRIPTION": "HVAC - includes a kitchen exhaustProposal for interior alterations to an existing restaurant for new tenant - BBQ restaurant, UNIT 3, \"Yakiniku Legend\""
+      }
+    },
+    "toronto-active-permit:26-273585": {
+      "source_url": "https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action/datastore_search?resource_id=6d0229af-bc54-46de-9c2b-26759b01dd05&filters=%7B%22PERMIT_NUM%22%3A+%2226+273585+BLD%22%2C+%22REVISION_NUM%22%3A+%2200%22%7D&limit=3",
+      "record": {
+        "PERMIT_NUM": "26 273585 BLD",
+        "REVISION_NUM": "00",
+        "APPLICATION_DATE": "2026-11-23",
+        "ISSUED_DATE": null,
+        "STATUS": "Not Started",
+        "STREET_NUM": "181",
+        "STREET_NAME": "WELLINGTON",
+        "STREET_TYPE": "ST",
+        "STREET_DIRECTION": "W",
+        "DESCRIPTION": "Proposal for interior alterations on level 1 mezzanine of existing hotel. Work to include demolition of existing millwork, glass partitions of wine storage room, and indicated sections of the ceiling. Construction of new partitions, floor finishes, ceilings, millwork, and light fixtures."
+      }
+    },
+    "toronto-active-permit:25-188267-rev03": {
+      "source_url": "https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action/datastore_search?resource_id=6d0229af-bc54-46de-9c2b-26759b01dd05&filters=%7B%22PERMIT_NUM%22%3A+%2225+188267+BLD%22%2C+%22REVISION_NUM%22%3A+%2203%22%7D&limit=3",
+      "record": {
+        "PERMIT_NUM": "25 188267 BLD",
+        "REVISION_NUM": "03",
+        "APPLICATION_DATE": "2026-11-23",
+        "ISSUED_DATE": null,
+        "STATUS": "Not Started",
+        "STREET_NUM": "1",
+        "STREET_NAME": "YORK",
+        "STREET_TYPE": "ST",
+        "STREET_DIRECTION": " ",
+        "DESCRIPTION": "REV03: Addition of new partition and door to enclose Cafe / Lunch Room area on east side of floor plan. REV02: Proposed revision of office layout scope of work as shown on submitted drawings. Interior Alterations: Extensive Renovation, demolition of all existing interior buildout, construction of new full floor office layout.Rev 01 - Office layout revisions throughout scope of work as shown on submitted drawingsProposal for interior alterations to existing office space on the 8th floor - Healthcare of Ontario Pension Plan"
+      }
+    },
+    "toronto-active-permit:26-153807-rev01": {
+      "source_url": "https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action/datastore_search?resource_id=6d0229af-bc54-46de-9c2b-26759b01dd05&filters=%7B%22PERMIT_NUM%22%3A+%2226+153807+BLD%22%2C+%22REVISION_NUM%22%3A+%2201%22%7D&limit=3",
+      "record": {
+        "PERMIT_NUM": "26 153807 BLD",
+        "REVISION_NUM": "01",
+        "APPLICATION_DATE": "2026-11-23",
+        "ISSUED_DATE": null,
+        "STATUS": "Under Review ",
+        "STREET_NUM": "15",
+        "STREET_NAME": "FRASER",
+        "STREET_TYPE": "AVE",
+        "STREET_DIRECTION": " ",
+        "DESCRIPTION": "Revision to the following areas - P3 shaft wall added to drawing A010 attached..P2 wall on the north side of the Mechanical Room has been replaced with P3 shaft wall, see drawing A201, attached Details added for the rating of the existing steel beams above the Mechanical room with cementitious fire spray, refer to drawing A602, attached.Addition of entry vestibule. Refer to schedule drawing A011-2, vestibule drawings A012-2, and plans on A201Proposed interior alteration of an existing space into a reception area."
+      }
+    },
+    "toronto-active-permit:26-249322": {
+      "source_url": "https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action/datastore_search?resource_id=6d0229af-bc54-46de-9c2b-26759b01dd05&filters=%7B%22PERMIT_NUM%22%3A+%2226+249322+HVA%22%2C+%22REVISION_NUM%22%3A+%2200%22%7D&limit=3",
+      "record": {
+        "PERMIT_NUM": "26 249322 HVA",
+        "REVISION_NUM": "00",
+        "APPLICATION_DATE": "2026-10-05",
+        "ISSUED_DATE": "2026-11-23",
+        "STATUS": "Permit Issued",
+        "STREET_NUM": "90",
+        "STREET_NAME": "CROATIA",
+        "STREET_TYPE": "ST",
+        "STREET_DIRECTION": " ",
+        "DESCRIPTION": "HVAC - Interior renovation for a noodle restaurant, including building plumbing and HVAC work"
+      }
+    },
+    "toronto-active-permit:26-208327": {
+      "source_url": "https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action/datastore_search?resource_id=6d0229af-bc54-46de-9c2b-26759b01dd05&filters=%7B%22PERMIT_NUM%22%3A+%2226+208327+HVA%22%2C+%22REVISION_NUM%22%3A+%2200%22%7D&limit=3",
+      "record": {
+        "PERMIT_NUM": "26 208327 HVA",
+        "REVISION_NUM": "00",
+        "APPLICATION_DATE": "2026-07-24",
+        "ISSUED_DATE": "2026-11-23",
+        "STATUS": "Permit Issued",
+        "STREET_NUM": "2017",
+        "STREET_NAME": "DANFORTH",
+        "STREET_TYPE": "AVE",
+        "STREET_DIRECTION": " ",
+        "DESCRIPTION": "HVAC - Proposal to convert exsiting office to a Coffee Shop&Bar (30 Seats)"
+      }
+    },
+    "toronto-active-permit:26-259345": {
+      "source_url": "https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action/datastore_search?resource_id=6d0229af-bc54-46de-9c2b-26759b01dd05&filters=%7B%22PERMIT_NUM%22%3A+%2226+259345+BLD%22%2C+%22REVISION_NUM%22%3A+%2200%22%7D&limit=3",
+      "record": {
+        "PERMIT_NUM": "26 259345 BLD",
+        "REVISION_NUM": "00",
+        "APPLICATION_DATE": "2026-10-23",
+        "ISSUED_DATE": "2026-11-23",
+        "STATUS": "Permit Issued",
+        "STREET_NUM": "1670",
+        "STREET_NAME": "BAYVIEW",
+        "STREET_TYPE": "AVE",
+        "STREET_DIRECTION": " ",
+        "DESCRIPTION": "Proposal for interior alterations to vacant unit into a medical clinic."
+      }
+    }
+  }
+}
