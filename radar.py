@@ -592,6 +592,49 @@ def _ckan_datastore_incremental(source: Dict[str, Any], http: Http, res: Dict[st
     return rows
 
 
+def _ckan_json_csv_fallback(source, http, package, primary):
+    """Read the configured JSON twin of a CSV published in the same cycle."""
+    fallback = next(
+        (resource for resource in package["resources"]
+         if resource.get("id") == source["json_fallback_resource_id"]),
+        None,
+    )
+    if not fallback or fallback.get("format", "").upper() != "JSON" or not fallback.get("url"):
+        raise RuntimeError("CKAN JSON fallback resource is unavailable")
+    try:
+        primary_time = datetime.fromisoformat(primary["last_modified"].replace("Z", "+00:00"))
+        fallback_time = datetime.fromisoformat(fallback["last_modified"].replace("Z", "+00:00"))
+        delay = (fallback_time - primary_time).total_seconds()
+    except (KeyError, AttributeError, ValueError, TypeError) as exc:
+        raise RuntimeError("CKAN fallback publication cycle could not be verified") from exc
+    if not 0 <= delay <= 300:
+        raise RuntimeError("CKAN fallback does not match the primary publication cycle")
+    response = http.get(fallback["url"], timeout=(20, 240), retries=2)
+    if isinstance(fallback.get("size"), int) and fallback["size"] > 0:
+        if len(response.content) != fallback["size"]:
+            raise RuntimeError("CKAN fallback download size does not match catalogue metadata")
+    payload = response.json()
+    if not isinstance(payload, list) or not payload or not isinstance(payload[0], dict):
+        raise RuntimeError("CKAN fallback is not a nonempty JSON table")
+    expected = set(payload[0])
+    key_fields = {norm_field(field) for field in source["key_fields"]}
+    if not key_fields or not key_fields.issubset({norm_field(field) for field in expected}):
+        raise RuntimeError("CKAN fallback licence identity fields are missing")
+    for row in payload:
+        if (not isinstance(row, dict) or row.keys() != expected or
+                any(isinstance(value, (list, dict)) for value in row.values())):
+            raise RuntimeError("CKAN fallback has inconsistent or nested fields")
+        normalized = {norm_field(key): "" if value is None else str(value)
+                      for key, value in row.items()}
+        if any(not normalized[field].strip() for field in key_fields):
+            raise RuntimeError("CKAN fallback has a blank licence identity")
+        # CKAN CSV values are read as strings. Keep record digests consistent
+        # when the publisher's JSON serialization uses numbers or null.
+        row.clear()
+        row.update(normalized)
+    return payload, fallback
+
+
 def collect_ckan(source: Dict[str, Any], http: Http, progress=True, *, smart=False, since_date: Optional[str]=None, previous_metadata: Optional[Dict[str, Any]]=None, force_full=False) -> Snapshot:
     pkg=resolve_ckan_package(source,http)
     res=choose_ckan_resource(pkg,source)
@@ -621,8 +664,23 @@ def collect_ckan(source: Dict[str, Any], http: Http, progress=True, *, smart=Fal
     if progress:
         why="resource changed; full file required" if smart and not force_full else "full snapshot"
         print(f"  {source['name']}: {why}; downloading {res.get('name','resource')} [{res.get('format','?')}]",flush=True)
-    r=http.get(url,timeout=(20,240),retries=3)
-    rows=parse_tabular_bytes(r.content,url,str(res.get("format") or ""))
+    try:
+        r=http.get(url,timeout=(20,240),retries=3)
+    except requests.HTTPError as exc:
+        if (not source.get("json_fallback_resource_id") or exc.response is None or
+                not 500 <= exc.response.status_code < 600):
+            raise
+        if progress:
+            print(f"  {source['name']}: CSV server error; checking the matching official JSON export", flush=True)
+        rows, fallback = _ckan_json_csv_fallback(source, http, pkg, res)
+        url = fallback["url"]
+        meta.update({"transport": "ckan_json_fallback", "fallback_resource_id": fallback["id"],
+                     "fallback_resource_url": url, "fallback_resource_modified": fallback["last_modified"],
+                     "primary_http_status": exc.response.status_code})
+        if progress:
+            print(f"  {source['name']}: official JSON fallback fetched {len(rows):,} rows", flush=True)
+    else:
+        rows=parse_tabular_bytes(r.content,url,str(res.get("format") or ""))
     if source.get("gta_only"):
         before=len(rows); rows=[x for x in rows if gta_match(x)]
         if progress: print(f"  {source['name']}: GTA filter kept {len(rows):,}/{before:,}",flush=True)
