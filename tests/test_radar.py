@@ -1,5 +1,7 @@
 import json, sqlite3, tempfile, unittest, io
 from pathlib import Path
+from unittest.mock import Mock, patch
+import requests
 import pandas as pd
 from radar import (normalize_row, stable_key, normalized_summary, open_db, process_snapshot, Snapshot,
                    resolve_ckan_package, choose_ckan_resource, parse_tabular_bytes, clear_source_current,
@@ -167,6 +169,40 @@ class RadarTests(unittest.TestCase):
                 r=process_snapshot(con,Snapshot(s,[{'ID':'1','NAME':'A','_id':999}],b'','x',{'snapshot_mode':'incremental_datastore'},False,'incremental_datastore'),td/'raw')
                 self.assertEqual(r['updated'],0)
             finally: con.close()
+
+    def test_ckan_uses_current_json_twin_after_csv_server_failure(self):
+        source = {"id": "toronto_business_licences", "name": "Licences",
+                  "preferred_formats": ["CSV"], "key_fields": ["LICENCE_NO"],
+                  "json_fallback_resource_id": "json-id"}
+        primary = {"id": "csv-id", "format": "CSV", "url": "https://example.test/licences.csv",
+                   "last_modified": "2026-11-25T06:12:30"}
+        fallback = {"id": "json-id", "format": "JSON", "url": "https://example.test/licences.json",
+                    "last_modified": "2026-11-25T06:12:34"}
+        package = {"resources": [primary, fallback]}
+        rows = [{"_id": 1, "Licence No.": "A001", "Operating Name": None},
+                {"_id": 2, "Licence No.": "A002", "Operating Name": "A Shop"}]
+        http = Mock()
+        unavailable = requests.HTTPError(response=Mock(status_code=500))
+        http.get.side_effect = [unavailable, Mock(json=lambda: rows)]
+        with patch("radar.resolve_ckan_package", return_value=package):
+            from radar import collect_ckan
+            snapshot = collect_ckan(source, http, progress=False)
+        self.assertTrue(snapshot.is_complete)
+        self.assertEqual(snapshot.rows, [
+            {"ID": "1", "LICENCE_NO": "A001", "OPERATING_NAME": ""},
+            {"ID": "2", "LICENCE_NO": "A002", "OPERATING_NAME": "A Shop"},
+        ])
+        self.assertEqual(snapshot.resource_url, fallback["url"])
+        self.assertEqual(snapshot.metadata["primary_http_status"], 500)
+        self.assertEqual(snapshot.metadata["resource_id"], "csv-id")
+
+        fallback["last_modified"] = "2022-12-01T05:49:06"
+        http.get.reset_mock(side_effect=True)
+        http.get.side_effect = [unavailable]
+        with patch("radar.resolve_ckan_package", return_value=package):
+            with self.assertRaisesRegex(RuntimeError, "publication cycle"):
+                collect_ckan(source, http, progress=False)
+        self.assertEqual(http.get.call_count, 1)
 
     def test_ckan_metadata_unchanged(self):
         prev={'resource_id':'r1','resource_modified':'2026-10-08T10:00:00'}

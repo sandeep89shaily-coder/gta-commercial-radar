@@ -180,6 +180,7 @@
     "collector": "ckan",
     "mode": "daily",
     "enabled": true,
+    "json_fallback_resource_id": "6f2e2588-059e-48fe-aaec-9582e161eee9",
     "api_base": "https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action",
     "package_query": "Municipal Licensing and Standards Business Licences and Permits",
     "preferred_resource_names": [
