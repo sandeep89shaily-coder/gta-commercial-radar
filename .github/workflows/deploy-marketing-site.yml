@@ -1,6 +1,6 @@
 name: Deploy GTA Radar marketing website
 
-# Publishing is triggered by changes to the editor-reviewed feed or the opportunities page.
+# Changes to the approved feed, opportunities page, or this workflow trigger publishing.
 # The private daily collector/AI research NEVER publishes automatically. The
 # deployment validator rejects unapproved/unsafe publication JSON.
 on:
@@ -11,6 +11,7 @@ on:
     paths:
       - 'website/data/opportunities.json'
       - 'website/opportunities.html'
+      - '.github/workflows/deploy-marketing-site.yml'
 
 permissions:
   contents: read
@@ -44,7 +45,10 @@ jobs:
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
+          name: github-pages-${{ github.run_attempt }}
           path: _site
       - name: Deploy to GitHub Pages
         id: deploy
         uses: actions/deploy-pages@v4
+        with:
+          artifact_name: github-pages-${{ github.run_attempt }}
