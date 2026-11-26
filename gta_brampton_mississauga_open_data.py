@@ -20,6 +20,9 @@ from urllib.parse import urlsplit, urlencode
 from urllib.request import Request, urlopen
 from urllib.robotparser import RobotFileParser
 
+from gta_brampton_public_planning import LANE as BRAMPTON_PORTAL, LICENCE as PORTAL_LICENCE
+from gta_brampton_public_planning import collect as collect_brampton_portal
+
 BRAMPTON_BASE=("https://services3.arcgis.com/rl7ACuZkiFsmDA2g/arcgis/rest/"
               "services/Planning_Land_Use_Development/FeatureServer")
 MISSISSAUGA=("https://services6.arcgis.com/hM5ymMLbxIyWTjn2/ArcGIS/rest/"
@@ -162,7 +165,7 @@ def normalize(lane,a):
         "first_publication_verified":"False","buyer_verified":"False",
         "procurement_verified":"False"}
 
-def run(results,*,getter=request_json):
+def run(results, *, getter=request_json, portal_collector=None):
     root=Path(results)
     root.mkdir(parents=True,exist_ok=True)
     states={};records=[]
@@ -177,6 +180,23 @@ def run(results,*,getter=request_json):
             states[lane]={"status":"BLOCKED_OR_FAILED","valid_files":0,
                 "licence_status":LICENSE[lane],
                 "failure":type(exc).__name__+":"+str(exc)[:170]}
+    if portal_collector is None and getter is request_json:
+        portal_collector = collect_brampton_portal
+    if portal_collector is not None:
+        try:
+            rows, detail = portal_collector()
+            records.extend(rows)
+            states[BRAMPTON_PORTAL] = {
+                "status": ("LIVE_VALID_APPLICATION_FILES_PARTIAL" if rows
+                           else "FETCHED_ZERO_VALID_APPLICATION_FILES"),
+                "valid_files": len(rows), "licence_status": PORTAL_LICENCE, **detail,
+            }
+        except (OSError, ValueError) as exc:
+            states[BRAMPTON_PORTAL] = {
+                "status": "BLOCKED_OR_FAILED", "valid_files": 0,
+                "licence_status": PORTAL_LICENCE,
+                "failure": f"{type(exc).__name__}:{exc}"[:190],
+            }
     # Multiple Brampton land-use layers may carry identical FILE_NUMBER.
     # Keep the richer record; retain individual lane coverage in the manifest.
     unique={}
@@ -198,7 +218,7 @@ def run(results,*,getter=request_json):
         "unique_application_files":len(unique),
         "by_city":{city:sum(x["city"]==city for x in unique.values())
                    for city in ("Brampton","Mississauga")},
-        "source_count":len(SOURCES),"citywide_coverage_verified":False,
+        "source_count":len(states),"citywide_coverage_verified":False,
         "mississauga_custom_licence_reuse_authorized":False,
         "qualified_buyers":0,"verified_new_publications":0,
         "supplier_contracts_verified":0,"paid_ai_calls":0,

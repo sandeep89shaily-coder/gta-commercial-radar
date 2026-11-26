@@ -25,6 +25,16 @@ Date: 2026-11-19. Source-specific supplement, **not** replacement of working off
 
 All four layers have independent status. The source uses paginated, bounded first-party ArcGIS queries, `objectIdField` supplied by the publisher, HTTPS and redirect restrictions, and robots checks on the actual request. Failure of any source does not erase the other source's records. API errors and truncation are explicit.
 
+BramPlanOnline is a separate Brampton source. Radar submits the City's public
+planning search for the last 14 calendar days and reads up to five result
+pages. It keeps permanent Pre Consultation, Site Plan, and OPA/ZBA file IDs
+with exact City record links. Results include the displayed file date and
+status. The date is for tracking and does not certify first publication.
+BramPlanOnline results stay research-only while commercial reuse is unverified.
+
+The GeoHub CSV download API served older cached files during validation.
+Use the authorized local export to retain a larger planning baseline.
+
 ## ZIP audit outputs
 
 - `GTA_RADAR_BR_MISS_OPEN_PLANNING_APPLICATIONS.csv`: exact file-ID rows, published company/agent, application stage, **separate** floor area metrics where present, date basis, and source permissions.
