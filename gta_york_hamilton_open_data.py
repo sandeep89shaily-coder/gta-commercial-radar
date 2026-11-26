@@ -20,10 +20,11 @@ from urllib.parse import urlencode, urlsplit
 from urllib.request import Request, urlopen
 from urllib.robotparser import RobotFileParser
 
-from gta_arcgis_hub_exports import YORK_ITEM, csv_date, download_rows
+from gta_arcgis_hub_exports import HAMILTON_ITEM, YORK_ITEM, csv_date, download_rows
 
 YORK_CATALOGUE = "https://insights-york.opendata.arcgis.com/datasets/york::active-development-application-boundaries"
 YORK="https://services1.arcgis.com/GzvOwaQBbX7KLiuG/ArcGIS/rest/services/Hosted_Active_Development_Application/FeatureServer/0"
+HAMILTON_CATALOGUE = "https://open.hamilton.ca/datasets/SpatialSolutions::development-applications-1/about"
 HAMILTON="https://services.arcgis.com/rYz782eMbySr2srL/arcgis/rest/services/Development_Applications/FeatureServer/2"
 BRANTFORD="https://services.arcgis.com/aji2lCmjXt0KpGzI/ArcGIS/rest/services/Planning_Application_Open_Data_view/FeatureServer/0"
 YORK_CITIES=("Vaughan","Markham","Richmond Hill")
@@ -144,21 +145,20 @@ def parse_york(attributes, *, source_url=YORK):
           "open_supplier_package_verified":"False"})
     return rows
 
-def parse_hamilton(attributes):
+def parse_hamilton(attributes, *, source_url=HAMILTON):
     rows=[]
     for a in attributes:
         ident=clean(a.get("FILE_NUM"),120)
         addr=clean(a.get("ADDRESS"),230)
         scope=clean(a.get("DESCRIP") or a.get("FILE_TYPE"),1400)
         if not all((ident,addr,scope)):continue
-        year=a.get("FILE_YEAR")
         # FILE_YEAR is an application year, not notice date. Never claim
         # the 2026 field means a November 2026 new investment.
         rows.append({"city":"Hamilton","application_id":ident,"address":addr,
           "scope":scope,"applicant":"","stage":"STATUS_NOT_IN_DATASET",
           "category":clean(a.get("FILE_TYPE"),100),"date":"",
           "date_basis":"FILE_YEAR_ONLY_NOT_PUBLICATION",
-          "source_url":HAMILTON,
+          "source_url":source_url,
           "source_lane":"HAMILTON_OPEN_DATA_DEVELOPMENT_APPLICATIONS",
           "source_permission":"HAMILTON_OPEN_DATA_COMMERCIAL_LICENCE",
           "publication_verified":"False","buyer_verified":"False",
@@ -251,6 +251,10 @@ def run(results,*,getter=None,today=None):
                 ))
                 diag = {"features_examined": len(attrs), "transport": "ARCGIS_HUB_CSV"}
                 data = parse_york(attrs, source_url=YORK_CATALOGUE)
+            elif layer == HAMILTON and getter is None:
+                attrs = download_rows(HAMILTON_ITEM, ("FILE_NUM", "FILE_TYPE", "ADDRESS", "FILE_YEAR", "DESCRIP"))
+                diag = {"features_examined": len(attrs), "transport": "ARCGIS_HUB_CSV"}
+                data = parse_hamilton(attrs, source_url=HAMILTON_CATALOGUE)
             else:
                 attrs,diag=pull(layer,getter=getter or fetch_json)
                 data=(parse_york(attrs) if layer==YORK else

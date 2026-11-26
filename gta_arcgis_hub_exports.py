@@ -11,6 +11,8 @@ HUB = "https://hub.arcgis.com"
 AGENT = "GTA-Radar-official-open-data/1.0"
 MAX_BYTES = 12_000_000
 YORK_ITEM = "2ea061702aaa4d5fae39c1226525fd4e"
+HAMILTON_ITEM = "da765ab0f2f64ce5a4792879ecad9f17"
+DATASET_LAYERS = {YORK_ITEM: 0, HAMILTON_ITEM: 2}
 MAX_ROBOTS_BYTES = 500 * 1024
 
 
@@ -31,10 +33,10 @@ def csv_date(value):
 
 
 def download_rows(item, required_fields):
-    if item != YORK_ITEM:
+    if item not in DATASET_LAYERS:
         raise ValueError("UNAPPROVED_HUB_EXPORT_ITEM")
     params = "format=csv&spatialRefId=26917&where=1%3D1"
-    url = f"{HUB}/api/v3/datasets/{item}_0/downloads/data?{params}"
+    url = f"{HUB}/api/v3/datasets/{item}_{DATASET_LAYERS[item]}/downloads/data?{params}"
     opener = build_opener(NoRedirect())
     headers = {"User-Agent": AGENT}
     with opener.open(Request(HUB + "/robots.txt", headers=headers), timeout=12) as response:

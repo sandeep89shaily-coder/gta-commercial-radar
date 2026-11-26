@@ -71,6 +71,26 @@ class Recovery(unittest.TestCase):
         self.assertEqual(row["applicant"], "")
         self.assertEqual(row["publication_verified"], "False")
 
+    def test_default_hamilton_uses_licensed_catalogue_csv(self):
+        sample = {"FILE_NUM": "ZAC-26-098", "FILE_TYPE": "Zoning", "FILE_YEAR": "2026",
+                  "ADDRESS": "92 John Street", "DESCRIP": "Proposed industrial warehouse"}
+        def download(item, required):
+            if item == regional.HAMILTON_ITEM:
+                return [sample]
+            raise PermissionError("Unavailable source")
+
+        with tempfile.TemporaryDirectory() as root:
+            with patch.object(regional, "download_rows", side_effect=download), \
+                    patch.object(regional, "fetch_json", side_effect=PermissionError("Unavailable source")):
+                result = regional.run(root)
+            self.assertEqual(result["records_by_city"]["Hamilton"], 1)
+            self.assertEqual(result["source_status"]["Hamilton"]["transport"], "ARCGIS_HUB_CSV")
+            with (Path(root) / regional.OUTPUT).open(encoding="utf-8-sig", newline="") as fp:
+                row = next(csv.DictReader(fp))
+        self.assertEqual(row["source_url"], regional.HAMILTON_CATALOGUE)
+        self.assertEqual(row["date"], "")
+        self.assertEqual(row["publication_verified"], "False")
+
     def test_hamilton_file_year_not_publication(self):
         rows=parse_hamilton(pull(HAMILTON,getter=getter,check_robots=False)[0])
         self.assertEqual(len(rows),1)
@@ -137,7 +157,8 @@ class YorkDailyIntegrationTest(unittest.TestCase):
 
             def collect(rows, today):
                 def download(item, fields):
-                    assert item == YORK_ITEM
+                    if item != YORK_ITEM:
+                        raise PermissionError("Unavailable source")
                     return rows
                 with patch("gta_york_hamilton_open_data.download_rows", download), patch(
                         "gta_york_hamilton_open_data.pull", side_effect=PermissionError("ROBOTS_DENIED")):
