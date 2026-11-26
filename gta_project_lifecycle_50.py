@@ -42,8 +42,18 @@ def load_seeds():
 
 def queries(p, day):
     name, location = p["search_name"], p["location"]
+    # Rotate secondary channels without losing the daily broad project query.
+    channels = (
+        "site:ero.ontario.ca environmental approval equipment",
+        "municipal planning building permit council approval",
+        "government funding investment manufacturing modernization",
+        "equipment procurement tender award contractor supplier",
+        "corporate news investor update construction commissioning",
+        "jobs production line maintenance new equipment",
+    )
+    channel = channels[dt.date.fromisoformat(day).toordinal() % len(channels)]
     return [f'"{name}" {location} Ontario {p["scope_hint"]} update {day[:4]}',
-            f'"{name}" {location} Ontario equipment procurement tender award approval expansion']
+            f'"{name}" {location} Ontario {channel}']
 
 
 def evidence_hash(pages):
@@ -136,8 +146,8 @@ def search_pages(project, db, day, legacy, key, transport):
             pages.append({"id": len(pages)+1, "url": url, "text": content[:1500],
                           "retrieved_on": day, "source_type": "PROVIDER_SEARCH_CONTENT",
                           "reuse_permission": "UNCONFIRMED"})
-            if len(pages) >= 5:
-                return pages, errors
+            if len(pages) >= (3 if index == 0 else 5):
+                break
     return pages, errors
 
 
@@ -194,7 +204,7 @@ def last_review(folder, before):
 
 
 def safe_cell(x):
-    value = str(x or "")
+    value = "" if x is None else str(x)
     return "'" + value if value.lstrip().startswith(("=", "+", "-", "@")) else value
 
 
@@ -246,6 +256,7 @@ def run(results, *, paid=False, key=None, transport=None, today=None):
                          "change_status": result.get("change_status", "NOT_ASSESSED"),
                          "packages_review_only": len(result.get("packages", [])),
                          "participants_review_only": len(result.get("participants", [])),
+                         "review_file": str(path.relative_to(root)) if path.exists() else "",
                          "evidence_urls": " | ".join(p["url"] for p in record.get("sources", [])),
                          "verified_open_contract": False, "sale_ready": False})
         budget = native.effective_spend(db, day)[0] + legacy if db is not None else None
