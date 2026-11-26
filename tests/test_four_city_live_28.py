@@ -130,7 +130,12 @@ class FourCityLiveAndReconcile(unittest.TestCase):
                        "failed_or_blocked_source_count":"1","application_files":"0",
                        "source_rows":"0"} for city in legacy.CITIES]
             write(root/"GTA_RADAR_COMBINED_24_CITY_COVERAGE.csv",legacy.COVERAGE_COLS,coverage)
-            live.run(root,collector=lambda city,**kw:source(city),today=DAY)
+            def collect(city, **kwargs):
+                if city == "Newmarket":
+                    raise PermissionError("ROBOTS_DISALLOWED")
+                return source(city)
+
+            live.run(root,collector=collect,today=DAY)
             alt_fields=("city","application_id","address","scope","applicant","stage",
                 "category","date","date_basis","source_url","source_lane",
                 "source_permission","publication_verified","buyer_verified",
@@ -140,11 +145,12 @@ class FourCityLiveAndReconcile(unittest.TestCase):
                 "source_url":"https://services1.arcgis.com/example",
                 "source_permission":"YORK_REGION_OPEN_DATA_LICENCE",
                 "source_lane":"YORK_REGION_ACTIVE_APPLICATIONS_OPEN_DATA"}]
+            data.append(dict(data[0], city="Newmarket"))
             write(root/"GTA_RADAR_ADDITIONAL_OFFICIAL_OPEN_DATA.csv",alt_fields,data)
             (root/"GTA_RADAR_ADDITIONAL_OFFICIAL_OPEN_DATA_STATUS.json").write_text(
                 json.dumps({"status":"PUBLISHED_OPEN_DATA_RECOVERY_PARTIAL_UNTIL_LIVE_VERIFIED",
                 "source_status":{"York Region":{"status":"LIVE_APPLICATION_FILES_RETRIEVED"}}}))
-            together.run(root,today=DAY)
+            status=together.run(root,today=DAY)
             with (root/together.COVERAGE).open(encoding="utf-8-sig") as f:
                 entries={row["city"]:row for row in csv.DictReader(f)}
             self.assertEqual(entries["Vaughan"]["application_files"],"1")
@@ -152,6 +158,15 @@ class FourCityLiveAndReconcile(unittest.TestCase):
             self.assertIn("ALTERNATE_EXACT_FILE_IDS_PARTIAL",
                           entries["Vaughan"]["source_health"])
             self.assertEqual(entries["Vaughan"]["coverage_verified_citywide"],"False")
+            self.assertEqual(status["added_cities_with_live_application_ids"],4)
+            self.assertEqual(status["all_four_added_city_source_rows"],3)
+            self.assertEqual(entries["Newmarket"]["application_files"],"1")
+            self.assertEqual(entries["Newmarket"]["failed_or_blocked_source_count"],"1")
+            self.assertIn("REGIONAL_OPEN_DATA_LIVE_PARTIAL",entries["Newmarket"]["source_health"])
+            with (root/together.MASTER).open(encoding="utf-8-sig") as fp:
+                newmarket=next(r for r in csv.DictReader(fp) if r["city"]=="Newmarket")
+            self.assertEqual(newmarket["cohort"],"ADDED_4")
+            self.assertEqual(newmarket["original_publication_verified"],"False")
 
     def test_robots_fails_closed_and_no_network_in_mock(self):
         self.assertFalse(live.robots_allowed("http://example.com/"))

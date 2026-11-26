@@ -172,6 +172,7 @@ def run(results,*,today=None):
         "Vaughan":"YORK_REGION_OPEN_DATA_LICENCE",
         "Markham":"YORK_REGION_OPEN_DATA_LICENCE",
         "Richmond Hill":"YORK_REGION_OPEN_DATA_LICENCE",
+        "Newmarket":"YORK_REGION_OPEN_DATA_LICENCE",
         "Hamilton":"HAMILTON_OPEN_DATA_COMMERCIAL_LICENCE",
         "Brantford":"BRANTFORD_OPEN_DATA_COMMERCIAL_LICENCE",
     }
@@ -192,8 +193,8 @@ def run(results,*,today=None):
             scope=item["scope"]
             regional.append({
                 "canonical_id":city.upper().replace(" ","_")+":FILE:"+safeid,
-                "city":city,"cohort":"CORE_16","record_kind":"APPLICATION",
-                "application_id":ident,"address":item["address"],
+                "city":city,"cohort":"ADDED_4" if city in ADDED else "CORE_16",
+                "record_kind":"APPLICATION","application_id":ident,"address":item["address"],
                 "project_title":"","scope":scope,
                 "current_status":item.get("stage",""),
                 "applicant_or_agent_source_claim":item.get("applicant",""),
@@ -314,9 +315,16 @@ def run(results,*,today=None):
             " application IDs; prior failed/blocked source remains unresolved; "+
             "regional sources are not citywide complete.")[:850]
         entry["coverage_verified_citywide"]="False"
+    added_source_health={}
     for city in ADDED:
         info=health[city]
-        count=sum(x["city"]==city for x in extra)
+        direct_ids={x["canonical_id"] for x in extra if x["city"]==city}
+        regional_ids={x["canonical_id"] for x in regional if x["city"]==city}
+        count=len(direct_ids | regional_ids)
+        source_health=info["status"]
+        if regional_ids:
+            source_health+=" | REGIONAL_OPEN_DATA_LIVE_PARTIAL"
+        added_source_health[city]=source_health
         new_coverage.append({
             "city":city,"cohort":"ADDED_4","application_files":count,
             "building_permits_historical":0,"project_only_signals":0,
@@ -326,7 +334,7 @@ def run(results,*,today=None):
             "published_contact_email_records":0,
             "failed_or_blocked_source_count":int(
                 info["status"]!="LIVE_APPLICATION_IDS_RETRIEVED_PARTIAL_COVERAGE"),
-            "source_health":info["status"],"coverage_verified_citywide":"False",
+            "source_health":source_health,"coverage_verified_citywide":"False",
             "first_publications_verified":0,"verified_buyers":0,
             "open_supplier_contracts_verified":0,
             "source_limitations":info.get("failure","")+
@@ -341,9 +349,10 @@ def run(results,*,today=None):
         "configured_city_count":28,
         "legacy_city_count":24,"new_city_count":4,
         "added_cities_with_live_application_ids":sum(
-            info["retrieved_application_id_records"]>0 for info in health.values()),
-        "added_cities_source_health":{x:xinfo["status"]
-            for x,xinfo in health.items()},
+            info["retrieved_application_id_records"]>0 or
+            "REGIONAL_OPEN_DATA_LIVE_PARTIAL" in added_source_health[city]
+            for city,info in health.items()),
+        "added_cities_source_health":added_source_health,
         "all_four_added_city_source_rows":len(extra),
         "official_alternative_source_rows_joined":len(fallback),
         "regional_open_data_rows_joined":len(regional),

@@ -30,7 +30,11 @@ def getter(url,**kw):
             "MUN_NAME":"City of Markham","ADDRESS":"2020 Markham Road",
             "APPL_DESC":"Industrial logistics development",
             "APPL_STATUS":"Under Review",
-            "DATE_RECVD":1794441600000}}]}
+            "DATE_RECVD":1794441600000}},
+            {"attributes":{
+            "ESRI_OID":4,"REG_FILE_NUM":"D07-2026-007",
+            "MUN_NAME":"Town of Newmarket","ADDRESS":"18 Industrial Parkway",
+            "APPL_DESC":"Proposed industrial facility"}}]}
     if "Planning_Application_Open_Data_view" in url:
         return {"features":[{"attributes":{
             "OBJECTID":7,"ApplicationNum":"SPA-2026-0004",
@@ -44,11 +48,11 @@ def getter(url,**kw):
         "ADDRESS":"92 John Street","DESCRIP":"Proposed industrial warehouse"}}]}
 
 class Recovery(unittest.TestCase):
-    def test_real_regional_file_id_and_three_cities(self):
+    def test_real_regional_file_ids(self):
         features,diag=pull(YORK,getter=getter,check_robots=False)
         rows=parse_york(features)
         self.assertEqual({r["city"] for r in rows},
-                         {"Vaughan","Markham","Richmond Hill"})
+                         {"Vaughan","Markham","Richmond Hill","Newmarket"})
         self.assertTrue(all(r["application_id"].startswith("D07-") for r in rows))
         self.assertEqual(rows[0]["date_basis"],"REGIONAL_RECEIPT_NOT_PUBLICATION")
         self.assertEqual(rows[0]["buyer_verified"],"False")
@@ -127,14 +131,14 @@ class Recovery(unittest.TestCase):
     def test_all_four_recover_independently(self):
         with tempfile.TemporaryDirectory() as tmp:
             result=run(tmp,getter=getter)
-            self.assertEqual(result["total_valid_application_files"],5)
+            self.assertEqual(result["total_valid_application_files"],6)
             self.assertEqual(result["records_by_city"],{
-                "Vaughan":1,"Markham":1,"Richmond Hill":1,"Hamilton":1,"Brantford":1})
+                "Vaughan":1,"Markham":1,"Richmond Hill":1,"Newmarket":1,"Hamilton":1,"Brantford":1})
             self.assertFalse(result["complete_citywide_application_inventory_verified"])
             self.assertEqual(result["verified_buyers"],0)
             with (Path(tmp)/"GTA_RADAR_ADDITIONAL_OFFICIAL_OPEN_DATA.csv").open(
                     encoding="utf-8-sig") as fp:
-                self.assertEqual(len(list(csv.DictReader(fp))),5)
+                self.assertEqual(len(list(csv.DictReader(fp))),6)
     def test_failed_york_keeps_hamilton(self):
         def partial(url,**kw):
             if "Hosted_" in url:raise PermissionError("Denied")
