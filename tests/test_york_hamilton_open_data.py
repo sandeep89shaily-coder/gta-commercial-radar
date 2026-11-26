@@ -91,6 +91,27 @@ class Recovery(unittest.TestCase):
         self.assertEqual(row["date"], "")
         self.assertEqual(row["publication_verified"], "False")
 
+    def test_default_brantford_imports_public_fields_without_applicant(self):
+        sample = {"ApplicationNum": "SPA-2026-0004", "Address": "15 Copernicus Boulevard",
+                  "Description": "New industrial factory building", "Applicant": "Personal Name",
+                  "Status": "Under Review", "Submitted_date": "11/20/2026"}
+        def download(item, required):
+            if item == regional.BRANTFORD_ITEM:
+                return [sample]
+            raise PermissionError("Unavailable source")
+
+        with tempfile.TemporaryDirectory() as root:
+            with patch.object(regional, "download_rows", side_effect=download):
+                result = regional.run(root)
+            self.assertEqual(result["records_by_city"]["Brantford"], 1)
+            self.assertEqual(result["source_status"]["Brantford"]["transport"], "ARCGIS_HUB_CSV")
+            with (Path(root) / regional.OUTPUT).open(encoding="utf-8-sig", newline="") as fp:
+                row = next(csv.DictReader(fp))
+        self.assertEqual(row["source_url"], regional.BRANTFORD_CATALOGUE)
+        self.assertEqual(row["date"], "2026-11-20")
+        self.assertEqual(row["applicant"], "")
+        self.assertEqual(row["publication_verified"], "False")
+
     def test_hamilton_file_year_not_publication(self):
         rows=parse_hamilton(pull(HAMILTON,getter=getter,check_robots=False)[0])
         self.assertEqual(len(rows),1)

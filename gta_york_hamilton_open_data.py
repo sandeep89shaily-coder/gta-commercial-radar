@@ -20,12 +20,13 @@ from urllib.parse import urlencode, urlsplit
 from urllib.request import Request, urlopen
 from urllib.robotparser import RobotFileParser
 
-from gta_arcgis_hub_exports import HAMILTON_ITEM, YORK_ITEM, csv_date, download_rows
+from gta_arcgis_hub_exports import BRANTFORD_ITEM, HAMILTON_ITEM, YORK_ITEM, csv_date, download_rows
 
 YORK_CATALOGUE = "https://insights-york.opendata.arcgis.com/datasets/york::active-development-application-boundaries"
 YORK="https://services1.arcgis.com/GzvOwaQBbX7KLiuG/ArcGIS/rest/services/Hosted_Active_Development_Application/FeatureServer/0"
 HAMILTON_CATALOGUE = "https://open.hamilton.ca/datasets/SpatialSolutions::development-applications-1/about"
 HAMILTON="https://services.arcgis.com/rYz782eMbySr2srL/arcgis/rest/services/Development_Applications/FeatureServer/2"
+BRANTFORD_CATALOGUE = "https://www.buildbrantford.ca/planning-and-development-services/planning-applications-data/"
 BRANTFORD="https://services.arcgis.com/aji2lCmjXt0KpGzI/ArcGIS/rest/services/Planning_Application_Open_Data_view/FeatureServer/0"
 YORK_CITIES=("Vaughan","Markham","Richmond Hill")
 ALL_CITIES=(*YORK_CITIES,"Hamilton","Brantford")
@@ -165,7 +166,7 @@ def parse_hamilton(attributes, *, source_url=HAMILTON):
           "open_supplier_package_verified":"False"})
     return rows
 
-def parse_brantford(attributes):
+def parse_brantford(attributes, *, source_url=BRANTFORD):
     rows=[]
     for a in attributes:
         # This is Brantford's *published Open Data view*, not the old
@@ -177,12 +178,12 @@ def parse_brantford(attributes):
         if not all((ident,address,scope)):continue
         rows.append({"city":"Brantford","application_id":ident,
             "address":address,"scope":scope,
-            "applicant":clean(a.get("Applicant"),220),
+            "applicant":("" if source_url == BRANTFORD_CATALOGUE else clean(a.get("Applicant"),220)),
             "stage":clean(a.get("Status"),120),
             "category":clean(a.get("Category") or a.get("Proposed_use"),120),
             "date":date(a.get("Submitted_date")),
             "date_basis":"APPLICATION_SUBMITTED_NOT_FIRST_NOTICE",
-            "source_url":BRANTFORD,
+            "source_url":source_url,
             "source_lane":"BRANTFORD_OFFICIAL_OPEN_DATA_VIEW",
             "source_permission":"BRANTFORD_OPEN_DATA_COMMERCIAL_LICENCE",
             "publication_verified":"False","buyer_verified":"False",
@@ -255,6 +256,13 @@ def run(results,*,getter=None,today=None):
                 attrs = download_rows(HAMILTON_ITEM, ("FILE_NUM", "FILE_TYPE", "ADDRESS", "FILE_YEAR", "DESCRIP"))
                 diag = {"features_examined": len(attrs), "transport": "ARCGIS_HUB_CSV"}
                 data = parse_hamilton(attrs, source_url=HAMILTON_CATALOGUE)
+            elif layer == BRANTFORD and getter is None:
+                attrs = download_rows(BRANTFORD_ITEM, (
+                    "ApplicationNum", "ApplicationID", "Address", "Description",
+                    "Proposed_use", "Status", "Submitted_date", "Category",
+                ))
+                diag = {"features_examined": len(attrs), "transport": "ARCGIS_HUB_CSV"}
+                data = parse_brantford(attrs, source_url=BRANTFORD_CATALOGUE)
             else:
                 attrs,diag=pull(layer,getter=getter or fetch_json)
                 data=(parse_york(attrs) if layer==YORK else

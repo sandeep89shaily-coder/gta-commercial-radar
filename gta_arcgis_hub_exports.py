@@ -12,7 +12,8 @@ AGENT = "GTA-Radar-official-open-data/1.0"
 MAX_BYTES = 12_000_000
 YORK_ITEM = "2ea061702aaa4d5fae39c1226525fd4e"
 HAMILTON_ITEM = "da765ab0f2f64ce5a4792879ecad9f17"
-DATASET_LAYERS = {YORK_ITEM: 0, HAMILTON_ITEM: 2}
+BRANTFORD_ITEM = "939767a48a194b6699554d08bfff8d2e"
+DATASETS = {YORK_ITEM: (0, 26917), HAMILTON_ITEM: (2, 26917), BRANTFORD_ITEM: (0, 2958)}
 MAX_ROBOTS_BYTES = 500 * 1024
 
 
@@ -33,10 +34,11 @@ def csv_date(value):
 
 
 def download_rows(item, required_fields):
-    if item not in DATASET_LAYERS:
+    if item not in DATASETS:
         raise ValueError("UNAPPROVED_HUB_EXPORT_ITEM")
-    params = "format=csv&spatialRefId=26917&where=1%3D1"
-    url = f"{HUB}/api/v3/datasets/{item}_{DATASET_LAYERS[item]}/downloads/data?{params}"
+    layer, spatial_reference = DATASETS[item]
+    params = f"format=csv&spatialRefId={spatial_reference}&where=1%3D1"
+    url = f"{HUB}/api/v3/datasets/{item}_{layer}/downloads/data?{params}"
     opener = build_opener(NoRedirect())
     headers = {"User-Agent": AGENT}
     with opener.open(Request(HUB + "/robots.txt", headers=headers), timeout=12) as response:
