@@ -10,9 +10,11 @@ list of local planning files, and source dates never equal first disclosure.
 """
 from __future__ import annotations
 import argparse
+from collections import Counter
 import csv
 import datetime as dt
 import json
+from tempfile import NamedTemporaryFile
 from pathlib import Path
 from urllib.parse import urlencode, urlsplit
 from urllib.request import Request, urlopen
@@ -31,6 +33,10 @@ MAX_PAGES=5
 PAGE=200
 OUTPUT="GTA_RADAR_ADDITIONAL_OFFICIAL_OPEN_DATA.csv"
 STATUS="GTA_RADAR_ADDITIONAL_OFFICIAL_OPEN_DATA_STATUS.json"
+OBSERVATIONS="GTA_RADAR_REGIONAL_OPEN_DATA_OBSERVATIONS.csv"
+LEDGER="GTA_RADAR_REGIONAL_OPEN_DATA_SEEN.json"
+LIVE="LIVE_APPLICATION_FILES_RETRIEVED"
+PUBLISHERS={**dict.fromkeys(YORK_CITIES, "York Region"), "Hamilton":"Hamilton", "Brantford":"Brantford"}
 FIELDS=("city","application_id","address","scope","applicant","stage","category",
         "date","date_basis","source_url","source_lane",
         "source_permission","publication_verified","buyer_verified",
@@ -183,7 +189,54 @@ def parse_brantford(attributes):
             "open_supplier_package_verified":"False"})
     return rows
 
-def run(results,*,getter=None):
+def _record_observations(root, rows, day):
+    ledger = root / LEDGER
+    if ledger.exists():
+        previous = json.loads(ledger.read_text(encoding="utf-8"))
+    else:
+        previous = {}
+    updated = {city: dict(files) for city, files in previous.items()}
+    observations = []
+    compared_fields = ("address", "scope", "stage", "category", "date")
+    for row in rows:
+        city = row["city"]
+        key = row["application_id"].casefold()
+        old = previous.get(city, {}).get(key)
+        values = {field: row[field] for field in compared_fields}
+        first = old["first_seen_local"] if old else day
+        changed = [field for field in compared_fields if old and old["values"][field] != values[field]]
+        if city not in previous:
+            event = "INITIAL_BASELINE"
+        elif old is None:
+            event = "FIRST_OBSERVED"
+        else:
+            event = "RECORD_CHANGED" if changed else "UNCHANGED"
+        updated.setdefault(city, {})[key] = {"first_seen_local": first, "values": values}
+        observations.append({
+            **row, "observation": event, "first_seen_local": first,
+            "changed_fields": "|".join(changed), "source_index_url": row["source_url"],
+        })
+    fields = (*FIELDS, "observation", "first_seen_local", "changed_fields", "source_index_url")
+    _write_csv(root / OBSERVATIONS, fields, observations)
+    if rows:
+        with NamedTemporaryFile(mode="w", dir=root, encoding="utf-8", delete=False) as fp:
+            temporary = Path(fp.name)
+            json.dump(updated, fp, ensure_ascii=False)
+        temporary.replace(ledger)
+    return dict(Counter(row["observation"] for row in observations))
+
+
+def _write_csv(path, fields, rows):
+    with path.open("w", encoding="utf-8-sig", newline="") as fp:
+        writer = csv.DictWriter(fp, fieldnames=fields)
+        writer.writeheader()
+        for row in rows:
+            values = {key:clean(row.get(key),1500) for key in fields}
+            writer.writerow({key:("'" + value if value.startswith(("=","+","-","@")) else value)
+                             for key,value in values.items()})
+
+
+def run(results,*,getter=None,today=None):
     root=Path(results)
     root.mkdir(parents=True,exist_ok=True)
     states={}
@@ -204,7 +257,7 @@ def run(results,*,getter=None):
                       parse_hamilton(attrs) if layer==HAMILTON else
                       parse_brantford(attrs))
             rows.extend(data)
-            states[name]={"status":("LIVE_APPLICATION_FILES_RETRIEVED" if data
+            states[name]={"status":(LIVE if data
                       else "FETCHED_WITHOUT_VALID_APPLICATION_FILES"),
                       "validated_file_rows":len(data),**diag}
         except (OSError,PermissionError,ValueError,TypeError,UnicodeError) as exc:
@@ -215,13 +268,8 @@ def run(results,*,getter=None):
     for row in rows:
         key=(row["city"].casefold(),row["application_id"].casefold())
         dedup.setdefault(key,row)
-    with (root/OUTPUT).open("w",encoding="utf-8-sig",newline="") as fp:
-        writer=csv.DictWriter(fp,fieldnames=FIELDS)
-        writer.writeheader()
-        for row in dedup.values():
-            writer.writerow({k:("'" + clean(row.get(k),1500) if clean(row.get(k),1500).startswith(
-                 ("=","+","-","@","\\t","\\r")) else clean(row.get(k),1500))
-                for k in FIELDS})
+    _write_csv(root / OUTPUT, FIELDS, dedup.values())
+    observed = _record_observations(root, dedup.values(), (today or dt.date.today()).isoformat())
     by_city={c:sum(r["city"]==c for r in dedup.values()) for c in ALL_CITIES}
     result={"status":"PUBLISHED_OPEN_DATA_RECOVERY_PARTIAL_UNTIL_LIVE_VERIFIED",
             "source_status":states,"records_by_city":by_city,
@@ -229,7 +277,7 @@ def run(results,*,getter=None):
             "complete_citywide_application_inventory_verified":False,
             "verified_buyers":0,"verified_first_publications":0,
             "source_caveat":"York Region reviews only applications within regional mandate, not every Vaughan/Markham/Richmond Hill file",
-            "csv":OUTPUT}
+            "csv":OUTPUT,"observations_csv":OBSERVATIONS,"observations":observed}
     (root/STATUS).write_text(json.dumps(result,indent=2),encoding="utf-8")
     return result
 

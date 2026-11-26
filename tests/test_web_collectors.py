@@ -181,7 +181,10 @@ class WebCollectorTests(unittest.TestCase):
         current={s['id']:s for s in SOURCES}
         for s in old:
             if s['id'].startswith('agco_'): continue
-            self.assertEqual(s,current[s['id']])
+            actual = dict(current[s['id']])
+            if s['id'] == 'toronto_business_licences':
+                self.assertTrue(actual.pop('json_fallback_resource_id'))
+            self.assertEqual(s,actual)
             self.assertEqual(source_universe_hash(s),source_universe_hash(current[s['id']]))
 
 

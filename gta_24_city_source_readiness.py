@@ -15,6 +15,8 @@ from pathlib import Path
 
 from gta_24_city_combined import CITIES, CORE_CITIES, EXPANSION_CITIES
 
+from gta_york_hamilton_open_data import LIVE, PUBLISHERS, STATUS as REGIONAL_STATUS
+
 COVERAGE = "GTA_RADAR_COMBINED_24_CITY_COVERAGE.csv"
 OUTPUT = "GTA_RADAR_COMBINED_24_CITY_LIVE_SOURCE_READINESS.csv"
 STATUS = "GTA_RADAR_COMBINED_24_CITY_LIVE_SOURCE_READINESS.json"
@@ -28,7 +30,7 @@ COLUMNS = (
     "procurement_open_verified", "recommended_access_action",
 )
 
-SUCCESS = ("COLLECTED", "BASELINED", "OK_BASELINE", "OK_MONITORED",
+SUCCESS = (LIVE, "COLLECTED", "BASELINED", "OK_BASELINE", "OK_MONITORED",
            "BASELINE_COMPLETE", "INDEX_FETCHED",
            "DETAILS_CAPTURED_REVIEW_ONLY",
            "DATED_NOTICE_REVIEW_ONLY",
@@ -37,7 +39,7 @@ SUCCESS = ("COLLECTED", "BASELINED", "OK_BASELINE", "OK_MONITORED",
            "BOUNDED_GIS_SAMPLE_NOT_CITYWIDE")
 FAILED = ("FAILED", "BLOCK", "DENIED", "SOURCE_HELD", "SOURCE_FETCH_FAILED",
           "NO_PUBLISHED_PERMIT_NUMBER_HOLD", "FETCH_FAILED",
-          "PARTIAL_OR_HELD", "ROBOTS", "HTTP_403")
+          "PARTIAL_OR_HELD", "INCOMPLETE_SOURCE", "ROBOTS", "HTTP_403")
 INDEX = ("INDEX_ONLY", "NO_APPLICATION_ID", "NO_EXACT", "PROJECT_SIGNALS_ONLY",
          "NOTICE_DOCUMENT_LINKS_ONLY", "NO_PLANNING", "NO_ELIGIBLE",
          "SOURCE_BLOCKED_OR_UNSUPPORTED")
@@ -113,6 +115,13 @@ def _sources(root, *, not_before):
                 x.get("status", "UNKNOWN"), 0,
                 str(x.get("application_id_rows", 0)) +
                 " local application rows; NOT current live collection")
+    regional = current(REGIONAL_STATUS)
+    for city, publisher in PUBLISHERS.items():
+        source = regional.get("source_status", {}).get(publisher)
+        if source:
+            add(city, publisher.upper().replace(" ", "_") + "_OPEN_DATA",
+                source.get("status"), regional.get("records_by_city", {}).get(city, 0),
+                source.get("failure", ""))
     # Old 16-city collectors. One HTML index can coexist with separate
     # functioning municipal/GIS/permit feeds: do not erase either.
     early = current("GTA_RADAR_EARLY_APPLICATION_SOURCE_STATUS.json")

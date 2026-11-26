@@ -16,6 +16,7 @@ from collections import Counter,defaultdict
 from pathlib import Path
 
 from gta_freshness import _date
+from gta_york_hamilton_open_data import LIVE, OBSERVATIONS, PUBLISHERS, STATUS as REGIONAL_STATUS
 
 BASE="GTA_RADAR_DAILY_NEW_DEVELOPMENTS.csv"
 OUTPUT="GTA_RADAR_UNIFIED_MUNICIPAL_DAILY_CHANGES.csv"
@@ -43,6 +44,7 @@ FEEDS=(
  ("GTA_RADAR_MARKHAM_CIRCULATION_CHANGES.csv","MARKHAM_CIRCULATION"),
  ("GTA_RADAR_NORTHERN_MAJOR_CITY_SOURCE_CHANGES.csv","NORTHERN_MAJOR"),
  ("GTA_RADAR_FOUR_CITY_LIVE_APPLICATIONS.csv","FOUR_CITY_LIVE"),
+ (OBSERVATIONS,"REGIONAL_OPEN_DATA"),
  # Toronto remains served by the canonical daily permit feed; do not import
  # legacy Toronto CKAN changes dated weeks ago as current-day observations.
 )
@@ -67,7 +69,7 @@ KNOWN=("Toronto","Brampton","Mississauga","Hamilton","Burlington","Oakville",
        "Vaughan","Kitchener","Markham","Oshawa","Milton","Halton Hills",
        "Caledon","Cambridge","Waterloo","Guelph","Niagara Falls",
        "St. Catharines","Brantford","Barrie","Greater Sudbury","North Bay",
-       "Peterborough","Whitby","Ajax","Newmarket","Windsor","Pickering",
+       "Peterborough","Whitby","Ajax","Newmarket","Richmond Hill","Windsor","Pickering",
        "London","Sarnia","Chatham-Kent")
 OBS={"FIRST_OBSERVED","RECORD_CHANGED"}
 OBS_ALIASES={
@@ -134,6 +136,8 @@ def run(results,*,today=None,not_before=None):
     secondary_sources={}
     four=current_status("GTA_RADAR_FOUR_CITY_SOURCE_STATUS.json")
     four_health={r["city"]:r for r in four.get("city_status", [])}
+    regional_state=current_status(REGIONAL_STATUS) if current(OBSERVATIONS) else {}
+    regional=regional_state.get("source_status", {})
     for filename,lane in FEEDS:
         data=current_rows(filename)
         rejected_reasons=Counter()
@@ -153,6 +157,10 @@ def run(results,*,today=None,not_before=None):
                     continue
                 if city_source.get("initial_baseline") and obs=="FIRST_OBSERVED":
                     obs="INITIAL_BASELINE"
+            if lane=="REGIONAL_OPEN_DATA" and regional.get(PUBLISHERS.get(city),{}).get("status")!=LIVE:
+                audit["rejected"]+=1
+                rejected_reasons["NO_CURRENT_SUCCESSFUL_CITY_SOURCE"]+=1
+                continue
             if obs in NON_EVENTS or obs.startswith("INITIAL_BASELINE_"):
                 label="unchanged" if obs=="UNCHANGED" else "baseline"
                 audit[label]+=1
@@ -250,11 +258,16 @@ def run(results,*,today=None,not_before=None):
         extra=four_health.get(city,{})
         wider=combined.get(city,{})
         recorded=wider.get("source_health") or extra.get("status") or scope.get("measured_source_readiness") or status
+        regional_source=regional.get(PUBLISHERS.get(city), {})
+        regional_live=regional_source.get("status")==LIVE and bool(
+            regional_state.get("records_by_city", {}).get(city, 0))
+        if regional_live:
+            recorded += " | REGIONAL_OPEN_DATA_LIVE_PARTIAL"
         failed=max(int(failures or 0),int(scope.get("blocked_or_failed_lanes") or 0),
                    int(wider.get("failed_or_blocked_source_count") or 0),x["source_failures"])
         if extra.get("status")=="BLOCKED_OR_FAILED_NO_NEW_LIVE_RECORDS":
             failed=max(failed,1)
-        live=bool(changed or x["unchanged"] or x["baseline"] or x["public_unchanged"]
+        live=bool(regional_live or changed or x["unchanged"] or x["baseline"] or x["public_unchanged"]
                   or int(scope.get("live_sources_with_application_ids") or 0)
                   or int(extra.get("retrieved_application_id_records") or 0)
                   or int(alternatives.get(city,{}).get("valid_application_rows") or 0))
@@ -267,7 +280,7 @@ def run(results,*,today=None,not_before=None):
                   else "LIVE_NO_ADMITTED_CHANGE" if live else "NO_CURRENT_ACTIVITY_EVIDENCE")
         note=("CHANGE_FEED_HAS_OBSERVATIONS" if changed
               else "NO_NEW_OR_CHANGED_IN_MONITORED_FEEDS_NOT_CITYWIDE_ZERO")
-        if not changed and not x["public_unchanged"] and not x["master_applications"]:
+        if not live and not x["master_applications"]:
             note="NO_LIVE_RECORDS_IN_RECONCILED_FEEDS_CHECK_SOURCE_ACCESS"
         city_rows.append({
             "city":city,"primary_daily_new":x["primary_new"],

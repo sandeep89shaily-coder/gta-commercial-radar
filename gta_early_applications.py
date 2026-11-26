@@ -31,9 +31,9 @@ SOURCES = {
     "Oshawa":"https://www.oshawa.ca/business-development/planning-and-development/development-applications/",
     "Milton":"https://www.milton.ca/business-development/planning-and-development/development-applications/development-application-notices/",
     "Halton Hills":"https://www.haltonhills.ca/developmentproposalsunderreview",
-    "Caledon":"https://www.caledon.ca/en/town-services/current-applications.aspx",
+    "Caledon":"https://caledon.ca/current-development-applications",
     "Cambridge":"https://www.cambridge.ca/business-building-development/building-planning/current-development-applications/",
-    "Waterloo":"https://www.engagewr.ca/development-planning-projects",
+    "Waterloo":"https://www.engagewr.ca/waterloo/development-planning-projects",
     "Guelph":"https://guelph.ca/city-government/planning-and-development/current-development-applications/",
 }
 # These are official source-page endpoints, NOT confirmed per-file APIs.  The

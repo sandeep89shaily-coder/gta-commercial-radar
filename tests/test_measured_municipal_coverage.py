@@ -15,7 +15,8 @@ TODAY=dt.date(2026,11,2)
 
 class MunicipalHTMLExtractors(unittest.TestCase):
     def test_caledon_points_to_current_applications_not_forms(self):
-        self.assertTrue(SOURCES["Caledon"].endswith("/current-applications.aspx"))
+        self.assertEqual(SOURCES["Caledon"], "https://caledon.ca/current-development-applications")
+        self.assertEqual(SOURCES["Waterloo"], "https://www.engagewr.ca/waterloo/development-planning-projects")
         self.assertEqual(SOURCES["Burlington"], "https://www.burlington.ca/news-and-notices/news-views/current-development-projects/")
         html="<li>RZ 2025-0027 - New industrial warehouse at 20836 Kennedy Road</li>"
         rows,_=_rows(html,"Caledon",SOURCES["Caledon"])
