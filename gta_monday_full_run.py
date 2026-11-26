@@ -641,6 +641,7 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
                 "status":recovery["status"],
                 "source_status":recovery["source_status"],
                 "records_by_city":recovery["records_by_city"],
+                "observations":recovery["observations"],
                 "verified_citywide_complete":False,
             }
         except (OSError,ValueError,TypeError,ImportError) as exc:

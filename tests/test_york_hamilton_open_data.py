@@ -113,3 +113,49 @@ class Recovery(unittest.TestCase):
             pull(YORK,getter=duplicates,check_robots=False)
 if __name__=="__main__":
     unittest.main()
+
+
+class YorkDailyIntegrationTest(unittest.TestCase):
+    def test_regional_snapshot_feeds_daily_reconciliation(self):
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+
+        with TemporaryDirectory() as directory:
+            tmp_path = Path(directory)
+            import datetime as dt
+            import csv
+            from unittest.mock import patch
+            from gta_york_hamilton_open_data import YORK_ITEM, run
+            from gta_unified_municipal_daily import OUTPUT, run as reconcile
+            from gta_24_city_source_readiness import _sources
+
+            baseline = {"MUN_NAME": "City of Richmond Hill", "REG_FILE_NUM": "SP-26-101",
+                        "ADDRESS": "1 Industrial Road", "APPL_DESC": "Proposed industrial manufacturing building.",
+                        "DATE_RECVD": "11/20/2026"}
+            changed = dict(baseline, APPL_DESC="Revised industrial manufacturing building with warehouse.")
+            added = dict(baseline, MUN_NAME="Vaughan", REG_FILE_NUM="SP-26-102")
+
+            def collect(rows, today):
+                def download(item, fields):
+                    assert item == YORK_ITEM
+                    return rows
+                with patch("gta_york_hamilton_open_data.download_rows", download), patch(
+                        "gta_york_hamilton_open_data.pull", side_effect=PermissionError("ROBOTS_DENIED")):
+                    return run(tmp_path, today=today)
+
+            first = dt.date(2026, 11, 25)
+            day = dt.date(2026, 11, 26)
+            assert collect([baseline, added], first)["observations"] == {"INITIAL_BASELINE": 2}
+            assert reconcile(tmp_path, today=first)["unified_change_rows"] == 0
+            assert collect([], day)["observations"] == {}
+            assert collect([changed, added, dict(added, REG_FILE_NUM="SP-26-103")], day)["observations"] == {
+                "RECORD_CHANGED": 1, "UNCHANGED": 1, "FIRST_OBSERVED": 1}
+            assert reconcile(tmp_path, today=day)["unified_change_rows"] == 2
+            with (tmp_path / OUTPUT).open(encoding="utf-8-sig", newline="") as fp:
+                records = {row["city"]: row for row in csv.DictReader(fp)}
+            assert records["Richmond Hill"]["observation"] == "RECORD_CHANGED"
+            assert records["Vaughan"]["observation"] == "FIRST_OBSERVED"
+            assert all(not r["record_source_url"] for r in records.values())
+            assert all(r["paid_freshness_eligible"] == "False" for r in records.values())
+            assert _sources(tmp_path, not_before=0)["Vaughan"][0]["application_id_rows"] == 2
+            assert not _sources(tmp_path, not_before=float("inf")).get("Vaughan")

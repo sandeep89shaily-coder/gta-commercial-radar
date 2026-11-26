@@ -35,7 +35,7 @@ SOURCES={
     "Brampton":[
         "https://letsconnect.brampton.ca/yourcityplans"],
     "Burlington":[
-        "https://www.burlington.ca/Modules/News/en/Development"],
+        "https://www.burlington.ca/news-and-notices/news-views/current-development-projects/"],
     "Vaughan":[
         "https://www.vaughan.ca/about-city-vaughan/departments/office-city-clerk/public-notices"],
     "Kitchener":[
@@ -252,19 +252,14 @@ def _brampton(soup,url):
     return out
 
 def _burlington(soup,url):
-    # The news/project directory can expose named ward development pages
-    # even when it does not expose a file number. Keep as project signals.
+    from gta_burlington_official_pages import _valid_url
+
+    # The index is a signal. Only official project details establish file IDs.
     out=[]
     for a in soup.find_all("a",href=True):
         title=_clean(a.get_text(" ",strip=True))
         link=urljoin(url,a["href"])
-        if not _safe(link,url) or link==url:continue
-        if re.search(r"\.(?:png|jpe?g|pdf|webp|docx?)$",urlparse(link).path,re.I):
-            continue
-        if (len(title)<14 or
-                not re.search(r"(?i)(?:development|project|ward\s*[1-6]|"
-                              r"\d{2,5}\s+[A-Za-z].{1,60}(?:street|road|drive|"
-                              r"avenue|boulevard|lane))",title)):
+        if not title or not _valid_url(link):
             continue
         row=_project("Burlington",title,title,link)
         if row:out.append(row)
@@ -417,6 +412,19 @@ def run(results,*,today=None,fetcher=None,sources=None):
                     for link in _notice_links(markup,url):
                         detail=(fetcher or _fetch)(link)
                         items.extend(_parse(city,detail,link))
+                if city == "Burlington":
+                    from gta_burlington_official_pages import _parse as parse_burlington_detail
+                    for link in list(dict.fromkeys(row["source_url"] for row in items))[:12]:
+                        try:
+                            details = parse_burlington_detail((fetcher or _fetch)(link), link)
+                            exact = [_project(city, r["project_title"], r["description"] or r["project_title"],
+                                              link, application_id=r["application_id"]) for r in details]
+                            if any(exact):
+                                items = [r for r in items if r["source_url"] != link]
+                                items.extend(r for r in exact if r)
+                        except (OSError, ValueError) as exc:
+                            errors.append({"url":link,"error":type(exc).__name__+":"+str(exc)[:140],
+                                           "stage":"DETAIL_PROJECT"})
                 if city in ("Guelph","Halton Hills"):
                     # Official project detail pages are independent evidence;
                     # an unavailable detail is recorded without suppressing

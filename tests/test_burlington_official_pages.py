@@ -1,3 +1,4 @@
+import unittest
 """Offline acceptance tests for Burlington official-page assisted recovery."""
 import csv
 import datetime as dt
@@ -97,3 +98,21 @@ def test_burlington_unlabelled_number_not_treated_as_application():
         _parse(page,url)
 
 
+class BurlingtonLiveIndexTest(unittest.TestCase):
+    def test_live_burlington_index_uses_exact_file_from_detail(self):
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+
+        with TemporaryDirectory() as directory:
+            tmp_path = Path(directory)
+            from gta_municipal_project_feed import SOURCES, run
+
+            index = SOURCES["Burlington"][0]
+            detail = "https://www.burlington.ca/news-and-notices/posts/current-development-projects/industrial-warehouse/"
+            pages = {
+                index: f'<main><a href="{detail}">4495 North Service Road</a></main>',
+                detail: '<main><h1>Industrial warehouse development</h1><h2>File Numbers</h2>'
+                        '<ul><li>520-15/26</li></ul><h2>Supporting Documents</h2></main>',
+            }
+            result = run(tmp_path, fetcher=pages.__getitem__, sources={"Burlington": [index]})
+            assert result["source_status"][0]["application_id_rows"] == 1

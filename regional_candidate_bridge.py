@@ -112,6 +112,10 @@ def bridge(database,output_dir,*,today=None,max_days=180,per_source=60,per_regio
     for sid,s in sorted(by_source.items(),key=lambda x:(PRIORITY.get(x[1]["region"],99),x[0])):
         if source_counts[sid]:
             label="SOURCE_DATED_RESEARCH_CANDIDATES"
+        elif sid == "york_region_active_development_applications" and not s.get("enabled"):
+            label="REPLACED_IN_FULL_RUN_BY_OFFICIAL_YORK_REGION_CSV"
+        elif sid in ("durham_planit_consents", "durham_planit_opa") and not s.get("enabled"):
+            label="SCHEDULED_MONTHLY_IN_DURHAM_REFERENCE_COLLECTOR"
         elif not s.get("enabled"):
             label="STAGED_DISABLED_NOT_COLLECTED_OR_NO_DATED_RECORDS"
         elif db_counts[sid]==0:
