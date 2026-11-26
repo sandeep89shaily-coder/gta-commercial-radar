@@ -1,0 +1,402 @@
+[
+  {
+    "project_id": "LC-001",
+    "name": "Ford Canada",
+    "location": "Oakville",
+    "scope_hint": "assembly retooling and stamping plant",
+    "search_name": "Ford",
+    "qualification": "UNVERIFIED_SEED"
+  },
+  {
+    "project_id": "LC-002",
+    "name": "Honda",
+    "location": "Alliston",
+    "scope_hint": "hybrid vehicle retooling",
+    "search_name": "Honda",
+    "qualification": "UNVERIFIED_SEED"
+  },
+  {
+    "project_id": "LC-003",
+    "name": "Hitachi Energy",
+    "location": "London",
+    "scope_hint": "transformer factory",
+    "search_name": "Hitachi Energy",
+    "qualification": "UNVERIFIED_SEED"
+  },
+  {
+    "project_id": "LC-004",
+    "name": "Concast Pipe",
+    "location": "Oakville",
+    "scope_hint": "manufacturing facility",
+    "search_name": "Concast Pipe",
+    "qualification": "UNVERIFIED_SEED"
+  },
+  {
+    "project_id": "LC-005",
+    "name": "Tempel Canada",
+    "location": "Burlington",
+    "scope_hint": "manufacturing facility",
+    "search_name": "Tempel",
+    "qualification": "UNVERIFIED_SEED"
+  },
+  {
+    "project_id": "LC-006",
+    "name": "New port facility",
+    "location": "Sault Ste. Marie",
+    "scope_hint": "port infrastructure investment",
+    "search_name": "Sault Ste. Marie",
+    "qualification": "UNVERIFIED_SEED"
+  },
+  {
+    "project_id": "LC-007",
+    "name": "Generation Mining",
+    "location": "Marathon",
+    "scope_hint": "mine development",
+    "search_name": "Generation Mining",
+    "qualification": "UNVERIFIED_SEED"
+  },
+  {
+    "project_id": "LC-008",
+    "name": "Tenaris",
+    "location": "Sault Ste. Marie",
+    "scope_hint": "steel manufacturing modernization",
+    "search_name": "Tenaris",
+    "qualification": "UNVERIFIED_SEED"
+  },
+  {
+    "project_id": "LC-009",
+    "name": "Sunrise Farms",
+    "location": "Woodstock",
+    "scope_hint": "food manufacturing expansion",
+    "search_name": "Sunrise Farms",
+    "qualification": "UNVERIFIED_SEED"
+  },
+  {
+    "project_id": "LC-010",
+    "name": "Ross Video",
+    "location": "Ottawa / Iroquois",
+    "scope_hint": "manufacturing investment",
+    "search_name": "Ross Video",
+    "qualification": "UNVERIFIED_SEED"
+  },
+  {
+    "project_id": "LC-011",
+    "name": "SEKISUI",
+    "location": "Burlington",
+    "scope_hint": "manufacturing expansion",
+    "search_name": "SEKISUI",
+    "qualification": "UNVERIFIED_SEED"
+  },
+  {
+    "project_id": "LC-012",
+    "name": "Massilly North America",
+    "location": "Ontario",
+    "scope_hint": "manufacturing investment",
+    "search_name": "Massilly",
+    "qualification": "UNVERIFIED_SEED"
+  },
+  {
+    "project_id": "LC-013",
+    "name": "Lee Li",
+    "location": "Mississauga",
+    "scope_hint": "beverage manufacturing investment",
+    "search_name": "Lee Li",
+    "qualification": "UNVERIFIED_SEED"
+  },
+  {
+    "project_id": "LC-014",
+    "name": "AtomVie",
+    "location": "Hamilton",
+    "scope_hint": "radiopharmaceutical facility",
+    "search_name": "AtomVie",
+    "qualification": "UNVERIFIED_SEED"
+  },
+  {
+    "project_id": "LC-015",
+    "name": "Vianode",
+    "location": "St. Thomas",
+    "scope_hint": "industrial site development",
+    "search_name": "Vianode",
+    "qualification": "UNVERIFIED_SEED"
+  },
+  {
+    "project_id": "LC-016",
+    "name": "Chapman's",
+    "location": "Markdale",
+    "scope_hint": "food manufacturing expansion",
+    "search_name": "Chapman",
+    "qualification": "UNVERIFIED_SEED"
+  },
+  {
+    "project_id": "LC-017",
+    "name": "Northern Transformer",
+    "location": "Innisfil",
+    "scope_hint": "transformer manufacturing expansion",
+    "search_name": "Northern Transformer",
+    "qualification": "UNVERIFIED_SEED"
+  },
+  {
+    "project_id": "LC-018",
+    "name": "Electra Battery Materials",
+    "location": "Temiskaming Shores",
+    "scope_hint": "battery materials refinery",
+    "search_name": "Electra Battery Materials",
+    "qualification": "UNVERIFIED_SEED"
+  },
+  {
+    "project_id": "LC-019",
+    "name": "Sandvik",
+    "location": "Sudbury",
+    "scope_hint": "industrial facility development",
+    "search_name": "Sandvik",
+    "qualification": "UNVERIFIED_SEED"
+  },
+  {
+    "project_id": "LC-020",
+    "name": "Asahi Kasei",
+    "location": "Port Colborne",
+    "scope_hint": "battery separator manufacturing",
+    "search_name": "Asahi Kasei",
+    "qualification": "UNVERIFIED_SEED"
+  },
+  {
+    "project_id": "LC-021",
+    "name": "Daybar Industries",
+    "location": "Ontario",
+    "scope_hint": "manufacturing modernization",
+    "search_name": "Daybar",
+    "qualification": "UNVERIFIED_SEED"
+  },
+  {
+    "project_id": "LC-022",
+    "name": "Oxygen8 Solutions",
+    "location": "Ontario",
+    "scope_hint": "manufacturing modernization",
+    "search_name": "Oxygen8",
+    "qualification": "UNVERIFIED_SEED"
+  },
+  {
+    "project_id": "LC-023",
+    "name": "Dy-Tech",
+    "location": "Ontario",
+    "scope_hint": "manufacturing modernization",
+    "search_name": "Dy-Tech",
+    "qualification": "UNVERIFIED_SEED"
+  },
+  {
+    "project_id": "LC-024",
+    "name": "Nelson Industrial",
+    "location": "Ontario",
+    "scope_hint": "manufacturing automation",
+    "search_name": "Nelson Industrial",
+    "qualification": "UNVERIFIED_SEED"
+  },
+  {
+    "project_id": "LC-025",
+    "name": "OFGO Studio",
+    "location": "Ontario",
+    "scope_hint": "manufacturing automation",
+    "search_name": "OFGO Studio",
+    "qualification": "UNVERIFIED_SEED"
+  },
+  {
+    "project_id": "LC-026",
+    "name": "Exco Engineering",
+    "location": "Ontario",
+    "scope_hint": "manufacturing modernization",
+    "search_name": "Exco Engineering",
+    "qualification": "UNVERIFIED_SEED"
+  },
+  {
+    "project_id": "LC-027",
+    "name": "SinaLite",
+    "location": "Ontario",
+    "scope_hint": "printing manufacturing modernization",
+    "search_name": "SinaLite",
+    "qualification": "UNVERIFIED_SEED"
+  },
+  {
+    "project_id": "LC-028",
+    "name": "Pulp Moulded Products",
+    "location": "Ontario",
+    "scope_hint": "production line and press",
+    "search_name": "Pulp Moulded Products",
+    "qualification": "UNVERIFIED_SEED"
+  },
+  {
+    "project_id": "LC-029",
+    "name": "Maxxit Systems",
+    "location": "Ontario",
+    "scope_hint": "steel processing equipment",
+    "search_name": "Maxxit Systems",
+    "qualification": "UNVERIFIED_SEED"
+  },
+  {
+    "project_id": "LC-030",
+    "name": "APS Metal Industries",
+    "location": "Ontario",
+    "scope_hint": "manufacturing modernization",
+    "search_name": "APS Metal Industries",
+    "qualification": "UNVERIFIED_SEED"
+  },
+  {
+    "project_id": "LC-031",
+    "name": "ICON Digital Productions",
+    "location": "Ontario",
+    "scope_hint": "manufacturing modernization",
+    "search_name": "ICON Digital Productions",
+    "qualification": "UNVERIFIED_SEED"
+  },
+  {
+    "project_id": "LC-032",
+    "name": "Future Steel Buildings",
+    "location": "Ontario",
+    "scope_hint": "manufacturing modernization",
+    "search_name": "Future Steel Buildings",
+    "qualification": "UNVERIFIED_SEED"
+  },
+  {
+    "project_id": "LC-033",
+    "name": "Rapid Aid",
+    "location": "Ontario",
+    "scope_hint": "manufacturing modernization",
+    "search_name": "Rapid Aid",
+    "qualification": "UNVERIFIED_SEED"
+  },
+  {
+    "project_id": "LC-034",
+    "name": "Brannon Steel",
+    "location": "Ontario",
+    "scope_hint": "steel processing equipment",
+    "search_name": "Brannon Steel",
+    "qualification": "UNVERIFIED_SEED"
+  },
+  {
+    "project_id": "LC-035",
+    "name": "Sierra Custom Foods",
+    "location": "Ontario",
+    "scope_hint": "manufacturing modernization",
+    "search_name": "Sierra Custom Foods",
+    "qualification": "UNVERIFIED_SEED"
+  },
+  {
+    "project_id": "LC-036",
+    "name": "Dascan Industrial Controls",
+    "location": "Ontario",
+    "scope_hint": "manufacturing modernization",
+    "search_name": "Dascan Industrial Controls",
+    "qualification": "UNVERIFIED_SEED"
+  },
+  {
+    "project_id": "LC-037",
+    "name": "Feature Foods",
+    "location": "Ontario",
+    "scope_hint": "manufacturing modernization",
+    "search_name": "Feature Foods",
+    "qualification": "UNVERIFIED_SEED"
+  },
+  {
+    "project_id": "LC-038",
+    "name": "Metelix Products",
+    "location": "Ontario",
+    "scope_hint": "equipment and automation",
+    "search_name": "Metelix Products",
+    "qualification": "UNVERIFIED_SEED"
+  },
+  {
+    "project_id": "LC-039",
+    "name": "Technical Steel",
+    "location": "Ontario",
+    "scope_hint": "manufacturing modernization",
+    "search_name": "Technical Steel",
+    "qualification": "UNVERIFIED_SEED"
+  },
+  {
+    "project_id": "LC-040",
+    "name": "Canada Smoked Fish",
+    "location": "Ontario",
+    "scope_hint": "manufacturing modernization",
+    "search_name": "Canada Smoked Fish",
+    "qualification": "UNVERIFIED_SEED"
+  },
+  {
+    "project_id": "LC-041",
+    "name": "Scapa Tapes",
+    "location": "Ontario",
+    "scope_hint": "advanced manufacturing equipment",
+    "search_name": "Scapa Tapes",
+    "qualification": "UNVERIFIED_SEED"
+  },
+  {
+    "project_id": "LC-042",
+    "name": "Continental Conveyor",
+    "location": "Ontario",
+    "scope_hint": "manufacturing modernization",
+    "search_name": "Continental Conveyor",
+    "qualification": "UNVERIFIED_SEED"
+  },
+  {
+    "project_id": "LC-043",
+    "name": "Soluroc Cobourg",
+    "location": "Cobourg",
+    "scope_hint": "manufacturing modernization",
+    "search_name": "Soluroc",
+    "qualification": "UNVERIFIED_SEED"
+  },
+  {
+    "project_id": "LC-044",
+    "name": "Grayler Metals",
+    "location": "Ontario",
+    "scope_hint": "manufacturing modernization",
+    "search_name": "Grayler Metals",
+    "qualification": "UNVERIFIED_SEED"
+  },
+  {
+    "project_id": "LC-045",
+    "name": "Kawartha Metals",
+    "location": "Ontario",
+    "scope_hint": "manufacturing modernization",
+    "search_name": "Kawartha Metals",
+    "qualification": "UNVERIFIED_SEED"
+  },
+  {
+    "project_id": "LC-046",
+    "name": "Max Aicher",
+    "location": "Ontario",
+    "scope_hint": "rolling mill modernization",
+    "search_name": "Max Aicher",
+    "qualification": "UNVERIFIED_SEED"
+  },
+  {
+    "project_id": "LC-047",
+    "name": "Whitebird / Moyy",
+    "location": "Ontario",
+    "scope_hint": "manufacturing modernization",
+    "search_name": "Whitebird",
+    "qualification": "UNVERIFIED_SEED"
+  },
+  {
+    "project_id": "LC-048",
+    "name": "Hooper Welding",
+    "location": "Ontario",
+    "scope_hint": "manufacturing modernization",
+    "search_name": "Hooper Welding",
+    "qualification": "UNVERIFIED_SEED"
+  },
+  {
+    "project_id": "LC-049",
+    "name": "Canadian Metal Buildings",
+    "location": "Ontario",
+    "scope_hint": "manufacturing modernization",
+    "search_name": "Canadian Metal Buildings",
+    "qualification": "UNVERIFIED_SEED"
+  },
+  {
+    "project_id": "LC-050",
+    "name": "Superior Radiant Products",
+    "location": "Ontario",
+    "scope_hint": "manufacturing modernization",
+    "search_name": "Superior Radiant Products",
+    "qualification": "UNVERIFIED_SEED"
+  }
+]
