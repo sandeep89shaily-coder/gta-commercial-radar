@@ -1,0 +1,115 @@
+{
+  "as_of": "2026-11-26T08:27:56.692071-05:00",
+  "toronto_open_data_attribution": "Contains information licensed under the Open Government Licence – Toronto.",
+  "records": {
+    "toronto-active-permit:26-273879": {
+      "source_url": "https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action/datastore_search?resource_id=6d0229af-bc54-46de-9c2b-26759b01dd05&q=26+273879&limit=30",
+      "record": [
+        {
+          "PERMIT_NUM": "26 273879 BLD",
+          "REVISION_NUM": "00",
+          "STREET_NUM": "141",
+          "STREET_NAME": "BAY",
+          "STREET_TYPE": "ST",
+          "APPLICATION_DATE": "2026-11-23",
+          "ISSUED_DATE": null,
+          "STATUS": "Application Acceptable",
+          "WORK": "Interior Alterations",
+          "DESCRIPTION": "INTERIOR ALTERATIONS (BUILDING, PLUMBING AND HVAC) - TENANT FITOUT FOR LEVELS 26-30",
+          "EST_CONST_COST": "83700000"
+        },
+        {
+          "PERMIT_NUM": "26 273879 HVA",
+          "REVISION_NUM": "00",
+          "STREET_NUM": "141",
+          "STREET_NAME": "BAY",
+          "STREET_TYPE": "ST",
+          "APPLICATION_DATE": "2026-11-23",
+          "ISSUED_DATE": null,
+          "STATUS": "Application Acceptable",
+          "WORK": "Building Permit Related(MS)",
+          "DESCRIPTION": "HVAC - INTERIOR ALTERATIONS (BUILDING, PLUMBING AND HVAC) - TENANT FITOUT FOR LEVELS 26-30",
+          "EST_CONST_COST": "DO NOT UPDATE OR DELETE THIS INFO FIELD"
+        },
+        {
+          "PERMIT_NUM": "26 273879 PLB",
+          "REVISION_NUM": "00",
+          "STREET_NUM": "141",
+          "STREET_NAME": "BAY",
+          "STREET_TYPE": "ST",
+          "APPLICATION_DATE": "2026-11-23",
+          "ISSUED_DATE": null,
+          "STATUS": "Application On Hold",
+          "WORK": "Building Permit Related(PS)",
+          "DESCRIPTION": "Plumbing  - INTERIOR ALTERATIONS (BUILDING, PLUMBING AND HVAC) - TENANT FITOUT FOR LEVELS 26-30",
+          "EST_CONST_COST": "DO NOT UPDATE OR DELETE THIS INFO FIELD"
+        }
+      ]
+    },
+    "toronto-active-permit:26-274270": {
+      "source_url": "https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action/datastore_search?resource_id=6d0229af-bc54-46de-9c2b-26759b01dd05&q=26+274270&limit=30",
+      "record": [
+        {
+          "PERMIT_NUM": "26 274270 HVA",
+          "REVISION_NUM": "00",
+          "STREET_NUM": "81",
+          "STREET_NAME": "MAYBROOK",
+          "STREET_TYPE": "DR",
+          "APPLICATION_DATE": "2026-11-24",
+          "ISSUED_DATE": null,
+          "STATUS": "Application On Hold",
+          "WORK": "Building Permit Related(MS)",
+          "DESCRIPTION": "HVAC - adding manufacturing equipments in an existing industrial suite, confirming travel distance, exit sign and emergency lights. adding 4 roof top units for heating, ventilation and cooling equipments",
+          "EST_CONST_COST": "DO NOT UPDATE OR DELETE THIS INFO FIELD"
+        },
+        {
+          "PERMIT_NUM": "26 274270 BLD",
+          "REVISION_NUM": "00",
+          "STREET_NUM": "81",
+          "STREET_NAME": "MAYBROOK",
+          "STREET_TYPE": "DR",
+          "APPLICATION_DATE": "2026-11-24",
+          "ISSUED_DATE": null,
+          "STATUS": "Application On Hold",
+          "WORK": "Interior Alterations",
+          "DESCRIPTION": "adding manufacturing equipments in an existing industrial suite, confirming travel distance, exit sign and emergency lights. adding 4 roof top units for heating, ventilation and cooling equipments",
+          "EST_CONST_COST": "1250000"
+        }
+      ]
+    },
+    "toronto-active-permit:26-274463": {
+      "source_url": "https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action/datastore_search?resource_id=6d0229af-bc54-46de-9c2b-26759b01dd05&q=26+274463&limit=30",
+      "record": [
+        {
+          "PERMIT_NUM": "26 274463 BLD",
+          "REVISION_NUM": "00",
+          "STREET_NUM": "700",
+          "STREET_NAME": "BAY",
+          "STREET_TYPE": "ST",
+          "APPLICATION_DATE": "2026-11-24",
+          "ISSUED_DATE": null,
+          "STATUS": "Application On Hold",
+          "WORK": "Window Replacement",
+          "DESCRIPTION": "Proposal for replacement of existing windows of office floors from Level 2-24.",
+          "EST_CONST_COST": "4000000"
+        }
+      ]
+    },
+    "ontario-ero:025-0211": {
+      "source_url": "https://ero.ontario.ca/notice/025-0211",
+      "record": {
+        "notice": "025-0211",
+        "proponent": "Manac Inc.",
+        "decision_date": "2026-11-26",
+        "address": "130 Belfield Road",
+        "scope": [
+          "storm sewers",
+          "catch basins",
+          "orifice tube",
+          "oil-grit separator"
+        ],
+        "source_html_sha256": "8fe4ddbd2eff1947f8778978046efb4981da56be6139f0f453bbc4fd215eaab7"
+      }
+    }
+  }
+}

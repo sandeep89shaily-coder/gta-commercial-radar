@@ -1175,5 +1175,101 @@
       "open_supplier_package_verified": false
     },
     "capture_sha256": "8088421796e310319a283ee23d50bff6d1094029dcfa05418ce2e15a6c0050a4"
+  },
+  "toronto-active-permit:26-273879": {
+    "record_sha256": "1b881e5a43e39a0ad8bbe09aca49a8f8fa1a897abf27528e20d406675f9ba31d",
+    "publisher": "City of Toronto",
+    "capture_file": "captures/comintel-2026-11-26.json",
+    "captured_at": "2026-11-26T08:27:56.692071-05:00",
+    "approved_at": "2026-11-26T08:27:56.692071-05:00",
+    "stage_as_of": "2026-11-26",
+    "reviewer": "Comintel editorial source review (Codex, operator authorized)",
+    "rights_basis": "Open Government Licence – Toronto. Capture excludes builder and personal fields.",
+    "rights_url": "https://open.toronto.ca/open-data-licence/",
+    "verification_limitation": "The permit cost is an estimate. The register does not confirm buyer identity or availability of supplier work.",
+    "reviewed_claims": {
+      "source_url": "https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action/datastore_search?resource_id=6d0229af-bc54-46de-9c2b-26759b01dd05&q=26+273879&limit=30",
+      "source_project_id": "26 273879 BLD / 00",
+      "address": "141 Bay St",
+      "scope": "Tenant fit-out on floors 26–30 with HVAC and plumbing. The building application lists an estimated construction cost of $83.7 million.",
+      "source_date": "2026-11-23",
+      "date_basis": "Building permit application date",
+      "stage": "Building and HVAC applications acceptable. Plumbing application on hold.",
+      "buyer_verified": false,
+      "open_supplier_package_verified": false
+    },
+    "capture_sha256": "b1f34598dc208623bb58e5ad1ede3d29b4d8fb0b2cc87beac756ce01d6d5b2fb"
+  },
+  "toronto-active-permit:26-274270": {
+    "record_sha256": "7a305687040729f0b50704597222cb8f02e160ead8ae3373711b5d9764cbdd1c",
+    "publisher": "City of Toronto",
+    "capture_file": "captures/comintel-2026-11-26.json",
+    "captured_at": "2026-11-26T08:27:56.692071-05:00",
+    "approved_at": "2026-11-26T08:27:56.692071-05:00",
+    "stage_as_of": "2026-11-26",
+    "reviewer": "Comintel editorial source review (Codex, operator authorized)",
+    "rights_basis": "Open Government Licence – Toronto. Capture excludes builder and personal fields.",
+    "rights_url": "https://open.toronto.ca/open-data-licence/",
+    "verification_limitation": "The permit cost is an estimate. The register does not confirm buyer identity or availability of supplier work.",
+    "reviewed_claims": {
+      "source_url": "https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action/datastore_search?resource_id=6d0229af-bc54-46de-9c2b-26759b01dd05&q=26+274270&limit=30",
+      "source_project_id": "26 274270 BLD / 00",
+      "address": "81 Maybrook Dr",
+      "scope": "The filing proposes manufacturing equipment, four rooftop HVAC units and related life-safety work. The building application lists an estimated construction cost of $1.25 million.",
+      "source_date": "2026-11-24",
+      "date_basis": "Building permit application date",
+      "stage": "Building register: Application On Hold",
+      "buyer_verified": false,
+      "open_supplier_package_verified": false
+    },
+    "capture_sha256": "b1f34598dc208623bb58e5ad1ede3d29b4d8fb0b2cc87beac756ce01d6d5b2fb"
+  },
+  "toronto-active-permit:26-274463": {
+    "record_sha256": "702dafbd6a26d4d30440514dec5a72a804f00cab666811e1ce1cee392c69ccba",
+    "publisher": "City of Toronto",
+    "capture_file": "captures/comintel-2026-11-26.json",
+    "captured_at": "2026-11-26T08:27:56.692071-05:00",
+    "approved_at": "2026-11-26T08:27:56.692071-05:00",
+    "stage_as_of": "2026-11-26",
+    "reviewer": "Comintel editorial source review (Codex, operator authorized)",
+    "rights_basis": "Open Government Licence – Toronto. Capture excludes builder and personal fields.",
+    "rights_url": "https://open.toronto.ca/open-data-licence/",
+    "verification_limitation": "The permit cost is an estimate. The register does not confirm buyer identity or availability of supplier work.",
+    "reviewed_claims": {
+      "source_url": "https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action/datastore_search?resource_id=6d0229af-bc54-46de-9c2b-26759b01dd05&q=26+274463&limit=30",
+      "source_project_id": "26 274463 BLD / 00",
+      "address": "700 Bay St",
+      "scope": "The filing proposes window replacement on office floors 2–24. The building application lists an estimated construction cost of $4 million.",
+      "source_date": "2026-11-24",
+      "date_basis": "Building permit application date",
+      "stage": "Building register: Application On Hold",
+      "buyer_verified": false,
+      "open_supplier_package_verified": false
+    },
+    "capture_sha256": "b1f34598dc208623bb58e5ad1ede3d29b4d8fb0b2cc87beac756ce01d6d5b2fb"
+  },
+  "ontario-ero:025-0211": {
+    "record_sha256": "ef52fd53e1868c40c17374144c711033af99db1353bbd6c50f1bc87aa9a857a1",
+    "publisher": "Environmental Registry of Ontario",
+    "capture_file": "captures/comintel-2026-11-26.json",
+    "captured_at": "2026-11-26T08:27:56.692071-05:00",
+    "approved_at": "2026-11-26T08:27:56.692071-05:00",
+    "stage_as_of": "2026-11-26",
+    "reviewer": "Comintel editorial source review (Codex, operator authorized)",
+    "rights_basis": "Original editorial summary of public regulatory facts. The capture includes factual notes and a source hash.",
+    "rights_url": "https://www.ontario.ca/page/copyright-information",
+    "verification_limitation": "Manac announced earlier renovations at this operating facility. Installation and purchasing status are unconfirmed.",
+    "reviewed_claims": {
+      "source_url": "https://ero.ontario.ca/notice/025-0211",
+      "source_project_id": "ERO 025-0211",
+      "address": "130 Belfield Rd",
+      "scope": "Ontario granted approval for industrial stormwater works at Manac's Etobicoke facility. The scope includes storm sewers, an outlet flow-control device and an oil-grit separator.",
+      "source_date": "2026-11-26",
+      "date_basis": "Ontario registry decision date",
+      "stage": "Environmental approval granted",
+      "buyer_verified": false,
+      "open_supplier_package_verified": false
+    },
+    "capture_sha256": "b1f34598dc208623bb58e5ad1ede3d29b4d8fb0b2cc87beac756ce01d6d5b2fb"
   }
 }
