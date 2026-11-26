@@ -971,6 +971,21 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
             "status":"HISTORICAL_OR_STUB_RUN_NO_PAID_FRESH_RESEARCH",
             "ai_completed_review_only":0,"outreach_authorized":False}
 
+    # Independent long-lived industrial projects: never feed AI-only claims to the fresh lead lane.
+    # Preserve the existing paid fresh-project priority and shared daily budget.
+    if not skip_collection and runner is None:
+        try:
+            from gta_project_lifecycle_50 import run as run_lifecycle
+            report["project_lifecycle_50"] = run_lifecycle(results, paid=True)
+            print("PROJECT LIFECYCLE AI: " + str(report["project_lifecycle_50"]["ai_reviewed_today"])
+                  + "/50 reviewed today (review only).", flush=True)
+        except (OSError, ValueError, TypeError, KeyError, ImportError, RuntimeError) as exc:
+            report["project_lifecycle_50"] = {"status": "LIFECYCLE_TRACKER_FAILED",
+                "error_type": type(exc).__name__, "outreach_authorized": False}
+    else:
+        report["project_lifecycle_50"] = {"status": "HISTORICAL_OR_STUB_RUN_NO_PAID_RESEARCH"}
+    save()
+
     if deferred_harness:
         row = run_stage(*deferred_harness)
         inspect_harness()
