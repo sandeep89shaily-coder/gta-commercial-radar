@@ -1,6 +1,6 @@
 """Four municipal recovery lanes from TWO published open-data services.
 
-York Region active applications -> Vaughan / Markham / Richmond Hill.
+York Region active applications -> Vaughan / Markham / Richmond Hill / Newmarket.
 Hamilton official development applications -> Hamilton.
 
 No scraping a blocked local GIS site, no proxy/login bypass. Officially
@@ -28,7 +28,7 @@ HAMILTON_CATALOGUE = "https://open.hamilton.ca/datasets/SpatialSolutions::develo
 HAMILTON="https://services.arcgis.com/rYz782eMbySr2srL/arcgis/rest/services/Development_Applications/FeatureServer/2"
 BRANTFORD_CATALOGUE = "https://www.buildbrantford.ca/planning-and-development-services/planning-applications-data/"
 BRANTFORD="https://services.arcgis.com/aji2lCmjXt0KpGzI/ArcGIS/rest/services/Planning_Application_Open_Data_view/FeatureServer/0"
-YORK_CITIES=("Vaughan","Markham","Richmond Hill")
+YORK_CITIES=("Vaughan","Markham","Richmond Hill","Newmarket")
 ALL_CITIES=(*YORK_CITIES,"Hamilton","Brantford")
 MAX_BYTES=2500000
 MAX_PAGES=5
@@ -126,7 +126,8 @@ def parse_york(attributes, *, source_url=YORK):
     rows=[]
     for a in attributes:
         mun=clean(a.get("MUN_NAME"),90).casefold()
-        city=next((c for c in YORK_CITIES if c.casefold() in mun),None)
+        city=next((c for c in YORK_CITIES if mun in (
+            c.casefold(), "city of "+c.casefold(), "town of "+c.casefold())),None)
         if city is None:continue
         # Regional file number is a true planning file; GIS record IDs aren't.
         ident=clean(a.get("REG_FILE_NUM") or a.get("EXT_REF_NUM"),120)
@@ -288,7 +289,7 @@ def run(results,*,getter=None,today=None):
             "total_valid_application_files":len(dedup),
             "complete_citywide_application_inventory_verified":False,
             "verified_buyers":0,"verified_first_publications":0,
-            "source_caveat":"York Region reviews only applications within regional mandate, not every Vaughan/Markham/Richmond Hill file",
+            "source_caveat":"York Region reviews only applications within regional mandate, not every local planning file",
             "csv":OUTPUT,"observations_csv":OBSERVATIONS,"observations":observed}
     (root/STATUS).write_text(json.dumps(result,indent=2),encoding="utf-8")
     return result
