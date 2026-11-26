@@ -270,9 +270,28 @@ def run(results,*,today=None):
                 "verification_required":"Confirm original notice, applicant, buyer, reuse rights and open supplier work",
             })
     records={}
-    for row in base+extra+fallback+regional+peel:
+    for row in base+extra+fallback+regional:
         if row.get("canonical_id"):
             records.setdefault(row["canonical_id"],row)
+    brampton_peel_overlaps = 0
+    for row in peel:
+        ident = row["canonical_id"]
+        previous = records.setdefault(ident, row)
+        if previous is row or row["city"] != "Brampton":
+            continue
+        brampton_peel_overlaps += 1
+        if previous["source_lanes"] == "AUTHORIZED_CITY_CSV_OFFLINE":
+            # A public search result supplies current status but only a file
+            # type for its scope. Keep the richer City GeoHub description.
+            if previous["scope"]:
+                row["scope"] = previous["scope"]
+            if not row["current_status"]:
+                row["current_status"] = previous["current_status"]
+            if not row["source_date"]:
+                row["source_date"] = previous["source_date"]
+                row["source_date_basis"] = previous["source_date_basis"]
+            row["source_lanes"] += " | AUTHORIZED_CITY_CSV_OFFLINE"
+            records[ident] = row
     allrows=list(records.values())
     for row in allrows:
         row["source_event_age_band_not_publication"]=_age(row,day)
@@ -304,7 +323,8 @@ def run(results,*,today=None):
         recovered=alternative_by_city.get(city,0)
         if not recovered:
             continue
-        entry["application_files"]=str(max(0,int(entry.get("application_files") or 0))+recovered)
+        new_files = recovered - (brampton_peel_overlaps if city == "Brampton" else 0)
+        entry["application_files"]=str(max(0,int(entry.get("application_files") or 0))+new_files)
         entry["source_rows"]=str(max(0,int(entry.get("source_rows") or 0))+recovered)
         legacy_status=entry.get("source_health","")
         entry["source_health"]=(legacy_status+" | "+
