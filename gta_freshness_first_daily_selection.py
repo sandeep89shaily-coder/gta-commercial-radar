@@ -217,7 +217,10 @@ def run(results, *, today=None):
             source_url=_url(r.get("source_url")),
             freshness_class="RECENT_PUBLISHER_REPORTED_DATE_UNVERIFIED",
             decision="SOURCE_RESEARCH_ONLY_NOT_EQUIPMENT_ORDER",
-            next_verification_action="Check original dated release, manufacturer identity, exact equipment scope, vendor selection and purchasing contact.")
+            next_verification_action=(
+                f"Confirm {r['funding_program_signal']} recipient, facility, funded equipment and buying stage."
+                if r.get("funding_program_signal") else
+                "Check original dated release, manufacturer identity, exact equipment scope, vendor selection and purchasing contact."))
         recent_equipment.append(row)
     # Full-text dated announcements from the FedDev fallback, InvestOntario
     # and manufacturer newsrooms are research evidence, not open orders.

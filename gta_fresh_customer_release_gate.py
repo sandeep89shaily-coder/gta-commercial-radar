@@ -18,6 +18,7 @@ from collections import Counter
 from pathlib import Path
 from urllib.parse import urlencode, urlsplit
 from gta_freshness_first_daily_selection import EQUIPMENT_ALL, GENERAL_ALL, RECENT_MAX_DAYS
+from gta_public_procurement import FIVE_DAY as PUBLIC_PROCUREMENT, STATUS as PROCUREMENT_STATUS
 
 CLIENT = "GTA_RADAR_CLIENT_FRESH_NONREPEAT_TOP_10.csv"
 INVESTMENT_DIR = "GTA_RADAR_INVESTMENT_DISCOVERY"
@@ -100,7 +101,7 @@ def _already_reported_index(root, owner):
     return ids, sites
 
 
-def _inventory(root, *, five_day_as_of=None):
+def _inventory(root, *, five_day_as_of=None, include_shortlist=True, include_procurement=True):
     candidates = {}
     for row in _csv(root / CLIENT):
         key = str(row.get("opportunity_id") or "").strip()
@@ -158,8 +159,33 @@ def _inventory(root, *, five_day_as_of=None):
         for key, candidate in candidates.items():
             if candidate["source_url"] and candidate["address"]:
                 known_urls[(candidate["source_url"], _clean(candidate["address"]))] = key
-        for filename in (GENERAL_ALL, EQUIPMENT_ALL):
-            for row in _csv(root / filename):
+        procurement_status = root / PROCUREMENT_STATUS
+        same_day = (include_procurement and procurement_status.is_file() and json.loads(
+            procurement_status.read_text(encoding="utf-8")).get("as_of") == five_day_as_of.isoformat())
+        procurement = []
+        if same_day:
+            for tender in _csv(root / PUBLIC_PROCUREMENT):
+                if tender.get("observed_on") != five_day_as_of.isoformat() or tender.get(
+                        "procurement_state") not in {"OPEN_SNAPSHOT_REQUIRES_BUYER_RECHECK",
+                                                     "NEW_NOTICE_PENDING_OPEN_SNAPSHOT_RECHECK"}:
+                    continue
+                procurement.append({
+                    "lane": "PUBLIC_TENDER",
+                    "source_event_date": tender.get("source_event_date", ""),
+                    "source_event_date_basis": tender.get("source_event_type", ""),
+                    "source_project_id": tender.get("source", "") + ":" + tender.get("record_id", ""),
+                    "project_or_company": tender.get("title", ""),
+                    "city": tender.get("city", ""),
+                    "source_url": tender.get("source_url", ""),
+                    "scope": tender.get("scope", ""),
+                    "stage": tender.get("procurement_state", ""),
+                    "next_verification_action": (
+                        f"Confirm {tender.get('buyer', '')}, solicitation {tender.get('solicitation_id', '')}, "
+                        f"live status, listed deadline {tender.get('closing_at', '')} and publication rights."),
+                })
+        current = (_csv(root / GENERAL_ALL), _csv(root / EQUIPMENT_ALL)) if include_shortlist else ()
+        for lane in (*current, procurement):
+            for row in lane:
                 date = _day(row.get("source_event_date"))
                 if not date or not 0 <= (five_day_as_of - date).days <= RECENT_MAX_DAYS:
                     continue
@@ -386,14 +412,16 @@ def _write(path, fields, rows):
                 ("=", "+", "-", "@", "\t", "\r")) else v for k, v in clean.items()})
 
 
-def run(results, *, workspace=None, today=None, five_day=False, include_shortlist=True):
+def run(results, *, workspace=None, today=None, five_day=False, include_shortlist=True,
+        include_procurement=True):
     root = Path(results)
     if not root.is_dir():
         raise FileNotFoundError("EXISTING_RESULTS_REQUIRED")
     today = _day(today) or dt.date.today()
     owner = Path(workspace) if workspace is not None else root
     max_age = RECENT_MAX_DAYS if five_day else MAX_AGE_DAYS
-    inventory = _inventory(root, five_day_as_of=today if five_day and include_shortlist else None)
+    inventory = _inventory(root, five_day_as_of=today if five_day else None,
+                           include_shortlist=include_shortlist, include_procurement=include_procurement)
     reported_ids, reported_sites = _already_reported_index(root, owner)
     reviews_path = owner / REVIEW
     source_dir = owner / EVIDENCE_DIR

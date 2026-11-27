@@ -6,6 +6,7 @@ import re
 from urllib.parse import urlsplit
 
 from gta_freshness import _date
+from gta_utility_milestones import OUTPUT as UTILITY_MILESTONES
 
 SOURCES = {
     "GTA_RADAR_UNIFIED_MUNICIPAL_DAILY_CHANGES.csv":
@@ -17,6 +18,8 @@ SOURCES = {
                                                   "industrial_scope_quote", "equipment_excerpt")),
     "GTA_RADAR_EQUIPMENT_COMMERCIAL_INDEX.csv":
         ("source_date", "source_url", ("company", "equipment_or_scope", "municipality")),
+    UTILITY_MILESTONES:
+        ("source_event_date", "source_url", ("company", "title", "scope", "location")),
 }
 
 

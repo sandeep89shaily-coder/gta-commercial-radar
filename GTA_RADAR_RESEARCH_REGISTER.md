@@ -1,6 +1,14 @@
 # GTA Radar — Research Register and Source Backlog
 _Recorded 2026-10-24. This is the durable inventory of **all previously researched directions**, including lower-priority ideas. It is not a list of implemented APIs and does not guarantee scrape rights, feed stability, or present procurement availability._
 
+### November 27 daily source additions
+
+- **Toronto Bids and CanadaBuys** run through `gta_public_procurement.py` in the daily launcher. Toronto uses the official open-licence solicitation and award datasets. CanadaBuys uses the official new and open notices plus the current fiscal year's awards. Ontario delivery must be stated in the CanadaBuys data. `GTA_RADAR_PUBLIC_PROCUREMENT.csv` contains equipment-related open snapshots and recent awards. `GTA_RADAR_PUBLIC_PROCUREMENT_FIVE_DAY.csv` feeds the internal verification worklist. The five calendar days use the original posting or a publisher-dated amendment where comparison shows changed scope or deadline. Confirm bid status and the original source before publication.
+- **Ontario manufacturing programs** are tagged within the existing Ontario Newsroom announcement monitor. The equipment research queue carries the program tag into the verification task. Confirm the named recipient, exact site and scope before treating funding as a purchase signal.
+- **OEB and IESO** run through `gta_utility_milestones.py`. Dated OEB facility filings and decisions feed the lifecycle comparison. IESO connection changes retain their undated status and proposed service period separately. The latest results and source errors appear in `GTA_RADAR_UTILITY_MILESTONES.csv` and its status JSON. Source access failures preserve the comparison history.
+
+The standalone runs accept `--results <path-to-GTA_RADAR_RESULTS>`. The additional collectors use public data and make zero model calls. The daily launcher still uses the existing editorial approval process for ComIntel.
+
 ## Purpose
 Keep every researched public cue visible while prioritizing the few sources most likely to increase *measurable* time-to-discovery or qualified buyer identification.
 

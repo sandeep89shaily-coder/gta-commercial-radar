@@ -218,6 +218,9 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
                 report.get("project_lifecycle_50", {}).get("ai_reviewed_today", 0))) + ".</p>"
             "<p><a href='../GTA_RADAR_FRESH_EVIDENCE_WORKLIST.csv'>Five-day evidence worklist</a>. "
             "Records awaiting source or reviewer checks are held for research.</p>"
+            "<p><a href='../GTA_RADAR_PUBLIC_PROCUREMENT_FIVE_DAY.csv'>Five-day public tender review</a> · "
+            "<a href='../GTA_RADAR_PUBLIC_PROCUREMENT.csv'>Open bid snapshots and recent awards</a> · "
+            "<a href='../GTA_RADAR_UTILITY_MILESTONES.csv'>Utility milestones</a>.</p>"
             "<p><b>DeepSeek outcome:</b> " + html.escape(str(
                 report.get("ai_top10_preselection", {}).get("status", "NOT_RUN")))
             + " (candidate count " + html.escape(str(
@@ -931,6 +934,21 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
         report["combined_24_city_source_readiness"] = {
             "status":"NOT_RUN_COMBINED_COLLECTION_UNAVAILABLE_OR_HISTORICAL"}
 
+    # These source collectors are independent of the main municipal run.
+    # Only the operator's live run may fetch. No model or publishing call.
+    if not skip_collection and runner is None:
+        from gta_public_procurement import run as collect_public_procurement
+        from gta_utility_milestones import run as collect_utility_milestones
+        for name, collect in (
+            ("public_procurement", collect_public_procurement),
+            ("utility_milestones", collect_utility_milestones),
+        ):
+            try:
+                report[name] = collect(results)
+            except (OSError, ValueError, TypeError, KeyError) as exc:
+                report[name] = {"status": "COLLECTION_FAILED", "error_type": type(exc).__name__}
+        save()
+
     # Regional collectors must finish before the five-day AI queue is built.
     if not skip_collection and runner is None and report["fresh_collection_verified"]:
         try:
@@ -1410,6 +1428,7 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
         try:
             from gta_fresh_customer_release_gate import run as release_fresh
             customer_release = release_fresh(results, workspace=ws, five_day=True,
+                include_procurement="sources" in report.get("public_procurement", {}),
                 include_shortlist=report["fresh_collection_verified"] and
                 report["freshness_first_daily_selection"]["status"] ==
                 "FRESHNESS_FIRST_DAILY_RESEARCH_ONLY")
@@ -1483,7 +1502,9 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
     has_warnings=bool(report["optional_source_warnings"]["optional_failed_stages"]
                       or report["optional_source_warnings"]["blocked_sources"]
                       or industrial_warnings
-                      or report.get("combined_24_city_source_readiness", {}).get("blocked_city_names"))
+                      or report.get("combined_24_city_source_readiness", {}).get("blocked_city_names")
+                      or any(report.get(key, {}).get("status") not in (None, "COLLECTED")
+                             for key in ("public_procurement", "utility_milestones")))
     report["status"] = (
         "ALL_STAGES_RAN_WITH_SOURCE_WARNINGS_REVIEW_ONLY"
         if not failed and not skip_collection and has_warnings

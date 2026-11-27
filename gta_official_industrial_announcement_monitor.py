@@ -43,7 +43,7 @@ CSV_FIELDS = (
     "publisher_date_basis","first_seen_by_radar","last_seen_by_radar",
     "observation","company_source_claim_unverified","city_mentioned",
     "industrial_scope_quote","equipment_explicit_in_excerpt",
-    "equipment_inference_only","classification","project_stage","buyer_verified",
+    "equipment_inference_only","classification","funding_program_signal","project_stage","buyer_verified",
     "open_supplier_package_verified","publication_independently_verified",
     "next_check",
 )
@@ -57,6 +57,15 @@ ACTION = re.compile(r"\b(?:invest\w*|expand\w*|expansion|new|build\w*|"
     r"construct\w*|moderniz\w*|upgrade|retool\w*|install\w*|"
     r"launch\w*|production line|acquir\w*|purchase\w*|"
     r"automat\w*|capacity)\b",re.I)
+ONTARIO_MANUFACTURING_PROGRAMS = (
+    ("AMIC", re.compile(r"\b(?:advanced manufacturing and innovation competitiveness|AMIC)\b", re.I)),
+    ("SWODF", re.compile(r"\b(?:southwestern ontario development fund|SWODF)\b", re.I)),
+    ("EODF", re.compile(r"\b(?:eastern ontario development fund|EODF)\b", re.I)),
+    ("RDP", re.compile(r"\bregional development program\b", re.I)),
+    ("O_AMP", re.compile(r"\b(?:ontario automotive modernization program|O-AMP)\b", re.I)),
+)
+FUNDING_ACTION = re.compile(r"\b(?:invest\w*|funding|awarded|contribution|financial support)\b", re.I)
+FUNDING_INTAKE = re.compile(r"\b(?:applications (?:open|now open)|call for applications|apply for funding|funding intake)\b", re.I)
 COMPLETED = re.compile(r"\b(?:retooling (?:is |was |has been )?complete|"
     r"retooling of the plant now complete|already operational|"
     r"now operational|has begun production|began production|"
@@ -197,7 +206,12 @@ def run(results, *, today=None, fetcher=None, feeds=None):
             continue
         for entry in entries:
             title=entry["title"]; body=entry["body"];combined=title+" "+body
-            if not (SECTOR.search(combined) and ACTION.search(combined)):
+            program = ""
+            if source == "ONTARIO_NEWSROOM" and FUNDING_ACTION.search(combined) and not FUNDING_INTAKE.search(title):
+                program = next((name for name, pattern in ONTARIO_MANUFACTURING_PROGRAMS
+                                if pattern.search(combined)), "")
+            capital_signal = program and (program != "RDP" or SECTOR.search(combined))
+            if not (SECTOR.search(combined) and ACTION.search(combined)) and not capital_signal:
                 continue
             date=_date(entry["publisher_date"])
             url=entry["url"]
@@ -258,6 +272,7 @@ def run(results, *, today=None, fetcher=None, feeds=None):
                 "equipment_explicit_in_excerpt":str(explicit),
                 "equipment_inference_only":str(not explicit),
                 "classification":classification,
+                "funding_program_signal":program if capital_signal else "",
                 "project_stage":project_stage,
                 "buyer_verified":"False","open_supplier_package_verified":"False",
                 "publication_independently_verified":"False",
@@ -278,6 +293,8 @@ def run(results, *, today=None, fetcher=None, feeds=None):
             "run_date":day.isoformat(),"source_health":feed_health,
             "source_count":len(sources),"sources_collected":success,
             "feed_items_relevant":len(outputs),"recent_publisher_dated_research":len(fresh),
+            "recent_ontario_manufacturing_funding_signals":sum(
+                bool(row["funding_program_signal"]) for row in fresh),
             "historical_observed":len(historical),
             "ledger_unique_urls":len(records),
             "verified_first_publications":0,"verified_buyers":0,
