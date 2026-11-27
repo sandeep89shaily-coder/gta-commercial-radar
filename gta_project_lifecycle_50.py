@@ -12,6 +12,7 @@ from pathlib import Path
 
 import v5_investigator as v5
 import v8_deepseek_native as native
+from gta_lifecycle_baseline import BASELINE_FILE, install_baseline, read_baseline, research_context
 from radar_config import DEEPSEEK_DAILY_LIMIT_USD
 
 ROOT = Path(__file__).resolve().parent
@@ -151,7 +152,7 @@ def search_pages(project, db, day, legacy, key, transport):
     return pages, errors
 
 
-def review_one(project, prior, db, day, legacy, key, transport, prompt):
+def review_one(project, prior, db, day, legacy, key, transport, prompt, *, analyst_context=None):
     pid = project["project_id"]
     if native.effective_spend(db, day)[0] + legacy + MODEL_RESERVE + 2 * native.SEARCH_COST > DEEPSEEK_DAILY_LIMIT_USD:
         return {"status": "DEFERRED_SHARED_BUDGET"}
@@ -166,6 +167,7 @@ def review_one(project, prior, db, day, legacy, key, transport, prompt):
                    {"role": "user", "content": json.dumps({
                        "project": project, "review_date": day,
                        "previous_review": json.dumps(prior or {}, ensure_ascii=True)[:1800],
+                       "historical_analyst_baseline": analyst_context or {},
                        "documents": pages}, ensure_ascii=True)}]}
     if len(json.dumps(payload, ensure_ascii=True).encode("ascii")) > 35000:
         return {"status": "INPUT_LIMIT", "sources": pages, "errors": errors}
@@ -208,13 +210,24 @@ def safe_cell(x):
     return "'" + value if value.lstrip().startswith(("=", "+", "-", "@")) else value
 
 
-def run(results, *, paid=False, key=None, transport=None, today=None):
+def run(results, *, paid=False, key=None, transport=None, today=None,
+        baseline_path=BASELINE_FILE, paid_imported=False):
     root = Path(results)
     root.mkdir(parents=True, exist_ok=True)
     dest = root / FOLDER
     dest.mkdir(exist_ok=True)
     day = (today or dt.date.today()).isoformat()
     projects = load_seeds()
+    original_ids = {p["project_id"] for p in projects}
+    baseline_date, baseline_rows = "", {}
+    if baseline_path is not None and Path(baseline_path).exists():
+        manifest, baseline_rows = read_baseline(baseline_path)
+        baseline_date = manifest["reviewed_on"]
+        projects += [{field: row[field] for field in (
+            "project_id", "name", "location", "search_name", "scope_hint")}
+            for pid, row in baseline_rows.items() if pid not in original_ids]
+        for project in projects:
+            project["location"] = baseline_rows[project["project_id"]]["location"]
     prompt = (ROOT / "config/lifecycle_investigator_prompt.txt").read_text(encoding="utf-8")
     prior = {p["project_id"]: last_review(dest / p["project_id"], day) for p in projects}
     # Rotate oldest successful review first so budget holds do not permanently starve later projects.
@@ -233,13 +246,18 @@ def run(results, *, paid=False, key=None, transport=None, today=None):
                 record = json.loads(path.read_text(encoding="utf-8"))
             elif not paid:
                 record = {"status": "PREVIEW_NO_PAID_CALL"}
+            elif pid not in original_ids and not paid_imported:
+                record = {"status": "BASELINE_IMPORTED_REVIEW_PENDING"}
             elif not key:
                 record = {"status": "MISSING_API_KEY"}
             elif stopped:
                 record = {"status": "DEFERRED_PROVIDER_BALANCE"}
             else:
                 try:
-                    record = review_one(project, prior[pid][1], db, day, legacy, key, transport, prompt)
+                    record = review_one(
+                        project, prior[pid][1], db, day, legacy, key, transport, prompt,
+                        analyst_context=research_context(baseline_rows.get(pid), baseline_date)
+                        if paid_imported else None)
                 except native.DeepSeekAccountBalanceError:
                     record, stopped = {"status": "PROVIDER_HTTP_402"}, True
                 record.update({"project_id": pid, "review_date": day, "outreach_authorized": False})
@@ -251,6 +269,9 @@ def run(results, *, paid=False, key=None, transport=None, today=None):
             rows.append({"project_id": pid, "project": project["name"], "location": project["location"],
                          "run_status": record["status"], "review_date": day,
                          "last_successful_ai_review": day if record["status"] == "AI_REVIEW_SAVED" else last_day,
+                         "baseline_date": baseline_date if pid in baseline_rows else "",
+                         "baseline_lifecycle": baseline_rows.get(pid, {}).get("lifecycle", ""),
+                         "baseline_equipment": baseline_rows.get(pid, {}).get("equipment", ""),
                          "current_stage_ai_hint": result.get("stage", "UNKNOWN"),
                          "previous_stage_ai_hint": last.get("stage", "UNKNOWN"),
                          "change_status": result.get("change_status", "NOT_ASSESSED"),
@@ -272,9 +293,10 @@ def run(results, *, paid=False, key=None, transport=None, today=None):
         writer.writerows({k: safe_cell(v) for k,v in row.items()} for row in rows)
     os.replace(temp, csv_path)
     count = sum(row["run_status"] == "AI_REVIEW_SAVED" for row in rows)
-    report = {"status": "REVIEW_ONLY_COMPLETE" if count == 50 else "REVIEW_ONLY_PARTIAL",
-              "review_date": day, "watchlist_count": 50, "ai_reviewed_today": count,
-              "not_reviewed_today": 50-count, "shared_budget_used_or_held_usd": budget,
+    report = {"status": "REVIEW_ONLY_COMPLETE" if count == len(projects) else "REVIEW_ONLY_PARTIAL",
+              "review_date": day, "watchlist_count": len(projects),
+              "baseline_date": baseline_date, "baseline_project_count": len(baseline_rows), "ai_reviewed_today": count,
+              "not_reviewed_today": len(projects)-count, "shared_budget_used_or_held_usd": budget,
               "shared_budget_cap_usd": DEEPSEEK_DAILY_LIMIT_USD,
               "verified_open_contracts": 0, "outreach_authorized": False,
               "report_csv": CSV, "history_folder": FOLDER,
@@ -288,5 +310,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--results", required=True)
     parser.add_argument("--paid", action="store_true")
+    parser.add_argument("--import-baseline", type=Path, help="Install the private Radar lifecycle archive")
     args = parser.parse_args()
-    print(json.dumps(run(args.results, paid=args.paid), indent=2))
+    if args.import_baseline:
+        print(json.dumps(install_baseline(args.import_baseline), indent=2))
+    print(json.dumps(run(args.results, paid=args.paid, paid_imported=args.paid), indent=2))
