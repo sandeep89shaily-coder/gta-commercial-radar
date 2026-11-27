@@ -971,6 +971,21 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
             "status":"HISTORICAL_OR_STUB_RUN_NO_PAID_FRESH_RESEARCH",
             "ai_completed_review_only":0,"outreach_authorized":False}
 
+    # Include lifecycle evidence in the daily archive. Paid lifecycle refreshes are manual.
+    if not skip_collection and runner is None:
+        try:
+            from gta_project_lifecycle_50 import run as run_lifecycle
+            lifecycle = run_lifecycle(results)
+            report["project_lifecycle_50"] = lifecycle
+            print(f"PROJECT LIFECYCLE: {lifecycle['watchlist_count']} tracked, "
+                  f"{lifecycle['ai_reviewed_today']} reviewed today.", flush=True)
+        except (OSError, ValueError, TypeError, KeyError, ImportError, RuntimeError) as exc:
+            report["project_lifecycle_50"] = {"status": "LIFECYCLE_TRACKER_FAILED",
+                "error_type": type(exc).__name__, "outreach_authorized": False}
+    else:
+        report["project_lifecycle_50"] = {"status": "HISTORICAL_OR_STUB_RUN_NO_PAID_RESEARCH"}
+    save()
+
     if deferred_harness:
         row = run_stage(*deferred_harness)
         inspect_harness()
