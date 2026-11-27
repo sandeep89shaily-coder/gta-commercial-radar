@@ -1271,5 +1271,102 @@
       "open_supplier_package_verified": false
     },
     "capture_sha256": "b1f34598dc208623bb58e5ad1ede3d29b4d8fb0b2cc87beac756ce01d6d5b2fb"
+  },
+  "ontario-newsroom:1008328": {
+    "record_sha256": "869744ca79e20e99e2cf94847edab78c7d9e8a2c3ee73686e09204753249319c",
+    "publisher": "Ontario Newsroom",
+    "capture_file": "captures/comintel-2026-11-27-industrial.json",
+    "capture_sha256": "0dc8c15ffe67684d114500b00115f83f72b6f62c53cbacb20e72c9d76395d663",
+    "captured_at": "2026-11-27T09:53:32-05:00",
+    "approved_at": "2026-11-27T09:53:32-05:00",
+    "stage_as_of": "2026-11-27",
+    "reviewer": "Comintel editorial source review (Codex, operator authorized)",
+    "rights_basis": "Independent wording summarizing public facts with a link to the publisher. No source text, images, or documents are reproduced.",
+    "rights_url": "https://www.ontario.ca/page/copyright-information",
+    "verification_limitation": "Publisher’s dated project event verified. Purchasing authority, vendor selection and remaining packages are unconfirmed.",
+    "reviewed_claims": {
+      "source_url": "https://news.ontario.ca/en/release/1008328/ontario-investing-more-than-36-million-to-grow-made-in-ontario-wood-manufacturing",
+      "source_project_id": "Ontario release 1008328",
+      "address": "Clinton industrial facility",
+      "scope": "Ontario announced support for Atlas’s automated wood-products facility in Clinton. Atlas reported that its first robotic roof-truss line was commissioned in October. Remaining procurement scope is unconfirmed.",
+      "source_date": "2026-11-26",
+      "date_basis": "Ontario funding release date",
+      "stage": "Funding announced; first truss line commissioned",
+      "buyer_verified": false,
+      "open_supplier_package_verified": false
+    },
+    "independent_source_url": "https://www.atlasengineeredproducts.com/news/atlas-engineered-products-completes-installation-of-canadas-first-robotic-roof-truss-manufacturing-line"
+  },
+  "ontario-ero:026-1135": {
+    "record_sha256": "87b95b051c8768b4db9eb62306c09b0cf57959aac0913392954171c07b4a0bc1",
+    "publisher": "Environmental Registry of Ontario",
+    "capture_file": "captures/comintel-2026-11-27-industrial.json",
+    "capture_sha256": "0dc8c15ffe67684d114500b00115f83f72b6f62c53cbacb20e72c9d76395d663",
+    "captured_at": "2026-11-27T09:53:32-05:00",
+    "approved_at": "2026-11-27T09:53:32-05:00",
+    "stage_as_of": "2026-11-27",
+    "reviewer": "Comintel editorial source review (Codex, operator authorized)",
+    "rights_basis": "Independent wording summarizing public facts with a link to the publisher. No source text, images, or documents are reproduced.",
+    "rights_url": "https://www.ontario.ca/page/copyright-information",
+    "verification_limitation": "Publisher’s dated project event verified. Purchasing authority, vendor selection and remaining packages are unconfirmed.",
+    "reviewed_claims": {
+      "source_url": "https://ero.ontario.ca/notice/026-1135",
+      "source_project_id": "ERO 026-1135",
+      "address": "Mobile facility listed in Vaughan; Ontario-wide deployment",
+      "scope": "Aquen’s environmental application describes a mobile trailer designed to treat industrial wastewater and construction dewatering effluent. It is intended for use at sites across Ontario. Fabrication and supplier selection status are unconfirmed.",
+      "source_date": "2026-11-26",
+      "date_basis": "Ontario registry proposal date",
+      "stage": "Environmental approval proposed",
+      "buyer_verified": false,
+      "open_supplier_package_verified": false
+    }
+  },
+  "ontario-ero:026-1220": {
+    "record_sha256": "f77ce6a37fd3b65563e5a328c5f31a8cf6afd6bedc4c780117d09498e1bdb8a6",
+    "publisher": "Environmental Registry of Ontario",
+    "capture_file": "captures/comintel-2026-11-27-industrial.json",
+    "capture_sha256": "0dc8c15ffe67684d114500b00115f83f72b6f62c53cbacb20e72c9d76395d663",
+    "captured_at": "2026-11-27T09:53:32-05:00",
+    "approved_at": "2026-11-27T09:53:32-05:00",
+    "stage_as_of": "2026-11-27",
+    "reviewer": "Comintel editorial source review (Codex, operator authorized)",
+    "rights_basis": "Independent wording summarizing public facts with a link to the publisher. No source text, images, or documents are reproduced.",
+    "rights_url": "https://www.ontario.ca/page/copyright-information",
+    "verification_limitation": "Publisher’s dated project event verified. Purchasing authority, vendor selection and remaining packages are unconfirmed.",
+    "reviewed_claims": {
+      "source_url": "https://ero.ontario.ca/notice/026-1220",
+      "source_project_id": "ERO 026-1220",
+      "address": "Lot 9, Concession B; registry address lists Commanda",
+      "scope": "GFL proposes replacing a waste-storage building near North Bay with a structure of approximately 1,860 square metres, clearing the former building and adding a fuel-powered generator. Supplier selection is unconfirmed.",
+      "source_date": "2026-11-25",
+      "date_basis": "Ontario registry proposal date",
+      "stage": "Environmental approval amendment proposed",
+      "buyer_verified": false,
+      "open_supplier_package_verified": false
+    }
+  },
+  "ontario-ero:026-0008": {
+    "record_sha256": "5e42f6a972e23e7cc9b5d898e99942c848085846fabef6748d61c065bff91e72",
+    "publisher": "Environmental Registry of Ontario",
+    "capture_file": "captures/comintel-2026-11-27-industrial.json",
+    "capture_sha256": "0dc8c15ffe67684d114500b00115f83f72b6f62c53cbacb20e72c9d76395d663",
+    "captured_at": "2026-11-27T09:53:32-05:00",
+    "approved_at": "2026-11-27T09:53:32-05:00",
+    "stage_as_of": "2026-11-27",
+    "reviewer": "Comintel editorial source review (Codex, operator authorized)",
+    "rights_basis": "Independent wording summarizing public facts with a link to the publisher. No source text, images, or documents are reproduced.",
+    "rights_url": "https://www.ontario.ca/page/copyright-information",
+    "verification_limitation": "Publisher’s dated project event verified. Purchasing authority, vendor selection and remaining packages are unconfirmed.",
+    "reviewed_claims": {
+      "source_url": "https://ero.ontario.ca/notice/026-0008",
+      "source_project_id": "ERO 026-0008",
+      "address": "Waterdown proponent; mobile facility across Ontario",
+      "scope": "Ontario issued an air and noise approval for a mobile crushing plant operated by a Waterdown-based company. Listed equipment includes a crusher, screener, conveyors and a 404 kW generator. Equipment purchasing status is unconfirmed.",
+      "source_date": "2026-11-24",
+      "date_basis": "Ontario registry decision date",
+      "stage": "Approval to operate mobile crushing plant",
+      "buyer_verified": false,
+      "open_supplier_package_verified": false
+    }
   }
 }

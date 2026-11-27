@@ -1,0 +1,21 @@
+{
+  "as_of": "2026-11-27T09:53:32-05:00",
+  "records": {
+    "ontario-newsroom:1008328": {
+      "source_url": "https://news.ontario.ca/en/release/1008328/ontario-investing-more-than-36-million-to-grow-made-in-ontario-wood-manufacturing",
+      "editorial_source_notes": "Ontario’s November 26 release describes provincial support for an automated facility producing wood trusses and wall components. The October 8 company release reports commissioning completed for the first robotic roof-truss line."
+    },
+    "ontario-ero:026-1135": {
+      "source_url": "https://ero.ontario.ca/notice/026-1135",
+      "editorial_source_notes": "Registry notice 026-1135 is a proposal posted November 26. It lists Vaughan as the mobile facility location and Ontario-wide operation. The scope covers trailer design and fabrication for wastewater treatment."
+    },
+    "ontario-ero:026-1220": {
+      "source_url": "https://ero.ontario.ca/notice/026-1220",
+      "editorial_source_notes": "Registry notice 026-1220 is an amendment proposal posted November 25. It lists Lot 9, Concession B, Commanda, and describes the property as west of North Bay. Proposed changes include the replacement 1,860-square-metre building and a generator."
+    },
+    "ontario-ero:026-0008": {
+      "source_url": "https://ero.ontario.ca/notice/026-0008",
+      "editorial_source_notes": "Registry notice 026-0008 is a decision posted November 24. Waterdown is the proponent location. The approval covers a mobile crusher, screener, transfer and stacker conveyors, and a 404 kW generator."
+    }
+  }
+}
