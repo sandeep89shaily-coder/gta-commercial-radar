@@ -33,8 +33,12 @@ def run(results):
     rows = []
     for r in _read(root / "INDUSTRIAL_PILOT" /
                    "GTA_RADAR_INDUSTRIAL_EQUIPMENT_REVIEW.csv"):
-        if not r.get("official_notice_url") or not r.get("equipment"):
+        if (not r.get("official_notice_url") or not r.get("equipment")
+                or r.get("review_status") == "SOURCE_CHANGED_OR_RECHECK_FAILED_HOLD"):
             continue
+        stage = r.get("notice_stage", "").casefold()
+        date_field = {"decision": "decision_posted", "exception": "exception_posted"
+                      }.get(stage, "proposal_posted")
         rows.append({
             "source_type": "ERO_INSTRUMENT_PROPOSAL",
             "company": r.get("proponent", ""),
@@ -42,8 +46,8 @@ def run(results):
             "municipality": r.get("city", ""),
             "equipment_or_scope": (r.get("equipment", "") + " / " +
                                    r.get("action", "")).strip(" /"),
-            "source_date": r.get("proposal_posted", ""),
-            "source_date_basis": "ERO_NOTICE_POSTING_NOT_FIRST_EQUIPMENT_ORDER",
+            "source_date": r.get(date_field, ""),
+            "source_date_basis": "ERO_" + date_field.upper() + "_NOT_FIRST_EQUIPMENT_ORDER",
             "source_url": r.get("official_notice_url", ""),
             "qualification_status": "ERO_RESEARCH_RECHECK_PURCHASING_STAGE",
         })
@@ -71,7 +75,12 @@ def run(results):
     unique = {}
     for row in rows:
         key = (row["source_type"], row["company"], row["source_url"])
-        unique.setdefault(key, row)
+        prior = unique.setdefault(key, row)
+        if prior is not row and row["source_type"] == "ERO_INSTRUMENT_PROPOSAL":
+            scopes = prior["equipment_or_scope"].split("; ")
+            scope = row["equipment_or_scope"]
+            if scope not in scopes:
+                prior["equipment_or_scope"] += "; " + scope
     rows = list(unique.values())
     path = root / OUTPUT
     with path.open("w", encoding="utf-8-sig", newline="") as f:

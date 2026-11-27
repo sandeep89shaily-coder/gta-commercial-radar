@@ -16,7 +16,8 @@ import json
 import re
 from collections import Counter
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import urlencode, urlsplit
+from gta_freshness_first_daily_selection import EQUIPMENT_ALL, GENERAL_ALL, RECENT_MAX_DAYS
 
 CLIENT = "GTA_RADAR_CLIENT_FRESH_NONREPEAT_TOP_10.csv"
 INVESTMENT_DIR = "GTA_RADAR_INVESTMENT_DISCOVERY"
@@ -35,7 +36,7 @@ ROLES = {"OWNER", "DEVELOPER", "OPERATOR", "APPLICANT", "PROJECT_TEAM"}
 SCOPE_KINDS = {"NEW_PROJECT", "MATERIAL_NEW_SCOPE"}
 PROCUREMENT = {"UNKNOWN_CHECKED", "PRE_TENDER_DOCUMENTED",
                "OPEN_PACKAGE_DOCUMENTED", "AWARDED", "COMPLETED", "CANCELLED"}
-OLD_STAGE = re.compile(r"completed|fully occupied|cancelled|withdrawn|closed", re.I)
+OLD_STAGE = re.compile(r"completed|fully occupied|cancelled|withdrawn|closed|refused", re.I)
 
 
 def _day(raw):
@@ -99,7 +100,7 @@ def _already_reported_index(root, owner):
     return ids, sites
 
 
-def _inventory(root):
+def _inventory(root, *, five_day_as_of=None):
     candidates = {}
     for row in _csv(root / CLIENT):
         key = str(row.get("opportunity_id") or "").strip()
@@ -149,6 +150,45 @@ def _inventory(root):
                     "source_url": urls[0], "application_ids": "",
                     "source_event_date": "", "source_date_basis": "UNVERIFIED_ANNOUNCEMENT_DATE",
                     "existing_stage": "",
+                }
+                candidate["candidate_fingerprint"] = _ident(candidate)
+                candidates.setdefault(key, candidate)
+    if five_day_as_of is not None:
+        known_urls = {}
+        for key, candidate in candidates.items():
+            if candidate["source_url"] and candidate["address"]:
+                known_urls[(candidate["source_url"], _clean(candidate["address"]))] = key
+        for filename in (GENERAL_ALL, EQUIPMENT_ALL):
+            for row in _csv(root / filename):
+                date = _day(row.get("source_event_date"))
+                if not date or not 0 <= (five_day_as_of - date).days <= RECENT_MAX_DAYS:
+                    continue
+                url, name = row.get("source_url", ""), row.get("project_or_company", "")
+                city, address = row.get("city", ""), row.get("address_or_company_site_unverified", "")
+                if not name or not city:
+                    continue
+                url = url if _https(url) else ""
+                if address and (url, _clean(address)) in known_urls:
+                    continue
+                source_id = row.get("source_project_id", "")
+                lookup = ""
+                permit = re.fullmatch(r"toronto_active_building_permits:(\d{2} \d{6})", source_id)
+                if not url and permit and city == "Toronto":
+                    from gta_toronto_permit_evidence import API, RESOURCE_HINT
+                    lookup = API + "datastore_search?" + urlencode({
+                        "resource_id": RESOURCE_HINT, "q": permit.group(1), "limit": 30,
+                    })
+                identity = [row.get("lane", ""), city, address, name, source_id, url]
+                key = "FIVE_DAY:" + hashlib.sha256(json.dumps(identity).encode()).hexdigest()[:24]
+                candidate = {
+                    "record_id": key, "origin": row.get("lane", "FIVE_DAY_RESEARCH"),
+                    "city": city, "address": address, "project_name": name,
+                    "description": row.get("scope", ""), "source_url": url,
+                    "application_ids": "", "source_event_date": date.isoformat(),
+                    "source_date_basis": row.get("source_event_date_basis", ""),
+                    "existing_stage": row.get("stage", ""),
+                    "next_verification_action": row.get("next_verification_action", ""),
+                    "source_lookup_url_unverified": lookup,
                 }
                 candidate["candidate_fingerprint"] = _ident(candidate)
                 candidates.setdefault(key, candidate)
@@ -220,7 +260,7 @@ def _publication_date_quoted(quote, date):
     return any(_clean(token) in _clean(quote) for token in formats)
 
 
-def _verify(case, candidate, source_dir, today):
+def _verify(case, candidate, source_dir, today, max_age_days=MAX_AGE_DAYS):
     reasons = []
     def fail(reason):
         reasons.append(reason)
@@ -237,8 +277,9 @@ def _verify(case, candidate, source_dir, today):
     if case.get("decision") != "APPROVE_FOR_EARLY_WARNING":
         fail("NO_APPROVAL_ATTESTATION")
     date = _day((case.get("publication") or {}).get("published_on"))
-    if not date or not 0 <= (today - date).days <= MAX_AGE_DAYS:
-        fail("ORIGINAL_PUBLICATION_NOT_WITHIN_7_DAYS")
+    if not date or not 0 <= (today - date).days <= max_age_days:
+        fail("ORIGINAL_PUBLICATION_NOT_WITHIN_" +
+             ("5_CALENDAR_DAYS" if max_age_days == RECENT_MAX_DAYS else "7_DAYS"))
     if (case.get("publication") or {}).get("date_basis") not in (
             "PUBLISHER_DATED_PROJECT_ANNOUNCEMENT",
             "OFFICIAL_POSTING_DATE_ON_ORIGINAL_NOTICE"):
@@ -345,13 +386,14 @@ def _write(path, fields, rows):
                 ("=", "+", "-", "@", "\t", "\r")) else v for k, v in clean.items()})
 
 
-def run(results, *, workspace=None, today=None):
+def run(results, *, workspace=None, today=None, five_day=False, include_shortlist=True):
     root = Path(results)
     if not root.is_dir():
         raise FileNotFoundError("EXISTING_RESULTS_REQUIRED")
     today = _day(today) or dt.date.today()
     owner = Path(workspace) if workspace is not None else root
-    inventory = _inventory(root)
+    max_age = RECENT_MAX_DAYS if five_day else MAX_AGE_DAYS
+    inventory = _inventory(root, five_day_as_of=today if five_day and include_shortlist else None)
     reported_ids, reported_sites = _already_reported_index(root, owner)
     reviews_path = owner / REVIEW
     source_dir = owner / EVIDENCE_DIR
@@ -377,9 +419,11 @@ def run(results, *, workspace=None, today=None):
         review = cases_by_id.get(key)
         if review is None:
             reasons = ["NO_PROJECT_SPECIFIC_SOURCE_EVIDENCE_AND_HUMAN_REVIEW"]
+            if key.startswith("FIVE_DAY:") and not candidate["source_url"]:
+                reasons.append("NO_EXACT_SOURCE_URL_IN_SHORTLIST")
             open_documented = False
         else:
-            reasons, open_documented = _verify(review, candidate, source_dir, today)
+            reasons, open_documented = _verify(review, candidate, source_dir, today, max_age)
         site = (_clean(candidate["city"]), re.sub(r"[^a-z0-9]", "",
                                       _clean(candidate["address"])))
         if key in reported_ids or site in reported_sites:
@@ -423,7 +467,8 @@ def run(results, *, workspace=None, today=None):
         counts["REVIEW_CASE_NO_CURRENT_SOURCE_CANDIDATE"] += 1
     candidate_fields = ("record_id", "origin", "city", "address", "project_name", "description",
                         "source_url", "source_event_date", "source_date_basis",
-                        "application_ids", "candidate_fingerprint")
+                        "application_ids", "candidate_fingerprint", "next_verification_action",
+                        "source_lookup_url_unverified")
     _write(root / WORKLIST, candidate_fields, list(inventory.values()))
     _write(root / DECISIONS, tuple(outcomes[0]) if outcomes else (
         "record_id", "origin", "city", "address", "candidate_fingerprint",
@@ -440,7 +485,9 @@ def run(results, *, workspace=None, today=None):
                          "purchaser_claim", "status"), open_cases)
     result = {
         "status": "OFFLINE_FRESH_RELEASE_GATE_REVIEW_ONLY",
-        "date": today.isoformat(), "freshness_limit_days": MAX_AGE_DAYS,
+        "date": today.isoformat(), "freshness_limit_days": max_age,
+        "selection_window_days_inclusive": max_age + 1,
+        "five_day_shortlist_included": five_day and include_shortlist,
         "candidates_considered": len(inventory),
         "case_reviews_submitted": len(cases_by_id),
         "reviewed_source_matched_early_warnings": len(early),
@@ -450,7 +497,8 @@ def run(results, *, workspace=None, today=None):
         "held_research_candidates": len(inventory) - len(early),
         "hold_reasons": dict(counts),
         "new_network_calls": 0, "new_ai_calls": 0,
-        "release_policy": "NO_TOP10_PADDING; primary publisher date within seven days; "
+        "release_policy": "NO_TOP10_PADDING; primary publisher date today or within "
+                          f"the prior {max_age} days; "
                           "new project or materially new scope; named organization and "
                           "source-matched public contact; procurement checked. "
                           "Historical version checked by a human. Evidence matched "
@@ -473,8 +521,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--results", required=True)
     parser.add_argument("--workspace", help="Persistent folder for owner source reviews")
+    parser.add_argument("--five-day", action="store_true", help="Use the ComIntel five-day window")
     args = parser.parse_args()
-    print(json.dumps(run(args.results, workspace=args.workspace), indent=2))
+    print(json.dumps(run(args.results, workspace=args.workspace, five_day=args.five_day), indent=2))
 
 
 if __name__ == "__main__":

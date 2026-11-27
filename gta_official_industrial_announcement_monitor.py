@@ -22,14 +22,16 @@ from urllib.request import Request, urlopen
 
 from gta_freshness import _date
 
+FEDDEV_ARCHIVE = (
+    "https://api.io.canada.ca/io-server/gc/news/en/v2?"
+    "atomtitle=Federal+Economic+Development+Agency+for+Southern+Ontario"
+    "&dept=economicdevelopmentsouthernontario&format=atom&orderBy=desc"
+    "&pick=50&publishedDate%3E=2026-01-01&sort=publishedDate&type=newsreleases"
+)
+
 FEEDS = {
     "ONTARIO_NEWSROOM": "https://news.ontario.ca/newsroom/en/rss/allnews.rss",
-    "FEDDEV_ONTARIO": (
-        "https://api.io.canada.ca/io-server/gc/news/en/v2?"
-        "atomtitle=Federal+Economic+Development+Agency+for+Southern+Ontario"
-        "&dept=economicdevelopmentsouthernontario&format=atom&orderBy=desc"
-        "&pick=50&publishedDate%3E=2021-07-23&sort=publishedDate"
-    ),
+    "FEDDEV_ONTARIO": FEDDEV_ARCHIVE,
 }
 ALLOWED_HOST = {"news.ontario.ca", "api.io.canada.ca"}
 LEDGER = "GTA_RADAR_INDUSTRIAL_ANNOUNCEMENT_LEDGER.json"
@@ -68,7 +70,7 @@ CITIES = ("Toronto","Brampton","Mississauga","Burlington","Oakville",
     "London","Sarnia","Windsor","Chatham-Kent","Barrie","Brantford",
     "St. Catharines","Niagara Falls","Ajax","Pickering","Whitby",
     "Markham","Oshawa","Newmarket","Milton","Caledon","Peterborough",
-    "Woodbridge","Stevensville","Alliston")
+    "Woodbridge","Stevensville","Alliston","Clinton")
 MAX_FEED = 2_000_000
 MAX_ITEMS_PER_SOURCE = 90
 
@@ -170,6 +172,17 @@ def run(results, *, today=None, fetcher=None, feeds=None):
         try:
             data=(fetcher or _http)(url)
             entries=_entries(data)
+            if source == "FEDDEV_ONTARIO":
+                from gta_industrial_fulltext_discovery import _federal_atom_entries, _feddev_item
+                entries = [entry for entry in entries if _feddev_item(entry)]
+                if not entries:
+                    links = [link for link, _, _ in _federal_atom_entries(data)
+                             if _feddev_item({"url": link})]
+                    if links:
+                        feed_health[source] = {
+                            "status": "UNDATED_LINKS_ROUTED_TO_OFFICIAL_ARTICLE_COLLECTOR",
+                            "items": 0, "article_links": len(links)}
+                        continue
             if not entries:
                 # HTTP 200 with an empty/mismatched feed is not coverage.
                 feed_health[source]={"status":"EMPTY_OR_UNRECOGNIZED_FEED",

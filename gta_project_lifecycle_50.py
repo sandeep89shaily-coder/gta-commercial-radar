@@ -211,7 +211,7 @@ def safe_cell(x):
 
 
 def run(results, *, paid=False, key=None, transport=None, today=None,
-        baseline_path=BASELINE_FILE, paid_imported=False):
+        baseline_path=BASELINE_FILE, paid_imported=False, collected_since=None):
     root = Path(results)
     root.mkdir(parents=True, exist_ok=True)
     dest = root / FOLDER
@@ -232,6 +232,15 @@ def run(results, *, paid=False, key=None, transport=None, today=None,
     prior = {p["project_id"]: last_review(dest / p["project_id"], day) for p in projects}
     # Rotate oldest successful review first so budget holds do not permanently starve later projects.
     projects.sort(key=lambda p: (prior[p["project_id"]][0], p["project_id"]))
+    source_files, mentions = {}, {}
+    if collected_since is not None:
+        from gta_lifecycle_collected_sources import scan
+        source_files, mentions = scan(root, projects, dt.date.fromisoformat(day), collected_since)
+        atomic_json(dest / ("collected-sources-" + day + ".json"), {
+            "date": day, "source_rows_checked": source_files,
+            "project_name_mentions_for_review": {pid: rows for pid, rows in mentions.items() if rows},
+            "coverage": "CURRENT_RADAR_COLLECTED_FEEDS_ONLY",
+        })
     key = (v5.key_from_windows() if key is None else key) if paid else None
     db = v5._ledger(root / "v5_ai_budget.sqlite") if paid and key else None
     legacy = v5._legacy_reserved(root / "deepseek_budget.sqlite", day) if db is not None else 0
@@ -266,6 +275,11 @@ def run(results, *, paid=False, key=None, transport=None, today=None,
                     atomic_json(path, record)
             result = record.get("review", {})
             last_day, last = prior[pid]
+            signal_rows = mentions.get(pid, [])
+            source_scan = ("POTENTIAL_SOURCE_MATCH_REVIEW_REQUIRED" if signal_rows else
+                           "NO_MATCH_IN_COLLECTED_FEEDS" if any(source_files.values()) else
+                           "NO_CURRENT_DATED_FEED_EVIDENCE" if collected_since is not None else
+                           "NOT_REQUESTED")
             rows.append({"project_id": pid, "project": project["name"], "location": project["location"],
                          "run_status": record["status"], "review_date": day,
                          "last_successful_ai_review": day if record["status"] == "AI_REVIEW_SAVED" else last_day,
@@ -279,6 +293,9 @@ def run(results, *, paid=False, key=None, transport=None, today=None,
                          "participants_review_only": len(result.get("participants", [])),
                          "review_file": str(path.relative_to(root)) if path.exists() else "",
                          "evidence_urls": " | ".join(p["url"] for p in record.get("sources", [])),
+                         "collected_source_check": source_scan,
+                         "collected_source_candidate_urls": " | ".join(
+                             dict.fromkeys(r["source_url"] for r in signal_rows)),
                          "verified_open_contract": False, "sale_ready": False})
         budget = native.effective_spend(db, day)[0] + legacy if db is not None else None
     finally:
@@ -297,6 +314,10 @@ def run(results, *, paid=False, key=None, transport=None, today=None,
               "review_date": day, "watchlist_count": len(projects),
               "baseline_date": baseline_date, "baseline_project_count": len(baseline_rows), "ai_reviewed_today": count,
               "not_reviewed_today": len(projects)-count, "shared_budget_used_or_held_usd": budget,
+              "collected_source_check_performed": bool(any(source_files.values())),
+              "projects_compared_against_collected_sources": len(projects) if any(source_files.values()) else 0,
+              "projects_with_potential_collected_source_matches": sum(bool(v) for v in mentions.values()),
+              "collected_source_rows_checked": source_files,
               "shared_budget_cap_usd": DEEPSEEK_DAILY_LIMIT_USD,
               "verified_open_contracts": 0, "outreach_authorized": False,
               "report_csv": CSV, "history_folder": FOLDER,

@@ -49,14 +49,15 @@ EQUIPMENT = {
     "Cooling tower": r"\b(?:cooling towers?)\b",
     "Industrial refrigeration": r"\b(?:industrial refrigeration|ammonia refrigeration|chiller)\b",
     "Process line": r"\b(?:bottling line|production line|processing line)\b",
-    "Wastewater treatment": r"\b(?:wastewater treatment system|effluent treatment system)\b",
+    "Wastewater treatment": r"\b(?:wastewater treatment system|effluent treatment system|sewage treatment system|(?:mobile )?(?:air or )?water purification trailer)\b",
+    "Power generator": r"\b(?:fuel-powered|diesel|standby|backup) generators?\b",
     "Transformer": r"\b(?:transformers?|switchgear)\b",
     "Furnace": r"\b(?:industrial furnace|kiln)\b",
     "Cremation equipment": r"\b(?:human cremation units?|cremation units?|cremators?)\b",
 }
 ACTIONS = {
     "REPLACEMENT": r"\b(?:replac(?:e|es|ed|ing|ement)|substitut(?:e|ion))\b",
-    "INSTALLATION": r"\b(?:install(?:ation|ed|ing)?|add(?:ed|ition|ing)?|new)\b",
+    "INSTALLATION": r"\b(?:install(?:ation|ed|ing)?|add(?:ed|ition|ing)?|new|fabricat(?:e|ed|ing|ion))\b",
     "UPGRADE": r"\b(?:upgrad(?:e|ed|ing)|retrofit|moderniz(?:e|ation)|refurbish)\b",
     "EXPANSION": r"\b(?:expand(?:ed|ing)?|expansion|extend(?:ed|ing)?|extension)\b",
     "REMOVAL": r"\b(?:remov(?:e|al|ed|ing)|decommission(?:ed|ing)?)\b",
@@ -74,7 +75,7 @@ INVENTORY = re.compile(
     re.I,
 )
 COLUMNS = (
-    "signal_id", "ero_number", "official_notice_url", "notice_stage", "decision_posted",
+    "signal_id", "ero_number", "official_notice_url", "notice_stage", "decision_posted", "exception_posted",
     "proponent", "site_address", "city", "proposal_posted",
     "radar_first_seen_at", "radar_record_present", "equipment", "action", "replacement_equipment",
     "official_excerpt", "evidence_basis", "source_text_sha256", "retrieved_at",
@@ -150,6 +151,7 @@ def read_radar_ero(db):
             "ero_number": no, "official_notice_url": url,
             "notice_stage": _str(card.get("NOTICE_STAGE")),
             "proponent": _str(card.get("ENTITY_NAME")),
+            "title": _str(card.get("NOTICE_TITLE") or card.get("TITLE")),
             "proposal_posted": _str(card.get("PROPOSAL_POSTED")),
             "last_updated": _str(card.get("LAST_UPDATED")),
             "radar_first_seen_at": _str(first_seen),
@@ -373,7 +375,9 @@ def run(out, *, db=None, notice_csv=None, results=None, fetch_official=False,
         if number in held_notice_ids:
             continue
         # Never infer facility location from the proponent mailing address/name.
-        if _str(notice.get("city")).casefold() not in TARGET_CITIES:
+        mobile = _str(notice.get("site_address")).casefold() == "mobile facility"
+        if (_str(notice.get("city")).casefold() not in TARGET_CITIES
+                and not (mobile and notice.get("city") == "Ontario (mobile)")):
             site_exclusions.append({"ero_number": number, "reason": "MISSING_OR_OUT_OF_SCOPE_SITE_CITY"})
             continue
         card = cards.get(number, {})
@@ -387,7 +391,7 @@ def run(out, *, db=None, notice_csv=None, results=None, fetch_official=False,
         address = _norm_address(notice.get("site_address"))
         city = _str(notice.get("city")).casefold()
         candidates = projects.get((address, city), []) if address and city else []
-        matched = list({p["project_id"]: p for p in candidates}.values())
+        matched = [] if mobile else list({p["project_id"]: p for p in candidates}.values())
         # A legacy Oakville site-plan record can carry its civic address only in
         # the project description. This is a SITE HISTORY link, not proof the
         # ERO equipment is part of that municipal application.
@@ -483,6 +487,14 @@ def run(out, *, db=None, notice_csv=None, results=None, fetch_official=False,
         "</table></body></html>", encoding="utf-8"
     )
     summary = {
+        "collection_health": (
+            "PARTIAL_OFFICIAL_NOTICE_COLLECTION"
+            if chosen and any(row.get("status") not in
+                              {"DETAIL_RETRIEVED", "NON_INSTRUMENT_BULLETIN"}
+                              for row in fetch_audit)
+            else "OFFICIAL_NOTICE_BATCH_PROCESSED" if chosen
+            else "NO_OFFICIAL_NOTICE_BATCH"),
+        "official_details_retrieved_this_run": len(accepted_fetched),
         "mode": "BOUNDED_OFFICIAL_FETCH_REVIEW_ONLY" if fetch_official else
                 "OFFLINE_REVIEW_ONLY_NO_LIVE_FETCH_NO_PAID_AI",
         "ero_cards_in_existing_ledger": len(cards),

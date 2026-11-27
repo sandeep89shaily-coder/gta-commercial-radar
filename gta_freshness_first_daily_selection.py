@@ -42,12 +42,13 @@ FIELDS = (
 )
 INDUSTRIAL = re.compile(r"\b(?:industrial|manufactur|machin|cnc|automat|robot|"
     r"production|processing|packaging|fabricat|welding|equipment|scrubber|"
-    r"collector|battery|extrusion|assembly|injection mould|boiler)\b",re.I)
+    r"collector|battery|extrusion|assembly|injection mould|boiler|generator|"
+    r"treatment system|purification trailer)\b",re.I)
 COMMERCIAL = re.compile(r"\b(?:commercial|restaurant|clinic|dental|retail|"
     r"office|daycare|tenant|warehouse|industrial|manufactur|hotel|"
     r"commissary|kitchen|store|health|business|distribution|shop|"
     r"self.storage|data cent|fit.out|service|veterinary|alterations?)\b",re.I)
-CLOSED = re.compile(r"\b(?:cancelled|canceled|withdrawn|inactive|closed|"
+CLOSED = re.compile(r"\b(?:cancelled|canceled|withdrawn|inactive|closed|refused|"
     r"completed|occupied|demolished)\b",re.I)
 LATE = re.compile(r"\b(?:issued|inspection|completed)\b",re.I)
 SCOPED = re.compile(r"\b(?:interior alterations?|renovat|conver|fit.out|"

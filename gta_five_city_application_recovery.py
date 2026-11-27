@@ -14,6 +14,7 @@ from gta_regional_early_intelligence import _fetch as fetch_official_html
 from gta_burlington_official_pages import _parse as parse_burlington
 from gta_vaughan_official_notices import parse as parse_vaughan,SOURCE as VAUGHAN
 from gta_early_applications import SOURCES
+from gta_authorized_application_exports import load as load_authorized_exports
 
 BURLINGTON_INDEX=SOURCES["Burlington"]
 GIS="GTA_RADAR_BURLINGTON_GIS_PROJECTS.csv"
@@ -157,6 +158,9 @@ def _audit_restricted_sources(root):
  exports=_json(root/"GTA_RADAR_OFFICIAL_CSV_IMPORT_STATUS.json")
  reports=report.get("source_status",[])+york.get("source_status",[])
  assisted={r.get("city"):r for r in exports.get("source_status",[])}
+ _, authorized=load_authorized_exports(root)
+ assisted.update({r["city"]:r for r in authorized["sources"]
+                  if r.get("city") and r.get("status") == "PERMITTED_LOCAL_EXPORT_IMPORTED_NOT_LIVE"})
  results=[]
  for city in ("Kitchener","Richmond Hill","Newmarket"):
   item=next((r for r in reports if r.get("city")==city),{})
@@ -166,6 +170,7 @@ def _audit_restricted_sources(root):
     underlying_collector_status=state,
     underlying_candidate_count=count,
     assisted_export_status=assisted.get(city,{}).get("status","MISSING_AUTHORIZED_EXPORT"),
+    assisted_export_rows=int(assisted.get(city,{}).get("application_id_rows",0) or 0),
     application_id_rows_this_stage=0,
     automated_source_recovered_this_stage=False,
     access_status="RESTRICTED_OR_UNVERIFIED" if not count else "VERIFY_APPLICATION_LEVEL_COMPLETENESS",

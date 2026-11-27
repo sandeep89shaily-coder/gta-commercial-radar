@@ -6,7 +6,9 @@ successful visits from older pilot versions, then move through distinct notices.
 from __future__ import annotations
 import datetime as dt
 import json
+import re
 from pathlib import Path
+from gta_freshness import _date
 
 LEDGER = "GTA_RADAR_ERO_REVIEW_CURSOR.json"
 PREVIOUS_STATUS = "GTA_RADAR_INDUSTRIAL_EQUIPMENT_STATUS.json"
@@ -59,7 +61,24 @@ def select(cards,state,limit):
             retry.append(no)
         else:
             new.append(no)
-    ids=(changed+new+retry)[:limit]
+    def source_date(number):
+        card = cards[number]
+        return max((_date(card.get(key)) or dt.date.min for key in
+                    ("last_updated", "source_date", "proposal_posted")))
+
+    def relevant(number):
+        return bool(re.search(r"manufactur|industrial|waste|sewage|\(air\)|"
+                              r"equipment|factory|fabricat|processing",
+                              str(cards[number].get("title", "")), re.I))
+
+    priority = {number: priority for priority, group in
+                enumerate((retry, new, changed)) for number in group}
+    dates = {number: source_date(number) for number in priority}
+    latest = max(dates.values(), default=dt.date.min)
+    ids = sorted(priority, key=lambda number: (
+        dates[number] != dt.date.min and (latest - dates[number]).days <= 4,
+        priority[number], dates[number], relevant(number), number),
+        reverse=True)[:limit]
     return {no:cards[no] for no in ids}
 
 def update(state,cards,audit):

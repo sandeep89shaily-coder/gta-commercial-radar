@@ -30,6 +30,10 @@ STATUS = "GTA_RADAR_MISSISSAUGA_DETAIL_STATUS.json"
 LEDGER = "GTA_RADAR_MISSISSAUGA_DETAIL_LEDGER.json"
 PREFIX = "/services-and-programs/planning-and-development/development-applications/active-development-applications/"
 MAX_PAGES = 35
+ARCHIVED_DECISIONS = {
+    "TOZ262W3": "https://www.mississauga.ca/publication/t-oz-26-2-notice-of-refusal-to-amend-the-zoning-by-law-ward-3/",
+    "OZ262W3": "https://www.mississauga.ca/publication/t-oz-26-2-notice-of-refusal-to-amend-the-zoning-by-law-ward-3/",
+}
 COLUMNS = (
     "project_id", "city", "application_id", "address", "project_title",
     "description", "current_status", "applicant_name_source_claim",
@@ -247,7 +251,7 @@ def run(results, *, today=None, fetcher=None):
     old = previous.get("records", {})
     if not isinstance(old, dict):
         raise ValueError("INVALID_DETAIL_LEDGER_RECORDS")
-    fetched, failures, changes = [], [], []
+    fetched, failures, changes, archival_decisions = [], [], [], []
     for candidate in items:
         url = candidate["record_source_url"]
         try:
@@ -283,6 +287,27 @@ def run(results, *, today=None, fetcher=None):
             if state == "DETAIL_PAGE_CHANGED_NOT_NEW_PUBLICATION":
                 changes.append(record)
         except (OSError, ValueError, TypeError, KeyError, RuntimeError) as exc:
+            archived_url = ARCHIVED_DECISIONS.get(_normal_id(candidate["application_id"]))
+            if archived_url and str(exc) == "HTTP_404_OR_REDIRECT":
+                try:
+                    decision_page = BeautifulSoup((fetcher or _fetch)(archived_url), "html.parser")
+                    heading = decision_page.h1.get_text(" ", strip=True) if decision_page.h1 else ""
+                    article = _clean((decision_page.find("main") or decision_page).get_text(" ", strip=True))
+                    if ("notice of refusal" not in heading.casefold() or
+                            "TOZ262W3" not in _normal_id(heading) or
+                            "1075 canadian place" not in article.casefold()):
+                        raise ValueError("ARCHIVED_DECISION_IDENTITY_NOT_VERIFIED")
+                    archival_decisions.append({
+                        "project_id": candidate["project_id"], "source_url": archived_url,
+                        "broken_active_url": url, "status": "OFFICIAL_REFUSAL_NOTICE_FOUND",
+                    })
+                    continue
+                except (OSError, ValueError, TypeError, RuntimeError) as archive_exc:
+                    failures.append({
+                        "project_id": candidate["project_id"], "url": archived_url,
+                        "error": type(archive_exc).__name__ + ":" + str(archive_exc)[:170],
+                    })
+                    continue
             failures.append({
                 "project_id": candidate["project_id"], "url": url,
                 "error": type(exc).__name__ + ":" + str(exc)[:170]})
@@ -300,6 +325,8 @@ def run(results, *, today=None, fetcher=None):
         "eligible_index_application_links": len(wanted),
         "pages_attempted": len(items),
         "pages_collected": len(fetched),
+        "archived_refusal_notices_verified": len(archival_decisions),
+        "archived_refusal_notices": archival_decisions,
         "page_failures": failures[:MAX_PAGES],
         "pages_with_posted_date": sum(bool(x["publisher_page_posted_date"]) for x in fetched),
         "pages_with_named_applicant": sum(bool(x["applicant_name_source_claim"]) for x in fetched),

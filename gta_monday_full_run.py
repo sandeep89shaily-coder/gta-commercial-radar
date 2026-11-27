@@ -210,6 +210,14 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
             "Daily municipal activity and source access</a>. "
             "See which cities changed, which returned unchanged records, "
             "and which source attempts failed.</p>"
+            "<p><a href='../GTA_RADAR_PROJECT_LIFECYCLE_50.csv'>Industrial watchlist</a>. "
+            "Projects compared with current collected evidence: " + html.escape(str(
+                report.get("project_lifecycle_50", {}).get(
+                    "projects_compared_against_collected_sources", 0)))
+            + ". Paid lifecycle reviews today: " + html.escape(str(
+                report.get("project_lifecycle_50", {}).get("ai_reviewed_today", 0))) + ".</p>"
+            "<p><a href='../GTA_RADAR_FRESH_EVIDENCE_WORKLIST.csv'>Five-day evidence worklist</a>. "
+            "Records awaiting source or reviewer checks are held for research.</p>"
             "<p><b>DeepSeek outcome:</b> " + html.escape(str(
                 report.get("ai_top10_preselection", {}).get("status", "NOT_RUN")))
             + " (candidate count " + html.escape(str(
@@ -439,6 +447,7 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
                     "pages_attempted", "pages_collected", "pages_with_posted_date",
                     "pages_with_named_applicant", "pages_with_planner_email",
                     "changed_detail_pages_not_new_projects", "page_failures",
+                    "archived_refusal_notices_verified", "archived_refusal_notices",
                     "publisher_first_construction_disclosures_verified",
                     "buyers_verified")}
         except (OSError, ValueError, TypeError, RuntimeError, ImportError) as exc:
@@ -975,10 +984,12 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
     if not skip_collection and runner is None:
         try:
             from gta_project_lifecycle_50 import run as run_lifecycle
-            lifecycle = run_lifecycle(results)
+            lifecycle = run_lifecycle(results, collected_since=run_threshold
+                                      if report["fresh_collection_verified"] else None)
             report["project_lifecycle_50"] = lifecycle
             print(f"PROJECT LIFECYCLE: {lifecycle['watchlist_count']} tracked, "
-                  f"{lifecycle['ai_reviewed_today']} reviewed today.", flush=True)
+                  f"{lifecycle['projects_compared_against_collected_sources']} compared with current collected evidence, "
+                  f"{lifecycle['ai_reviewed_today']} paid reviews today.", flush=True)
         except (OSError, ValueError, TypeError, KeyError, ImportError, RuntimeError) as exc:
             report["project_lifecycle_50"] = {"status": "LIFECYCLE_TRACKER_FAILED",
                 "error_type": type(exc).__name__, "outreach_authorized": False}
@@ -1349,42 +1360,6 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
             "error_type": type(exc).__name__,
         }
 
-    # Customer evidence release is SEPARATE from freshness-ranked internal
-    # research. No buyer or live open tender may be certified by source dates,
-    # model text, corporate contact pages or same-address records alone.
-    if not skip_collection:
-        try:
-            from gta_fresh_customer_release_gate import run as release_fresh
-            customer_release = release_fresh(results, workspace=ws)
-            report["fresh_customer_release_gate"] = {
-                "status": customer_release["status"],
-                "candidates_considered": customer_release["candidates_considered"],
-                "reviewed_source_matched_early_warnings": customer_release[
-                    "reviewed_source_matched_early_warnings"],
-                "held_research_candidates": customer_release["held_research_candidates"],
-                "reviewed_open_listings_pending_live_recheck": customer_release[
-                    "reviewed_open_listings_pending_live_recheck"],
-                "independently_live_verified_open_supplier_contracts": 0,
-                "outreach_authorized": False, "paid_calls": 0,
-            }
-        except (OSError, ValueError, TypeError, KeyError, ImportError) as exc:
-            # If a review manifest is corrupt, never leave a stale READY CSV
-            # from a previous run in the current export directory.
-            from gta_fresh_customer_release_gate import EARLY, OPEN
-            for name in (EARLY, OPEN):
-                (results / name).write_text("", encoding="utf-8")
-            report["fresh_customer_release_gate"] = {
-                "status": "EVIDENCE_GATE_FAILURE_CUSTOMER_RELEASE_BLOCKED",
-                "error_type": type(exc).__name__,
-                "independently_live_verified_open_supplier_contracts": 0,
-                "outreach_authorized": False,
-            }
-    else:
-        report["fresh_customer_release_gate"] = {
-            "status": "HISTORICAL_MODE_NO_CURRENT_CUSTOMER_RELEASE",
-            "outreach_authorized": False,
-        }
-
     # Connect the saved federal machinery research to existing company and
     # municipal identities AFTER the combined master has been built. No paid
     # research is automatically initiated from grant keyword matches.
@@ -1428,18 +1403,87 @@ def execute(workspace=None, *, industrial_limit=10, skip_collection=False,
             "verified_open_supplier_contracts": 0,
         }
 
+    # Customer evidence release is SEPARATE from freshness-ranked internal
+    # research. No buyer or live open tender may be certified by source dates,
+    # model text, corporate contact pages or same-address records alone.
+    if not skip_collection:
+        try:
+            from gta_fresh_customer_release_gate import run as release_fresh
+            customer_release = release_fresh(results, workspace=ws, five_day=True,
+                include_shortlist=report["fresh_collection_verified"] and
+                report["freshness_first_daily_selection"]["status"] ==
+                "FRESHNESS_FIRST_DAILY_RESEARCH_ONLY")
+            report["fresh_customer_release_gate"] = {
+                "status": customer_release["status"],
+                "selection_window_days_inclusive": customer_release["selection_window_days_inclusive"],
+                "evidence_worklist": str(results / "GTA_RADAR_FRESH_EVIDENCE_WORKLIST.csv"),
+                "candidates_considered": customer_release["candidates_considered"],
+                "reviewed_source_matched_early_warnings": customer_release[
+                    "reviewed_source_matched_early_warnings"],
+                "held_research_candidates": customer_release["held_research_candidates"],
+                "reviewed_open_listings_pending_live_recheck": customer_release[
+                    "reviewed_open_listings_pending_live_recheck"],
+                "independently_live_verified_open_supplier_contracts": 0,
+                "outreach_authorized": False, "paid_calls": 0,
+            }
+        except (OSError, ValueError, TypeError, KeyError, ImportError) as exc:
+            # If a review manifest is corrupt, never leave a stale READY CSV
+            # from a previous run in the current export directory.
+            from gta_fresh_customer_release_gate import EARLY, OPEN
+            for name in (EARLY, OPEN):
+                (results / name).write_text("", encoding="utf-8")
+            report["fresh_customer_release_gate"] = {
+                "status": "EVIDENCE_GATE_FAILURE_CUSTOMER_RELEASE_BLOCKED",
+                "error_type": type(exc).__name__,
+                "independently_live_verified_open_supplier_contracts": 0,
+                "outreach_authorized": False,
+            }
+    else:
+        report["fresh_customer_release_gate"] = {
+            "status": "HISTORICAL_MODE_NO_CURRENT_CUSTOMER_RELEASE",
+            "outreach_authorized": False,
+        }
+
     passed = sum(x["status"] == "PASSED" for x in report["stages"])
     failed = [x["name"] for x in report["stages"]
               if x["status"] == "FAILED"]
     report["stage_successes"] = passed
     report["failed_stages"] = failed
     integrated_diag=report.get("daily_radar_diagnostics",{}).get("integrated",{})
+    industrial_warnings = []
+    source_reports = {
+        "ero": (results / "INDUSTRIAL_PILOT" / "GTA_RADAR_INDUSTRIAL_EQUIPMENT_STATUS.json",
+                "collection_health", {"PARTIAL_OFFICIAL_NOTICE_COLLECTION"}),
+        "announcements": (results / "GTA_RADAR_INDUSTRIAL_ANNOUNCEMENT_STATUS.json",
+                          "status", {"PARTIAL_OFFICIAL_FEED_COLLECTION", "NO_OFFICIAL_FEEDS_WITH_ITEMS"}),
+        "fulltext": (results / "GTA_RADAR_FULLTEXT_INDUSTRIAL_STATUS.json",
+                     "status", {"FULLTEXT_SOURCE_RESEARCH_WITH_GAPS"}),
+    }
+    if not skip_collection:
+        for name, (path, field, partial) in source_reports.items():
+            try:
+                if path.stat().st_mtime < run_threshold:
+                    continue
+                source_status = json.loads(path.read_text(encoding="utf-8-sig"))
+                if source_status.get(field) in partial:
+                    industrial_warnings.append({
+                        "source": name, "status": source_status[field],
+                        "report_file": str(path),
+                    })
+            except (OSError, ValueError, TypeError) as exc:
+                report["industrial_source_health_" + name] = {
+                    "status": "SOURCE_HEALTH_REPORT_UNAVAILABLE",
+                    "error_type": type(exc).__name__,
+                }
     report["optional_source_warnings"]={
         "optional_failed_stages":integrated_diag.get("optional_failed_stages") or [],
         "blocked_sources":integrated_diag.get("blocked_sources") or [],
-        "details":integrated_diag.get("stage_errors") or []}
+        "details":integrated_diag.get("stage_errors") or [],
+        "industrial_source_warnings": industrial_warnings}
     has_warnings=bool(report["optional_source_warnings"]["optional_failed_stages"]
-                      or report["optional_source_warnings"]["blocked_sources"])
+                      or report["optional_source_warnings"]["blocked_sources"]
+                      or industrial_warnings
+                      or report.get("combined_24_city_source_readiness", {}).get("blocked_city_names"))
     report["status"] = (
         "ALL_STAGES_RAN_WITH_SOURCE_WARNINGS_REVIEW_ONLY"
         if not failed and not skip_collection and has_warnings

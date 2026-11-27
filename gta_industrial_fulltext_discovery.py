@@ -19,7 +19,9 @@ from urllib.parse import urljoin,urlsplit,urlunsplit
 from urllib.request import Request,urlopen
 
 from gta_freshness import _date
-from gta_official_industrial_announcement_monitor import _entries,SECTOR,ACTION,MACHINES,_clean
+from gta_official_industrial_announcement_monitor import (
+    _entries, SECTOR, ACTION, MACHINES, _clean, FEDDEV_ARCHIVE,
+)
 
 # Government-wide Atom is an explicit fallback: only FedDev release URLs qualify.
 # This corrects the agency-specific feed that returned zero items on Nov 21.
@@ -31,12 +33,7 @@ INDEXES={
     "FEDDEV_GOVERNMENT_WIDE_ATOM":GOVERNMENT_ATOM,
     # The HTML archive is JS-rendered. Its official linked API is the actual
     # source of news items; parsing the HTML shell returns zero links.
-    "FEDDEV_OFFICIAL_2026_ARCHIVE":(
-        "https://api.io.canada.ca/io-server/gc/news/en/v2?"
-        "atomtitle=Federal+Economic+Development+Agency+for+Southern+Ontario"
-        "&dept=economicdevelopmentsouthernontario&format=atom&orderBy=desc"
-        "&pick=50&publishedDate%3E=2026-01-01&sort=publishedDate"
-        "&type=newsreleases"),
+    "FEDDEV_OFFICIAL_2026_ARCHIVE": FEDDEV_ARCHIVE,
     "INVEST_ONTARIO":"https://www.investontario.ca/press-room",
     "LINAMAR":"https://www.linamar.com/news-listings/",
     "MARTINREA":"https://www.martinrea.com/category/news-release/",
@@ -337,7 +334,7 @@ def run(results,*,today=None,fetcher=None,indexes=None,max_articles=MAX_ARTICLES
                 canonical=_canonical(url)
                 if canonical in visited:continue
                 visited.add(canonical);pending.append((source,url,title,feed_date))
-        except (OSError,ValueError,TypeError) as exc:
+        except (OSError,ValueError,TypeError,ET.ParseError) as exc:
             health[source]={"status":"INDEX_FAILED","error_type":type(exc).__name__,
                             "candidate_links":0,"articles_ok":0,"articles_failed":0,
                             "publisher_dated":0,"industrial":0}

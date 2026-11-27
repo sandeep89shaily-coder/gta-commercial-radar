@@ -1,4 +1,4 @@
-"""Free source-only sixteen-city coverage diagnostic, no V6 or DeepSeek.
+r"""Free source-only sixteen-city coverage diagnostic, no V6 or DeepSeek.
 
 Usage: python gta_city_coverage_check.py --workspace "C:\...\Desktop\new data"
 The collector does not overwrite the permits database or the regular V6 log.

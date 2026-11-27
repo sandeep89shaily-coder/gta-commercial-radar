@@ -91,8 +91,10 @@ def _section(soup, heading, max_chars=25000):
     terminators = {
         "proposal details": {"supporting materials", "comment", "decision details",
                              "view materials in person", "contact"},
+        "decision details": {"comments received", "supporting materials", "contact"},
+        "exception details": {"supporting materials", "contact", "connect with us"},
         "site address": {"site location map", "proponent(s)", "proposal details",
-                         "decision details", "supporting materials"},
+                         "decision details", "exception details", "supporting materials"},
         "proponent(s)": {"proposal details", "decision details", "supporting materials",
                          "comment", "location details"},
     }
@@ -143,12 +145,24 @@ def parse_notice_html(page_html, expected_number, source_url):
     visible = soup.get_text(" ", strip=True)
     if not re.search(r"(?<!\d)" + re.escape(expected_number) + r"(?!\d)", visible):
         raise ValueError("ERO_ID_NOT_IN_NOTICE")
-    stage_match = re.search(r"\bNotice stage\s+(Proposal|Decision|Bulletin)\b",
+    stage_match = re.search(r"\bNotice stage\s+(Proposal|Decision|Bulletin|Exception)\b",
                             visible, re.I)
-    if not stage_match:
+    headings = {" ".join(tag.stripped_strings).casefold()
+                for tag in soup.find_all(("h2", "h3", "h4", "h5"))}
+    if stage_match:
+        stage = stage_match.group(1).title()
+    elif {"exception summary", "exception details"} <= headings:
+        stage = "Exception"
+    else:
         raise ValueError("NOTICE_STAGE_MISSING")
-    stage = stage_match.group(1).title()
-    proposal = _section(soup, "Proposal details")
+    section = {"Decision": "Decision details", "Exception": "Exception details"}
+    proposal = _section(soup, section.get(stage, "Proposal details"))
+    generic_grant = re.fullmatch(
+        r"(?:the |an )?(?:approval|environmental compliance approval)"
+        r"\s+(?:has been|was|is)\s+(?:granted|issued)\s*[.!]?",
+        proposal, re.I)
+    if stage == "Decision" and (not proposal or generic_grant):
+        proposal = _section(soup, "Proposal details")
     if not proposal or len(proposal) < 25:
         raise ValueError("PROPOSAL_DETAILS_MISSING")
     # Only the explicitly labelled *site address* is accepted for site matching;
@@ -157,6 +171,7 @@ def parse_notice_html(page_html, expected_number, source_url):
     if not site:
         raise ValueError("EXPLICIT_SITE_ADDRESS_MISSING")
     lines = [re.sub(r"\s+", " ", x).strip() for x in site.splitlines() if x.strip()]
+    mobile = bool(lines and lines[0].casefold() == "mobile facility")
     if len(lines) < 2:
         raise ValueError("EXPLICIT_SITE_CITY_MISSING")
     address = lines[0]
@@ -169,9 +184,14 @@ def parse_notice_html(page_html, expected_number, source_url):
          if (m := re.match(r"^([A-Za-z .'-]+),\s*(?:ON|Ontario)\b", part, re.I))),
         None
     )
-    if not city_match:
+    if city_match:
+        city = city_match.group(1).strip()
+    elif mobile and (any(part.casefold() in {"on", "ontario"} for part in lines[1:])
+                     or "province of ontario" in _section(
+                         soup, "Site location details", max_chars=350).casefold()):
+        city = "Ontario (mobile)"
+    else:
         raise ValueError("EXPLICIT_SITE_CITY_MISSING")
-    city = city_match.group(1).strip()
     city = CITY_ALIASES.get(city.casefold(), city)
     proponent = _section(soup, "Proponent(s)", max_chars=300)
     proponent = proponent.splitlines()[0].strip() if proponent else ""
@@ -181,6 +201,7 @@ def parse_notice_html(page_html, expected_number, source_url):
         "site_address": address, "city": city, "notice_stage": stage,
         "proposal_posted": _date_after(visible, "Proposal posted"),
         "decision_posted": _date_after(visible, "Decision posted"),
+        "exception_posted": _date_after(visible, "Exception posted"),
         "proposal_details": proposal,
         "source_text_sha256": hashlib.sha256(page_html.encode("utf-8")).hexdigest(),
         "content_provenance": "FETCHED_EXACT_ERO_OFFICIAL_NOTICE",
@@ -228,7 +249,7 @@ def fetch_notice_details(cards, *, max_notices=5, session=None, sleep=time.sleep
                 "reason": type(e).__name__ + ": " + str(e)[:100],
             }]
         inspected = 0
-        for number, card in sorted(cards.items(), reverse=True):
+        for number, card in cards.items():
             if inspected >= max_notices:
                 break
             url = card.get("official_notice_url", "")
@@ -271,6 +292,12 @@ def fetch_notice_details(cards, *, max_notices=5, session=None, sleep=time.sleep
                         and not shape["site_address_label_seen"]):
                         failure["status"] = "NON_INSTRUMENT_BULLETIN"
                         failure["reason"] = "BULLETIN_WITHOUT_SITE_OR_PROPOSAL"
+                    elif ({"exception summary", "exception details"} <= headings
+                          and not shape["site_address_label_seen"]
+                          and re.search(r"\b(?:policy|act|regulation)\b",
+                                        next(iter(shape["heading_samples"]), ""), re.I)):
+                        failure["status"] = "NON_INSTRUMENT_BULLETIN"
+                        failure["reason"] = "NON_SITE_POLICY_EXCEPTION"
                 audit.append(failure)
         return notices, audit
     finally:

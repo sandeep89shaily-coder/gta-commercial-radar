@@ -228,6 +228,12 @@ def run(results, *, today=None):
             readiness="NO_VERIFIED_LIVE_APPLICATION_SOURCE_EVIDENCE"
         if bad:
             action="Restore permitted official data source or request municipal export. Do not bypass robots/auth/TLS."
+            if city == "Brampton":
+                action = "Use the City planning-search records for partial coverage. Import the official planning CSV once dataset-specific reuse is documented."
+            elif city == "Kitchener":
+                action = "Refresh the authorized City GeoHub CSV snapshot while the automated query is restricted."
+            elif city == "Vaughan":
+                action = "Use York Region data for partial coverage. Add a permitted Vaughan export or saved City statutory planning notices."
         elif not good:
             action="Find official project-file feed with exact IDs; current index-only evidence is insufficient."
         else:
