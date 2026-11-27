@@ -13,6 +13,13 @@
   <link rel="stylesheet" href="./premium-opportunities.css">
   <script src="./opportunities.js" defer></script>
   <style>
+    .op-watchlist { background: #f1f5fa; }
+    .op-card.op-watchlist-panel { display: block; min-height: 0; padding: clamp(1.25rem, 4vw, 2.5rem); }
+    .op-card.op-watchlist-panel:hover { transform: none; }
+    .op-watchlist-panel h2 { margin-top: 0; color: #153149; }
+    .op-watchlist-panel p { max-width: 72ch; }
+    .op-watchlist-panel li + li { margin-top: .65rem; }
+    .op-watchlist-panel a { text-decoration: underline; }
     .op-pro-samples { display: grid; gap: 1rem; margin: 1.5rem 0; }
     .op-pro-samples a { overflow-wrap: anywhere; }
     .op-pro-access summary { width: fit-content; cursor: pointer; }
@@ -127,6 +134,22 @@
         <div class="op-disclaimer">
           <span class="op-disclaimer-icon" aria-hidden="true">i</span>
           <div><strong>What these records mean.</strong> Source-event dates may reflect filings, permits or announcements rather than first public disclosure. Original-publication verification, company roles, purchasing authority and supplier availability are separate checks. Records are research leads, not guaranteed tenders, and data availability differs by municipality. Permit stages reflect the official register when reviewed. See the date basis on each card for the specific milestone. Contains information licensed under the <a href="https://open.toronto.ca/open-data-licence/" target="_blank" rel="noopener noreferrer">Open Government Licence – Toronto</a>. Independent research; the City does not endorse ComIntel.</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="op-watchlist" id="industrial-watchlist" aria-labelledby="industrial-watchlist-title">
+      <div class="wrap">
+        <div class="op-card op-watchlist-panel">
+          <h2 id="industrial-watchlist-title">100 industrial projects on our watchlist</h2>
+          <p>ComIntel tracks industrial projects across Ontario for developments that matter to suppliers, including funding decisions, permits, equipment plans, tenders and contract awards. The five-day Opportunity Monitor highlights recent findings backed by public sources.</p>
+          <h3>Selected projects we track</h3>
+          <ul>
+            <li><strong>Fowler Metal Industries, Burford.</strong> Federal funding supports a $610,000 project that includes machinery and welding fixture upgrades. <a href="https://www.canada.ca/en/economic-development-southern-ontario/news/2026/07/government-of-canada-supports-23-waterloo-and-brant-region-businesses-and-organizations-to-scale-accelerate-innovate-and-strengthen-economic-resili.html">FedDev Ontario, July 23, 2026</a>.</li>
+            <li><strong>Electra Battery Materials, Temiskaming Shores.</strong> The company reported progress on its cobalt sulfate refinery and targeted early commissioning for select utilities and circuits in late 2026. <a href="https://www.electrabmc.com/news-releases/news/electra-reports-third-quarter-2026-results-as-it-builds-north-americas-battery-grade-cobalt-refinery">Electra update, Nov. 9, 2026</a>.</li>
+            <li><strong>Concast Pipe, Oakville.</strong> Ontario announced a $44 million investment by Concast in a manufacturing plant for specialized telecommunications enclosures. <a href="https://news.ontario.ca/en/release/1008266/ontario_welcomes_more_than_44_million_advanced_manufacturing_investment_in_oakville">Ontario Newsroom, Nov. 10, 2026</a>.</li>
+          </ul>
+          <p>Open purchasing packages for these examples are unconfirmed. <a href="#preview-pro">See how ComIntel Pro qualifies supplier leads</a>.</p>
         </div>
       </div>
     </section>
